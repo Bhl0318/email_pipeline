@@ -1,0 +1,9 @@
+{
+  "accounts": [
+    { "account": "docketing", "folder": "TEST" }
+  ],
+  "sinks": {
+    "oa": false,
+    "report": true
+  }
+}
