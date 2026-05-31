@@ -107,10 +107,37 @@ DS/email_pipeline/
 └── scripts/
     ├── main.py                # ★ 唯一入口：read_and_classify → 扇出 → archive
     ├── loader.py              # importlib 隔离加载工具（解决同名模块冲突）
-    └── pipeline_config.json   # 调度配置：账号列表 / 开关 OA sink / 开关汇报信 sink
+    ├── pipeline_config.json   # 调度配置：账号列表 / sink 独立开关
+    └── email_config.json      # ★ 共用：两侧读取的唯一邮箱凭据 + 通知收件人（gitignore）
 ```
 
 不复制业务逻辑。读取/分类/两个 sink 全部**复用两侧现有代码**。
+
+### 4.1 `pipeline_config.json`（sink 独立开关）
+
+```json
+{
+  "accounts": [
+    { "account": "docketing", "folder": "TEST" }
+  ],
+  "sinks": {
+    "oa":     false,   // 先关，OA 跑通后再开
+    "report": true     // 先只开汇报信
+  }
+}
+```
+
+`main.py` 按 `sinks.oa` / `sinks.report` 决定是否调用对应 dispatch。
+**默认先只开汇报信**，OA 验证无误后再把 `oa` 置 true，实现分阶段灰度上线。
+
+### 4.2 `email_config.json`（两侧共用一份）
+
+现状两侧各有一份 `scripts/email_config.json`（邮箱 OAuth2 凭据 + 通知收件人）。
+**决策：email_pipeline 模式下统一用 `email_pipeline/scripts/email_config.json` 这一份。**
+
+实现：现有代码各模块都用 `CONFIG_PATH = os.path.join(SCRIPT_DIR, "email_config.json")`（指向自己目录）。
+重构时让 `read_and_classify` / `dispatch_*` 的配置路径**可由 main.py 注入**（函数参数或模块级 `set_config_path()` 覆盖），main.py 统一传 email_pipeline 下那份。
+两侧单独跑时仍回退到各自目录的 config（保持现状）。
 
 ---
 
@@ -225,8 +252,8 @@ RPT.archive_emails(emails)                     # 单次归档（只在这里 mov
 
 ---
 
-## 十、待确认
+## 十、已确认决策（2026-05-31）
 
-1. `pipeline_config.json` 里 OA sink / 汇报信 sink 是否要做**独立开关**（先只开汇报信、OA 跑通后再开）？
-2. 两侧 `email_config.json` 是各用各的，还是 email_pipeline 统一指定一份？（涉及读取用哪个账号凭据）
-3. 通知邮件：OA 的「立项通知」与汇报信的「审核链接」是分别发两封，还是合并一封？（现状是两封，建议维持）
+1. **sink 独立开关：加。** `pipeline_config.json` 用 `sinks.oa` / `sinks.report` 两个布尔位，默认先只开汇报信（`oa:false, report:true`），OA 跑通后再开 → 见 §4.1。
+2. **email_config.json 共用一份：是。** 统一用 `email_pipeline/scripts/email_config.json`，配置路径由 main.py 注入到两侧 → 见 §4.2。
+3. **通知邮件分别发两封：是（维持现状）。** OA sink 走 `send_notification()` 发立项汇总；汇报信 sink 走 `send_review_links_email()` 发审核链接。两封独立，互不合并。
