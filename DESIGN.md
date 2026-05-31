@@ -106,12 +106,28 @@ DS/email_pipeline/
 ├── requirements.txt           # 合并两侧依赖
 └── scripts/
     ├── main.py                # ★ 唯一入口：read_and_classify → 扇出 → archive
-    ├── loader.py              # importlib 隔离加载工具（解决同名模块冲突）
+    ├── loader.py              # importlib 隔离加载工具（解决 oa/report 子包同名模块冲突）
     ├── pipeline_config.json   # 调度配置：账号列表 / sink 独立开关
-    └── email_config.json      # ★ 共用：两侧读取的唯一邮箱凭据 + 通知收件人（gitignore）
+    ├── email_config.json      # ★ 共用：唯一邮箱凭据 + 通知收件人（gitignore）
+    ├── oa/                    # ← 复制自 OA立项/scripts/，在副本上拆函数
+    │   ├── read_email.py          # 拆出 read_and_classify_oa() / dispatch_oa()
+    │   ├── filter_oa_email.py     # 分类引擎（原样复制）
+    │   ├── db_query.py            # 原样复制
+    │   ├── us_deadline.py / downloadByAPI.py / parse_us_pdf.py / oainfo_cli.py
+    │   └── ...
+    └── report/                # ← 复制自 汇报信流程/scripts/，在副本上拆函数
+        ├── read_email.py          # 拆出 read_and_classify() / dispatch_report() / archive_emails()
+        ├── classify_report.py     # 分类引擎（原样复制）
+        ├── db_query.py / us_deadline.py / enrich_report.py / report_server.py
+        └── ...
 ```
 
-不复制业务逻辑。读取/分类/两个 sink 全部**复用两侧现有代码**。
+**核心原则（2026-05-31 修订）**：
+**两个原始文件夹 `OA立项/` 和 `汇报信流程/` 一律不动。**
+email_pipeline **自带一份副本**（`oa/` + `report/` 两个子目录），所有"拆 __main__ 为函数"的改造只在副本上做。
+这与项目既有做法一致——`汇报信流程/` 本身就是 `OA立项/` 脚本的副本（见 7.6 主流程一致原则）。
+
+> ⚠️ **同步成本**：副本会随时间与原始脚本漂移。后续原始侧改了分类规则/字段，需手动同步到 `email_pipeline/scripts/{oa,report}/`。在 README 标注每个子目录"复制自哪个 commit"以便追踪。
 
 ### 4.1 `pipeline_config.json`（sink 独立开关）
 
@@ -130,26 +146,25 @@ DS/email_pipeline/
 `main.py` 按 `sinks.oa` / `sinks.report` 决定是否调用对应 dispatch。
 **默认先只开汇报信**，OA 验证无误后再把 `oa` 置 true，实现分阶段灰度上线。
 
-### 4.2 `email_config.json`（两侧共用一份）
+### 4.2 `email_config.json`（副本共用一份）
 
-现状两侧各有一份 `scripts/email_config.json`（邮箱 OAuth2 凭据 + 通知收件人）。
-**决策：email_pipeline 模式下统一用 `email_pipeline/scripts/email_config.json` 这一份。**
+原始两侧各有一份 `scripts/email_config.json`（邮箱 OAuth2 凭据 + 通知收件人）。
+**决策：email_pipeline 用 `email_pipeline/scripts/email_config.json` 这一份，`oa/` 和 `report/` 两个副本都读它。**
 
-实现：现有代码各模块都用 `CONFIG_PATH = os.path.join(SCRIPT_DIR, "email_config.json")`（指向自己目录）。
-重构时让 `read_and_classify` / `dispatch_*` 的配置路径**可由 main.py 注入**（函数参数或模块级 `set_config_path()` 覆盖），main.py 统一传 email_pipeline 下那份。
-两侧单独跑时仍回退到各自目录的 config（保持现状）。
+实现：副本脚本里 `CONFIG_PATH = os.path.join(SCRIPT_DIR, "email_config.json")` 指向自己子目录。
+在副本上加一个 `set_config_path()`，由 `main.py` 注入上层那份共用 config，使 `oa/` 和 `report/` 读同一份凭据。
 
 ---
 
-## 五、调用机制：importlib 隔离加载
+## 五、调用机制：importlib 隔离加载（作用于副本）
 
 ### 5.1 为什么不能直接 import
 
-`OA立项/scripts/` 和 `汇报信流程/scripts/` 下都有同名文件：
+副本 `email_pipeline/scripts/oa/` 和 `report/` 下仍有同名文件：
 `read_email.py`、`db_query.py`、`us_deadline.py`、`email_config.json`。
 直接 `import read_email` 两次只会拿到先入 `sys.modules` 的那一份，后者被屏蔽。
 
-### 5.2 方案：每个 sink 在自己的目录上下文里加载
+### 5.2 方案：每个子包在自己的目录上下文里加载
 
 `loader.py` 提供一个工具，按目录隔离加载模块：
 
@@ -161,73 +176,75 @@ def load_module_from(dir_path, module_name, alias):
     ...
 ```
 
-`main.py` 用它分别拿到：
+`main.py` 用它分别拿到（注意：加载的是 email_pipeline 自带的副本，不碰原始文件夹）：
 
 ```python
-OA   = load_dir("DS/OA立项/scripts")        # 内部 import filter_oa_email / us_deadline / oainfo_cli 都解析到 OA 目录
-RPT  = load_dir("DS/汇报信流程/scripts")     # 内部 import classify_report / db_query / enrich 都解析到汇报信目录
+OA   = load_dir("email_pipeline/scripts/oa")      # 内部 import filter_oa_email / us_deadline / oainfo_cli 都解析到 oa/ 副本
+RPT  = load_dir("email_pipeline/scripts/report")   # 内部 import classify_report / db_query / enrich 都解析到 report/ 副本
 
-emails, results = RPT.read_and_classify()    # 读取层用汇报信版（超集）
-OA.dispatch_oa(results)                       # OA 下游
-RPT.dispatch_report(results, emails)          # 汇报信下游
+OA.set_config_path(SHARED_CONFIG)             # 注入共用 email_config.json
+RPT.set_config_path(SHARED_CONFIG)
+
+emails, results = RPT.read_and_classify()    # 读取层用 report 副本（分类是 OA 的超集）
+if cfg.sinks.oa:     OA.dispatch_oa(results)          # OA 下游（默认关）
+if cfg.sinks.report: RPT.dispatch_report(results, emails)  # 汇报信下游（默认开）
 RPT.archive_emails(emails)                     # 单次归档（只在这里 move）
 ```
 
-> 隔离加载的细节（`sys.path` 现场切换、`sys.modules` 命名空间、相对 import）在实现时统一封进 `loader.py`，main.py 只见到干净的 `OA.xxx` / `RPT.xxx`。
+> 隔离加载的细节（`sys.path` 现场切换、`sys.modules` 命名空间）在实现时统一封进 `loader.py`，main.py 只见到干净的 `OA.xxx` / `RPT.xxx`。
 
 ---
 
-## 六、两侧需要的改动（重构，不改逻辑）
+## 六、副本上的改造（复制 + 在副本上拆函数，原始文件夹不动）
 
-原则：**把现有 `__main__` 块原样搬进函数，逻辑 byte-for-byte 不动**，只是从"脚本直接跑"变成"可被调用"。每侧 `__main__` 仍保留，改为调用同一个新函数 → 两侧仍可独立跑（备查/单测）。
+原则：**先把两侧 scripts 整目录复制到 `email_pipeline/scripts/{oa,report}/`，再在副本上把 `__main__` 拆成函数，逻辑 byte-for-byte 不动。** 原始 `OA立项/`、`汇报信流程/` 零改动。
 
-### 6.1 `OA立项/scripts/read_email.py`
+### 6.1 `oa/`（复制自 `OA立项/scripts/`）
 
-新增三个函数（内容来自现 L663-825 的 `__main__`）：
+整目录复制后，在 `oa/read_email.py` 上拆出（内容来自原 `__main__` L663-825）：
 
 | 函数 | 来源 | 职责 |
 |--|--|--|
-| `read_and_classify_oa()` | L663-710 | 读邮件 + checkpoint + `process_emails`（OA 单独跑时用） |
+| `read_and_classify_oa()` | L663-710 | 读邮件 + checkpoint + `process_emails` |
 | `dispatch_oa(results)` | L732-825 | US 期限 → Wiki → `projects`（注释保持）→ `send_notification` |
+| `set_config_path()` | 新增 | 供 main.py 注入共用 config |
 
-`__main__` 改为：`emails, results = read_and_classify_oa(); dispatch_oa(results); archive...`
+### 6.2 `report/`（复制自 `汇报信流程/scripts/`）
 
-### 6.2 `汇报信流程/scripts/read_email.py`
+整目录复制后，在 `report/read_email.py` 上拆出：
 
 | 函数 | 来源 | 职责 |
 |--|--|--|
 | `read_and_classify()` | L848-902 | 读邮件 + `process_emails` + 建 `msgid_to_saved_pdfs` 索引；**返回 (emails, results)** |
-| `dispatch_report(results, emails)` | L910-1026 | PDF 入 `output/{案号}/source` → `INSERT report_tasks` → 收集并发审核链接邮件 |
-| `archive_emails(emails)` | L904-908 | 单次 `move_emails` → `TEST_AUTO` + `update_checkpoint` |
+| `dispatch_report(results, emails)` | L910-1026 | PDF 入 `output/{案号}/source` → `INSERT report_tasks` → 发审核链接邮件 |
+| `archive_emails(emails)` | L904-908 | 单次 `move_emails` → `TEST_AUTO` |
+| `set_config_path()` | 新增 | 供 main.py 注入共用 config |
 
-`__main__` 改为：`emails, results = read_and_classify(); dispatch_report(results, emails); archive_emails(emails)`
-
-> ⚠️ 现 `dispatch_report` 段里 `INSERT projects` 与汇报信写库混在一个循环里（L910-1024）。重构时**整段照搬**，不拆不改。其中测试硬编码 `v = '90009-0003US03'`（L942）维持原状，上线前另行处理（见 §九）。
+> ⚠️ 副本里 `dispatch_report` 段的 `INSERT projects` 与汇报信写库混在一个循环（L910-1024），**整段照搬不拆**。测试硬编码 `v = '90009-0003US03'`（L942）维持原状，上线前处理（见 §九）。
 
 ### 6.3 归档归谁
 
-`email_pipeline` 模式下：**只有 `archive_emails()` 执行一次 move**。两个 sink 内部**不再调 move_emails**。
-- 实现上：`dispatch_oa` 现有结尾若含 move（OA L706-710 在 read 循环里），需在重构时把 move 从 sink 里剥离，统一交给 `archive_emails`。
-- 单独跑某一侧时，该侧 `__main__` 自己负责归档（保持现状）。
+`email_pipeline` 模式下：**只有 `archive_emails()` 执行一次 move**，两个 sink 内部不再 move。
+`dispatch_oa` 副本里若含 move（OA 原 L706-710 在读取循环内），改造副本时把 move 剥离交给 `archive_emails`。
 
 ---
 
-## 七、改动清单
+## 七、改动清单（全部在 email_pipeline 内，原始两文件夹零改动）
 
 | 文件 | 改动 | 类型 |
 |--|--|--|
-| `email_pipeline/scripts/main.py` | 新建：入口 + 扇出 | 新增 |
+| `email_pipeline/scripts/oa/**` | 复制自 `OA立项/scripts/`，在副本 `read_email.py` 上拆 `read_and_classify_oa`/`dispatch_oa`/`set_config_path` | 新增（副本+改副本） |
+| `email_pipeline/scripts/report/**` | 复制自 `汇报信流程/scripts/`，在副本 `read_email.py` 上拆 `read_and_classify`/`dispatch_report`/`archive_emails`/`set_config_path` | 新增（副本+改副本） |
 | `email_pipeline/scripts/loader.py` | 新建：importlib 隔离加载 | 新增 |
+| `email_pipeline/scripts/main.py` | 新建：入口 + 扇出 | 新增 |
 | `email_pipeline/scripts/pipeline_config.json` | 新建：账号/sink 开关 | 新增 |
 | `email_pipeline/requirements.txt` | 新建：合并两侧依赖 | 新增 |
-| `OA立项/scripts/read_email.py` | `__main__` → `read_and_classify_oa()` + `dispatch_oa()`，move 剥离 | 重构 |
-| `汇报信流程/scripts/read_email.py` | `__main__` → `read_and_classify()` + `dispatch_report()` + `archive_emails()` | 重构 |
+| `OA立项/**`、`汇报信流程/**` | **不动** | — |
 
-> 超过 3 个文件，按工作规则需拆分子任务确认。建议执行顺序：
-> 1. 重构汇报信侧 `read_email.py`（拆函数，`__main__` 调用，自测仍可独立跑）
-> 2. 重构 OA 侧 `read_email.py`（同上）
-> 3. 写 `loader.py` + `main.py` + 配置 + requirements
-> 每步单独 commit，跑通一步再下一步。
+> 建议执行顺序（每步单独 commit）：
+> 1. 复制 `汇报信/scripts` → `report/`，在副本上拆函数 + 自测能独立跑
+> 2. 复制 `OA立项/scripts` → `oa/`，在副本上拆函数 + 自测
+> 3. 写 `loader.py` + `main.py` + `pipeline_config.json` + `requirements.txt`，串起来
 
 ---
 
