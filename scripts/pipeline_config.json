@@ -1,6 +1,7 @@
 {
   "accounts": [
-    { "account": "docketing", "folder": "TEST" }
+    { "account": "docketing", "folder": "TEST" },
+    { "account": "attorneys", "folder": "TEST" }
   ],
   "sinks": {
     "oa": false,
