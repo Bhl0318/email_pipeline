@@ -924,10 +924,11 @@ def read_and_classify(accounts=None, config_path=None):
     return all_emails, all_results
 
 
-def dispatch_report(all_results, all_emails):
+def dispatch_report(all_results, all_emails, dry_run=False):
     """汇报信下游 sink：官文 PDF 入库 + 写 report_tasks + 发审核链接邮件。
     all_emails 用于重建 msgid → saved_pdfs 索引（跨账号，message_id 全局唯一）。
-    注：email_pipeline 模式下本函数不再 move 邮件，归档统一交 archive_emails。"""
+    注：email_pipeline 模式下本函数不再 move 邮件，归档统一交 archive_emails。
+    dry_run=True 时：照常分类/打印，但不移 PDF、不写 report_tasks、不发邮件。"""
     # 重建 msgid → saved_pdfs 索引
     msgid_to_saved_pdfs = {
         em.get("message_id", ""): em.get("saved_pdfs", [])
@@ -1021,44 +1022,61 @@ def dispatch_report(all_results, all_emails):
                             name, ext = os.path.splitext(fname)
                             dst = os.path.join(case_source_dir, f"{name}_{datetime.now().strftime('%H%M%S')}{ext}")
                         try:
-                            shutil.move(src, dst)
+                            if dry_run:
+                                print(f"  [dry-run] 跳过移动官文 PDF: {fname}", file=sys.stderr)
+                            else:
+                                shutil.move(src, dst)
                             # 相对 output/ 的路径，confirm 时拼绝对路径
                             rel = f"{project}/source/{os.path.basename(dst)}"
                             source_attachments.append(rel)
                         except Exception as e:
                             print(f"  [移动官文 PDF 失败] {src}: {e}", file=sys.stderr)
 
-                try:
-                    execute_params(
-                        "INSERT INTO report_tasks (id, template, attach_pdf, fields_json, source_attachments, status) "
-                        "VALUES (%s, %s, %s, %s, %s, 'pending')",
-                        (row_id, template, 1 if attach_pdf else 0,
-                         json.dumps(report_fields, ensure_ascii=False),
-                         json.dumps(source_attachments, ensure_ascii=False) if source_attachments else None),
-                    )
-                    review_link = f"{REVIEW_BASE_URL}/review/{row_id}"
-                    print(f"  → 审核链接: {review_link}", file=sys.stderr)
-                    if source_attachments:
-                        print(f"    附 {len(source_attachments)} 个官文 PDF", file=sys.stderr)
-                    # 收集到通知邮件列表
+                review_link = f"{REVIEW_BASE_URL}/review/{row_id}"
+                if dry_run:
+                    print(f"  [dry-run] 将写 report_tasks（template={template}, attach_pdf={attach_pdf}, 官文PDF×{len(source_attachments)}）", file=sys.stderr)
+                    print(f"  [dry-run] 审核链接: {review_link}", file=sys.stderr)
                     all_review_links.append({
                         "link":       review_link,
                         "project":    project,
                         "ntype":      ntype,
                         "issue_date": item.get("issue_date", "") or item.get("oa_doc_date", ""),
                     })
-                except Exception as e:
-                    print(f"  [report_tasks 写库失败] {e}", file=sys.stderr)
+                else:
+                    try:
+                        execute_params(
+                            "INSERT INTO report_tasks (id, template, attach_pdf, fields_json, source_attachments, status) "
+                            "VALUES (%s, %s, %s, %s, %s, 'pending')",
+                            (row_id, template, 1 if attach_pdf else 0,
+                             json.dumps(report_fields, ensure_ascii=False),
+                             json.dumps(source_attachments, ensure_ascii=False) if source_attachments else None),
+                        )
+                        print(f"  → 审核链接: {review_link}", file=sys.stderr)
+                        if source_attachments:
+                            print(f"    附 {len(source_attachments)} 个官文 PDF", file=sys.stderr)
+                        # 收集到通知邮件列表
+                        all_review_links.append({
+                            "link":       review_link,
+                            "project":    project,
+                            "ntype":      ntype,
+                            "issue_date": item.get("issue_date", "") or item.get("oa_doc_date", ""),
+                        })
+                    except Exception as e:
+                        print(f"  [report_tasks 写库失败] {e}", file=sys.stderr)
 
         print(f"TIP 写入完成: {inserted} 条", file=sys.stderr)
 
     # 所有任务写完，统一发审核任务通知邮件
-    send_review_links_email(all_review_links)
+    if dry_run:
+        print(f"[dry-run] 跳过发送审核链接邮件（本应汇总 {len(all_review_links)} 条）", file=sys.stderr)
+    else:
+        send_review_links_email(all_review_links)
 
 
-def archive_emails(all_emails):
+def archive_emails(all_emails, dry_run=False):
     """单次归档：按账号把处理过的邮件 move 到 TEST_AUTO。
-    email_pipeline 模式下归档只在这里发生一次（各 sink 内不再 move）。"""
+    email_pipeline 模式下归档只在这里发生一次（各 sink 内不再 move）。
+    dry_run=True 时只打印不真正 move。"""
     groups = {}
     for acc, em in all_emails:
         key = (acc["account"], acc["folder"])
@@ -1069,6 +1087,9 @@ def archive_emails(all_emails):
             groups[key][1].append(mid)
     for (account_name, folder), (acc, message_ids) in groups.items():
         if not message_ids:
+            continue
+        if dry_run:
+            print(f"  [dry-run] 跳过归档 {len(message_ids)} 封（{account_name}/{folder} → TEST_AUTO）", file=sys.stderr)
             continue
         cfg = get_account_config(account_name)
         move_emails(cfg, folder, message_ids, target_folder="TEST_AUTO")

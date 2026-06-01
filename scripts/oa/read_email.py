@@ -727,9 +727,10 @@ def read_and_classify_oa(accounts=None, config_path=None):
     return all_emails, all_results
 
 
-def dispatch_oa(all_results):
+def dispatch_oa(all_results, dry_run=False):
     """OA 立项下游 sink：US 期限 → Wiki 新增OA → projects(注释) → 发立项通知邮件。
-    注：email_pipeline 模式下本函数不再 move 邮件，归档统一交 archive_emails。"""
+    注：email_pipeline 模式下本函数不再 move 邮件，归档统一交 archive_emails。
+    dry_run=True 时：不下载USPTO官文、不写Wiki、不发立项通知邮件。"""
     # # 为每条立项结果创建 Wiki OA信息记录表页面（暂时注释）
     # if all_results:
     #     from oainfo_cli import create_oa_page
@@ -752,7 +753,9 @@ def dispatch_oa(all_results):
 
     # US 答复期限：下载官文 PDF → 解析 months → 计算 deadline
     us_items = [r for r in all_results if r.get("region") == "US" and r.get("application_no")]
-    if us_items:
+    if us_items and dry_run:
+        print(f"  [dry-run] 跳过 {len(us_items)} 条 US 官文下载/期限解析", file=sys.stderr)
+    elif us_items:
         from us_deadline import get_us_deadline
         print(f"\n{len(us_items)} 条 US 记录需要获取答复期限...", file=sys.stderr)
         for item in us_items:
@@ -779,7 +782,9 @@ def dispatch_oa(all_results):
     print("results:", all_results)
 
     # 写入 Wiki 新增 OA 页面
-    if all_results:
+    if all_results and dry_run:
+        print(f"  [dry-run] 跳过写 Wiki 新增OA（{len(all_results)} 条）", file=sys.stderr)
+    elif all_results:
         from oainfo_cli import append_oa_to_wiki
         try:
             wiki_list_result = append_oa_to_wiki(all_results)
@@ -841,13 +846,16 @@ def dispatch_oa(all_results):
     #     print(f"TIP 写入完成: {inserted} 条", file=sys.stderr)
 
     # 发送立项结果通知邮件
-    if all_results:
+    if all_results and dry_run:
+        print(f"  [dry-run] 跳过发送立项通知邮件（{len(all_results)} 条）", file=sys.stderr)
+    elif all_results:
         send_notification(all_results)
 
 
-def archive_emails(all_emails):
+def archive_emails(all_emails, dry_run=False):
     """单次归档：按账号把处理过的邮件 move 到 TEST_AUTO。
-    email_pipeline 模式下归档只在这里发生一次（各 sink 内不再 move）。"""
+    email_pipeline 模式下归档只在这里发生一次（各 sink 内不再 move）。
+    dry_run=True 时只打印不真正 move。"""
     groups = {}
     for acc, em in all_emails:
         key = (acc["account"], acc["folder"])
@@ -858,6 +866,9 @@ def archive_emails(all_emails):
             groups[key][1].append(mid)
     for (account_name, folder), (acc, message_ids) in groups.items():
         if not message_ids:
+            continue
+        if dry_run:
+            print(f"  [dry-run] 跳过归档 {len(message_ids)} 封（{account_name}/{folder} → TEST_AUTO）", file=sys.stderr)
             continue
         cfg = get_account_config(account_name)
         move_emails(cfg, folder, message_ids, target_folder="TEST_AUTO")
