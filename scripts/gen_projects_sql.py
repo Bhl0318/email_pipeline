@@ -29,13 +29,15 @@ SHARED_EMAIL_CONFIG = os.path.join(SCRIPT_DIR, "email_config.json")
 PIPELINE_CONFIG = os.path.join(SCRIPT_DIR, "pipeline_config.json")
 
 # 与 dispatch_oa 完全一致的字段顺序
-FIELDS = ["id", "project", "project_name", "oa_doc_date", "entrust_date",
+FIELDS = ["id", "project", "project_name", "project_type", "oa_doc_date", "entrust_date",
           "oaNum", "applytype", "project_deadline", "dueDate",
           "now_status", "project_phase", "submitby", "oa_remark", "wikiurl"]
 
 
 def build_insert(item):
     """复刻 dispatch_oa 的单条 INSERT 构造逻辑。"""
+    # project_type：CN → 中国答复及其他；其他 → 海外答复及其他
+    item["project_type"] = "中国答复及其他" if item.get("region") == "CN" else "海外答复及其他"
     values = []
     for f in FIELDS:
         if f == "id":

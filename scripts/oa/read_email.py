@@ -856,6 +856,8 @@ def dispatch_oa(all_results, all_emails=None, dry_run=False):
             project_name = item.get("project_name", "")
             if not project or not project_name:
                 continue
+            # project_type：CN → 中国答复及其他；US/EP 等 → 海外答复及其他
+            item["project_type"] = "中国答复及其他" if item.get("region") == "CN" else "海外答复及其他"
             # 检查是否已存在
             check_sql = f"SELECT COUNT(*) as cnt FROM projects WHERE project='{project}' AND project_name='{project_name}'"
             try:
@@ -869,7 +871,7 @@ def dispatch_oa(all_results, all_emails=None, dry_run=False):
             # 构建 INSERT
             import uuid
             row_id = str(uuid.uuid4())
-            fields = ["id", "project", "project_name", "oa_doc_date", "entrust_date",
+            fields = ["id", "project", "project_name", "project_type", "oa_doc_date", "entrust_date",
                        "oaNum", "applytype", "project_deadline", "dueDate",
                        "now_status", "project_phase", "submitby", "oa_remark", "wikiurl"]
             values = []
