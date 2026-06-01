@@ -484,7 +484,11 @@ def send_notification(results):
 
     cfg = load_config()
     pa_cfg = cfg.get("accounts", {}).get("pa")
-    recipients = cfg.get("notification", {}).get("recipients", [])
+    notif = cfg.get("notification", {})
+    # OA 立项通知收件人/抄送与汇报信独立：优先 notification.oa，回退旧的扁平结构
+    oa_notif = notif.get("oa", notif)
+    recipients = oa_notif.get("recipients", [])
+    cc = oa_notif.get("cc", [])
 
     if not pa_cfg:
         print("[通知邮件] 未配置 PA 账号，跳过发送", file=sys.stderr)
@@ -498,6 +502,8 @@ def send_notification(results):
     msg = MIMEMultipart("alternative")
     msg["From"] = pa_cfg["user"]
     msg["To"] = ", ".join(recipients)
+    if cc:
+        msg["Cc"] = ", ".join(cc)
     msg["Subject"] = f"OA立项通知 - {today} ({len(results)}条)"
 
     html_body = _build_notification_html(results)
@@ -522,9 +528,11 @@ def send_notification(results):
         else:
             smtp.login(pa_cfg["user"], pa_cfg["password"])
 
-        smtp.sendmail(pa_cfg["user"], recipients, msg.as_string())
+        # 实际收件人 = To + Cc（SMTP sendmail 要显式给全）
+        smtp.sendmail(pa_cfg["user"], recipients + cc, msg.as_string())
         smtp.quit()
-        print(f"[通知邮件] 发送成功: {len(results)} 条结果 → {', '.join(recipients)}", file=sys.stderr)
+        print(f"[通知邮件] 发送成功: {len(results)} 条结果 → {', '.join(recipients)}"
+              + (f" (CC: {', '.join(cc)})" if cc else ""), file=sys.stderr)
     except Exception as e:
         print(f"[通知邮件] 发送失败: {e}", file=sys.stderr)
 

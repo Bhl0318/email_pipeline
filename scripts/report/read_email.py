@@ -662,18 +662,24 @@ def send_review_links_email(links):
         print("[审核通知] 未配置 PA 账号，跳过发送", file=sys.stderr)
         return
 
+    # 汇报信收件人/抄送与 OA 立项独立：优先 notification.report，回退写死的常量
+    report_notif = cfg.get("notification", {}).get("report", {})
+    to_list = report_notif.get("recipients") or REVIEW_NOTIFY_TO
+    cc_list = report_notif.get("cc") if report_notif.get("cc") is not None else REVIEW_NOTIFY_CC
+
     today = datetime.now().strftime("%Y-%m-%d")
     msg = MIMEMultipart("alternative")
     msg["From"] = pa_cfg["user"]
-    msg["To"] = ", ".join(REVIEW_NOTIFY_TO)
-    msg["Cc"] = ", ".join(REVIEW_NOTIFY_CC)
+    msg["To"] = ", ".join(to_list)
+    if cc_list:
+        msg["Cc"] = ", ".join(cc_list)
     msg["Subject"] = f"汇报信审核任务通知 - {today} ({len(links)}条)"
 
     html_body = _build_review_links_html(links)
     msg.attach(MIMEText(html_body, "html", "utf-8"))
 
     # 实际收件人 = To + Cc（SMTP sendmail 要显式给全）
-    recipients = REVIEW_NOTIFY_TO + REVIEW_NOTIFY_CC
+    recipients = to_list + cc_list
 
     try:
         smtp = smtplib.SMTP(pa_cfg["smtp_host"], pa_cfg["smtp_port"], timeout=30)
@@ -695,7 +701,8 @@ def send_review_links_email(links):
 
         smtp.sendmail(pa_cfg["user"], recipients, msg.as_string())
         smtp.quit()
-        print(f"[审核通知] 发送成功: {len(links)} 条 → {', '.join(REVIEW_NOTIFY_TO)} (CC: {', '.join(REVIEW_NOTIFY_CC)})", file=sys.stderr)
+        print(f"[审核通知] 发送成功: {len(links)} 条 → {', '.join(to_list)}"
+              + (f" (CC: {', '.join(cc_list)})" if cc_list else ""), file=sys.stderr)
     except Exception as e:
         print(f"[审核通知] 发送失败: {e}", file=sys.stderr)
 
