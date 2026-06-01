@@ -37,6 +37,7 @@ def main(dry_run=False):
     sinks = cfg.get("sinks", {})
     oa_on = bool(sinks.get("oa", False))
     report_on = bool(sinks.get("report", True))
+    oa_test_prefix = cfg.get("oa_test_project_prefix") or None
 
     if dry_run:
         print("[email_pipeline] ★ DRY-RUN：照常读邮件+分类，但不写库/不发邮件/不移邮件"
@@ -59,7 +60,7 @@ def main(dry_run=False):
         print("[email_pipeline] → OA 立项 sink", file=sys.stderr)
         with oa as OA:
             OA.set_config_path(SHARED_EMAIL_CONFIG)
-            OA.dispatch_oa(all_results, all_emails, dry_run=dry_run)
+            OA.dispatch_oa(all_results, all_emails, dry_run=dry_run, test_project_prefix=oa_test_prefix)
     else:
         print("[email_pipeline] OA 立项 sink 关闭（sinks.oa=false）", file=sys.stderr)
 

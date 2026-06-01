@@ -735,11 +735,21 @@ def read_and_classify_oa(accounts=None, config_path=None):
     return all_emails, all_results
 
 
-def dispatch_oa(all_results, all_emails=None, dry_run=False):
+def dispatch_oa(all_results, all_emails=None, dry_run=False, test_project_prefix=None):
     """OA 立项下游 sink：建OA信息表页 → US期限 → 上传官文附件 → 新增OA → projects → 立项通知。
     all_emails 用于按 message_id 取邮件官文 PDF（CN/EP）；US 官文来自下载。
+    test_project_prefix 不为空时，把案号客户代码前缀换成它（如 20618-0895CN00 →
+    90009-0895CN00），用于测试时避免撞已存在的 Wiki 页面。
     注：email_pipeline 模式下本函数不再 move 邮件，归档统一交 archive_emails。
     dry_run=True 时：不下载USPTO官文、不建/写Wiki、不上传附件、不发立项通知邮件。"""
+    # 测试用案号前缀替换：20618-0895CN00 → 90009-0895CN00（防 Wiki 页面已存在）
+    # ⚠️ 直接改写 item['project']，OA 先于 report 跑且共用 all_results，开启时建议关 report sink
+    if test_project_prefix:
+        for _item in all_results:
+            _p = _item.get("project", "") or ""
+            if "-" in _p:
+                _item["project"] = f"{test_project_prefix}-{_p.split('-', 1)[1]}"
+        print(f"  [测试] 案号前缀已替换为 {test_project_prefix}", file=sys.stderr)
     # email_pipeline 测试标记：给 OA 立项的 project_name 统一加后缀，便于在
     # 数据表 / Wiki 里识别哪些是本管线（测试）生成的。只影响 OA 线，不动汇报信。
     PROJECT_NAME_SUFFIX = "_by_email_pipline"

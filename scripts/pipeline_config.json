@@ -6,5 +6,6 @@
   "sinks": {
     "oa": true,
     "report": true
-  }
+  },
+  "oa_test_project_prefix": "90009"
 }
