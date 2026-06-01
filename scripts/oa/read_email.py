@@ -746,25 +746,27 @@ def dispatch_oa(all_results, dry_run=False):
         _pn = _item.get("project_name", "") or ""
         if _pn and not _pn.endswith(PROJECT_NAME_SUFFIX):
             _item["project_name"] = _pn + PROJECT_NAME_SUFFIX
-    # # 为每条立项结果创建 Wiki OA信息记录表页面（暂时注释）
-    # if all_results:
-    #     from oainfo_cli import create_oa_page
-    #     wiki_cache = {}
-    #     for item in all_results:
-    #         project = item.get("project", "")
-    #         if not project:
-    #             item["wikiurl"] = ""
-    #             continue
-    #         if project not in wiki_cache:
-    #             try:
-    #                 wiki_result = create_oa_page(project)
-    #                 wiki_cache[project] = wiki_result.get("url", "")
-    #                 print(f"[Wiki] {project}: {wiki_result.get('msg', '')}", file=sys.stderr)
-    #             except Exception as e:
-    #                 wiki_cache[project] = ""
-    #                 print(f"[Wiki] {project} 创建失败: {e}", file=sys.stderr)
-    #         item["wikiurl"] = wiki_cache[project]
-    #     print(f"Wiki 页面处理完成: {len(wiki_cache)} 个案号", file=sys.stderr)
+    # 为每条立项结果创建 Wiki OA信息记录表页面（按案号建族页面+子页）
+    if all_results and dry_run:
+        print(f"  [dry-run] 跳过创建 OA 信息记录表 Wiki 页面（{len(all_results)} 条）", file=sys.stderr)
+    elif all_results:
+        from oainfo_cli import create_oa_page
+        wiki_cache = {}
+        for item in all_results:
+            project = item.get("project", "")
+            if not project:
+                item["wikiurl"] = ""
+                continue
+            if project not in wiki_cache:
+                try:
+                    wiki_result = create_oa_page(project)
+                    wiki_cache[project] = wiki_result.get("url", "")
+                    print(f"[Wiki] {project}: {wiki_result.get('msg', '')}", file=sys.stderr)
+                except Exception as e:
+                    wiki_cache[project] = ""
+                    print(f"[Wiki] {project} 创建失败: {e}", file=sys.stderr)
+            item["wikiurl"] = wiki_cache[project]
+        print(f"Wiki 页面处理完成: {len(wiki_cache)} 个案号", file=sys.stderr)
 
     # US 答复期限：下载官文 PDF → 解析 months → 计算 deadline
     us_items = [r for r in all_results if r.get("region") == "US" and r.get("application_no")]
