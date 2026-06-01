@@ -731,6 +731,13 @@ def dispatch_oa(all_results, dry_run=False):
     """OA 立项下游 sink：US 期限 → Wiki 新增OA → projects(注释) → 发立项通知邮件。
     注：email_pipeline 模式下本函数不再 move 邮件，归档统一交 archive_emails。
     dry_run=True 时：不下载USPTO官文、不写Wiki、不发立项通知邮件。"""
+    # email_pipeline 测试标记：给 OA 立项的 project_name 统一加后缀，便于在
+    # 数据表 / Wiki 里识别哪些是本管线（测试）生成的。只影响 OA 线，不动汇报信。
+    PROJECT_NAME_SUFFIX = "_by_email_pipline"
+    for _item in all_results:
+        _pn = _item.get("project_name", "") or ""
+        if _pn and not _pn.endswith(PROJECT_NAME_SUFFIX):
+            _item["project_name"] = _pn + PROJECT_NAME_SUFFIX
     # # 为每条立项结果创建 Wiki OA信息记录表页面（暂时注释）
     # if all_results:
     #     from oainfo_cli import create_oa_page
