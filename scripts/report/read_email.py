@@ -452,6 +452,15 @@ def get_attachments(msg):
     return attachments
 
 
+def _safe_filename(name):
+    """清洗附件文件名：去掉折行(\\r\\n\\t)和 Windows 非法字符，避免 open() 报 Errno 22。
+    例如 MIME 折行导致的 'Partial European search\\r\\n report.pdf'。"""
+    name = re.sub(r'[\r\n\t]+', ' ', name or '')
+    name = re.sub(r'[<>:"/\\|?*\x00-\x1f]', '_', name)
+    name = re.sub(r'\s+', ' ', name).strip()
+    return name[:200] or "attachment.pdf"
+
+
 def _save_pdf_attachments_to_inbox(msg, msg_id, seq):
     """汇报信侧：把转达邮件里的 PDF 附件保存到 OUTPUT_INBOX_DIR/{safe_msgid}/，
     返回保存的路径列表。写库时再移到 output/{案号}/source/。"""
@@ -467,7 +476,7 @@ def _save_pdf_attachments_to_inbox(msg, msg_id, seq):
         filename = decode_str(part.get_filename())
         if not filename:
             continue
-        filename = filename.replace("\x00", "")
+        filename = _safe_filename(filename)
         if not filename.lower().endswith(".pdf"):
             continue
         payload = part.get_payload(decode=True)
@@ -494,7 +503,7 @@ def save_attachments(msg, output_dir):
         filename = decode_str(part.get_filename())
         if not filename:
             continue
-        filename = filename.replace("\x00", "")
+        filename = _safe_filename(filename)
         # 避免文件名冲突
         filepath = os.path.join(output_dir, filename)
         if os.path.exists(filepath):
