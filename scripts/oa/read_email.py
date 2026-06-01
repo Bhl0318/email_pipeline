@@ -735,10 +735,11 @@ def read_and_classify_oa(accounts=None, config_path=None):
     return all_emails, all_results
 
 
-def dispatch_oa(all_results, dry_run=False):
-    """OA 立项下游 sink：US 期限 → Wiki 新增OA → projects(注释) → 发立项通知邮件。
+def dispatch_oa(all_results, all_emails=None, dry_run=False):
+    """OA 立项下游 sink：建OA信息表页 → US期限 → 上传官文附件 → 新增OA → projects → 立项通知。
+    all_emails 用于按 message_id 取邮件官文 PDF（CN/EP）；US 官文来自下载。
     注：email_pipeline 模式下本函数不再 move 邮件，归档统一交 archive_emails。
-    dry_run=True 时：不下载USPTO官文、不写Wiki、不发立项通知邮件。"""
+    dry_run=True 时：不下载USPTO官文、不建/写Wiki、不上传附件、不发立项通知邮件。"""
     # email_pipeline 测试标记：给 OA 立项的 project_name 统一加后缀，便于在
     # 数据表 / Wiki 里识别哪些是本管线（测试）生成的。只影响 OA 线，不动汇报信。
     PROJECT_NAME_SUFFIX = "_by_email_pipline"
@@ -751,7 +752,8 @@ def dispatch_oa(all_results, dry_run=False):
         print(f"  [dry-run] 跳过创建 OA 信息记录表 Wiki 页面（{len(all_results)} 条）", file=sys.stderr)
     elif all_results:
         from oainfo_cli import create_oa_page
-        wiki_cache = {}
+        wiki_cache = {}        # project -> url
+        wiki_id_cache = {}     # project -> page_id（供上传附件用）
         for item in all_results:
             project = item.get("project", "")
             if not project:
@@ -761,11 +763,14 @@ def dispatch_oa(all_results, dry_run=False):
                 try:
                     wiki_result = create_oa_page(project)
                     wiki_cache[project] = wiki_result.get("url", "")
+                    wiki_id_cache[project] = wiki_result.get("id")
                     print(f"[Wiki] {project}: {wiki_result.get('msg', '')}", file=sys.stderr)
                 except Exception as e:
                     wiki_cache[project] = ""
+                    wiki_id_cache[project] = None
                     print(f"[Wiki] {project} 创建失败: {e}", file=sys.stderr)
             item["wikiurl"] = wiki_cache[project]
+            item["wiki_page_id"] = wiki_id_cache.get(project)
         print(f"Wiki 页面处理完成: {len(wiki_cache)} 个案号", file=sys.stderr)
 
     # US 答复期限：下载官文 PDF → 解析 months → 计算 deadline
@@ -791,8 +796,39 @@ def dispatch_oa(all_results, dry_run=False):
                     print(f"[US] {item['project']} 答复期限: {dl['deadline']}", file=sys.stderr)
                 else:
                     print(f"[US] {item['project']} 答复期限获取失败，留空", file=sys.stderr)
+                # 记下下载的官文 PDF 路径，供上传到 OA 信息表页
+                if dl and dl.get("pdf_path"):
+                    item["us_pdf_path"] = dl["pdf_path"]
             except Exception as e:
                 print(f"[US] {item['project']} 异常: {e}", file=sys.stderr)
+
+    # 上传官文附件到 OA 信息记录表页：CN/EP 取邮件附件 PDF，US 取下载的官文
+    if all_results and dry_run:
+        print(f"  [dry-run] 跳过上传官文附件到 OA 信息表页", file=sys.stderr)
+    elif all_results:
+        from oainfo_cli import WikiClient
+        # msgid -> 邮件保存的官文 PDF（report 读取层存到 _inbox 的）
+        msgid_to_pdfs = {}
+        for _acc, _em in (all_emails or []):
+            mid = _em.get("message_id", "")
+            if mid and _em.get("saved_pdfs"):
+                msgid_to_pdfs[mid] = _em.get("saved_pdfs", [])
+        wiki = WikiClient()
+        uploaded = 0
+        for item in all_results:
+            page_id = item.get("wiki_page_id")
+            if not page_id:
+                continue
+            files = list(msgid_to_pdfs.get(item.get("message_id", ""), []))
+            if item.get("us_pdf_path"):
+                files.append(item["us_pdf_path"])
+            for fp in files:
+                try:
+                    if wiki.upload_attachment(page_id, fp):
+                        uploaded += 1
+                except Exception as e:
+                    print(f"[Wiki 附件] {item.get('project','')} 上传失败 {fp}: {e}", file=sys.stderr)
+        print(f"[Wiki 附件] 上传完成: {uploaded} 个文件", file=sys.stderr)
 
     print(f"\n{'='*40}", file=sys.stderr)
     print(f"汇总: {len(all_results)} 条立项结果", file=sys.stderr)
@@ -894,5 +930,5 @@ def archive_emails(all_emails, dry_run=False):
 if __name__ == "__main__":
     # 单独运行：读取 → 分类 → OA 下游 → 归档
     _all_emails, _all_results = read_and_classify_oa()
-    dispatch_oa(_all_results)
+    dispatch_oa(_all_results, _all_emails)
     archive_emails(_all_emails)

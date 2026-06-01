@@ -265,6 +265,34 @@ class WikiClient:
             logger.error(f"Wiki 创建页面异常 [{title}]: {e}")
             return 500
 
+    def upload_attachment(self, page_id, filepath):
+        """上传附件到指定页面（集成自 createwikioa.putAttachment）。
+        同名附件 Confluence 会更新为新版本，不会重复。返回 True/False。
+        注意：headers 只带 X-Atlassian-Token，不能带 application/json，
+        否则 multipart 上传会失败。"""
+        if not page_id:
+            logger.error(f"附件上传跳过：page_id 为空 ({filepath})")
+            return False
+        if not os.path.exists(filepath):
+            logger.error(f"附件上传跳过：文件不存在 {filepath}")
+            return False
+        url = f"{WIKI_BASE}/rest/api/content/{page_id}/child/attachment"
+        try:
+            with open(filepath, "rb") as fh:
+                resp = requests.post(
+                    url, auth=self.auth,
+                    headers={"X-Atlassian-Token": "nocheck"},
+                    files={"file": fh}, timeout=60,
+                )
+            if resp.status_code in (200, 201):
+                logger.info(f"附件上传成功: {os.path.basename(filepath)} → page {page_id}")
+                return True
+            logger.error(f"附件上传失败 [{os.path.basename(filepath)}]: HTTP {resp.status_code} - {resp.text[:200]}")
+            return False
+        except requests.RequestException as e:
+            logger.error(f"附件上传异常 [{filepath}]: {e}")
+            return False
+
 
 # ============================================================
 # OA 页面 HTML 模板
@@ -489,19 +517,22 @@ def create_oa_page(project, dry_run=False):
 
     if oa_results:
         logger.info(f"OA页面已存在: {page_url}")
-        return {"code": 0, "msg": "OA页面已存在", "url": page_url}
+        return {"code": 0, "msg": "OA页面已存在", "url": page_url, "id": oa_results[0].get("id")}
 
     if dry_run:
         logger.info(f"[DRY-RUN] 将创建OA页面: {fintitle}")
         logger.info(f"[DRY-RUN] 父页面ID: {zu_page_id}, 空间: {wikikey['key']}")
-        return {"code": 0, "msg": "[DRY-RUN] OA页面将被创建", "url": page_url}
+        return {"code": 0, "msg": "[DRY-RUN] OA页面将被创建", "url": page_url, "id": None}
 
     status = wiki.create_child_page(fintitle, page_html, wikikey["key"], zu_page_id)
     if status == 200:
         logger.info(f"OA页面创建成功: {page_url}")
-        return {"code": 0, "msg": "OA页面创建成功", "url": page_url}
+        # create_child_page 只返回状态码，回查一次拿 page id（供上传附件用）
+        created = wiki.get_page(fintitle)
+        return {"code": 0, "msg": "OA页面创建成功", "url": page_url,
+                "id": created.get("id") if created else None}
     else:
-        return {"code": 1, "msg": f"OA页面创建失败 (HTTP {status})", "url": ""}
+        return {"code": 1, "msg": f"OA页面创建失败 (HTTP {status})", "url": "", "id": None}
 
 
 # ============================================================

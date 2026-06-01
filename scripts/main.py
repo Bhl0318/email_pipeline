@@ -59,7 +59,7 @@ def main(dry_run=False):
         print("[email_pipeline] → OA 立项 sink", file=sys.stderr)
         with oa as OA:
             OA.set_config_path(SHARED_EMAIL_CONFIG)
-            OA.dispatch_oa(all_results, dry_run=dry_run)
+            OA.dispatch_oa(all_results, all_emails, dry_run=dry_run)
     else:
         print("[email_pipeline] OA 立项 sink 关闭（sinks.oa=false）", file=sys.stderr)
 
