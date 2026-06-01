@@ -808,57 +808,57 @@ def dispatch_oa(all_results, dry_run=False):
             print(f"[Wiki 新增OA] 写入失败: {e}", file=sys.stderr)
 
     # 写入 TIP 系统（projects 表）
-    # if all_results:
-    #     from db_query import execute as db_execute
-    #     inserted = 0
-    #     for item in all_results:
-    #         project = item.get("project", "")
-    #         project_name = item.get("project_name", "")
-    #         if not project or not project_name:
-    #             continue
-    #         # 检查是否已存在
-    #         check_sql = f"SELECT COUNT(*) as cnt FROM projects WHERE project='{project}' AND project_name='{project_name}'"
-    #         try:
-    #             check = db_execute(check_sql)
-    #             if check and check[0].get("cnt", 0) > 0:
-    #                 print(f"[TIP] {project} {project_name} 已存在，跳过", file=sys.stderr)
-    #                 continue
-    #         except Exception:
-    #             pass
-    #
-    #         # 构建 INSERT
-    #         import uuid
-    #         row_id = str(uuid.uuid4())
-    #         fields = ["id", "project", "project_name", "oa_doc_date", "entrust_date",
-    #                    "oaNum", "applytype", "project_deadline", "dueDate",
-    #                    "now_status", "project_phase", "submitby", "oa_remark", "wikiurl"]
-    #         values = []
-    #         for f in fields:
-    #             if f == "id":
-    #                 values.append(row_id)
-    #                 continue
-    #             v = item.get(f, "")
-    #             if f == 'project':
-    #                 v = '90009-0003US03'
-    #             if v is None:
-    #                 v = ""
-    #             # oa_doc_date 为 date 类型，空值用 NULL
-    #             if f == "oa_doc_date" and not v:
-    #                 values.append("__NULL__")
-    #                 continue
-    #             values.append(str(v).replace("'", "\\'"))
-    #
-    #         cols = ", ".join(fields)
-    #         vals = ", ".join("NULL" if v == "__NULL__" else f"'{v}'" for v in values)
-    #         insert_sql = f"INSERT INTO projects ({cols}) VALUES ({vals})"
-    #         try:
-    #             db_execute(insert_sql)
-    #             inserted += 1
-    #             print(f"[TIP] {project} {project_name} 写入成功", file=sys.stderr)
-    #         except Exception as e:
-    #             print(f"[TIP] {project} {project_name} 写入失败: {e}", file=sys.stderr)
-    #
-    #     print(f"TIP 写入完成: {inserted} 条", file=sys.stderr)
+    if all_results and dry_run:
+        print(f"  [dry-run] 跳过写 projects 表（{len(all_results)} 条）", file=sys.stderr)
+    elif all_results:
+        from db_query import execute as db_execute
+        inserted = 0
+        for item in all_results:
+            project = item.get("project", "")
+            project_name = item.get("project_name", "")
+            if not project or not project_name:
+                continue
+            # 检查是否已存在
+            check_sql = f"SELECT COUNT(*) as cnt FROM projects WHERE project='{project}' AND project_name='{project_name}'"
+            try:
+                check = db_execute(check_sql)
+                if check and check[0].get("cnt", 0) > 0:
+                    print(f"[TIP] {project} {project_name} 已存在，跳过", file=sys.stderr)
+                    continue
+            except Exception:
+                pass
+
+            # 构建 INSERT
+            import uuid
+            row_id = str(uuid.uuid4())
+            fields = ["id", "project", "project_name", "oa_doc_date", "entrust_date",
+                       "oaNum", "applytype", "project_deadline", "dueDate",
+                       "now_status", "project_phase", "submitby", "oa_remark", "wikiurl"]
+            values = []
+            for f in fields:
+                if f == "id":
+                    values.append(row_id)
+                    continue
+                v = item.get(f, "")
+                if v is None:
+                    v = ""
+                # oa_doc_date 为 date 类型，空值用 NULL
+                if f == "oa_doc_date" and not v:
+                    values.append("__NULL__")
+                    continue
+                values.append(str(v).replace("'", "\\'"))
+
+            cols = ", ".join(fields)
+            vals = ", ".join("NULL" if v == "__NULL__" else f"'{v}'" for v in values)
+            insert_sql = f"INSERT INTO projects ({cols}) VALUES ({vals})"
+            try:
+                db_execute(insert_sql)
+                inserted += 1
+                print(f"[TIP] {project} {project_name} 写入成功", file=sys.stderr)
+            except Exception as e:
+                print(f"[TIP] {project} {project_name} 写入失败: {e}", file=sys.stderr)
+
+        print(f"TIP 写入完成: {inserted} 条", file=sys.stderr)
 
     # 发送立项结果通知邮件
     if all_results and dry_run:
