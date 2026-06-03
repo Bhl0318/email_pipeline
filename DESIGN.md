@@ -2,7 +2,7 @@
 
 > 创建日期：2026-05-31
 > 目标：一封邮件**只读一次、只分类一次**，扇出给「OA 立项」和「汇报信」两条下游流程。
-> 状态：方案设计（未写代码）
+> 状态：已落地（`scripts/main.py`、`loader.py`、两 sink 副本均已实现）。本文档为设计依据，实现细节以代码为准。
 
 ---
 
@@ -134,17 +134,20 @@ email_pipeline **自带一份副本**（`oa/` + `report/` 两个子目录），�
 ```json
 {
   "accounts": [
-    { "account": "docketing", "folder": "TEST" }
+    { "account": "docketing", "folder": "TEST" },
+    { "account": "attorneys", "folder": "TEST" }
   ],
   "sinks": {
-    "oa":     false,   // 先关，OA 跑通后再开
-    "report": true     // 先只开汇报信
-  }
+    "oa":     true,
+    "report": true
+  },
+  "oa_test_project_prefix": "90009"
 }
 ```
 
 `main.py` 按 `sinks.oa` / `sinks.report` 决定是否调用对应 dispatch。
-**默认先只开汇报信**，OA 验证无误后再把 `oa` 置 true，实现分阶段灰度上线。
+分阶段灰度上线设计：初期 `oa:false, report:true` 先只开汇报信验证调度框架，OA 验证无误后把 `oa` 置 true。
+**当前状态：灰度已完成，两 sink 均开**；`oa_test_project_prefix` 限定 OA sink 落库的案号前缀范围。
 
 ### 4.2 `email_config.json`（副本共用一份）
 
@@ -271,6 +274,6 @@ RPT.archive_emails(emails)                     # 单次归档（只在这里 mov
 
 ## 十、已确认决策（2026-05-31）
 
-1. **sink 独立开关：加。** `pipeline_config.json` 用 `sinks.oa` / `sinks.report` 两个布尔位，默认先只开汇报信（`oa:false, report:true`），OA 跑通后再开 → 见 §4.1。
+1. **sink 独立开关：加。** `pipeline_config.json` 用 `sinks.oa` / `sinks.report` 两个布尔位，灰度初期先只开汇报信（`oa:false, report:true`），OA 跑通后再开 → 见 §4.1。**现状：两 sink 均已开。**
 2. **email_config.json 共用一份：是。** 统一用 `email_pipeline/scripts/email_config.json`，配置路径由 main.py 注入到两侧 → 见 §4.2。
 3. **通知邮件分别发两封：是（维持现状）。** OA sink 走 `send_notification()` 发立项汇总；汇报信 sink 走 `send_review_links_email()` 发审核链接。两封独立，互不合并。

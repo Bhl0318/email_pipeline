@@ -31,12 +31,17 @@ cd scripts && python3 main.py
 ## sink 开关（`pipeline_config.json`）
 
 ```json
-{ "accounts": [{ "account": "docketing", "folder": "TEST" }],
-  "sinks": { "oa": false, "report": true } }
+{ "accounts": [
+    { "account": "docketing", "folder": "TEST" },
+    { "account": "attorneys", "folder": "TEST" }
+  ],
+  "sinks": { "oa": true, "report": true },
+  "oa_test_project_prefix": "90009" }
 ```
 
-- `sinks.report=true / oa=false`（默认）：先只跑汇报信，灰度验证调度框架。
-- OA 验证无误后把 `oa` 置 true，两条一起跑。
+- `sinks.report` / `sinks.oa`：两个 sink 独立开关。灰度已完成，**当前两条都开**（曾以 `oa:false, report:true` 先验证调度框架，OA 跑通后置 true）。
+- `accounts`：当前读 `docketing`（CN+US）与 `attorneys`（EP）两个账号。
+- `oa_test_project_prefix`：OA sink 测试期只对该案号前缀的案件落库，限定灰度范围。
 
 ## 副本来源 commit
 
