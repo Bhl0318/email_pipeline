@@ -11,6 +11,7 @@
 测试：
   python3 enrich_report.py 20651-0129CM00
 """
+import html
 import os
 import sys
 import json
@@ -73,6 +74,39 @@ def query_case_info(project):
         return {}
 
 
+def query_customer_demands(project):
+    """SQL Server IPEasy: customer_code = project 前 5 位
+    → c_customer.customer_id → c_demand 要求列表"""
+    code = (project or "")[:5]
+    if not code:
+        return []
+    cfg = _load_db_config().get("mssql_ipeasy", {})
+    host = cfg.get("host", "")
+    if not host or host.startswith("请填写"):
+        return []
+    try:
+        import pymssql
+        conn = pymssql.connect(
+            cfg["host"], cfg["user"], cfg["password"], cfg["database"],
+            charset=cfg.get("charset", "utf8"),
+        )
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT cd.demand_name, cd.demand_desc "
+            "FROM c_customer cc "
+            "JOIN c_demand cd ON cd.obj_id = cc.customer_id "
+            "WHERE cc.customer_code = %s AND (cd.is_disabled = 0 OR cd.is_disabled IS NULL)",
+            (code,),
+        )
+        rows = cur.fetchall()
+        cur.close()
+        conn.close()
+        return [{"name": r[0] or "", "desc": html.unescape(r[1] or "")} for r in rows]
+    except Exception as e:
+        print(f"[enrich] 查客户要求失败 {project}: {e}", file=sys.stderr)
+        return []
+
+
 def enrich_cn_fields(project):
     """返回要合并进 fields_json 的字段（查到才返回该键，覆盖"请提供"）"""
     out = {}
@@ -97,6 +131,9 @@ def enrich_cn_fields(project):
 
 if __name__ == "__main__":
     if len(sys.argv) > 1:
-        print(json.dumps(enrich_cn_fields(sys.argv[1]), ensure_ascii=False, indent=2))
+        project = sys.argv[1]
+        print(json.dumps(enrich_cn_fields(project), ensure_ascii=False, indent=2))
+        demands = query_customer_demands(project)
+        print(json.dumps(demands, ensure_ascii=False, indent=2))
     else:
         print("用法: python3 enrich_report.py <代理所案号>", file=sys.stderr)

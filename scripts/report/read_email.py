@@ -504,11 +504,8 @@ def save_attachments(msg, output_dir):
         if not filename:
             continue
         filename = _safe_filename(filename)
-        # 避免文件名冲突
+        # 同名直接覆盖（去掉时间戳后缀）
         filepath = os.path.join(output_dir, filename)
-        if os.path.exists(filepath):
-            name, ext = os.path.splitext(filename)
-            filepath = os.path.join(output_dir, f"{name}_{datetime.now().strftime('%H%M%S')}{ext}")
         payload = part.get_payload(decode=True)
         if payload:
             with open(filepath, "wb") as f:
@@ -1034,9 +1031,6 @@ def dispatch_report(all_results, all_emails, dry_run=False):
                             continue
                         fname = os.path.basename(src)
                         dst = os.path.join(case_source_dir, fname)
-                        if os.path.exists(dst):
-                            name, ext = os.path.splitext(fname)
-                            dst = os.path.join(case_source_dir, f"{name}_{datetime.now().strftime('%H%M%S')}{ext}")
                         try:
                             if dry_run:
                                 print(f"  [dry-run] 跳过移动官文 PDF: {fname}", file=sys.stderr)
