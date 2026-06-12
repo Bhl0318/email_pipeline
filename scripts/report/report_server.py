@@ -17,12 +17,25 @@
   POST /api/tasks/{task_id}/save    UPDATE fields_json
   POST /api/tasks/{task_id}/confirm UPDATE status='done', reviewer
   POST /api/tasks/{task_id}/skip    UPDATE status='skipped'
+
+US 递交在线审核（/submission 路由组，表 submission_tasks）:
+  GET  /submission/review/{task_id}          审核页（web/submission.html）
+  GET  /api/submission/tasks                 任务列表 ?type=&status=
+  GET  /api/submission/tasks/{task_id}       fields_json + missing_json（含 subject_matter 推断）
+  POST /api/submission/tasks/{task_id}/save  UPDATE fields_json
+  POST /api/submission/tasks/{task_id}/preview  生成文档+PDF预览 ?target=confirmation|assignment|declaration
+  POST /api/submission/tasks/{task_id}/preview-send  硬校验+生成三件成品+返回发送清单（modal用）
+  POST /api/submission/tasks/{task_id}/confirm  发送成品邮件 → done + 插 signature_followup
+  POST /api/submission/tasks/{task_id}/skip  UPDATE status='skipped'
 """
 import json
+import shutil
 import sys
 import re
 import base64
 import smtplib
+import uuid
+from datetime import datetime
 from pathlib import Path
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -44,6 +57,14 @@ EMAIL_CONFIG_PATH = SCRIPT_DIR / "email_config.json"
 
 sys.path.insert(0, str(SCRIPT_DIR))
 from db_query import execute_params  # noqa: E402
+from submission.common import infer_subject_matter, normalize_parents, validate_for_confirm  # noqa: E402
+from submission.email_modules import build_email_modules  # noqa: E402
+from submission.confirmation_sheet import generate_confirmation_sheet  # noqa: E402
+from submission.assignment_generator import generate_assignments  # noqa: E402
+from submission.declaration_generator import generate_declarations  # noqa: E402
+from submission.preview import docx_to_pdf  # noqa: E402
+
+SUBMISSION_HTML = WEB_DIR / "submission.html"
 
 
 app = FastAPI(title="汇报信审核服务", version="0.1")
@@ -53,6 +74,9 @@ app.mount("/static", StaticFiles(directory=str(WEB_DIR)), name="static")
 _OUTPUT_DIR_FOR_MOUNT = ROOT / "output"
 _OUTPUT_DIR_FOR_MOUNT.mkdir(parents=True, exist_ok=True)
 app.mount("/output", StaticFiles(directory=str(_OUTPUT_DIR_FOR_MOUNT)), name="output")
+
+# US 递交预览/成品输出目录（挂载在 /output 下，PDF 可直接 URL 访问）
+SUBMISSION_OUTPUT_DIR = _OUTPUT_DIR_FOR_MOUNT / "submission"
 
 
 # ─── 健康检查 ────────────────────────────────────────────
@@ -158,16 +182,18 @@ def get_task(task_id: str):
     #    用 projects.project，没有就用 fields_json 里的代理所案号
     project = row.get("p_project") or user_fields.get("代理所案号", "")
     enriched = {}
+    customer_demands = []
     if project:
         try:
-            from enrich_report import enrich_cn_fields
+            from enrich_report import enrich_cn_fields, query_customer_demands
             enriched = enrich_cn_fields(project)
+            customer_demands = query_customer_demands(project)
         except Exception as e:
             print(f"[warn] task {task_id} enrich 失败: {e}", file=sys.stderr)
 
     # 合并优先级（低→高）：projects 默认 < enrich 主数据 < fields_json（审核人改过的最优先）
-    # 注：fields_json 里值为 ""/"请提供"/None 的是占位，不应覆盖 enrich 查到的真实值
-    effective_user = {k: v for k, v in user_fields.items() if v not in ("", "请提供", None)}
+    # 注：fields_json 里值为 ""/None 的是占位，不应覆盖 enrich 查到的真实值
+    effective_user = {k: v for k, v in user_fields.items() if v not in ("", None)}
     merged = {**p_defaults, **enriched, **effective_user}
 
     # 解析官文附件路径列表
@@ -186,6 +212,7 @@ def get_task(task_id: str):
         "status": row["status"],
         "reviewer": row.get("reviewer"),
         "fields": merged,
+        "customer_demands": customer_demands,
     }
 
 
@@ -239,7 +266,7 @@ def _safe_filename(fields):
         ntype += "转达"
     cref = fields.get("客户案号") or "请提供"
     oref = fields.get("代理所案号") or ""
-    name = f"{issue}-{ntype}（贵方案号：{cref}；代理所案号：{oref}）"
+    name = f"{issue}-{ntype}（委托方案号：{cref}；代理所案号：{oref}）"
     return re.sub(r'[\\/:*?"<>|\r\n]', "_", name).strip()
 
 
@@ -497,6 +524,364 @@ def skip_task(task_id: str):
     execute_params(
         "UPDATE report_tasks SET status = 'skipped' WHERE id = %s",
         (task_id,),
+    )
+    return {"ok": True, "task_id": task_id, "status": "skipped"}
+
+
+# ═══ US 递交在线审核（/submission 路由组，表 submission_tasks）═══
+# 设计见 us_submission/在线审核与文件生成方案.md；任务由 VPS skill 写入（pending），
+# 此处提供审核页数据层。preview/confirm 在后续子任务实现。
+
+
+def _load_submission_task(task_id: str) -> dict:
+    rows = execute_params(
+        "SELECT id, task_type, case_volume, fields_json, missing_json, source_mail, "
+        "contact_email, status, created_at, updated_at, confirmed_at "
+        "FROM submission_tasks WHERE id = %s",
+        (task_id,),
+    )
+    if not rows:
+        raise HTTPException(status_code=404, detail=f"任务不存在: {task_id}")
+    return rows[0]
+
+
+@app.get("/submission/review/{task_id}")
+def submission_review_page(task_id: str):
+    if not SUBMISSION_HTML.exists():
+        return PlainTextResponse(
+            f"审核页前端尚未部署（web/submission.html 缺失）。任务ID: {task_id}\n"
+            f"可先用 GET /api/submission/tasks/{task_id} 查看数据。",
+            status_code=503,
+        )
+    return FileResponse(str(SUBMISSION_HTML))
+
+
+@app.get("/api/submission/tasks")
+def list_submission_tasks(type: str = "filing_confirmation", status: str = "pending,skipped"):
+    statuses = [s.strip() for s in status.split(",") if s.strip()]
+    placeholders = ",".join(["%s"] * len(statuses))
+    rows = execute_params(
+        f"SELECT id, task_type, case_volume, contact_email, status, created_at, updated_at "
+        f"FROM submission_tasks WHERE task_type = %s AND status IN ({placeholders}) "
+        f"ORDER BY created_at DESC",
+        tuple([type] + statuses),
+    )
+    for row in rows:
+        for key in ("created_at", "updated_at"):
+            if row.get(key) is not None:
+                row[key] = str(row[key])
+    return {"tasks": rows}
+
+
+@app.get("/api/submission/tasks/{task_id}")
+def get_submission_task(task_id: str):
+    row = _load_submission_task(task_id)
+    try:
+        fields = json.loads(row["fields_json"]) if row["fields_json"] else {}
+    except Exception:
+        raise HTTPException(status_code=500, detail="fields_json 不是合法 JSON")
+    try:
+        missing = json.loads(row["missing_json"]) if row["missing_json"] else []
+    except Exception:
+        missing = []
+
+    # server 侧推断 subject_matter（来源3，审核页可改；save 后以 fields_json 为准）
+    fields["subject_matter"] = infer_subject_matter(fields)
+    normalize_parents(fields)  # 兼容存量任务的小写母案键
+
+    return {
+        "id": row["id"],
+        "task_type": row["task_type"],
+        "case_volume": row["case_volume"],
+        "fields_json": fields,
+        "missing_json": missing,
+        "source_mail": row["source_mail"],
+        "contact_email": row["contact_email"],
+        "status": row["status"],
+        "created_at": str(row["created_at"]) if row["created_at"] else None,
+        "updated_at": str(row["updated_at"]) if row["updated_at"] else None,
+        "confirmed_at": str(row["confirmed_at"]) if row["confirmed_at"] else None,
+    }
+
+
+class SubmissionSaveReq(BaseModel):
+    fields_json: dict
+    contact_email: str = ""
+
+
+@app.post("/api/submission/tasks/{task_id}/save")
+def save_submission_task(task_id: str, req: SubmissionSaveReq):
+    row = _load_submission_task(task_id)
+    if row["status"] != "pending":
+        raise HTTPException(status_code=400, detail=f"任务状态为 {row['status']}，不可编辑")
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    contact_email = req.contact_email.strip() or row["contact_email"]
+    execute_params(
+        "UPDATE submission_tasks SET fields_json = %s, contact_email = %s, updated_at = %s WHERE id = %s",
+        (json.dumps(req.fields_json, ensure_ascii=False), contact_email, now, task_id),
+    )
+    return {"ok": True, "task_id": task_id, "updated_at": now}
+
+
+class SubmissionPreviewReq(BaseModel):
+    # 可选传入页面当前编辑值（不落库，预览所见即所改）；缺省用库中 fields_json
+    fields_json: dict = None
+    target: str = "confirmation"  # confirmation / assignment / declaration
+
+
+@app.post("/api/submission/tasks/{task_id}/preview")
+def preview_submission_task(task_id: str, req: SubmissionPreviewReq):
+    row = _load_submission_task(task_id)
+    if req.fields_json is not None:
+        fields = req.fields_json
+    else:
+        try:
+            fields = json.loads(row["fields_json"]) if row["fields_json"] else {}
+        except Exception:
+            raise HTTPException(status_code=500, detail="fields_json 不是合法 JSON")
+    fields["subject_matter"] = infer_subject_matter(fields)
+    normalize_parents(fields)
+
+    preview_dir = SUBMISSION_OUTPUT_DIR / task_id / "preview"
+    files, missing_fields, missing_optional, warnings = [], [], [], []
+
+    def _url(path) -> str:
+        return "/output/" + str(Path(path).relative_to(_OUTPUT_DIR_FOR_MOUNT))
+
+    try:
+        if req.target == "confirmation":
+            result = generate_confirmation_sheet(fields, preview_dir)
+            missing_fields = result["missing_fields"]
+            missing_optional = result["missing_optional_fields"]
+            pdf_path = docx_to_pdf(result["file_path"], preview_dir)
+            files.append({"name": result["file_name"], "pdf_url": _url(pdf_path),
+                          "docx_url": _url(result["file_path"])})
+        elif req.target == "assignment":
+            for item in generate_assignments(fields, preview_dir):
+                warnings.extend(item.get("warnings") or [])
+                pdf_path = docx_to_pdf(item["file_path"], preview_dir)
+                files.append({"name": item["file_name"], "pdf_url": _url(pdf_path),
+                              "docx_url": _url(item["file_path"])})
+        elif req.target == "declaration":
+            for item in generate_declarations(fields, preview_dir):
+                files.append({"name": item["file_name"], "pdf_url": _url(item["file_path"]),
+                              "docx_url": None})
+        else:
+            raise HTTPException(status_code=400, detail=f"未知 target: {req.target}")
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"预览生成失败：{exc}")
+
+    return {
+        "target": req.target,
+        "files": files,
+        "missing_fields": missing_fields,
+        "missing_optional_fields": missing_optional,
+        "warnings": warnings,
+    }
+
+
+def _submission_final_dir(task_id: str) -> Path:
+    return SUBMISSION_OUTPUT_DIR / task_id / "final"
+
+
+def _submission_send_config():
+    """US 递交发送配置：email_config.json 的 submission 节（缺省回退 pa 账号、无抄送）。"""
+    cfg = _load_email_config()
+    sub = cfg.get("submission", {})
+    account_key = sub.get("account", "pa")
+    account_cfg = cfg.get("accounts", {}).get(account_key) or {}
+    if not account_cfg:
+        raise HTTPException(500, f"email_config.json 缺少 accounts.{account_key} 配置")
+    return account_cfg, sub.get("cc", [])
+
+
+class EmailModulesReq(BaseModel):
+    fields_json: dict = None       # 页面当前编辑值；缺省用库中值
+    params: dict = {}              # 超权费/超页费输入：claims_total / pages_total / pages_excess
+
+
+@app.post("/api/submission/tasks/{task_id}/email-modules")
+def email_modules_submission(task_id: str, req: EmailModulesReq):
+    """确认邮件正文模块清单（审核页全部展示，审阅人勾选适用项后拼装正文）。"""
+    row = _load_submission_task(task_id)
+    if req.fields_json is not None:
+        fields = req.fields_json
+    else:
+        fields = json.loads(row["fields_json"]) if row["fields_json"] else {}
+    normalize_parents(fields)
+    return {"modules": build_email_modules(fields, req.params or {})}
+
+
+class SubmissionPreviewSendReq(BaseModel):
+    fields_json: dict = None  # 页面当前编辑值；缺省用库中值
+
+
+@app.post("/api/submission/tasks/{task_id}/preview-send")
+def preview_send_submission(task_id: str, req: SubmissionPreviewSendReq):
+    """confirm 前置：硬校验 → 生成三件成品到 final/ → 返回发送清单供 modal 确认。"""
+    row = _load_submission_task(task_id)
+    if row["status"] != "pending":
+        raise HTTPException(status_code=400, detail=f"任务状态为 {row['status']}，不可发送")
+    if req.fields_json is not None:
+        fields = req.fields_json
+    else:
+        fields = json.loads(row["fields_json"]) if row["fields_json"] else {}
+    fields["subject_matter"] = infer_subject_matter(fields)
+    normalize_parents(fields)
+
+    # 1) 硬校验（申请类型/转让安排/四件套/发明人/申请人）
+    problems = validate_for_confirm(fields)
+    if problems:
+        raise HTTPException(status_code=422, detail={"problems": problems})
+
+    # 2) 生成三件成品（每次重建 final/，保证与当前字段一致）
+    final_dir = _submission_final_dir(task_id)
+    if final_dir.exists():
+        shutil.rmtree(final_dir)
+    final_dir.mkdir(parents=True, exist_ok=True)
+
+    warnings = []
+    try:
+        sheet = generate_confirmation_sheet(fields, final_dir)
+        if sheet["missing_fields"]:
+            shutil.rmtree(final_dir, ignore_errors=True)
+            raise HTTPException(status_code=422, detail={
+                "problems": [f"确认函必填缺失：{m.get('field_name') or m.get('field')}" for m in sheet["missing_fields"]],
+            })
+        assignment_results = generate_assignments(fields, final_dir)
+        for item in assignment_results:
+            warnings.extend(item.get("warnings") or [])
+        declaration_results = generate_declarations(fields, final_dir)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"成品生成失败：{exc}")
+
+    account_cfg, cc_addrs = _submission_send_config()
+    case_volume = row["case_volume"]
+    attachments = ([sheet["file_name"]]
+                   + [a["file_name"] for a in assignment_results]
+                   + [d["file_name"] for d in declaration_results])
+
+    return {
+        "from": account_cfg.get("user", ""),
+        "recipients": [row["contact_email"]] if row["contact_email"] else [],
+        "cc": cc_addrs,
+        "subject": f"【US递交】{case_volume} 确认函及签署文件",
+        "body_html": (
+            f"<p>您好，</p>"
+            f"<p>案号 <b>{case_volume}</b> 的确认函、Assignment 及 Declaration 已生成，"
+            f"请查收附件并安排签署。</p>"
+            f"<p>本邮件由系统自动发送。</p>"
+        ),
+        "attachments": attachments,
+        "missing_optional_fields": sheet["missing_optional_fields"],
+        "warnings": warnings,
+    }
+
+
+class SubmissionConfirmReq(BaseModel):
+    fields_json: dict = None      # 可选：与 confirm 一并保存
+    recipients: list = []         # modal 确认后的收件人（必填）
+    cc: list = []
+    subject: str = ""
+    body_html: str = ""
+
+
+@app.post("/api/submission/tasks/{task_id}/confirm")
+def confirm_submission_task(task_id: str, req: SubmissionConfirmReq):
+    """发送成品邮件（复用 preview-send 生成的 final/ 文件）→ done + 插 signature_followup。"""
+    row = _load_submission_task(task_id)
+    if row["status"] != "pending":
+        raise HTTPException(status_code=400, detail=f"任务状态为 {row['status']}，不可确认")
+    recipients = [r.strip() for r in req.recipients if r and r.strip()]
+    if not recipients:
+        raise HTTPException(status_code=400, detail="收件人不能为空")
+
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    # 1) 先保存字段（无论发送成功与否）
+    if req.fields_json is not None:
+        execute_params(
+            "UPDATE submission_tasks SET fields_json = %s, updated_at = %s WHERE id = %s",
+            (json.dumps(req.fields_json, ensure_ascii=False), now, task_id),
+        )
+
+    # 2) 取 preview-send 生成的成品
+    final_dir = _submission_final_dir(task_id)
+    files = sorted(p for p in final_dir.glob("*") if p.is_file()) if final_dir.exists() else []
+    if not files:
+        raise HTTPException(status_code=400, detail="成品文件不存在，请先点击发送预览（preview-send）")
+
+    # 3) 组装邮件并实发
+    case_volume = row["case_volume"]
+    subject = req.subject or f"【US递交】{case_volume} 确认函及签署文件"
+    body_html = req.body_html or f"<p>案号 {case_volume} 的签署文件见附件。</p>"
+    msg = MIMEMultipart()
+    msg["Subject"] = subject
+    msg.attach(MIMEText(body_html, "html", "utf-8"))
+    for path in files:
+        part = MIMEApplication(path.read_bytes())
+        part.add_header("Content-Disposition", "attachment", filename=("utf-8", "", path.name))
+        msg.attach(part)
+
+    account_cfg, _default_cc = _submission_send_config()
+    try:
+        _send_smtp(msg, account_cfg, recipients, req.cc or None)
+    except Exception as exc:
+        # 发送失败：保留 pending，成品已在 final/ 可人工补发
+        raise HTTPException(status_code=502, detail=f"邮件发送失败（任务保留 pending，成品已存 final/）：{exc}")
+
+    # 4) 落库：done + 插 signature_followup 待检查记录（供跟进客户回邮 skill 消费）
+    execute_params(
+        "UPDATE submission_tasks SET status = 'done', confirmed_at = %s, updated_at = %s WHERE id = %s",
+        (now, now, task_id),
+    )
+    followup_fields = json.dumps({
+        "source_task_id": task_id,
+        "files": [p.name for p in files],
+        "sent_to": recipients,
+        "sent_cc": req.cc,
+        "sent_at": now,
+    }, ensure_ascii=False)
+    existing = execute_params(
+        "SELECT id FROM submission_tasks WHERE task_type = 'signature_followup' AND case_volume = %s",
+        (case_volume,),
+    )
+    if existing:
+        execute_params(
+            "UPDATE submission_tasks SET fields_json = %s, status = 'pending', updated_at = %s WHERE id = %s",
+            (followup_fields, now, existing[0]["id"]),
+        )
+        followup_id = existing[0]["id"]
+    else:
+        followup_id = str(uuid.uuid4())
+        execute_params(
+            "INSERT INTO submission_tasks "
+            "(id, task_type, case_volume, fields_json, contact_email, status, created_at) "
+            "VALUES (%s, 'signature_followup', %s, %s, %s, 'pending', %s)",
+            (followup_id, case_volume, followup_fields, row["contact_email"], now),
+        )
+
+    return {
+        "ok": True,
+        "task_id": task_id,
+        "status": "done",
+        "sent_to": recipients,
+        "files": [p.name for p in files],
+        "followup_task_id": followup_id,
+    }
+
+
+@app.post("/api/submission/tasks/{task_id}/skip")
+def skip_submission_task(task_id: str):
+    _load_submission_task(task_id)
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    execute_params(
+        "UPDATE submission_tasks SET status = 'skipped', updated_at = %s WHERE id = %s",
+        (now, task_id),
     )
     return {"ok": True, "task_id": task_id, "status": "skipped"}
 

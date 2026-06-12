@@ -1,0 +1,106 @@
+#!/usr/bin/env python3
+"""Declaration PDF 生成（消费 fields_json，移植自 old_submission/assignment/func_normal_form.py）。
+
+每位发明人一份；模板按特例客户清单选择：
+- 特例客户（20618 类）→ DECLARATION_en.pdf（英文版，含 PCT 勾选与申请号/日期栏）
+- 其余 → DECLARATION_encn.pdf（中英对照版，Text16-28 + Check Box17/18）
+"""
+from datetime import datetime
+from pathlib import Path
+
+import fitz  # PyMuPDF
+
+from .common import (
+    DECLARATION_EN_TEMPLATE,
+    DECLARATION_ENCN_TEMPLATE,
+    inventor_names,
+    is_special_client,
+)
+
+
+def _fill_pdf_form(template_path: Path, output_path: Path, field_updates: dict) -> None:
+    """填写 PDF 表单字段（行为对齐旧 PDFFormHandler.update_pdf_form_field）。"""
+    doc = fitz.open(str(template_path))
+    doc.need_appearances(False)
+    for page in doc:
+        widgets = page.widgets()
+        if not widgets:
+            continue
+        for field in widgets:
+            if field.field_name in field_updates:
+                if field.field_type == 2:  # checkbox
+                    field.field_value = "Yes"
+                else:
+                    field.field_value = str(field_updates[field.field_name])
+                field.update()
+    doc.save(str(output_path))
+    doc.close()
+
+
+def _build_field_dict(special: bool, title: str, inventor: str,
+                      pct_app_no: str, pct_app_date: str) -> tuple:
+    """按模板版本组装字段字典，返回 (模板路径, 字段字典)。"""
+    is_pct = bool(pct_app_no)
+    if special:
+        check_box = (
+            {"undefined": "On",
+             "United States application or PCT international application number": pct_app_no,
+             "filed on": pct_app_date}
+            if is_pct else {"This declaration": "On"}
+        )
+        fields = {
+            "Title of Invention": title,
+            "Date Optional": "",
+            "Inventor": inventor,
+            "Text1": "",
+            **check_box,
+        }
+        return DECLARATION_EN_TEMPLATE, fields
+
+    check_box = (
+        {"Check Box18": "Yes", "Text19": pct_app_no, "Text20": pct_app_date}
+        if is_pct else {"Check Box17": "Yes"}
+    )
+    fields = {
+        "Text16": title,
+        "Text21": "", "Text22": "",
+        "Text23": inventor,
+        "Text24": "", "Text25": "", "Text26": "", "Text27": "", "Text28": "",
+        **check_box,
+    }
+    return DECLARATION_ENCN_TEMPLATE, fields
+
+
+def generate_declarations(fields: dict, output_dir) -> list:
+    """按发明人逐份生成 Declaration PDF。
+
+    :param fields: submission_tasks.fields_json
+    :param output_dir: 输出目录
+    :return: [{"file_path", "file_name", "inventor"}]
+    """
+    case_volume = fields.get("case_volume") or ""
+    title = (fields.get("case_info") or {}).get("case_name_en") or ""
+    advance = fields.get("case_advance_info") or {}
+    pct_app_no = (advance.get("pct_app_no") or "").strip()
+    pct_app_date = (advance.get("pct_app_date") or "").strip()
+    names = inventor_names(fields)
+    if not names:
+        raise ValueError("发明人列表为空，无法生成 Declaration")
+
+    special = is_special_client(case_volume)
+    template_path, _ = _build_field_dict(special, title, "", pct_app_no, pct_app_date)
+    if not template_path.exists():
+        raise RuntimeError(f"缺少模板 {template_path}")
+
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    today_str = datetime.now().strftime("%Y-%m-%d")
+
+    results = []
+    for inventor in names:
+        template_path, field_dict = _build_field_dict(special, title, inventor, pct_app_no, pct_app_date)
+        file_name = f"{today_str}-Declaration-{case_volume}-{inventor.replace(', ', '_').replace(',', '_')}.pdf"
+        file_path = output_dir / file_name
+        _fill_pdf_form(template_path, file_path, field_dict)
+        results.append({"file_path": str(file_path), "file_name": file_name, "inventor": inventor})
+    return results

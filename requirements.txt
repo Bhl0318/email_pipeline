@@ -5,3 +5,5 @@ pymssql
 requests
 python-multipart
 openai
+pymupdf
+python-docx

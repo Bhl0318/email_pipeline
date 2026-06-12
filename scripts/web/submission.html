@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>US 递交在线审核</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif; background: #f1f5f9; color: #1e293b; font-size: 13px; }
+  .layout { display: flex; height: 100vh; overflow: hidden; }
+
+  /* ── sidebar（对齐 prototype.html） ── */
+  .sidebar { width: 250px; background: #fff; border-right: 1px solid #e2e8f0; display: flex; flex-direction: column; flex-shrink: 0; transition: width .2s ease; }
+  .sidebar.collapsed { width: 36px; }
+  .sidebar-header { padding: 10px 12px; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+  .sidebar-title { font-size: 12px; font-weight: 600; color: #475569; white-space: nowrap; overflow: hidden; }
+  .sidebar.collapsed .sidebar-title, .sidebar.collapsed .sidebar-search, .sidebar.collapsed .sidebar-list { display: none; }
+  .sidebar-toggle { background: transparent; border: none; cursor: pointer; padding: 4px 6px; border-radius: 4px; color: #64748b; font-size: 14px; }
+  .sidebar-toggle:hover { background: #f1f5f9; }
+  .sidebar-search { padding: 8px 10px; border-bottom: 1px solid #f1f5f9; }
+  .sidebar-search input { width: 100%; padding: 6px 10px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 12px; outline: none; }
+  .sidebar-list { flex: 1; overflow-y: auto; }
+  .sidebar-item { padding: 9px 12px; border-bottom: 1px solid #f8fafc; cursor: pointer; display: flex; gap: 8px; }
+  .sidebar-item:hover { background: #f8fafc; }
+  .sidebar-item.active { background: #eff6ff; border-left: 3px solid #3b82f6; padding-left: 9px; }
+  .sidebar-item .dot { width: 6px; height: 6px; border-radius: 50%; margin-top: 6px; flex-shrink: 0; }
+  .dot.pending { background: #3b82f6; } .dot.skipped { background: #cbd5e1; } .dot.done { background: #10b981; }
+  .sidebar-item .row1 { font-size: 12px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sidebar-item .row2 { font-size: 11px; color: #94a3b8; margin-top: 2px; }
+  .sidebar-empty { padding: 24px 12px; text-align: center; color: #cbd5e1; font-size: 12px; }
+
+  /* ── 主区 ── */
+  .main { flex: 1; display: flex; min-width: 0; }
+  .form-pane { flex: 1; overflow-y: auto; padding: 16px 20px; min-width: 0; }
+  .preview-pane { width: 46%; border-left: 1px solid #e2e8f0; background: #fff; display: flex; flex-direction: column; flex-shrink: 0; }
+
+  .topbar { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+  .topbar h1 { font-size: 16px; }
+  .badge { font-size: 11px; padding: 2px 8px; border-radius: 10px; font-weight: 600; }
+  .badge.pending { background: #dbeafe; color: #1d4ed8; }
+  .badge.done { background: #d1fae5; color: #047857; }
+  .badge.skipped { background: #e2e8f0; color: #64748b; }
+  .topbar .spacer { flex: 1; }
+  button { cursor: pointer; border: 1px solid #cbd5e1; background: #fff; border-radius: 6px; padding: 7px 14px; font-size: 12.5px; color: #334155; }
+  button:hover { background: #f8fafc; }
+  button.primary { background: #2563eb; border-color: #2563eb; color: #fff; }
+  button.primary:hover { background: #1d4ed8; }
+  button.success { background: #059669; border-color: #059669; color: #fff; }
+  button.success:hover { background: #047857; }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+
+  .banner { border-radius: 8px; padding: 10px 14px; margin-bottom: 12px; font-size: 12.5px; line-height: 1.7; }
+  .banner.warn { background: #fef3c7; border: 1px solid #fcd34d; color: #92400e; }
+  .banner.error { background: #fee2e2; border: 1px solid #fca5a5; color: #b91c1c; }
+  .banner.ok { background: #d1fae5; border: 1px solid #6ee7b7; color: #047857; }
+  .banner ul { margin-left: 18px; }
+
+  .section { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; margin-bottom: 12px; overflow: hidden; }
+  .section-head { padding: 9px 14px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; font-weight: 600; font-size: 13px; color: #334155; display: flex; align-items: center; }
+  .section-head .spacer { flex: 1; }
+  .section-head button { padding: 3px 10px; font-size: 12px; }
+  .section-body { padding: 12px 14px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px 14px; }
+  .field label { display: block; font-size: 11.5px; color: #64748b; margin-bottom: 3px; }
+  .field label .req { color: #dc2626; }
+  .field input, .field select, .field textarea { width: 100%; padding: 6px 9px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 12.5px; outline: none; background: #fff; }
+  .field input:focus, .field select:focus, .field textarea:focus { border-color: #3b82f6; }
+  .field input[readonly] { background: #f8fafc; color: #64748b; }
+  .field input.missing, .field select.missing { border-color: #f59e0b; background: #fffbeb; }
+  .field .hint { font-size: 11px; color: #94a3b8; margin-top: 3px; line-height: 1.4; }
+
+  .item-block { border: 1px dashed #e2e8f0; border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; position: relative; }
+  .item-block .item-head { display: flex; align-items: center; margin-bottom: 8px; gap: 8px; }
+  .item-block .item-title { font-size: 12px; font-weight: 600; color: #475569; }
+  .item-block .item-head .spacer { flex: 1; }
+  .item-block .item-head button { padding: 2px 8px; font-size: 11.5px; }
+  .quad { margin-top: 8px; padding-top: 8px; border-top: 1px dashed #f1f5f9; }
+
+  /* ── 邮件正文模块 ── */
+  .mod-item { border: 1px solid #f1f5f9; border-radius: 8px; margin-bottom: 6px; }
+  .mod-head { display: flex; align-items: center; gap: 8px; padding: 8px 10px; cursor: pointer; flex-wrap: wrap; }
+  .mod-title { flex: 1; min-width: 120px; }
+  .mod-rowinput { display: flex; gap: 8px; align-items: center; padding: 8px 10px 0; flex-wrap: wrap; }
+  .mod-rowinput label { font-size: 11.5px; color: #64748b; }
+  .mod-rowinput input { flex: 1; min-width: 200px; padding: 5px 9px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 12.5px; }
+  .mod-head input[type=checkbox] { width: 15px; height: 15px; cursor: pointer; }
+  .mod-title { font-size: 12.5px; font-weight: 600; color: #334155; flex: 1; }
+  .mod-item.off .mod-title { color: #94a3b8; font-weight: 400; }
+  .mod-note { font-size: 11px; color: #94a3b8; }
+  .mod-num { width: 90px; padding: 3px 8px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 12px; }
+  .mod-body { border-top: 1px dashed #f1f5f9; padding: 8px 12px; font-size: 12.5px; color: #475569; background: #fcfcfd; display: none; }
+  .mod-item.open .mod-body { display: block; }
+  .mod-toggle { color: #94a3b8; font-size: 11px; user-select: none; }
+
+  /* ── 预览区 ── */
+  .preview-head { padding: 8px 12px; border-bottom: 1px solid #e2e8f0; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  .preview-head .tab { padding: 4px 12px; border-radius: 6px; font-size: 12px; border: 1px solid #e2e8f0; background: #fff; }
+  .preview-head .tab.active { background: #2563eb; border-color: #2563eb; color: #fff; }
+  .preview-files { padding: 6px 12px; font-size: 12px; border-bottom: 1px solid #f1f5f9; display: none; }
+  .preview-files .file-chip { display: inline-block; padding: 3px 10px; margin: 2px 8px 2px 0; border: 1px solid #e2e8f0; border-radius: 12px; color: #2563eb; cursor: pointer; }
+  .preview-files .file-chip.active { background: #2563eb; border-color: #2563eb; color: #fff; }
+  .preview-files .file-chip:hover:not(.active) { background: #eff6ff; }
+  .preview-files .dl-link { color: #059669; margin-left: 8px; text-decoration: none; font-weight: 600; }
+  .preview-files .dl-link:hover { text-decoration: underline; }
+  .preview-body { flex: 1; position: relative; }
+  .preview-body iframe { width: 100%; height: 100%; border: none; }
+  .preview-placeholder { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #cbd5e1; font-size: 13px; text-align: center; padding: 0 20px; line-height: 2; }
+
+  /* ── modal ── */
+  .modal-mask { position: fixed; inset: 0; background: rgba(15,23,42,.45); display: none; align-items: center; justify-content: center; z-index: 50; }
+  .modal-mask.show { display: flex; }
+  .modal { background: #fff; border-radius: 12px; width: 560px; max-width: 92vw; max-height: 88vh; overflow-y: auto; padding: 18px 20px; }
+  .modal h3 { font-size: 15px; margin-bottom: 12px; }
+  .modal .field { margin-bottom: 10px; }
+  .modal .attach-list { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 12px; font-size: 12px; line-height: 1.9; margin-bottom: 10px; }
+  .modal .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+
+  .toast { position: fixed; top: 14px; left: 50%; transform: translateX(-50%); background: #1e293b; color: #fff; padding: 9px 18px; border-radius: 8px; font-size: 12.5px; z-index: 99; display: none; }
+</style>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <span class="sidebar-title">US 递交待办</span>
+      <button class="sidebar-toggle" onclick="document.getElementById('sidebar').classList.toggle('collapsed')">&#9776;</button>
+    </div>
+    <div class="sidebar-search"><input id="sidebarSearch" placeholder="按案号筛选..." oninput="renderSidebar()"></div>
+    <div class="sidebar-list" id="sidebarList"><div class="sidebar-empty">加载中...</div></div>
+  </aside>
+
+  <div class="main">
+    <div class="form-pane" id="formPane">
+      <div class="topbar">
+        <h1 id="caseTitle">—</h1>
+        <span class="badge pending" id="statusBadge">…</span>
+        <span class="spacer"></span>
+        <button onclick="saveTask()">保存</button>
+        <button class="primary" onclick="refreshPreview()">刷新预览</button>
+        <button class="success" onclick="openSendModal()">确认发送</button>
+        <button onclick="skipTask()">跳过</button>
+      </div>
+      <div id="missingBanner"></div>
+      <div id="formSections"><div class="banner ok">从左侧选择任务，或通过审核链接进入。</div></div>
+    </div>
+
+    <div class="preview-pane">
+      <div class="preview-head">
+        <button class="tab active" data-target="confirmation" onclick="switchPreviewTab(this)">确认函</button>
+        <button class="tab" data-target="assignment" onclick="switchPreviewTab(this)">Assignment</button>
+        <button class="tab" data-target="declaration" onclick="switchPreviewTab(this)">Declaration</button>
+        <button class="tab" data-target="email" onclick="switchPreviewTab(this)">确认邮件</button>
+      </div>
+      <div class="preview-files" id="previewFiles"></div>
+      <div class="preview-body">
+        <iframe id="previewFrame" style="display:none"></iframe>
+        <div id="emailPreview" style="display:none;position:absolute;inset:0;overflow-y:auto;background:#f0f2f5;padding:18px;"></div>
+        <div class="preview-placeholder" id="previewPlaceholder">编辑字段后点击「刷新预览」<br>生成 PDF 在此显示</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 确认发送 modal -->
+<div class="modal-mask" id="sendModal">
+  <div class="modal">
+    <h3>确认发送 — 给客户的件和邮件</h3>
+    <div class="field"><label>发件人</label><input id="mFrom" readonly></div>
+    <div class="field"><label>收件人（多个用逗号分隔）<span class="req">*</span></label><input id="mTo"></div>
+    <div class="field"><label>抄送</label><input id="mCc"></div>
+    <div class="field"><label>主题</label><input id="mSubject"></div>
+    <div class="field"><label>正文（HTML）</label><textarea id="mBody" rows="5"></textarea></div>
+    <div class="field"><label>附件清单</label><div class="attach-list" id="mAttachments"></div></div>
+    <div id="mWarnings"></div>
+    <div class="actions">
+      <button onclick="closeSendModal()">取消</button>
+      <button class="success" id="mConfirmBtn" onclick="doConfirm()">确认并发送</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+const API = "/api/submission";
+let taskId = null, task = null, fields = {}, taskList = [];
+let emailModules = [], moduleChecked = {}, moduleParams = {};
+
+/* ───────── 工具 ───────── */
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+function toast(msg, ms = 2600) { const t = $("toast"); t.textContent = msg; t.style.display = "block"; clearTimeout(t._h); t._h = setTimeout(() => t.style.display = "none", ms); }
+function getPath(obj, path) { return path.reduce((o, k) => (o == null ? undefined : o[k]), obj); }
+function setPath(obj, path, val) {
+  let o = obj;
+  for (let i = 0; i < path.length - 1; i++) {
+    if (o[path[i]] == null) o[path[i]] = (typeof path[i + 1] === "number") ? [] : {};
+    o = o[path[i]];
+  }
+  o[path[path.length - 1]] = val;
+}
+async function api(method, url, body) {
+  const resp = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
+  const data = await resp.json().catch(() => ({}));
+  if (!resp.ok) { const err = new Error("api"); err.status = resp.status; err.data = data; throw err; }
+  return data;
+}
+function problemsOf(err) {
+  const d = err.data && err.data.detail;
+  if (d && d.problems) return d.problems;
+  if (typeof d === "string") return [d];
+  return ["请求失败 " + err.status];
+}
+
+/* ───────── 字段定义（数据驱动渲染） ───────── */
+const SECTIONS = {
+  caseInfo: { title: "案件信息", fields: [
+    { path: ["case_volume"], label: "方案号（Our Ref.）", readonly: true },
+    { path: ["case_info", "case_name_en"], label: "发明名称（英文）", req: true, wide: true },
+    { path: ["case_info", "case_name"], label: "发明名称（中文）" },
+    { path: ["business_type_zh_cn"], label: "业务类型" },
+    { path: ["filing_route"], label: "落地方式", req: true },
+    { path: ["ae_methods"], label: "加速方式", req: true },
+  ]},
+  advance: { title: "PCT 信息", fields: [
+    { path: ["case_advance_info", "pct_app_no"], label: "PCT 申请号" },
+    { path: ["case_advance_info", "pct_app_date"], label: "PCT 申请日" },
+    { path: ["case_advance_info", "pct_pub_no"], label: "PCT 公开号" },
+    { path: ["case_advance_info", "pct_pub_date"], label: "PCT 公开日" },
+    { path: ["case_advance_info", "original_app_no"], label: "原申请号" },
+    { path: ["case_advance_info", "original_app_date"], label: "原申请日" },
+  ]},
+};
+const APPLICANT_FIELDS = [
+  ["applicant_name_en", "英文名称", true], ["applicant_name_cn", "中文名称", false],
+  ["address1", "地址1（英文）", true], ["address2", "地址2（英文）", false],
+  ["contact_address_cn", "地址（中文）", false],
+  ["city_en", "城市（英文）", true], ["city_cn", "城市（中文）", false],
+  ["province_city_en_us", "省/州（英文）", true], ["province_city_zh_cn", "省/州（中文）", false],
+  ["postcode", "邮编", true], ["country_en_us", "国家（英文）", true], ["country_zh_cn", "国家（中文）", false],
+  ["entity_en", "实体类型（英文）", false], ["entity_cn", "实体类型（中文）", false],
+];
+const INVENTOR_FIELDS = [["last_name_en", "姓（大写）", true], ["first_name_en", "名", true], ["full_name_en", "全名", false]];
+const PRIORITY_FIELDS = [["priority_no", "优先权号", false], ["priority_num", "国别+号", false], ["priority_country_id", "国别", false], ["priority_date", "优先权日", false], ["access_code", "DAS 码", false]];
+const PARENT_FIELDS = [["Application No", "申请号", false], ["Filing Date", "申请日", false]];
+const ASSIGN_QUAD = [
+  ["assigning_company", "转让方公司名称"], ["company_representative", "签字代表姓名"],
+  ["representative_title", "代表职位"], ["company_address", "公司地址"],
+];
+
+/* ───────── sidebar ───────── */
+async function loadTaskList() {
+  try {
+    const d = await api("GET", `${API}/tasks?type=filing_confirmation&status=pending,skipped`);
+    taskList = d.tasks || [];
+  } catch (e) { taskList = []; }
+  renderSidebar();
+}
+function renderSidebar() {
+  const kw = ($("sidebarSearch").value || "").toLowerCase();
+  const list = taskList.filter(t => !kw || (t.case_volume || "").toLowerCase().includes(kw));
+  $("sidebarList").innerHTML = list.length ? list.map(t => `
+    <div class="sidebar-item ${t.id === taskId ? "active" : ""}" onclick="navigateTo('${esc(t.id)}')">
+      <span class="dot ${esc(t.status)}"></span>
+      <div class="info"><div class="row1">${esc(t.case_volume)}</div>
+      <div class="row2">${esc(t.status)} · ${esc((t.created_at || "").slice(0, 16))}</div></div>
+    </div>`).join("") : '<div class="sidebar-empty">无待办任务</div>';
+}
+function navigateTo(id) {
+  history.pushState(null, "", `/submission/review/${id}`);
+  openTask(id);
+}
+
+/* ───────── 任务加载与表单渲染 ───────── */
+async function openTask(id) {
+  taskId = id;
+  try { task = await api("GET", `${API}/tasks/${id}`); }
+  catch (e) { $("formSections").innerHTML = `<div class="banner error">任务加载失败：${esc(problemsOf(e).join("；"))}</div>`; return; }
+  fields = task.fields_json || {};
+  emailModules = []; moduleChecked = {}; moduleParams = {};
+  $("caseTitle").textContent = task.case_volume || id;
+  const b = $("statusBadge"); b.textContent = task.status; b.className = "badge " + task.status;
+  renderMissing(); renderForm(); renderSidebar(); resetPreview();
+  loadEmailModules();
+}
+
+/* ───────── 确认邮件正文模块 ───────── */
+async function loadEmailModules() {
+  try {
+    const d = await api("POST", `${API}/tasks/${taskId}/email-modules`, { fields_json: fields, params: moduleParams });
+    emailModules = d.modules || [];
+    for (const m of emailModules) if (!(m.id in moduleChecked)) moduleChecked[m.id] = m.checked;
+    renderEmailModules();
+    if (previewTarget === "email") renderEmailPreview();
+  } catch (e) {
+    const el = $("sec-email-modules");
+    if (el) el.innerHTML = `<span style="color:#dc2626;font-size:12px;">模块加载失败：${esc(problemsOf(e).join("；"))}</span>`;
+  }
+}
+function regenerateModules() {
+  moduleParams.salutation = ($("modSalutation") || {}).value || "";
+  moduleParams.route_phrase = ($("modRoutePhrase") || {}).value || "";
+  moduleParams.repeat_entity = ($("modRepeatEntity") || {}).value || "";
+  moduleParams.claims_total = ($("modClaims") || {}).value || "";
+  moduleParams.pages_total = ($("modPagesTotal") || {}).value || "";
+  moduleParams.pages_excess = ($("modPagesExcess") || {}).value || "";
+  loadEmailModules();
+}
+function renderEmailModules() {
+  const el = $("sec-email-modules");
+  if (!el) return;
+  el.innerHTML = emailModules.map(m => {
+    const on = !!moduleChecked[m.id];
+    let inputs = "";       // 标题行的短输入（窄）
+    let rowInput = "";     // 标题行下方独占一行的宽输入
+    if (m.id === "greeting")
+      inputs = `<input class="mod-num" id="modSalutation" style="width:150px" placeholder="客户称呼（如：张总）" value="${esc(moduleParams.salutation || "")}" onclick="event.stopPropagation()" onchange="regenerateModules()">`;
+    if (m.id === "app_info")
+      rowInput = `<div class="mod-rowinput"><label>落地方式话术</label>
+        <input id="modRoutePhrase" placeholder="落地方式话术" value="${esc(moduleParams.route_phrase || m.input_value || "")}" onchange="regenerateModules()"></div>`;
+    if (m.id === "entity_repeat") {
+      const cur = moduleParams.repeat_entity || m.select_value || "大";
+      inputs = `<select class="mod-num" id="modRepeatEntity" onclick="event.stopPropagation()" onchange="regenerateModules()">` +
+        ["大", "小", "微小"].map(o => `<option value="${o}" ${o === cur ? "selected" : ""}>${o}实体</option>`).join("") + `</select>`;
+    }
+    if (m.id === "excess_claims")
+      inputs = `<input class="mod-num" id="modClaims" placeholder="总权要数" value="${esc(moduleParams.claims_total || "")}" onclick="event.stopPropagation()" onchange="regenerateModules()">`;
+    if (m.id === "excess_pages")
+      inputs = `<input class="mod-num" id="modPagesTotal" placeholder="总页数" value="${esc(moduleParams.pages_total || "")}" onclick="event.stopPropagation()" onchange="regenerateModules()">
+                <input class="mod-num" id="modPagesExcess" placeholder="超页数" value="${esc(moduleParams.pages_excess || "")}" onclick="event.stopPropagation()" onchange="regenerateModules()">`;
+    return `<div class="mod-item ${on ? "" : "off"}" id="mod-${esc(m.id)}">
+      <div class="mod-head" onclick="toggleModuleBody('${esc(m.id)}')">
+        <input type="checkbox" ${on ? "checked" : ""} onclick="event.stopPropagation()" onchange="moduleChecked['${esc(m.id)}']=this.checked;document.getElementById('mod-${esc(m.id)}').classList.toggle('off',!this.checked);if(previewTarget==='email')renderEmailPreview()">
+        <span class="mod-title">${esc(m.title)}</span>
+        ${inputs}
+        ${m.note ? `<span class="mod-note">${esc(m.note)}</span>` : ""}
+        <span class="mod-toggle">展开▾</span>
+      </div>
+      ${rowInput}
+      <div class="mod-body">${m.html}</div>
+    </div>`;
+  }).join("");
+}
+function toggleModuleBody(id) { document.getElementById("mod-" + id).classList.toggle("open"); }
+function assembleEmailBody() {
+  return emailModules.filter(m => moduleChecked[m.id]).map(m => m.html).join("\n");
+}
+function renderMissing() {
+  const list = task.missing_json || [];
+  $("missingBanner").innerHTML = list.length
+    ? `<div class="banner warn"><b>入库时记录的缺失/待确认项（${list.length}）：</b><ul>${list.map(m => `<li>${esc(m.description || m.field)}</li>`).join("")}</ul></div>`
+    : "";
+}
+function missingFieldSet() {
+  return new Set((task.missing_json || []).map(m => m.field || ""));
+}
+
+/* 确认函补充字段的派生默认（须与 confirmation_sheet_generator 逐项对齐） */
+function _firstApplicant() { return (fields.applicants || [])[0] || {}; }
+function laborDefaultEn() { return _firstApplicant().applicant_name_en || ""; }
+function laborDefaultCn() { return _firstApplicant().applicant_name_cn || ""; }
+function residenceDefaultEn() {
+  const a = _firstApplicant();
+  return [a.address1, a.address2, a.city_en, a.province_city_en_us, a.postcode, a.country_en_us]
+    .filter(x => x && String(x).trim()).join(", ");
+}
+function residenceDefaultCn() {
+  const a = _firstApplicant();
+  return [a.contact_address_cn, a.city_cn, a.province_city_zh_cn, a.country_zh_cn]
+    .filter(x => x && String(x).trim()).join(", ");
+}
+
+function fieldInput(def) {
+  let val = getPath(fields, def.path);
+  const overridden = val != null && val !== "";
+  // 惰性默认：未覆盖时显示派生值，但不写回 fields（留空＝生成器走派生，仍跟随源字段）
+  if (!overridden && def.deriveDefault) val = def.deriveDefault();
+  const dp = esc(JSON.stringify(def.path));
+  const hint = def.deriveDefault
+    ? `<div class="hint">${esc(def.hintText || "未填用默认值")}${overridden ? "（已手动覆盖，清空可恢复跟随）" : "（当前为默认值，改动即覆盖、清空恢复跟随）"}</div>`
+    : "";
+  return `<div class="field" style="${def.wide ? "grid-column: span 2;" : ""}">
+    <label>${esc(def.label)}${def.req ? ' <span class="req">*</span>' : ""}</label>
+    <input data-path='${dp}' value="${esc(val ?? "")}" ${def.readonly ? "readonly" : ""}>${hint}</div>`;
+}
+function arrayBlock(key, title, defs, extraHTML) {
+  const arr = fields[key] || [];
+  const blocks = arr.map((item, i) => `
+    <div class="item-block">
+      <div class="item-head"><span class="item-title">${esc(title)} ${i + 1}</span><span class="spacer"></span>
+        <button onclick="moveItem('${key}',${i},-1)" ${i === 0 ? "disabled" : ""}>↑</button>
+        <button onclick="moveItem('${key}',${i},1)" ${i === arr.length - 1 ? "disabled" : ""}>↓</button>
+        <button onclick="removeItem('${key}',${i})">删除</button></div>
+      <div class="grid">${defs.map(([k, label, req]) =>
+        fieldInput({ path: [key, i, k], label, req })).join("")}</div>
+      ${extraHTML ? extraHTML(item, i) : ""}
+    </div>`).join("");
+  return blocks || '<div style="color:#94a3b8;font-size:12px;padding:4px 0;">（空，点右上角「添加」）</div>';
+}
+function assignmentBlock() {
+  const arr = fields.assignments || [];
+  if (!arr.length) return '<div style="color:#94a3b8;font-size:12px;padding:4px 0;">（空 — 入库时未抽取到转让安排，请添加）</div>';
+  return arr.map((item, i) => {
+    const isCompany = item.assignment_type === "公司转公司";
+    return `<div class="item-block">
+      <div class="item-head"><span class="item-title">转让安排 ${i + 1}</span><span class="spacer"></span>
+        <button onclick="removeItem('assignments',${i})">删除</button></div>
+      <div class="field" style="max-width:260px;">
+        <label>转让类型 <span class="req">*</span></label>
+        <select data-mpath='${esc(JSON.stringify(["assignments", i, "assignment_type"]))}' onchange="onAssignTypeChange(${i}, this.value)">
+          <option value="" ${!item.assignment_type ? "selected" : ""}>— 请选择 —</option>
+          <option value="个人转公司" ${item.assignment_type === "个人转公司" ? "selected" : ""}>个人转公司</option>
+          <option value="公司转公司" ${isCompany ? "selected" : ""}>公司转公司</option>
+        </select></div>
+      <div class="quad" style="display:${isCompany ? "block" : "none"};">
+        <div class="grid">${ASSIGN_QUAD.map(([k, label]) =>
+          fieldInput({ path: ["assignments", i, k], label, req: true })).join("")}</div>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+function renderForm() {
+  const ro = task.status !== "pending";
+  const head = (title, addKey, addLabel) =>
+    `<div class="section-head">${esc(title)}<span class="spacer"></span>${addKey && !ro ? `<button onclick="addItem('${addKey}')">＋ 添加${esc(addLabel || "")}</button>` : ""}</div>`;
+
+  $("formSections").innerHTML = `
+    ${ro ? `<div class="banner ok">该任务状态为 ${esc(task.status)}，仅可查看。</div>` : ""}
+    <div class="section">${head(SECTIONS.caseInfo.title)}<div class="section-body"><div class="grid">
+      ${SECTIONS.caseInfo.fields.map(fieldInput).join("")}
+      <div class="field"><label>申请类型 <span class="req">*</span></label>
+        <select data-path='["application_type"]'>
+          <option value="" ${!fields.application_type ? "selected" : ""}>— 请选择 —</option>
+          <option value="发明" ${fields.application_type === "发明" ? "selected" : ""}>发明</option>
+          <option value="外观" ${fields.application_type === "外观" ? "selected" : ""}>外观</option>
+        </select></div>
+      <div class="field"><label>Subject Matter（推断值可改）</label>
+        <select data-path='["subject_matter"]'>
+          ${["UTL", "DES", "371"].map(v => `<option value="${v}" ${fields.subject_matter === v ? "selected" : ""}>${v}</option>`).join("")}
+        </select></div>
+      <div class="field"><label>接口人邮箱（审核链接/成品收件人）</label>
+        <input id="contactEmail" value="${esc(task.contact_email || "")}"></div>
+    </div></div></div>
+
+    <div class="section">${head("申请人", "applicants", "申请人")}<div class="section-body" id="sec-applicants">
+      ${arrayBlock("applicants", "申请人", APPLICANT_FIELDS)}</div></div>
+
+    <div class="section">${head("发明人", "inventors", "发明人")}<div class="section-body" id="sec-inventors">
+      ${arrayBlock("inventors", "发明人", INVENTOR_FIELDS)}</div></div>
+
+    <div class="section">${head("确认函补充（发明地 / 劳动合同归属 / 发明人住址）")}<div class="section-body"><div class="grid">
+      ${[
+        { path: ["case_info", "location_invention_en"], label: "发明/设计地（英文）", deriveDefault: () => "People's Republic of China (CN)", hintText: "默认 People's Republic of China (CN)" },
+        { path: ["case_info", "location_invention_cn"], label: "发明/设计地（中文）", deriveDefault: () => "中国", hintText: "默认 中国" },
+        { path: ["labor_contract_en"], label: "劳动合同归属（英文）", deriveDefault: laborDefaultEn, hintText: "默认＝申请人[0] 英文名称" },
+        { path: ["labor_contract_cn"], label: "劳动合同归属（中文）", deriveDefault: laborDefaultCn, hintText: "默认＝申请人[0] 中文名称" },
+        { path: ["inventor_residence_en"], label: "发明人住址 Residence（英文）", wide: true, deriveDefault: residenceDefaultEn, hintText: "默认＝申请人[0] 地址六项合并" },
+        { path: ["inventor_residence_cn"], label: "发明人住址 Residence（中文）", wide: true, deriveDefault: residenceDefaultCn, hintText: "默认＝申请人[0] 中文地址合并" },
+      ].map(fieldInput).join("")}
+    </div></div></div>
+
+    <div class="section">${head("优先权", "priorities", "优先权")}<div class="section-body" id="sec-priorities">
+      ${arrayBlock("priorities", "优先权", PRIORITY_FIELDS)}</div></div>
+
+    <div class="section">${head(SECTIONS.advance.title)}<div class="section-body"><div class="grid">
+      ${SECTIONS.advance.fields.map(fieldInput).join("")}</div></div></div>
+
+    <div class="section">${head("美国母案链", "parent_applications", "母案")}<div class="section-body" id="sec-parents">
+      ${arrayBlock("parent_applications", "母案", PARENT_FIELDS)}</div></div>
+
+    <div class="section">${head("转让安排", "assignments", "一段转让")}<div class="section-body" id="sec-assignments">
+      ${assignmentBlock()}</div></div>
+
+    <div class="section"><div class="section-head">确认邮件正文模块（勾选适用项，发送时按勾选拼装）<span class="spacer"></span>
+      ${ro ? "" : '<button onclick="regenerateModules()">↻ 重新生成模块</button>'}</div>
+      <div class="section-body" id="sec-email-modules">${emailModules.length ? "" : '<span style="color:#94a3b8;font-size:12px;">加载中...</span>'}</div></div>`;
+
+  // 输入双向绑定（事件委托）
+  const pane = $("formSections");
+  pane.oninput = e => {
+    const dp = e.target.getAttribute("data-path");
+    if (dp) setPath(fields, JSON.parse(dp), e.target.value);
+  };
+  pane.onchange = pane.oninput;
+  if (ro) pane.querySelectorAll("input,select,button").forEach(el => { if (!el.closest(".section-head")) el.disabled = true; });
+  // 入库缺失项高亮（精确路径匹配：assignments[1].assignment_type → assignments.1.assignment_type）
+  const miss = [...missingFieldSet()].filter(Boolean).map(m => m.replace(/\[(\d+)\]/g, ".$1"));
+  pane.querySelectorAll("[data-path],[data-mpath]").forEach(el => {
+    const flat = JSON.parse(el.getAttribute("data-path") || el.getAttribute("data-mpath")).join(".");
+    for (const m of miss) if ((flat === m || flat.startsWith(m + ".")) && !el.value) { el.classList.add("missing"); break; }
+  });
+  // 数组增删等触发的重渲染会清空模块区，恢复已加载的模块
+  if (emailModules.length) renderEmailModules();
+}
+
+/* ───────── 数组操作（值保留在 state，重渲染对应区块） ───────── */
+const EMPTY_ITEM = {
+  applicants: () => Object.fromEntries(APPLICANT_FIELDS.map(([k]) => [k, ""])),
+  inventors: () => Object.fromEntries(INVENTOR_FIELDS.map(([k]) => [k, ""])),
+  priorities: () => Object.fromEntries(PRIORITY_FIELDS.map(([k]) => [k, ""])),
+  parent_applications: () => Object.fromEntries(PARENT_FIELDS.map(([k]) => [k, ""])),
+  assignments: () => ({ assignment_type: "", assigning_company: null, company_representative: null, representative_title: null, company_address: null }),
+};
+function addItem(key) { (fields[key] = fields[key] || []).push(EMPTY_ITEM[key]()); renderForm(); }
+function removeItem(key, i) { fields[key].splice(i, 1); renderForm(); }
+function moveItem(key, i, dir) { const a = fields[key]; const j = i + dir; [a[i], a[j]] = [a[j], a[i]]; renderForm(); }
+function onAssignTypeChange(i, val) { fields.assignments[i].assignment_type = val; renderForm(); } // 切换不清值：四件套留在 state
+
+/* ───────── 保存 / 跳过 ───────── */
+async function saveTask() {
+  if (!taskId) return;
+  try {
+    await api("POST", `${API}/tasks/${taskId}/save`, { fields_json: fields, contact_email: $("contactEmail") ? $("contactEmail").value.trim() : "" });
+    toast("已保存 ✅");
+  } catch (e) { toast("保存失败：" + problemsOf(e).join("；"), 4000); }
+}
+async function skipTask() {
+  if (!taskId || !confirm("确认跳过该任务？")) return;
+  try { await api("POST", `${API}/tasks/${taskId}/skip`); toast("已跳过"); await loadTaskList(); openTask(taskId); }
+  catch (e) { toast("操作失败：" + problemsOf(e).join("；"), 4000); }
+}
+
+/* ───────── 预览 ───────── */
+let previewTarget = "confirmation";
+let previewFileList = [];
+function renderPreviewFileChips(activeIdx) {
+  const f = previewFileList[activeIdx];
+  const dl = f ? `<span style="margin-left:4px;color:#94a3b8;">下载：</span>` +
+    (f.docx_url ? `<a class="dl-link" href="${esc(f.docx_url)}" download>docx</a>` : "") +
+    `<a class="dl-link" href="${esc(f.pdf_url)}" download>PDF</a>` : "";
+  $("previewFiles").innerHTML = previewFileList.map((fl, i) =>
+    `<span class="file-chip ${i === activeIdx ? "active" : ""}" onclick="showPreviewFile(${i})" title="${esc(fl.name)}">${esc(fl.name)}</span>`
+  ).join("") + dl;
+}
+function showPreviewFile(i) {
+  const f = previewFileList[i];
+  if (!f) return;
+  renderPreviewFileChips(i);
+  $("previewFrame").src = f.pdf_url + "?t=" + Date.now();
+  $("previewFrame").style.display = "block";
+  $("previewPlaceholder").style.display = "none";
+}
+function switchPreviewTab(btn) {
+  document.querySelectorAll(".preview-head .tab").forEach(t => t.classList.remove("active"));
+  btn.classList.add("active");
+  previewTarget = btn.dataset.target;
+  if (previewTarget === "email") { renderEmailPreview(); return; }
+  $("emailPreview").style.display = "none";
+  refreshPreview();
+}
+function renderEmailPreview() {
+  $("previewFrame").style.display = "none";
+  $("previewFiles").style.display = "none";
+  $("previewPlaceholder").style.display = "none";
+  const div = $("emailPreview");
+  div.style.display = "block";
+  // 白纸卡片 + 宋体/Times 12pt 行距150%，与汇报信邮件预览同款（所见即所得）
+  div.innerHTML = `<div style="background:#fff;min-height:620px;padding:36px 40px;box-shadow:0 1px 4px rgba(0,0,0,.08);border-radius:4px;font-family:宋体,'SimSun','Times New Roman',serif;font-size:12pt;line-height:1.5;color:#000;">${
+    emailModules.length ? assembleEmailBody() : '<span style="color:#94a3b8;">邮件模块加载中…</span>'
+  }</div>`;
+}
+function resetPreview() {
+  $("previewFrame").style.display = "none"; $("previewFiles").style.display = "none";
+  $("previewPlaceholder").style.display = "flex";
+  $("previewPlaceholder").innerHTML = "编辑字段后点击「刷新预览」<br>生成 PDF 在此显示";
+}
+async function refreshPreview() {
+  if (!taskId) return;
+  $("previewPlaceholder").style.display = "flex"; $("previewPlaceholder").textContent = "生成中…";
+  $("previewFrame").style.display = "none";
+  try {
+    const d = await api("POST", `${API}/tasks/${taskId}/preview`, { fields_json: fields, target: previewTarget });
+    const files = d.files || [];
+    if (!files.length) { $("previewPlaceholder").textContent = "无产物"; return; }
+    previewFileList = files;
+    $("previewFiles").style.display = "block";
+    renderPreviewFileChips(0);
+    showPreviewFile(0);
+    if ((d.warnings || []).length) toast("⚠ " + d.warnings.join("；"), 5000);
+  } catch (e) {
+    $("previewPlaceholder").innerHTML = `<div>预览失败：<br>${problemsOf(e).map(esc).join("<br>")}</div>`;
+  }
+}
+
+/* ───────── 确认发送 ───────── */
+async function openSendModal() {
+  if (!taskId) return;
+  try {
+    const d = await api("POST", `${API}/tasks/${taskId}/preview-send`, { fields_json: fields });
+    $("mFrom").value = d.from || "";
+    $("mTo").value = (d.recipients || []).join(", ");
+    $("mCc").value = (d.cc || []).join(", ");
+    $("mSubject").value = d.subject || "";
+    $("mBody").value = emailModules.length ? assembleEmailBody() : (d.body_html || "");
+    $("mAttachments").innerHTML = (d.attachments || []).map(esc).join("<br>");
+    const warn = [...(d.warnings || []), ...(d.missing_optional_fields || []).map(m => "可选缺失：" + (m.description || m.field_name || m.field))];
+    $("mWarnings").innerHTML = warn.length ? `<div class="banner warn"><ul>${warn.map(w => `<li>${esc(w)}</li>`).join("")}</ul></div>` : "";
+    $("sendModal").classList.add("show");
+  } catch (e) {
+    const probs = problemsOf(e);
+    $("missingBanner").innerHTML = `<div class="banner error"><b>发送前校验未通过：</b><ul>${probs.map(p => `<li>${esc(p)}</li>`).join("")}</ul></div>`;
+    window.scrollTo(0, 0); toast("校验未通过，请按提示补全", 3500);
+  }
+}
+function closeSendModal() { $("sendModal").classList.remove("show"); }
+async function doConfirm() {
+  const recipients = $("mTo").value.split(/[,，;；]/).map(s => s.trim()).filter(Boolean);
+  if (!recipients.length) { toast("收件人不能为空"); return; }
+  const btn = $("mConfirmBtn"); btn.disabled = true; btn.textContent = "发送中…";
+  try {
+    const d = await api("POST", `${API}/tasks/${taskId}/confirm`, {
+      fields_json: fields, recipients,
+      cc: $("mCc").value.split(/[,，;；]/).map(s => s.trim()).filter(Boolean),
+      subject: $("mSubject").value.trim(), body_html: $("mBody").value,
+    });
+    closeSendModal();
+    $("missingBanner").innerHTML = `<div class="banner ok">✅ 已发送给 ${esc(d.sent_to.join(", "))}，共 ${d.files.length} 个附件；任务完成（followup: ${esc(d.followup_task_id.slice(0, 8))}…）</div>`;
+    await loadTaskList(); openTask(taskId);
+  } catch (e) { toast("发送失败：" + problemsOf(e).join("；"), 6000); }
+  finally { btn.disabled = false; btn.textContent = "确认并发送"; }
+}
+
+/* ───────── 入口 ───────── */
+window.onpopstate = () => { const id = parseIdFromURL(); if (id) openTask(id); };
+function parseIdFromURL() {
+  const m = location.pathname.match(/\/submission\/review\/([0-9a-fA-F-]+)/);
+  return m ? m[1] : null;
+}
+(async function init() {
+  await loadTaskList();
+  const id = parseIdFromURL() || (taskList[0] && taskList[0].id);
+  if (id) openTask(id);
+})();
+</script>
+</body>
+</html>
