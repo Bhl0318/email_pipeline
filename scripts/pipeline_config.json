@@ -1,11 +1,10 @@
 {
   "accounts": [
-    { "account": "docketing", "folder": "TEST" },
-    { "account": "attorneys", "folder": "TEST" }
+    { "account": "docketing", "folder": "TEST" }
   ],
   "sinks": {
     "oa": true,
-    "report": true
+    "report": false
   },
   "oa_test_project_prefix": "90009"
 }
