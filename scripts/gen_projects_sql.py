@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""离线生成 OA 立项 projects 表的 INSERT 语句（只读邮箱，不连库/不发信/不写Wiki）。
+"""离线生成 OA 立项 projects 表的 INSERT 语句（只读，不写库/不发信/不写Wiki）。
 
 用途：dispatch_oa 已启用前漏写的那批立项数据，用本脚本重新分类后把 INSERT 语句
 导出到 .sql 文件，人工 review 后自行执行入库。生成逻辑与 dispatch_oa 的 INSERT
-完全一致（同字段、同顺序、同转义、project_name 带 _by_email_pipline 后缀）。
+完全一致（同字段、同顺序、同转义、project_name 带 _by_email_pipline 后缀、
+customer 取客户简称）。
 
 用法：
   python3 gen_projects_sql.py                      # 读 TEST_AUTO，含 US 期限下载
@@ -12,8 +13,9 @@
   python3 gen_projects_sql.py --out my.sql         # 指定输出文件
 
 输出：默认 projects_inserts.sql（与本脚本同目录）。
-注意：会连真实邮箱读取（只读 IMAP），开启 US 期限时会调 USPTO API 下载官文。
-      不连数据库、不发任何邮件、不写 Wiki、不移动邮件。
+注意：会连真实邮箱读取（只读 IMAP），开启 US 期限时会调 USPTO API 下载官文，
+      并对 atw customer 表做只读 SELECT 取客户简称。
+      不写数据库（不执行任何 INSERT/UPDATE）、不发任何邮件、不写 Wiki、不移动邮件。
 """
 import os
 import sys
@@ -29,15 +31,40 @@ SHARED_EMAIL_CONFIG = os.path.join(SCRIPT_DIR, "email_config.json")
 PIPELINE_CONFIG = os.path.join(SCRIPT_DIR, "pipeline_config.json")
 
 # 与 dispatch_oa 完全一致的字段顺序
-FIELDS = ["id", "project", "project_name", "project_type", "oa_doc_date", "entrust_date",
+FIELDS = ["id", "project", "project_name", "project_type", "customer", "oa_doc_date", "entrust_date",
           "oaNum", "applytype", "project_deadline", "dueDate",
           "now_status", "project_phase", "submitby", "oa_remark", "wikiurl"]
+
+_customer_cache = {}
+
+
+def lookup_customer_shortname(project):
+    """atw customer 表只读查：customer_code（案号前5位）→ customer_shortname。
+    复刻 dispatch_oa 的 query_customer_shortname；查不到/连不上返回空串。"""
+    code = (project or "")[:5]
+    if not code:
+        return ""
+    if code in _customer_cache:
+        return _customer_cache[code]
+    name = ""
+    try:
+        from db_query import execute
+        safe = code.replace("'", "\\'")
+        rows = execute(f"SELECT customer_shortname FROM customer WHERE customer_code = '{safe}'")
+        if rows and rows[0].get("customer_shortname"):
+            name = rows[0]["customer_shortname"]
+    except Exception as e:
+        print(f"[customer] 查客户简称失败 {code}: {e}", file=sys.stderr)
+    _customer_cache[code] = name
+    return name
 
 
 def build_insert(item):
     """复刻 dispatch_oa 的单条 INSERT 构造逻辑。"""
     # project_type：CN → 中国答复及其他；其他 → 海外答复及其他
     item["project_type"] = "中国答复及其他" if item.get("region") == "CN" else "海外答复及其他"
+    # customer：客户简称，按案号前5位查 atw customer 表（只读）
+    item["customer"] = lookup_customer_shortname(item.get("project", ""))
     values = []
     for f in FIELDS:
         if f == "id":

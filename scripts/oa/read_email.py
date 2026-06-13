@@ -735,6 +735,30 @@ def read_and_classify_oa(accounts=None, config_path=None):
     return all_emails, all_results
 
 
+_customer_shortname_cache = {}
+
+
+def query_customer_shortname(customer_code):
+    """atw customer 表：customer_code（案号前5位）→ customer_shortname（客户简称）。
+    查不到/连不上返回空串，不阻塞立项。按 code 缓存避免重复查。"""
+    code = (customer_code or "")[:5]
+    if not code:
+        return ""
+    if code in _customer_shortname_cache:
+        return _customer_shortname_cache[code]
+    name = ""
+    try:
+        from db_query import execute
+        safe = code.replace("'", "\\'")
+        rows = execute(f"SELECT customer_shortname FROM customer WHERE customer_code = '{safe}'")
+        if rows and rows[0].get("customer_shortname"):
+            name = rows[0]["customer_shortname"]
+    except Exception as e:
+        print(f"[customer] 查客户简称失败 {code}: {e}", file=sys.stderr)
+    _customer_shortname_cache[code] = name
+    return name
+
+
 def dispatch_oa(all_results, all_emails=None, dry_run=False, test_project_prefix=None):
     """OA 立项下游 sink：建OA信息表页 → US期限 → 上传官文附件 → 新增OA → projects → 立项通知。
     all_emails 用于按 message_id 取邮件官文 PDF（CN/EP）；US 官文来自下载。
@@ -748,6 +772,8 @@ def dispatch_oa(all_results, all_emails=None, dry_run=False, test_project_prefix
         for _item in all_results:
             _p = _item.get("project", "") or ""
             if "-" in _p:
+                # 客户简称要按真实案号查，先记下原客户代码（前5位），再替换前缀
+                _item["_orig_customer_code"] = _p[:5]
                 _item["project"] = f"{test_project_prefix}-{_p.split('-', 1)[1]}"
         print(f"  [测试] 案号前缀已替换为 {test_project_prefix}", file=sys.stderr)
     # email_pipeline 测试标记：给 OA 立项的 project_name 统一加后缀，便于在
@@ -868,6 +894,9 @@ def dispatch_oa(all_results, all_emails=None, dry_run=False, test_project_prefix
                 continue
             # project_type：CN → 中国答复及其他；US/EP 等 → 海外答复及其他
             item["project_type"] = "中国答复及其他" if item.get("region") == "CN" else "海外答复及其他"
+            # customer：客户简称，按真实客户代码查 atw customer 表（测试前缀下用原始代码）
+            cust_code = item.get("_orig_customer_code") or (project or "")[:5]
+            item["customer"] = query_customer_shortname(cust_code)
             # 检查是否已存在
             check_sql = f"SELECT COUNT(*) as cnt FROM projects WHERE project='{project}' AND project_name='{project_name}'"
             try:
@@ -881,7 +910,7 @@ def dispatch_oa(all_results, all_emails=None, dry_run=False, test_project_prefix
             # 构建 INSERT
             import uuid
             row_id = str(uuid.uuid4())
-            fields = ["id", "project", "project_name", "project_type", "oa_doc_date", "entrust_date",
+            fields = ["id", "project", "project_name", "project_type", "customer", "oa_doc_date", "entrust_date",
                        "oaNum", "applytype", "project_deadline", "dueDate",
                        "now_status", "project_phase", "submitby", "oa_remark", "wikiurl"]
             values = []
