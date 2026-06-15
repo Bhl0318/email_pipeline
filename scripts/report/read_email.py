@@ -75,29 +75,28 @@ REPORT_TYPE_TO_TEMPLATE = {
         #   "无效宣告请求受理":    ("CN_无效宣告请求受理.md",     True),   # 15 无效+pdf
         #   "视为放弃":            ("CN_视为放弃通知.md",         False),  # 17 仅正文
     },
-    # "US": {
-        # "CTNF":          "US_官方审查意见转达.md",   # Non-Final OA
-        # "CTFR":          "US_官方审查意见转达.md",   # Final OA
-        # "CTAV":          "US_官方审查意见转达.md",   # Advisory Action
-        # "CTRS":          "US_官方审查意见转达.md",   # Restriction Election
-        # "CTEQ":          "US_官方审查意见转达.md",   # Ex Parte Quayle
-        # "NT.CR.APP.PA":  "US_补正通知转达.md",       # Notice to file corrected papers
-        # "M327":          "US_补正通知转达.md",       # 同上(另一码)
-        # "NTC.MISS.PRT":  "US_补正通知转达.md",       # Notice to file missing parts
-        # "PETDEC":        "US_补正通知转达.md",       # Petition Decision Dismissed
-        # TODO: NOA(授权及缴费) / PPH.DECISION(PPH请求批准) 待补模板
-        # EXIN: 业务侧标"无需汇报信"，不映射
-    # },
-    # "EP": {
-        # "European search report":      "EP_扩展检索报告.md",  # EESR+R.70(2)分类时已合并期限
-        # "Communication A.94(3)":       "EP_官方审查意见转达.md",
-        # "Intention to grant":          "EP_预授权通知.md",
-        # "Further search fee":          "EP_部分检索报告.md",
-        # "Communication R.62a(1)":      "EP_官方审查意见转达.md",
-        # "Summons to oral proceedings": "EP_庭审邀请.md",
-        # R.70(2): 分类时合并到 EESR result，不作独立 task
+    "US": {
+        "CTNF":          ("US_官方审查意见转达.md", True),   # Non-Final OA
+        "CTFR":          ("US_官方审查意见转达.md", True),   # Final OA
+        "CTAV":          ("US_官方审查意见转达.md", True),   # Advisory Action
+        "CTRS":          ("US_官方审查意见转达.md", True),   # Restriction Election
+        "CTEQ":          ("US_官方审查意见转达.md", True),   # Ex Parte Quayle
+        "NT.CR.APP.PA":  ("US_补正通知转达.md",     True),   # Notice to file corrected papers
+        "M327":          ("US_补正通知转达.md",     True),   # 同上(另一码)
+        "NTC.MISS.PRT":  ("US_补正通知转达.md",     True),   # Notice to file missing parts
+        "PETDEC":        ("US_补正通知转达.md",     True),   # Petition Decision Dismissed
+        # 只立项、不发汇报信：NOA(分案/续案评估)、EXIN(Examiner Interview)、PPH.DECISION
+    },
+    "EP": {
+        "European search report":      ("EP_扩展检索报告.md",     True),  # EESR+R.70(2)分类时已合并期限
+        "Communication A.94(3)":       ("EP_官方审查意见转达.md", True),
+        "Communication R.62a(1)":      ("EP_官方审查意见转达.md", True),
+        "Further search fee":          ("EP_部分检索报告.md",     True),
+        "Intention to grant":          ("EP_预授权通知.md",       True),
+        "Summons to oral proceedings": ("EP_庭审邀请.md",         True),
+        # R.70(2): 分类时合并到 EESR result，不作独立 task，不发汇报信
         # TODO: R.161(2)+162 / Decision to grant / R.53(3)优先权翻译 待补模板&分类规则
-    # },
+    },
 }
 REVIEW_BASE_URL = "http://10.10.70.88:8501"
 
@@ -106,17 +105,17 @@ REVIEW_NOTIFY_TO  = ["weihong.yuan@metis-ip.com"]
 REVIEW_NOTIFY_CC  = ["hailing.bi@metis-ip.com"]
 
 # USPTO Document Type 代码 → 英文全名（用于汇报信"官文英文名称"字段）
-# US_DOC_TYPE_FULLNAME = {
-    # "CTNF":         "Non-Final Office Action",
-    # "CTFR":         "Final Office Action",
-    # "CTAV":         "Advisory Action",
-    # "CTRS":         "Requirement for Restriction Election",
-    # "CTEQ":         "Ex Parte Quayle Action",
-    # "NT.CR.APP.PA": "Notice to file corrected application papers",
-    # "M327":         "Notice to file corrected application papers",
-    # "NTC.MISS.PRT": "Notice to file missing parts of nonprovisional application",
-    # "PETDEC":       "Petition Decision Dismissed",
-# }
+US_DOC_TYPE_FULLNAME = {
+    "CTNF":         "Non-Final Office Action",
+    "CTFR":         "Final Office Action",
+    "CTAV":         "Advisory Action",
+    "CTRS":         "Requirement for Restriction Election",
+    "CTEQ":         "Ex Parte Quayle Action",
+    "NT.CR.APP.PA": "Notice to file corrected application papers",
+    "M327":         "Notice to file corrected application papers",
+    "NTC.MISS.PRT": "Notice to file missing parts of nonprovisional application",
+    "PETDEC":       "Petition Decision Dismissed",
+}
 
 
 def build_report_fields(region, item):
@@ -155,51 +154,51 @@ def build_report_fields(region, item):
             "复审案件编号": "请提供",
         }
 
-    # if region == "US":
-        # return {
-            # **common,
-            # "申请号":         item.get("application_no", "") or "请提供",
-            # "递交日":         "请提供",
-            # "延期描述":       "",
-            # "延期后截止日期": "",
-            # "官文英文名称":   US_DOC_TYPE_FULLNAME.get(ntype, ntype),
-            # "补正类型":       "",
-            # "补正内容":       "",
-            # "IDS邮箱":        "IDS@metis-ip.com",
-            # "案号字段名":     "贵方案号",
-        # }
+    if region == "US":
+        return {
+            **common,
+            "申请号":         item.get("application_no", "") or "请提供",
+            "递交日":         "请提供",
+            "延期描述":       "",
+            "延期后截止日期": "",
+            "官文英文名称":   US_DOC_TYPE_FULLNAME.get(ntype, ntype),
+            "补正类型":       "",
+            "补正内容":       "",
+            "IDS邮箱":        "IDS@metis-ip.com",
+            "案号字段名":     "贵方案号",
+        }
 
-    # if region == "EP":
-        # return {
-            # **common,
-            # "申请号":         item.get("ep_number", "") or "请提供",
-            # "申请日":         "请提供",
-            # "收文日期":       issue_date,
-            # "答复通知日期":   "",
-            # "延期月数":       "",
-            # "延期后截止日期": "",
-            # "官文英文名称":   ntype,
+    if region == "EP":
+        return {
+            **common,
+            "申请号":         item.get("ep_number", "") or "请提供",
+            "申请日":         "请提供",
+            "收文日期":       issue_date,
+            "答复通知日期":   "",
+            "延期月数":       "",
+            "延期后截止日期": "",
+            "官文英文名称":   ntype,
             # 检索报告类
-            # "发明组数":       "",
-            # "引用文献数":     "",
-            # "剩余组数":       "",
-            # "缴费截止日期":   "",
-            # "每组检索费":     "",
+            "发明组数":       "",
+            "引用文献数":     "",
+            "剩余组数":       "",
+            "缴费截止日期":   "",
+            "每组检索费":     "",
             # 优先权翻译
-            # "优先权数量":     "",
-            # "优先权申请号":   "",
+            "优先权数量":     "",
+            "优先权申请号":   "",
             # 预授权
-            # "授权号":         "",
-            # "公告日期":       "",
-            # "生效截止日期":   "",
-            # "生效指示期限":   "",
-            # "分案截止日期":   "",
-            # "指示日期":       "",
-            # "生效国家列表":   "",
+            "授权号":         "",
+            "公告日期":       "",
+            "生效截止日期":   "",
+            "生效指示期限":   "",
+            "分案截止日期":   "",
+            "指示日期":       "",
+            "生效国家列表":   "",
             # 庭审
-            # "口审日期时间":     "",
-            # "书面答复截止日期": "",
-        # }
+            "口审日期时间":     "",
+            "书面答复截止日期": "",
+        }
 
     return common
 
@@ -1041,6 +1040,28 @@ def dispatch_report(all_results, all_emails, dry_run=False):
                             source_attachments.append(rel)
                         except Exception as e:
                             print(f"  [移动官文 PDF 失败] {src}: {e}", file=sys.stderr)
+
+                # US 官文 PDF 不走邮件附件：uspto.gov 通知邮件常不带 PDF，官文由 OA sink
+                # 经 USPTO API 下载（item['us_pdf_path']）。把它也并入审核任务附件。
+                # 依赖 OA sink 先于本 sink 跑（main.py 已保证）；OA 关或没下到则无此附件。
+                us_pdf = item.get("us_pdf_path", "")
+                if us_pdf and project:
+                    if not os.path.exists(us_pdf):
+                        print(f"  [US官文PDF] 路径不存在，跳过: {us_pdf}", file=sys.stderr)
+                    else:
+                        case_source_dir = os.path.join(OUTPUT_DIR, project, "source")
+                        os.makedirs(case_source_dir, exist_ok=True)
+                        dst = os.path.join(case_source_dir, os.path.basename(us_pdf))
+                        rel = f"{project}/source/{os.path.basename(dst)}"
+                        if rel not in source_attachments:
+                            try:
+                                if dry_run:
+                                    print(f"  [dry-run] 跳过复制 US 官文 PDF: {os.path.basename(us_pdf)}", file=sys.stderr)
+                                else:
+                                    shutil.copy2(us_pdf, dst)  # 复制非移动：OA 已用它上传 Wiki，保留原件
+                                source_attachments.append(rel)
+                            except Exception as e:
+                                print(f"  [复制 US 官文 PDF 失败] {us_pdf}: {e}", file=sys.stderr)
 
                 review_link = f"{REVIEW_BASE_URL}/review/{row_id}"
                 if dry_run:
