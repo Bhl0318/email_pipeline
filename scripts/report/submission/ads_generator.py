@@ -403,9 +403,11 @@ if __name__ == "__main__":
                       "Signature": "", "Date": "2025-11-28", "title": "Patent Agent"},
     }
     xml = build_ads_datasets_xml(sample)
-    print(xml[:600], "...\n")
     print(f"[self-test] datasets XML 长度={len(xml)}，含案号={'64504-H006US00' in xml}，"
           f"含客户号={'194498' in xml}")
-    if len(sys.argv) > 1:  # 传模板路径则真注入
-        r = generate_ads(sample, "/tmp/ads_out", template_pdf=sys.argv[1])
-        print("生成:", r)
+    # 默认用包内模板(submission/templates/ADS.pdf)生成到 report/ads_test_out/
+    # 传参可覆盖模板：py -m submission.ads_generator <模板路径>
+    template = sys.argv[1] if len(sys.argv) > 1 else None
+    out_dir = Path(__file__).resolve().parent.parent / "ads_test_out"  # = report/ads_test_out/
+    r = generate_ads(sample, out_dir, template_pdf=template)
+    print("生成:", r)
