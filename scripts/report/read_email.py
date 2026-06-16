@@ -169,7 +169,7 @@ def build_report_fields(region, item):
             "补正类型":       "",
             "补正内容":       "",
             "IDS邮箱":        "IDS@metis-ip.com",
-            "案号字段名":     "贵方案号",
+            "案号字段名":     "委托方案号",
         }
 
     if region == "EP":
