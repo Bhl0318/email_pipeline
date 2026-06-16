@@ -2,10 +2,13 @@
 """US 递交文档生成：共享常量与字段加工。
 
 输入统一为 submission_tasks.fields_json（schema 见 us_submission/在线审核与文件生成方案.md 2.2），
-所有函数只读 fields，不做网络/数据库访问。
+字段加工函数只读 fields、不做网络/数据库访问；另提供本地 PDF AcroForm 填表工具
+fill_pdf_form（仅本地文件 I/O，供 POA/Transmittal 等生成器共用）。
 """
 import re
 from pathlib import Path
+
+import fitz  # PyMuPDF
 
 # 模板自包含在本包内（部署单元是汇报信流程目录，不依赖仓库其他路径）
 TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
@@ -13,7 +16,35 @@ TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
 ASSIGNMENT_TEMPLATE = TEMPLATES_DIR / "Assignment.docx"
 DECLARATION_EN_TEMPLATE = TEMPLATES_DIR / "DECLARATION_en.pdf"
 DECLARATION_ENCN_TEMPLATE = TEMPLATES_DIR / "DECLARATION_encn.pdf"
-ADS_TEMPLATE = TEMPLATES_DIR / "ADS.pdf"  # USPTO ADS 空 XFA 表单（待从旧机取回放入）
+ADS_TEMPLATE = TEMPLATES_DIR / "ADS.pdf"  # USPTO ADS 空 XFA 表单
+POA_TEMPLATE = TEMPLATES_DIR / "POA.pdf"
+TRANSMITTAL_TEMPLATE = TEMPLATES_DIR / "Transmittal.pdf"            # UTL
+TRANSMITTAL_DESIGN_TEMPLATE = TEMPLATES_DIR / "Design-Transmittal.pdf"  # DES
+TRANSMITTAL_371_TEMPLATE = TEMPLATES_DIR / "371-Transmittal.pdf"    # 其他(371)
+# 注：POA / Transmittal 三件空表单模板需放入 submission/templates/（同 ADS，从旧机取回）
+
+
+def fill_pdf_form(template_pdf, output_pdf, field_updates: dict) -> None:
+    """填写 PDF AcroForm 表单字段（PyMuPDF，本地，移植自旧 PDFFormHandler.update_pdf_form_field）。
+    checkbox(field_type==2) 命中即勾选 'Yes'，其余按字符串写入；非表单字段名忽略。"""
+    template_pdf = Path(template_pdf)
+    if not template_pdf.is_file():
+        raise FileNotFoundError(f"PDF 模板不存在: {template_pdf}（需放入 submission/templates/）")
+    doc = fitz.open(str(template_pdf))
+    doc.need_appearances(False)
+    for page in doc:
+        widgets = page.widgets()
+        if not widgets:
+            continue
+        for field in widgets:
+            if field.field_name in field_updates:
+                if field.field_type == 2:  # checkbox
+                    field.field_value = "Yes"
+                else:
+                    field.field_value = str(field_updates[field.field_name])
+                field.update()
+    doc.save(str(output_pdf))
+    doc.close()
 
 # 特例客户清单（方案 2.3 全局配置）：方案号前缀命中 → Declaration 用英文版模板、
 # Assignment 公司转公司时保留受让人签字页
