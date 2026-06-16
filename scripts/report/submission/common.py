@@ -13,6 +13,7 @@ TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
 ASSIGNMENT_TEMPLATE = TEMPLATES_DIR / "Assignment.docx"
 DECLARATION_EN_TEMPLATE = TEMPLATES_DIR / "DECLARATION_en.pdf"
 DECLARATION_ENCN_TEMPLATE = TEMPLATES_DIR / "DECLARATION_encn.pdf"
+ADS_TEMPLATE = TEMPLATES_DIR / "ADS.pdf"  # USPTO ADS 空 XFA 表单（待从旧机取回放入）
 
 # 特例客户清单（方案 2.3 全局配置）：方案号前缀命中 → Declaration 用英文版模板、
 # Assignment 公司转公司时保留受让人签字页
