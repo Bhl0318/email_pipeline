@@ -1,0 +1,73 @@
+{
+  "_README": [
+    "邮箱凭据 + 通知收件人配置模板。复制本文件为 email_config.json 后填真实值。",
+    "两处都要放：① scripts/email_config.json（main.py 批处理用）；② scripts/report/email_config.json（report_server.py 审核服务独读）。",
+    "凡 <...> 占位都必须替换为真实值，否则连不上邮箱/发不了信。",
+    "以 _ 开头的键是注释，代码用 .get() 取键、忽略多余键，所以填完后留着或删掉都行。",
+    "imap_host/imap_port/smtp_host/smtp_port/resource 已是 partner.outlook.cn 正确值，通常不用改。",
+    "凭据（client_id/client_secret/token_url 的 tenant）来自 Azure 应用注册（世纪互联 China 云）。",
+    "本文件不含任何真实凭据，可安全提交到 git；真实的 email_config.json 已被 gitignore。"
+  ],
+
+  "accounts": {
+    "docketing": {
+      "_说明": "CN + US OA 邮件收件箱（IMAP 只读）。main.py 读这个账号的 TEST 文件夹。",
+      "imap_host": "smtp.partner.outlook.cn",
+      "imap_port": "993",
+      "user": "<docketing 真实邮箱，如 docketing@xxx.com>",
+      "password": "",
+      "_password说明": "OAuth2 模式下留空即可，登录靠下面 oauth2 的 token。",
+      "oauth2": {
+        "enabled": "True",
+        "token_url": "https://login.partner.microsoftonline.cn/<租户ID>/oauth2/token",
+        "client_id": "<Azure 应用 client_id>",
+        "client_secret": "<Azure 应用 client_secret>",
+        "resource": "https://partner.outlook.cn"
+      }
+    },
+
+    "attorneys": {
+      "_说明": "EP OA 邮件收件箱（IMAP 只读）。EP 邮件来自 panovision，转达到此账号。",
+      "imap_host": "smtp.partner.outlook.cn",
+      "imap_port": "993",
+      "user": "<attorneys 真实邮箱>",
+      "password": "",
+      "oauth2": {
+        "enabled": "True",
+        "token_url": "https://login.partner.microsoftonline.cn/<租户ID>/oauth2/token",
+        "client_id": "<Azure 应用 client_id>",
+        "client_secret": "<Azure 应用 client_secret>",
+        "resource": "https://partner.outlook.cn"
+      }
+    },
+
+    "pa": {
+      "_说明": "发信账号（SMTP）。用于发 OA 立项通知 send_notification + 汇报信审核链接 send_review_links_email。",
+      "smtp_host": "smtp.partner.outlook.cn",
+      "smtp_port": "587",
+      "user": "<发信邮箱>",
+      "password": "",
+      "oauth2": {
+        "enabled": "True",
+        "token_url": "https://login.partner.microsoftonline.cn/<租户ID>/oauth2/token",
+        "client_id": "<Azure 应用 client_id>",
+        "client_secret": "<Azure 应用 client_secret>",
+        "resource": "https://partner.outlook.cn"
+      }
+    }
+  },
+
+  "notification": {
+    "_说明": "通知邮件收件人。OA 与汇报信各一份，互不合并。recipients 非空就用它（不回退代码里写死的常量）。",
+    "oa": {
+      "_说明": "OA 立项汇总通知（dispatch_oa → send_notification）的收件人。",
+      "recipients": ["<OA 立项通知收件人邮箱>"],
+      "cc": ["<抄送邮箱，没有就写 []>"]
+    },
+    "report": {
+      "_说明": "汇报信审核链接通知（dispatch_report → send_review_links_email）的收件人。测试期填自己的测试邮箱，切勿填客户。",
+      "recipients": ["<汇报信审核通知收件人邮箱>"],
+      "cc": ["<抄送邮箱，没有就写 []>"]
+    }
+  }
+}
