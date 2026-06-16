@@ -296,6 +296,14 @@
             <div class="field-source"><span class="src-manual">&#9679;</span> 手选</div>
           </div>
         </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>指示期限</label>
+            <input type="date" id="f-instruction-deadline">
+            <div class="field-source"><span class="src-manual">&#9679;</span> 发信日+2周（驳回/US/EP 用）</div>
+          </div>
+          <div class="form-group form-group--placeholder" style="visibility:hidden;"></div>
+        </div>
       </div>
 
       <!-- 接口联系方式 -->
@@ -340,11 +348,189 @@
             <input type="text" id="f-review-no" placeholder="如：1F587103">
             <div class="field-source"><span class="src-manual">&#9679;</span> 手填（复审通知书用）</div>
           </div>
+          <div class="form-group form-group--placeholder" style="visibility:hidden;"></div>
+        </div>
+      </div>
+
+      <!-- 海外（US/EP）通用字段 -->
+      <div class="form-section">
+        <h3><span class="icon icon-purple">&#127758;</span> 海外通用字段（US/EP）</h3>
+        <div class="form-row">
           <div class="form-group">
-            <label>指示期限</label>
-            <input type="date" id="f-instruction-deadline">
-            <div class="field-source"><span class="src-manual">&#9679;</span> 手填（驳回决定用）</div>
+            <label>官文英文名称</label>
+            <input type="text" id="f-doc-en-name" placeholder="如：Non-Final Office Action">
+            <div class="field-source"><span class="src-auto">&#9679;</span> 官文类型映射 / 手填</div>
           </div>
+          <div class="form-group">
+            <label>延期后截止日期</label>
+            <input type="date" id="f-ext-deadline">
+            <div class="field-source"><span class="src-manual">&#9679;</span> 手填（绝限，需交延期费）</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- US 专属字段 -->
+      <div class="form-section">
+        <h3><span class="icon icon-purple">&#127482;&#127480;</span> US 专属字段</h3>
+        <div class="form-row">
+          <div class="form-group">
+            <label>本申请递交日</label>
+            <input type="date" id="f-submit-date">
+            <div class="field-source"><span class="src-auto">&#9679;</span> 案件系统 / 手填</div>
+          </div>
+          <div class="form-group">
+            <label>案号字段名</label>
+            <select id="f-ref-label">
+              <option value="贵方案号">贵方案号</option>
+              <option value="委托方案号">委托方案号</option>
+            </select>
+            <div class="field-source"><span class="src-manual">&#9679;</span> 手选</div>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>延期描述</label>
+            <input type="text" id="f-ext-desc" placeholder="如：再延三个月">
+            <div class="field-source"><span class="src-manual">&#9679;</span> 手填</div>
+          </div>
+          <div class="form-group">
+            <label>IDS 邮箱</label>
+            <input type="text" id="f-ids-email" placeholder="IDS@metis-ip.com">
+            <div class="field-source"><span class="src-manual">&#9679;</span> 手填</div>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>补正类型</label>
+            <input type="text" id="f-correction-type" placeholder="如：补正附图">
+            <div class="field-source"><span class="src-manual">&#9679;</span> 手填（补正通知用）</div>
+          </div>
+          <div class="form-group">
+            <label>补正内容</label>
+            <input type="text" id="f-correction-content" placeholder="官文要求补正的内容">
+            <div class="field-source"><span class="src-manual">&#9679;</span> 手填（补正通知用）</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- EP 专属字段 -->
+      <div class="form-section">
+        <h3><span class="icon icon-purple">&#127466;&#127482;</span> EP 专属字段</h3>
+        <div class="form-row">
+          <div class="form-group">
+            <label>收文日期</label>
+            <input type="date" id="f-receive-date">
+            <div class="field-source"><span class="src-auto">&#9679;</span> 邮件/官文</div>
+          </div>
+          <div class="form-group">
+            <label>答复通知日期</label>
+            <input type="date" id="f-reply-notice-date">
+            <div class="field-source"><span class="src-manual">&#9679;</span> 手填（EESR R.70(2)）</div>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>延期月数</label>
+            <input type="text" id="f-ext-months" placeholder="如：2">
+            <div class="field-source"><span class="src-manual">&#9679;</span> 手填</div>
+          </div>
+          <div class="form-group">
+            <label>书面答复截止日期</label>
+            <input type="date" id="f-written-reply-deadline">
+            <div class="field-source"><span class="src-manual">&#9679;</span> 手填（庭审用）</div>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>口审日期时间</label>
+            <input type="text" id="f-oral-datetime" placeholder="如：2026-05-20 10:00（欧洲时间）">
+            <div class="field-source"><span class="src-manual">&#9679;</span> 手填（庭审用）</div>
+          </div>
+          <div class="form-group">
+            <label>缴费截止日期</label>
+            <input type="date" id="f-fee-deadline">
+            <div class="field-source"><span class="src-manual">&#9679;</span> 手填（检索报告用）</div>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>发明组数</label>
+            <input type="text" id="f-invention-groups" placeholder="如：3">
+            <div class="field-source"><span class="src-manual">&#9679;</span> 手填（部分检索用）</div>
+          </div>
+          <div class="form-group">
+            <label>剩余组数</label>
+            <input type="text" id="f-remaining-groups" placeholder="如：2">
+            <div class="field-source"><span class="src-manual">&#9679;</span> 手填（部分检索用）</div>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>引用文献数</label>
+            <input type="text" id="f-cited-count" placeholder="如：5">
+            <div class="field-source"><span class="src-manual">&#9679;</span> 手填（部分检索用）</div>
+          </div>
+          <div class="form-group">
+            <label>每组检索费（欧元）</label>
+            <input type="text" id="f-search-fee" placeholder="如：1300">
+            <div class="field-source"><span class="src-manual">&#9679;</span> 手填（部分检索用）</div>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>优先权数量</label>
+            <input type="text" id="f-priority-count" placeholder="如：1">
+            <div class="field-source"><span class="src-manual">&#9679;</span> 手填（优先权翻译用）</div>
+          </div>
+          <div class="form-group">
+            <label>优先权申请号</label>
+            <input type="text" id="f-priority-no">
+            <div class="field-source"><span class="src-manual">&#9679;</span> 手填（优先权翻译用）</div>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>授权号</label>
+            <input type="text" id="f-grant-no">
+            <div class="field-source"><span class="src-auto">&#9679;</span> 官文（预授权用）</div>
+          </div>
+          <div class="form-group">
+            <label>公告日期</label>
+            <input type="date" id="f-publish-date">
+            <div class="field-source"><span class="src-auto">&#9679;</span> 官文（预授权用）</div>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>生效截止日期</label>
+            <input type="date" id="f-validate-deadline">
+            <div class="field-source"><span class="src-manual">&#9679;</span> 手填（预授权用）</div>
+          </div>
+          <div class="form-group">
+            <label>生效指示期限</label>
+            <input type="date" id="f-validate-instruction-deadline">
+            <div class="field-source"><span class="src-manual">&#9679;</span> 手填（预授权用）</div>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>分案截止日期</label>
+            <input type="date" id="f-divisional-deadline">
+            <div class="field-source"><span class="src-manual">&#9679;</span> 手填（预授权用）</div>
+          </div>
+          <div class="form-group">
+            <label>指示日期</label>
+            <input type="date" id="f-instruction-date">
+            <div class="field-source"><span class="src-manual">&#9679;</span> 手填（预授权用）</div>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>生效国家列表</label>
+            <input type="text" id="f-validate-countries" placeholder="如：DE, FR, GB">
+            <div class="field-source"><span class="src-manual">&#9679;</span> 手填（预授权用）</div>
+          </div>
+          <div class="form-group form-group--placeholder" style="visibility:hidden;"></div>
         </div>
       </div>
 
@@ -433,8 +619,41 @@
     "联系人手机": "f-contact-phone",
     "复审案件编号": "f-review-no",
     "复审请求费":  "f-review-fee",
+    // 海外通用（US/EP）
+    "官文英文名称":   "f-doc-en-name",
+    "延期后截止日期": "f-ext-deadline",
+    // US 专属
+    "递交日":     "f-submit-date",
+    "案号字段名": "f-ref-label",
+    "延期描述":   "f-ext-desc",
+    "IDS邮箱":    "f-ids-email",
+    "补正类型":   "f-correction-type",
+    "补正内容":   "f-correction-content",
+    // EP 专属
+    "收文日期":     "f-receive-date",
+    "答复通知日期": "f-reply-notice-date",
+    "延期月数":     "f-ext-months",
+    "书面答复截止日期": "f-written-reply-deadline",
+    "口审日期时间": "f-oral-datetime",
+    "缴费截止日期": "f-fee-deadline",
+    "发明组数":     "f-invention-groups",
+    "剩余组数":     "f-remaining-groups",
+    "引用文献数":   "f-cited-count",
+    "每组检索费":   "f-search-fee",
+    "优先权数量":   "f-priority-count",
+    "优先权申请号": "f-priority-no",
+    "授权号":       "f-grant-no",
+    "公告日期":     "f-publish-date",
+    "生效截止日期": "f-validate-deadline",
+    "生效指示期限": "f-validate-instruction-deadline",
+    "分案截止日期": "f-divisional-deadline",
+    "指示日期":     "f-instruction-date",
+    "生效国家列表": "f-validate-countries",
   };
-  const DATE_FIELDS = ["发文日期", "截止日期", "申请日"];
+  const DATE_FIELDS = ["发文日期", "截止日期", "申请日", "指示期限",
+    "延期后截止日期", "递交日", "收文日期", "答复通知日期", "书面答复截止日期",
+    "缴费截止日期", "公告日期", "生效截止日期", "生效指示期限",
+    "分案截止日期", "指示日期"];
 
   // ───────────── 状态 ─────────────
   let currentTaskId = null;
