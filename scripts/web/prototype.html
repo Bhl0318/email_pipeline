@@ -788,7 +788,8 @@
     document.querySelectorAll('.form-section').forEach(section => {
       if (section.id === 'section-source-attachments') return; // 由 renderAttachments 单独控制
       if (section.id === 'section-customer-demands') return;   // 由 loadTask 单独控制
-      const groups = section.querySelectorAll('.form-group');
+      // 排除占位空格子（form-group--placeholder，仅用于布局），否则带占位的区永远收不起来
+      const groups = section.querySelectorAll('.form-group:not(.form-group--placeholder)');
       if (groups.length === 0) return;
       const anyVisible = Array.from(groups).some(g => g.style.display !== 'none');
       section.style.display = anyVisible ? '' : 'none';
