@@ -157,6 +157,10 @@ def build_report_fields(region, item):
     if region == "US":
         return {
             **common,
+            # 流程联系人（模板末尾"如您对此案有流程方面的疑问…"，审核人手填）
+            "联系人":     "请提供",
+            "联系人邮箱": "请提供",
+            "联系人手机": "请提供",
             "申请号":         item.get("application_no", "") or "请提供",
             "递交日":         "请提供",
             "延期描述":       "",
@@ -171,6 +175,10 @@ def build_report_fields(region, item):
     if region == "EP":
         return {
             **common,
+            # 流程联系人（模板末尾"如您对此案有流程方面的疑问…"，审核人手填）
+            "联系人":     "请提供",
+            "联系人邮箱": "请提供",
+            "联系人手机": "请提供",
             "申请号":         item.get("ep_number", "") or "请提供",
             "申请日":         "请提供",
             "收文日期":       issue_date,
