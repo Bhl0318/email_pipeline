@@ -14,12 +14,37 @@ case_info 结构对齐三个生成器（ads_generator/poa_generator/transmittal_
 - Small Entity（可由 applicants.entity_en 推，规则待定）
 """
 import datetime
+import json
+from pathlib import Path
 
 from .common import clean_priority_no, infer_subject_matter
+
+# 签字代理人/Customer Number/Deposit 全局配置（gitignore，本地维护；模板见 agent_config.example.json）
+AGENT_CONFIG_PATH = Path(__file__).resolve().parent / "agent_config.json"
 
 
 def _today():
     return datetime.datetime.now().strftime("%Y-%m-%d")
+
+
+def load_agent_info(case_volume: str, config_path=None) -> dict:
+    """从全局配置 agent_config.json 取签字代理人信息（方案 §2.3）。
+    取值：default 为基底，若 by_client 下有该客户代码(案号前5位)条目则覆盖。
+    无配置文件时返回 {}（签字块留空，不阻塞生成）。过滤 _ 开头的注释键。"""
+    path = Path(config_path or AGENT_CONFIG_PATH)
+    if not path.is_file():
+        return {}
+    try:
+        cfg = json.loads(path.read_text(encoding="utf-8"))
+    except Exception as e:
+        print(f"[agent_config] 解析失败 {path}: {e}")
+        return {}
+    base = {k: v for k, v in (cfg.get("default") or {}).items() if not k.startswith("_")}
+    code = (case_volume or "")[:5]
+    override = (cfg.get("by_client") or {}).get(code)
+    if isinstance(override, dict):
+        base.update({k: v for k, v in override.items() if not k.startswith("_")})
+    return base
 
 
 def fields_to_case_info(fields: dict, agent_info: dict = None) -> dict:

@@ -1,0 +1,36 @@
+{
+  "_README": [
+    "签字代理人 / Customer Number / Deposit Account 全局配置（方案 §2.3）。",
+    "复制本文件为 agent_config.json 后填真实值；agent_config.json 已 gitignore（含 Deposit 半敏感）。",
+    "load_agent_info(case_volume) 取值：先取 default，若 by_client 下有该客户代码(案号前5位)条目则覆盖。",
+    "字段对应 case_info：Name/First Name/Last Name/Registration Number/title → Signature；",
+    "Customer Number → Correspondence/Representative；Deposit Account No → Deposit；Email Address → 通信邮箱。",
+    "_ 开头的键为注释，load 时会被过滤，不进 case_info。"
+  ],
+
+  "default": {
+    "_说明": "默认签字代理人（多数案件用这位）",
+    "Name": "<签字人全名，如 Yifei Guan>",
+    "First Name": "<名>",
+    "Last Name": "<姓>",
+    "Registration Number": "<USPTO 执业号>",
+    "title": "Patent Agent",
+    "Customer Number": "<USPTO Customer Number>",
+    "Deposit Account No": "<USPTO Deposit Account 号>",
+    "Email Address": ["<通信邮箱1>", "<通信邮箱2>"]
+  },
+
+  "by_client": {
+    "_说明": "按客户代码(案号前5位)覆盖默认签字人/客户号等；无需覆盖就留空 {}",
+    "20618": {
+      "Name": "<该客户专用签字人>",
+      "First Name": "",
+      "Last Name": "",
+      "Registration Number": "",
+      "title": "Patent Agent",
+      "Customer Number": "",
+      "Deposit Account No": "",
+      "Email Address": []
+    }
+  }
+}
