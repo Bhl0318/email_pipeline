@@ -23,6 +23,7 @@ Adobe 打开时按"模板+datasets"重渲染出填好的 ADS。
   由 submission_tasks.fields_json → case_info 的映射另行实现（部分字段仍是缺口）。
 """
 import datetime
+import re
 from pathlib import Path
 
 import pikepdf
@@ -320,32 +321,51 @@ def build_ads_datasets_xml(case_info: dict) -> str:
     return '<?xml version="1.0" encoding="UTF-8"?>' + datasets
 
 
+_DATA_RE = re.compile(r"<xfa:data\b[^>]*>.*</xfa:data\s*>", re.S)
+_USREQ_RE = re.compile(r"<us-request\b.*</us-request\s*>", re.S)
+
+
 def inject_ads_datasets(template_pdf, datasets_xml: str, out_path) -> None:
-    """把 datasets XML 注入 XFA 模板的 datasets 流并保存。
-    本地 pikepdf 实现，替代旧 pdfRest 云 API。"""
+    """把数据注入 XFA 模板的 datasets 流并保存（本地 pikepdf，替代旧 pdfRest 云）。
+
+    只替换模板 datasets 里的 <xfa:data>…</xfa:data> 子树，**保留 dd:dataDescription**
+    （含重复节点 dd:maxOccur 等绑定约束，丢了会影响多发明人/多优先权等绑定）。
+    模板 datasets 无 <xfa:data> 时，回退为整流写入。"""
     template_pdf = Path(template_pdf)
     if not template_pdf.is_file():
-        raise FileNotFoundError(f"ADS XFA 模板不存在: {template_pdf}（需从旧机取回放入 submission/templates/）")
-    data = datasets_xml.encode("utf-8")
+        raise FileNotFoundError(f"ADS XFA 模板不存在: {template_pdf}（需放入 submission/templates/ADS.pdf）")
     pdf = pikepdf.open(str(template_pdf))
     acro = pdf.Root.get("/AcroForm")
     if acro is None or "/XFA" not in acro:
         raise ValueError(f"模板不含 XFA 表单: {template_pdf}")
     xfa = acro.XFA
-    injected = False
-    if isinstance(xfa, pikepdf.Array):
-        # [name, stream, name, stream, ...] 形式，定位 "datasets"
-        for i in range(0, len(xfa) - 1, 2):
-            if str(xfa[i]) == "datasets":
-                xfa[i + 1].write(data)
-                injected = True
-                break
-    else:
-        # 单一流形式：整包就是一段 XFA，直接覆盖（少见，多为静态/混合）
-        xfa.write(data)
-        injected = True
-    if not injected:
+    if not isinstance(xfa, pikepdf.Array):
+        # 单一流：整包覆盖（少见）
+        xfa.write(datasets_xml.encode("utf-8"))
+        acro.NeedsRendering = True
+        pdf.save(str(out_path))
+        return
+
+    ds_stream = None
+    for i in range(0, len(xfa) - 1, 2):
+        if str(xfa[i]) == "datasets":
+            ds_stream = xfa[i + 1]
+            break
+    if ds_stream is None:
         raise ValueError("XFA 数组中未找到 datasets 项，无法注入")
+
+    tmpl_ds = bytes(ds_stream.read_bytes()).decode("utf-8", "ignore")
+    m = _USREQ_RE.search(datasets_xml)
+    data_inner = m.group(0) if m else datasets_xml  # 取生成数据里的 <us-request>…</us-request>
+
+    if _DATA_RE.search(tmpl_ds):
+        # 保留 dd:dataDescription，仅替换 <xfa:data> 子树
+        new_ds = _DATA_RE.sub("<xfa:data>" + data_inner + "</xfa:data>", tmpl_ds, count=1)
+    else:
+        # 模板没有 <xfa:data>，在 </xfa:datasets> 前插入
+        new_ds = tmpl_ds.replace(
+            "</xfa:datasets>", "<xfa:data>" + data_inner + "</xfa:data></xfa:datasets>", 1)
+    ds_stream.write(new_ds.encode("utf-8"))
     acro.NeedsRendering = True  # 让 Adobe 重渲染动态 XFA
     pdf.save(str(out_path))
 
