@@ -386,6 +386,96 @@ def generate_ads(case_info: dict, output_dir, template_pdf=None) -> dict:
     return {"file_path": str(file_path), "file_name": file_name, "type": "ADS"}
 
 
+def _build_ads_preview_docx(case_info: dict, out_dir):
+    """生成 ADS"数据核对版"docx（可读数据单，非官方表单外观）。"""
+    from docx import Document
+    doc = Document()
+    doc.add_heading("Application Data Sheet — 数据核对版", level=1)
+    doc.add_paragraph("非正式表单，仅供在线核对；正式递交以 XFA 版为准。")
+
+    def kv_table(rows):
+        t = doc.add_table(rows=0, cols=2)
+        t.style = "Table Grid"
+        for k, v in rows:
+            c = t.add_row().cells
+            c[0].text = str(k); c[1].text = "" if v is None else str(v)
+
+    ai = case_info.get("Application Information", {})
+    doc.add_heading("申请信息", level=2)
+    kv_table([
+        ("代理所案号", case_info.get("Our Ref.", "")),
+        ("申请名称", case_info.get("Title", "")),
+        ("Subject Matter", ai.get("Subject Matter", "")),
+        ("Application Type", ai.get("Application Type", "")),
+        ("Small Entity", ai.get("Small Entity Status Claimed", "")),
+        ("图纸页数", ai.get("Total Number of Drawing Sheets", "")),
+    ])
+
+    doc.add_heading("发明人", level=2)
+    ti = doc.add_table(rows=1, cols=3); ti.style = "Table Grid"
+    h = ti.rows[0].cells; h[0].text, h[1].text, h[2].text = "First Name", "Last Name", "全名"
+    for inv in case_info.get("Inventors", []):
+        c = ti.add_row().cells
+        c[0].text, c[1].text, c[2].text = inv.get("firstName", ""), inv.get("lastName", ""), inv.get("name", "")
+
+    doc.add_heading("申请人 / 受让人", level=2)
+    ta = doc.add_table(rows=1, cols=4); ta.style = "Table Grid"
+    h = ta.rows[0].cells
+    h[0].text, h[1].text, h[2].text, h[3].text = "名称", "地址", "国别", "实体"
+    for ap in case_info.get("Applicants", []):
+        c = ta.add_row().cells
+        c[0].text = ap.get("Name", ""); c[1].text = ap.get("Address", "")
+        c[2].text = ap.get("Nationality", ""); c[3].text = str(ap.get("Entity", ""))
+
+    if case_info.get("Priorities"):
+        doc.add_heading("优先权", level=2)
+        tp = doc.add_table(rows=1, cols=4); tp.style = "Table Grid"
+        h = tp.rows[0].cells
+        h[0].text, h[1].text, h[2].text, h[3].text = "优先权号", "国别", "日期", "DAS"
+        for pr in case_info["Priorities"]:
+            c = tp.add_row().cells
+            c[0].text = pr.get("Priority", ""); c[1].text = pr.get("Country", "")
+            c[2].text = pr.get("Priority date", ""); c[3].text = pr.get("DAS code", "")
+
+    if case_info.get("Parent Applications"):
+        doc.add_heading("母案", level=2)
+        tm = doc.add_table(rows=1, cols=3); tm.style = "Table Grid"
+        h = tm.rows[0].cells
+        h[0].text, h[1].text, h[2].text = "申请号", "申请日", "Continuity Type"
+        for pa in case_info["Parent Applications"]:
+            c = tm.add_row().cells
+            c[0].text = pa.get("Application No", ""); c[1].text = pa.get("Filing Date", "")
+            c[2].text = pa.get("Continuity Type", "")
+
+    corr = case_info.get("Correspondence Information", {})
+    sig = case_info.get("Signature", {})
+    doc.add_heading("通信 / 签字", level=2)
+    kv_table([
+        ("Customer Number", corr.get("Customer Number", "")),
+        ("Email", ", ".join(corr.get("Email Address", []) or [])),
+        ("签字人", sig.get("Name", "")),
+        ("执业号", sig.get("Registration Number", "")),
+        ("日期", sig.get("Date", "")),
+    ])
+
+    out_dir = Path(out_dir); out_dir.mkdir(parents=True, exist_ok=True)
+    today = datetime.datetime.now().strftime("%Y-%m-%d")
+    ref = case_info.get("Our Ref.", "UNKNOWN")
+    docx_path = out_dir / f"{today}-ADS数据核对-{ref}.docx"
+    doc.save(str(docx_path))
+    return docx_path
+
+
+def generate_ads_preview(case_info: dict, output_dir) -> dict:
+    """ADS 数据核对版 PDF（在线浏览用；docx → LibreOffice 转 PDF）。
+    :return: {"file_path", "file_name", "type": "ADS-preview"}
+    """
+    from .preview import docx_to_pdf
+    docx_path = _build_ads_preview_docx(case_info, output_dir)
+    pdf_path = docx_to_pdf(docx_path, output_dir)
+    return {"file_path": str(pdf_path), "file_name": Path(pdf_path).name, "type": "ADS-preview"}
+
+
 if __name__ == "__main__":
     import sys
     # 自测：只构建 datasets XML（不依赖模板），验证移植无误

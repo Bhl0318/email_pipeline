@@ -67,7 +67,7 @@ from submission.preview import docx_to_pdf  # noqa: E402
 from submission.fields_mapping import fields_to_case_info, load_agent_info  # noqa: E402
 from submission.poa_generator import generate_poa  # noqa: E402
 from submission.transmittal_generator import generate_transmittal  # noqa: E402
-from submission.ads_generator import generate_ads  # noqa: E402
+from submission.ads_generator import generate_ads, generate_ads_preview  # noqa: E402
 from submission.agent_email import build_agent_email  # noqa: E402
 
 SUBMISSION_HTML = WEB_DIR / "submission.html"
@@ -1070,20 +1070,27 @@ def preview_filing_task(task_id: str, req: FilingPreviewReq):
     try:
         if req.target == "poa":
             d = generate_poa(ci, preview_dir)
+            files = [{"name": d["file_name"], "pdf_url": _output_url(d["file_path"]), "type": d.get("type")}]
         elif req.target == "transmittal":
             d = generate_transmittal(ci, preview_dir, options=opts)
             warnings.extend(d.get("warnings") or [])
+            files = [{"name": d["file_name"], "pdf_url": _output_url(d["file_path"]), "type": d.get("type")}]
         elif req.target == "ads":
-            d = generate_ads(ci, preview_dir)
-            warnings.append("ADS 为动态 XFA，仅 Adobe Reader 能正确渲染，请下载后用 Adobe 打开")
+            # 数据核对版（可内联浏览）+ XFA 版（下载/发送用）
+            xfa = generate_ads(ci, preview_dir)
+            prev = generate_ads_preview(ci, preview_dir)
+            warnings.append("ADS 在线为数据核对版；正式递交/发送用 XFA 版（需 Adobe 打开）")
+            files = [{
+                "name": prev["file_name"], "pdf_url": _output_url(prev["file_path"]), "type": "ADS-preview",
+                "download_url": _output_url(xfa["file_path"]), "download_name": xfa["file_name"],
+            }]
         else:
             raise HTTPException(400, f"未知 target: {req.target}")
     except HTTPException:
         raise
     except Exception as exc:
         raise HTTPException(500, f"预览生成失败：{exc}")
-    return {"target": req.target, "files": [{"name": d["file_name"], "pdf_url": _output_url(d["file_path"]),
-                                             "type": d.get("type")}], "warnings": warnings}
+    return {"target": req.target, "files": files, "warnings": warnings}
 
 
 class FilingConfirmReq(BaseModel):

@@ -107,9 +107,10 @@
         <button class="tab" onclick="preview('transmittal')">Transmittal</button>
         <button class="tab" onclick="preview('ads')">ADS</button>
       </div>
+      <div id="dlBar" style="display:none;padding:6px 12px;background:#fef3c7;border-bottom:1px solid #fcd34d;font-size:12px;"></div>
       <div class="preview-body">
         <iframe id="previewFrame" style="display:none"></iframe>
-        <div class="preview-placeholder" id="previewPlaceholder">填好递交清单后点上方按钮生成预览<br>POA/Transmittal 内联显示，ADS 仅下载（需 Adobe）</div>
+        <div class="preview-placeholder" id="previewPlaceholder">填好递交清单后点上方按钮生成预览<br>POA/Transmittal 内联显示；ADS 在线为数据核对版、下载用 XFA 版</div>
       </div>
     </div>
   </div>
@@ -284,13 +285,16 @@ async function preview(target){
     const j = await api("POST", `${API}/${taskId}/preview`, { target, fields_json: fields, transmittal_options: opts });
     const file = (j.files||[])[0];
     if (!file) { toast("未生成文件"); return; }
-    if (target === "ads") {
-      $("previewFrame").style.display = "none";
-      $("previewPlaceholder").style.display = "flex";
-      $("previewPlaceholder").innerHTML = `ADS 为动态 XFA，浏览器无法渲染。<br><a href="${esc(file.pdf_url)}" target="_blank" style="color:#2563eb;">⬇ 下载 ${esc(file.name)}（用 Adobe Reader 打开）</a>`;
+    // 数据核对版（含 ADS）内联显示；ADS 额外给 XFA 下载条
+    $("previewPlaceholder").style.display = "none";
+    const fr = $("previewFrame"); fr.style.display = "block"; fr.src = file.pdf_url;
+    const bar = $("dlBar");
+    if (target === "ads" && file.download_url) {
+      bar.style.display = "block";
+      bar.innerHTML = `当前为<b>数据核对版</b>（在线浏览）。正式递交/发送用 XFA 版：` +
+        `<a href="${esc(file.download_url)}" target="_blank" style="color:#b45309;font-weight:600;">⬇ 下载 ${esc(file.download_name||"ADS.pdf")}</a>（需 Adobe 打开）`;
     } else {
-      $("previewPlaceholder").style.display = "none";
-      const fr = $("previewFrame"); fr.style.display = "block"; fr.src = file.pdf_url;
+      bar.style.display = "none";
     }
     if ((j.warnings||[]).length) toast(j.warnings[0]);
   } catch(e){ toast("预览失败: "+e.message); }
