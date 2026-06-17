@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>US 递交准备审核（环节4）</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif; background: #f1f5f9; color: #1e293b; font-size: 13px; }
+  .layout { display: flex; height: 100vh; overflow: hidden; }
+  .sidebar { width: 250px; background: #fff; border-right: 1px solid #e2e8f0; display: flex; flex-direction: column; flex-shrink: 0; transition: width .2s ease; }
+  .sidebar.collapsed { width: 36px; }
+  .sidebar-header { padding: 10px 12px; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: space-between; }
+  .sidebar-title { font-size: 12px; font-weight: 600; color: #475569; }
+  .sidebar.collapsed .sidebar-title, .sidebar.collapsed .sidebar-search, .sidebar.collapsed .sidebar-list { display: none; }
+  .sidebar-toggle { background: transparent; border: none; cursor: pointer; padding: 4px 6px; border-radius: 4px; color: #64748b; font-size: 14px; }
+  .sidebar-search { padding: 8px 10px; border-bottom: 1px solid #f1f5f9; }
+  .sidebar-search input { width: 100%; padding: 6px 10px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 12px; outline: none; }
+  .sidebar-list { flex: 1; overflow-y: auto; }
+  .sidebar-item { padding: 9px 12px; border-bottom: 1px solid #f8fafc; cursor: pointer; display: flex; gap: 8px; }
+  .sidebar-item:hover { background: #f8fafc; }
+  .sidebar-item.active { background: #eff6ff; border-left: 3px solid #3b82f6; padding-left: 9px; }
+  .sidebar-item .dot { width: 6px; height: 6px; border-radius: 50%; margin-top: 6px; flex-shrink: 0; }
+  .dot.pending { background: #3b82f6; } .dot.skipped { background: #cbd5e1; } .dot.done { background: #10b981; }
+  .sidebar-item .row1 { font-size: 12px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sidebar-item .row2 { font-size: 11px; color: #94a3b8; margin-top: 2px; }
+  .sidebar-empty { padding: 24px 12px; text-align: center; color: #cbd5e1; font-size: 12px; }
+  .main { flex: 1; display: flex; min-width: 0; }
+  .form-pane { flex: 1; overflow-y: auto; padding: 16px 20px; min-width: 0; }
+  .preview-pane { width: 46%; border-left: 1px solid #e2e8f0; background: #fff; display: flex; flex-direction: column; flex-shrink: 0; }
+  .topbar { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+  .topbar h1 { font-size: 16px; }
+  .badge { font-size: 11px; padding: 2px 8px; border-radius: 10px; font-weight: 600; }
+  .badge.pending { background: #dbeafe; color: #1d4ed8; }
+  .badge.done { background: #d1fae5; color: #047857; }
+  .badge.skipped { background: #e2e8f0; color: #64748b; }
+  .topbar .spacer { flex: 1; }
+  button { cursor: pointer; border: 1px solid #cbd5e1; background: #fff; border-radius: 6px; padding: 7px 14px; font-size: 12.5px; color: #334155; }
+  button:hover { background: #f8fafc; }
+  button.primary { background: #2563eb; border-color: #2563eb; color: #fff; }
+  button.primary:hover { background: #1d4ed8; }
+  button.success { background: #059669; border-color: #059669; color: #fff; }
+  button.success:hover { background: #047857; }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  .banner { border-radius: 8px; padding: 10px 14px; margin-bottom: 12px; font-size: 12.5px; line-height: 1.7; }
+  .banner.warn { background: #fef3c7; border: 1px solid #fcd34d; color: #92400e; }
+  .banner.ok { background: #d1fae5; border: 1px solid #6ee7b7; color: #047857; }
+  .section { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; margin-bottom: 12px; overflow: hidden; }
+  .section-head { padding: 9px 14px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; font-weight: 600; font-size: 13px; color: #334155; }
+  .section-body { padding: 12px 14px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px 14px; }
+  .field label { display: block; font-size: 11.5px; color: #64748b; margin-bottom: 3px; }
+  .field input, .field select, .field textarea { width: 100%; padding: 6px 9px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 12.5px; outline: none; background: #fff; }
+  .field input:focus, .field select:focus, .field textarea:focus { border-color: #3b82f6; }
+  .field input[readonly] { background: #f8fafc; color: #64748b; }
+  .checks { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px 14px; }
+  .checks label { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: #334155; cursor: pointer; }
+  .checks input[type=checkbox] { width: 15px; height: 15px; cursor: pointer; }
+  .docrow { display: flex; align-items: center; gap: 8px; padding: 4px 0; font-size: 12.5px; }
+  .docrow a { color: #2563eb; text-decoration: none; }
+  .docrow .del { color: #dc2626; cursor: pointer; font-size: 11.5px; border: none; background: none; padding: 0 4px; }
+  .preview-head { padding: 8px 12px; border-bottom: 1px solid #e2e8f0; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  .preview-head .tab { padding: 4px 12px; border-radius: 6px; font-size: 12px; border: 1px solid #e2e8f0; background: #fff; }
+  .preview-head .tab.active { background: #2563eb; border-color: #2563eb; color: #fff; }
+  .preview-body { flex: 1; position: relative; }
+  .preview-body iframe { width: 100%; height: 100%; border: none; }
+  .preview-placeholder { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #cbd5e1; font-size: 13px; text-align: center; padding: 0 20px; line-height: 2; }
+  .modal-mask { position: fixed; inset: 0; background: rgba(15,23,42,.45); display: none; align-items: center; justify-content: center; z-index: 50; }
+  .modal-mask.show { display: flex; }
+  .modal { background: #fff; border-radius: 12px; width: 560px; max-width: 92vw; max-height: 88vh; overflow-y: auto; padding: 18px 20px; }
+  .modal h3 { font-size: 15px; margin-bottom: 12px; }
+  .modal .field { margin-bottom: 10px; }
+  .modal .attach-list { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 12px; font-size: 12px; line-height: 1.9; margin-bottom: 10px; }
+  .modal .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+  .toast { position: fixed; top: 14px; left: 50%; transform: translateX(-50%); background: #1e293b; color: #fff; padding: 9px 18px; border-radius: 8px; font-size: 12.5px; z-index: 99; display: none; }
+</style>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <span class="sidebar-title">递交准备待办</span>
+      <button class="sidebar-toggle" onclick="document.getElementById('sidebar').classList.toggle('collapsed')">&#9776;</button>
+    </div>
+    <div class="sidebar-search"><input id="sidebarSearch" placeholder="按案号筛选..." oninput="renderSidebar()"></div>
+    <div class="sidebar-list" id="sidebarList"><div class="sidebar-empty">加载中...</div></div>
+  </aside>
+
+  <div class="main">
+    <div class="form-pane">
+      <div class="topbar">
+        <h1 id="caseTitle">—</h1>
+        <span class="badge pending" id="statusBadge">…</span>
+        <span class="spacer"></span>
+        <button class="primary" id="saveBtn" onclick="save()" disabled>保存</button>
+        <button class="success" id="sendBtn" onclick="openSendModal()" disabled>发美代理</button>
+      </div>
+      <div id="warnBanner"></div>
+      <div id="formSections"><div class="banner ok">从左侧选择一个递交准备任务。</div></div>
+    </div>
+
+    <div class="preview-pane">
+      <div class="preview-head">
+        <span style="font-size:12px;color:#64748b;">预览：</span>
+        <button class="tab" onclick="preview('poa')">POA</button>
+        <button class="tab" onclick="preview('transmittal')">Transmittal</button>
+        <button class="tab" onclick="preview('ads')">ADS</button>
+      </div>
+      <div class="preview-body">
+        <iframe id="previewFrame" style="display:none"></iframe>
+        <div class="preview-placeholder" id="previewPlaceholder">填好递交清单后点上方按钮生成预览<br>POA/Transmittal 内联显示，ADS 仅下载（需 Adobe）</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-mask" id="sendModal">
+  <div class="modal">
+    <h3>发送给美国代理人</h3>
+    <div class="field"><label>收件人（美代理，多个用逗号分隔）<span style="color:#dc2626">*</span></label><input id="mTo" placeholder="agent@example.com"></div>
+    <div class="field"><label>抄送</label><input id="mCc"></div>
+    <div class="field"><label>称呼</label><input id="mName" value="X总/X律师"></div>
+    <div class="field"><label>主题</label><input id="mSubject"></div>
+    <div class="field"><label>正文</label><textarea id="mBody" rows="6"></textarea></div>
+    <div class="field"><label>附件（确认发送时生成）</label><div class="attach-list" id="mAttach"></div></div>
+    <div id="mWarn"></div>
+    <div class="actions">
+      <button onclick="closeSendModal()">取消</button>
+      <button class="success" id="mConfirm" onclick="doConfirm()">确认并发送</button>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const LIST_API = "/api/submission/tasks";   // 复用环节2 列表（按 type 过滤）
+const API = "/api/submission/filing";
+let taskId = null, taskList = [], data = null, fields = {}, opts = {};
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;" }[c]));
+function toast(m, ms=2600){ const t=$("toast"); t.textContent=m; t.style.display="block"; clearTimeout(t._h); t._h=setTimeout(()=>t.style.display="none", ms); }
+async function api(method, url, body, isForm){
+  const opt = { method };
+  if (isForm) { opt.body = body; }
+  else if (body !== undefined) { opt.headers = {"Content-Type":"application/json"}; opt.body = JSON.stringify(body); }
+  const r = await fetch(url, opt);
+  const j = await r.json().catch(()=>({}));
+  if (!r.ok) throw new Error(typeof j.detail === "string" ? j.detail : JSON.stringify(j.detail || j));
+  return j;
+}
+
+async function loadTaskList(){
+  try {
+    const j = await api("GET", `${LIST_API}?type=filing_preparation&status=pending,skipped,done`);
+    taskList = j.tasks || [];
+  } catch(e){ taskList = []; }
+  renderSidebar();
+}
+function renderSidebar(){
+  const kw = ($("sidebarSearch").value || "").toLowerCase();
+  const items = taskList.filter(t => !kw || (t.case_volume||"").toLowerCase().includes(kw));
+  $("sidebarList").innerHTML = items.length ? items.map(t => `
+    <div class="sidebar-item ${t.id===taskId?"active":""}" onclick="openTask('${esc(t.id)}')">
+      <span class="dot ${esc(t.status)}"></span>
+      <div><div class="row1">${esc(t.case_volume)}</div><div class="row2">${esc(t.status)}</div></div>
+    </div>`).join("") : '<div class="sidebar-empty">无递交准备任务</div>';
+}
+
+async function openTask(id){
+  taskId = id;
+  try { data = await api("GET", `${API}/${id}`); }
+  catch(e){ toast("加载失败: "+e.message); return; }
+  fields = data.fields_json || {};
+  opts = data.transmittal_options || {};
+  $("caseTitle").textContent = data.case_volume || "—";
+  const b = $("statusBadge"); b.textContent = data.status; b.className = "badge " + data.status;
+  const ro = data.status !== "pending";
+  $("saveBtn").disabled = ro; $("sendBtn").disabled = ro;
+  renderForm();
+  renderSidebar();
+  history.replaceState(null, "", `/submission/filing/${id}`);
+}
+
+function _v(path){ return path.split(".").reduce((o,k)=> o==null?undefined:o[k], fields); }
+function renderForm(){
+  const ci = fields.case_info || {};
+  const ap = (fields.applicants||[])[0] || {};
+  const invs = (fields.inventors||[]).map(i=>i.full_name_en||`${i.first_name_en||""} ${i.last_name_en||""}`).filter(Boolean).join("；");
+  const docs = (data.final_docs||[]).map(d=>`<div class="docrow">📄 <a href="${esc(d.url)}" target="_blank">${esc(d.name)}</a><button class="del" onclick="delFinal('${esc(d.name)}')">删除</button></div>`).join("") || '<div style="color:#94a3b8;font-size:12px;">尚未上传定稿</div>';
+  const ck = (k)=> opts[k] ? "checked" : "";
+  $("formSections").innerHTML = `
+    <div class="section"><div class="section-head">案件信息（来自 fields_json，只读）</div><div class="section-body grid">
+      <div class="field"><label>代理所案号</label><input readonly value="${esc(fields.case_volume||"")}"></div>
+      <div class="field"><label>申请名称</label><input readonly value="${esc(ci.case_name_en||"")}"></div>
+      <div class="field"><label>申请人</label><input readonly value="${esc(ap.applicant_name_en||"")}"></div>
+      <div class="field"><label>发明人</label><input readonly value="${esc(invs)}"></div>
+      <div class="field"><label>主题(Subject Matter)</label><input readonly value="${esc(fields.subject_matter||"")}"></div>
+    </div></div>
+
+    <div class="section"><div class="section-head">递交清单（transmittal_options）</div><div class="section-body">
+      <div class="grid">
+        <div class="field"><label>实体</label><select id="o-entity">
+          <option value="large" ${opts.entity==="large"?"selected":""}>大实体</option>
+          <option value="small" ${opts.entity==="small"?"selected":""}>小实体</option>
+          <option value="micro" ${opts.entity==="micro"?"selected":""}>微实体</option>
+        </select></div>
+        <div class="field"><label>说明书页数</label><input id="o-spec" value="${esc(opts.spec_pages||"")}"></div>
+        <div class="field"><label>附图页数</label><input id="o-draw" value="${esc(opts.drawing_sheets||"")}"></div>
+        <div class="field"><label>Declaration 页数</label><input id="o-decl" value="${esc(opts.declaration_pages||"")}"></div>
+      </div>
+      <div style="margin:10px 0 6px;font-size:11.5px;color:#64748b;">随附文件（勾选本次实际递交的）</div>
+      <div class="checks">
+        <label><input type="checkbox" id="o-has_declaration" ${ck("has_declaration")}>Declaration（声明）</label>
+        <label><input type="checkbox" id="o-has_poa" ${ck("has_poa")}>POA（委托书）</label>
+        <label><input type="checkbox" id="o-has_ids" ${ck("has_ids")}>IDS</label>
+        <label><input type="checkbox" id="o-has_preliminary_amendment" ${ck("has_preliminary_amendment")}>Preliminary Amendment</label>
+        <label><input type="checkbox" id="o-has_sequence_listing" ${ck("has_sequence_listing")}>序列表</label>
+        <label><input type="checkbox" id="o-has_assignment" ${ck("has_assignment")}>Assignment</label>
+        <label><input type="checkbox" id="o-has_ads" ${opts.has_ads!==false?"checked":""}>ADS</label>
+      </div>
+      <div class="field" style="margin-top:10px;"><label>备注</label><input id="o-remark" value="${esc(opts.remark||"")}"></div>
+    </div></div>
+
+    <div class="section"><div class="section-head">定稿文件（说明书/权要/附图终版，手动上传）</div><div class="section-body">
+      <div id="finalDocs">${docs}</div>
+      <div style="margin-top:8px;"><input type="file" id="finalFile"> <button onclick="uploadFinal()">上传定稿</button></div>
+    </div></div>`;
+}
+
+function collectOpts(){
+  if (!$("o-entity")) return opts;
+  opts = {
+    entity: $("o-entity").value,
+    spec_pages: $("o-spec").value.trim(),
+    drawing_sheets: $("o-draw").value.trim(),
+    declaration_pages: $("o-decl").value.trim(),
+    has_declaration: $("o-has_declaration").checked,
+    has_poa: $("o-has_poa").checked,
+    has_ids: $("o-has_ids").checked,
+    has_preliminary_amendment: $("o-has_preliminary_amendment").checked,
+    has_sequence_listing: $("o-has_sequence_listing").checked,
+    has_assignment: $("o-has_assignment").checked,
+    has_ads: $("o-has_ads").checked,
+    remark: $("o-remark").value.trim(),
+  };
+  return opts;
+}
+
+async function save(){
+  collectOpts();
+  try { await api("POST", `${API}/${taskId}/save`, { fields_json: fields, transmittal_options: opts }); toast("已保存"); }
+  catch(e){ toast("保存失败: "+e.message); }
+}
+
+async function uploadFinal(){
+  const f = $("finalFile").files[0];
+  if (!f) { toast("请先选择文件"); return; }
+  const fd = new FormData(); fd.append("file", f);
+  try { await api("POST", `${API}/${taskId}/upload-final`, fd, true); toast("上传成功"); await openTask(taskId); }
+  catch(e){ toast("上传失败: "+e.message); }
+}
+async function delFinal(name){
+  try { await api("DELETE", `${API}/${taskId}/final/${encodeURIComponent(name)}`); await openTask(taskId); }
+  catch(e){ toast("删除失败: "+e.message); }
+}
+
+async function preview(target){
+  collectOpts();
+  toast("生成中...");
+  try {
+    const j = await api("POST", `${API}/${taskId}/preview`, { target, fields_json: fields, transmittal_options: opts });
+    const file = (j.files||[])[0];
+    if (!file) { toast("未生成文件"); return; }
+    if (target === "ads") {
+      $("previewFrame").style.display = "none";
+      $("previewPlaceholder").style.display = "flex";
+      $("previewPlaceholder").innerHTML = `ADS 为动态 XFA，浏览器无法渲染。<br><a href="${esc(file.pdf_url)}" target="_blank" style="color:#2563eb;">⬇ 下载 ${esc(file.name)}（用 Adobe Reader 打开）</a>`;
+    } else {
+      $("previewPlaceholder").style.display = "none";
+      const fr = $("previewFrame"); fr.style.display = "block"; fr.src = file.pdf_url;
+    }
+    if ((j.warnings||[]).length) toast(j.warnings[0]);
+  } catch(e){ toast("预览失败: "+e.message); }
+}
+
+function buildMail(){
+  const cv = data.case_volume || "";
+  const name = $("mName").value || "X总/X律师";
+  $("mSubject").value = `${cv} 递交文件签署`;
+  $("mBody").value = `${name}，您好，\n\n烦请签署题述 POA、Transmittal 文件，其他文件已通过 DocuSign 发送，谢谢。\n\n祝好！\n成萍`;
+  const gen = ["POA", "Transmittal", "ADS（需 Adobe）"];
+  const finals = (data.final_docs||[]).map(d=>d.name);
+  $("mAttach").innerHTML = "生成成品：" + gen.join("、") + (finals.length ? "<br>定稿：" + finals.map(esc).join("、") : "<br>定稿：（未上传）");
+}
+function openSendModal(){
+  if (!taskId) return;
+  collectOpts();
+  $("mName").value = "X总/X律师"; $("mTo").value = ""; $("mCc").value = "";
+  buildMail();
+  $("mName").oninput = buildMail;
+  $("sendModal").classList.add("show");
+}
+function closeSendModal(){ $("sendModal").classList.remove("show"); }
+async function doConfirm(){
+  const recipients = $("mTo").value.split(/[,，;；]/).map(s=>s.trim()).filter(Boolean);
+  if (!recipients.length) { toast("收件人不能为空"); return; }
+  const cc = $("mCc").value.split(/[,，;；]/).map(s=>s.trim()).filter(Boolean);
+  $("mConfirm").disabled = true;
+  try {
+    const j = await api("POST", `${API}/${taskId}/confirm`, {
+      fields_json: fields, transmittal_options: opts, recipients, cc,
+      recipient_name: $("mName").value, subject: $("mSubject").value, body: $("mBody").value,
+    });
+    toast("已发送，任务完成");
+    closeSendModal(); await loadTaskList(); await openTask(taskId);
+  } catch(e){ toast("发送失败: "+e.message); }
+  finally { $("mConfirm").disabled = false; }
+}
+
+(function init(){
+  loadTaskList();
+  const m = location.pathname.match(/\/submission\/filing\/([\w-]+)$/);
+  if (m) openTask(m[1]);
+})();
+</script>
+</body>
+</html>
