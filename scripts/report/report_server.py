@@ -915,6 +915,33 @@ def _filing_case_info(row: dict, fields: dict):
     return ci, ai
 
 
+def _filing_review_base() -> str:
+    cfg = _load_email_config()
+    return cfg.get("submission", {}).get("review_base_url", "http://10.10.70.88:8501")
+
+
+def _send_filing_review_link(case_volume: str, link: str) -> bool:
+    """转入后给审阅人发审阅链接（best-effort，收件人取 email_config.submission.review_notify）。"""
+    try:
+        cfg = _load_email_config()
+        sub = cfg.get("submission", {})
+        recipients = [r for r in (sub.get("review_notify") or []) if r]
+        if not recipients:
+            return False
+        account_cfg, _cc = _submission_send_config()
+        msg = MIMEMultipart()
+        msg["Subject"] = f"【US递交-待审阅】{case_volume} 递交文件"
+        msg.attach(MIMEText(
+            f"<p>案号 <b>{case_volume}</b> 的递交文件已转入准备，请审阅 POA/Transmittal/ADS：</p>"
+            f"<p><a href='{link}'>{link}</a></p><p>本邮件由系统自动发送。</p>",
+            "html", "utf-8"))
+        _send_smtp(msg, account_cfg, recipients, sub.get("cc") or None)
+        return True
+    except Exception as exc:
+        print(f"[filing] 审阅链接发送失败: {exc}", file=sys.stderr)
+        return False
+
+
 @app.get("/submission/filing/{task_id}")
 def filing_review_page(task_id: str):
     if not FILING_HTML.exists():
@@ -934,7 +961,9 @@ def create_filing_task(case_volume: str):
         "SELECT id FROM submission_tasks WHERE task_type='filing_preparation' AND case_volume=%s",
         (case_volume,))
     if existing:
-        return {"task_id": existing[0]["id"], "existed": True}
+        eid = existing[0]["id"]
+        return {"task_id": eid, "existed": True,
+                "review_link": f"{_filing_review_base()}/submission/filing/{eid}", "notified": False}
     src = execute_params(
         "SELECT fields_json, contact_email FROM submission_tasks "
         "WHERE task_type='filing_confirmation' AND case_volume=%s ORDER BY created_at DESC LIMIT 1",
@@ -947,7 +976,9 @@ def create_filing_task(case_volume: str):
         "INSERT INTO submission_tasks (id, task_type, case_volume, fields_json, contact_email, status, created_at) "
         "VALUES (%s, 'filing_preparation', %s, %s, %s, 'pending', %s)",
         (new_id, case_volume, src[0]["fields_json"], src[0].get("contact_email"), now))
-    return {"task_id": new_id, "existed": False}
+    link = f"{_filing_review_base()}/submission/filing/{new_id}"
+    notified = _send_filing_review_link(case_volume, link)
+    return {"task_id": new_id, "existed": False, "review_link": link, "notified": notified}
 
 
 @app.get("/api/submission/filing/{task_id}")

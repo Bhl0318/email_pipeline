@@ -83,6 +83,7 @@
       <button class="sidebar-toggle" onclick="document.getElementById('sidebar').classList.toggle('collapsed')">&#9776;</button>
     </div>
     <div class="sidebar-search"><input id="sidebarSearch" placeholder="按案号筛选..." oninput="renderSidebar()"></div>
+    <div style="padding:0 10px 8px;"><button class="primary" style="width:100%;padding:6px;" onclick="transferIn()">+ 转入递交准备</button></div>
     <div class="sidebar-list" id="sidebarList"><div class="sidebar-empty">加载中...</div></div>
   </aside>
 
@@ -164,6 +165,18 @@ function renderSidebar(){
       <span class="dot ${esc(t.status)}"></span>
       <div><div class="row1">${esc(t.case_volume)}</div><div class="row2">${esc(t.status)}</div></div>
     </div>`).join("") : '<div class="sidebar-empty">无递交准备任务</div>';
+}
+
+async function transferIn(){
+  const cv = (prompt("输入要转入的代理所案号（须已有该案的确认函/filing_confirmation 任务）：")||"").trim();
+  if (!cv) return;
+  try {
+    const j = await api("POST", `${API}/create?case_volume=${encodeURIComponent(cv)}`);
+    toast(j.existed ? "该案已转入，打开现有任务"
+                    : (j.notified ? "已转入并发出审阅链接" : "已转入（未配审阅人，未发链接）"));
+    await loadTaskList();
+    await openTask(j.task_id);
+  } catch(e){ toast("转入失败: "+e.message); }
 }
 
 async function openTask(id){
