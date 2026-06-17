@@ -42,7 +42,7 @@ from email.mime.text import MIMEText
 from email.mime.application import MIMEApplication
 
 import requests
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.responses import FileResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -63,8 +63,15 @@ from submission.confirmation_sheet import generate_confirmation_sheet  # noqa: E
 from submission.assignment_generator import generate_assignments  # noqa: E402
 from submission.declaration_generator import generate_declarations  # noqa: E402
 from submission.preview import docx_to_pdf  # noqa: E402
+# 环节4（递交文件）生成器 —— 与环节2 互不影响
+from submission.fields_mapping import fields_to_case_info, load_agent_info  # noqa: E402
+from submission.poa_generator import generate_poa  # noqa: E402
+from submission.transmittal_generator import generate_transmittal  # noqa: E402
+from submission.ads_generator import generate_ads  # noqa: E402
+from submission.agent_email import build_agent_email  # noqa: E402
 
 SUBMISSION_HTML = WEB_DIR / "submission.html"
+FILING_HTML = WEB_DIR / "filing.html"
 
 
 app = FastAPI(title="汇报信审核服务", version="0.1")
@@ -883,6 +890,265 @@ def skip_submission_task(task_id: str):
         "UPDATE submission_tasks SET status = 'skipped', updated_at = %s WHERE id = %s",
         (now, task_id),
     )
+    return {"ok": True, "task_id": task_id, "status": "skipped"}
+
+
+# ═══════════════════════════════════════════════════════════════════
+# 环节4：准备递交文件（task_type='filing_preparation'）—— 审阅人审 POA/Transmittal/ADS
+# 全部新增 /api/submission/filing/* 路由，与环节2 的 /api/submission/tasks/* 互不影响。
+# ═══════════════════════════════════════════════════════════════════
+
+def _output_url(path) -> str:
+    """绝对路径 → /output 挂载下的相对 URL。"""
+    return "/output/" + str(Path(path).relative_to(_OUTPUT_DIR_FOR_MOUNT))
+
+
+def _filing_final_docs_dir(task_id: str) -> Path:
+    """人工上传的定稿文件目录（说明书/权要/附图终版）。"""
+    return SUBMISSION_OUTPUT_DIR / task_id / "final-docs"
+
+
+def _filing_case_info(row: dict, fields: dict):
+    """fields_json → case_info（注入 agent_config 的签字人/Customer Number/Deposit）。"""
+    ai = load_agent_info(row["case_volume"])
+    ci = fields_to_case_info(fields, ai)
+    return ci, ai
+
+
+@app.get("/submission/filing/{task_id}")
+def filing_review_page(task_id: str):
+    if not FILING_HTML.exists():
+        return PlainTextResponse(
+            f"递交准备审核页前端尚未部署（web/filing.html 缺失）。任务ID: {task_id}\n"
+            f"可先用 GET /api/submission/filing/{task_id} 查看数据。",
+            status_code=503,
+        )
+    return FileResponse(str(FILING_HTML))
+
+
+@app.post("/api/submission/filing/create")
+def create_filing_task(case_volume: str):
+    """从同案的 filing_confirmation 任务复制 fields_json，建一条 filing_preparation 任务。
+    （本期手动转入用；cron 触发后置。已存在则返回现有。）"""
+    existing = execute_params(
+        "SELECT id FROM submission_tasks WHERE task_type='filing_preparation' AND case_volume=%s",
+        (case_volume,))
+    if existing:
+        return {"task_id": existing[0]["id"], "existed": True}
+    src = execute_params(
+        "SELECT fields_json, contact_email FROM submission_tasks "
+        "WHERE task_type='filing_confirmation' AND case_volume=%s ORDER BY created_at DESC LIMIT 1",
+        (case_volume,))
+    if not src:
+        raise HTTPException(404, f"未找到案号 {case_volume} 的 filing_confirmation 任务，无法转入")
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    new_id = str(uuid.uuid4())
+    execute_params(
+        "INSERT INTO submission_tasks (id, task_type, case_volume, fields_json, contact_email, status, created_at) "
+        "VALUES (%s, 'filing_preparation', %s, %s, %s, 'pending', %s)",
+        (new_id, case_volume, src[0]["fields_json"], src[0].get("contact_email"), now))
+    return {"task_id": new_id, "existed": False}
+
+
+@app.get("/api/submission/filing/{task_id}")
+def get_filing_task(task_id: str):
+    row = _load_submission_task(task_id)
+    fields = json.loads(row["fields_json"]) if row["fields_json"] else {}
+    final_dir = _filing_final_docs_dir(task_id)
+    final_docs = ([{"name": p.name, "url": _output_url(p)}
+                   for p in sorted(final_dir.glob("*")) if p.is_file()]
+                  if final_dir.exists() else [])
+    return {
+        "id": row["id"],
+        "task_type": row["task_type"],
+        "case_volume": row["case_volume"],
+        "status": row["status"],
+        "fields_json": fields,
+        "transmittal_options": fields.get("transmittal_options") or {},
+        "final_docs": final_docs,
+    }
+
+
+class FilingSaveReq(BaseModel):
+    fields_json: dict
+    transmittal_options: dict = None
+
+
+@app.post("/api/submission/filing/{task_id}/save")
+def save_filing_task(task_id: str, req: FilingSaveReq):
+    _load_submission_task(task_id)
+    fields = dict(req.fields_json or {})
+    if req.transmittal_options is not None:
+        fields["transmittal_options"] = req.transmittal_options
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    execute_params(
+        "UPDATE submission_tasks SET fields_json=%s, updated_at=%s WHERE id=%s",
+        (json.dumps(fields, ensure_ascii=False), now, task_id))
+    return {"ok": True, "task_id": task_id}
+
+
+@app.post("/api/submission/filing/{task_id}/upload-final")
+def upload_final_doc(task_id: str, file: UploadFile = File(...)):
+    """上传定稿文件（说明书/权要/附图终版）到 final-docs/。"""
+    _load_submission_task(task_id)
+    dest_dir = _filing_final_docs_dir(task_id)
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    name = re.sub(r'[\\/:*?"<>|\r\n\t]+', "_", file.filename or "upload.bin").strip() or "upload.bin"
+    dest = dest_dir / name
+    dest.write_bytes(file.file.read())
+    return {"ok": True, "name": name, "url": _output_url(dest)}
+
+
+@app.delete("/api/submission/filing/{task_id}/final/{name}")
+def delete_final_doc(task_id: str, name: str):
+    safe = re.sub(r'[\\/:*?"<>|\r\n\t]+', "_", name)
+    p = _filing_final_docs_dir(task_id) / safe
+    if p.is_file():
+        p.unlink()
+    return {"ok": True, "name": safe}
+
+
+class FilingPreviewReq(BaseModel):
+    target: str                    # poa | transmittal | ads
+    fields_json: dict = None       # 页面当前编辑值；缺省用库中值
+    transmittal_options: dict = None
+
+
+@app.post("/api/submission/filing/{task_id}/preview")
+def preview_filing_task(task_id: str, req: FilingPreviewReq):
+    """生成 POA / Transmittal / ADS 预览（PDF）。POA/Transmittal 可内联预览，ADS 仅下载。"""
+    row = _load_submission_task(task_id)
+    fields = req.fields_json if req.fields_json is not None else (
+        json.loads(row["fields_json"]) if row["fields_json"] else {})
+    fields["subject_matter"] = infer_subject_matter(fields)
+    normalize_parents(fields)
+    ci, _ai = _filing_case_info(row, fields)
+    opts = req.transmittal_options if req.transmittal_options is not None else (fields.get("transmittal_options") or {})
+
+    preview_dir = SUBMISSION_OUTPUT_DIR / task_id / "preview"
+    preview_dir.mkdir(parents=True, exist_ok=True)
+    warnings = []
+    try:
+        if req.target == "poa":
+            d = generate_poa(ci, preview_dir)
+        elif req.target == "transmittal":
+            d = generate_transmittal(ci, preview_dir, options=opts)
+            warnings.extend(d.get("warnings") or [])
+        elif req.target == "ads":
+            d = generate_ads(ci, preview_dir)
+            warnings.append("ADS 为动态 XFA，仅 Adobe Reader 能正确渲染，请下载后用 Adobe 打开")
+        else:
+            raise HTTPException(400, f"未知 target: {req.target}")
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(500, f"预览生成失败：{exc}")
+    return {"target": req.target, "files": [{"name": d["file_name"], "pdf_url": _output_url(d["file_path"]),
+                                             "type": d.get("type")}], "warnings": warnings}
+
+
+class FilingConfirmReq(BaseModel):
+    fields_json: dict = None
+    transmittal_options: dict = None
+    recipients: list = []          # 美国代理人邮箱（必填）
+    cc: list = []
+    recipient_name: str = "X总/X律师"
+    subject: str = ""
+    body: str = ""
+
+
+@app.post("/api/submission/filing/{task_id}/confirm")
+def confirm_filing_task(task_id: str, req: FilingConfirmReq):
+    """生成 POA/Transmittal/ADS 三件成品 + 给美代理邮件 → 发美代理（附定稿）→ done。"""
+    row = _load_submission_task(task_id)
+    if row["status"] != "pending":
+        raise HTTPException(400, f"任务状态为 {row['status']}，不可确认")
+    recipients = [r.strip() for r in req.recipients if r and r.strip()]
+    if not recipients:
+        raise HTTPException(400, "美代理收件人不能为空")
+
+    fields = req.fields_json if req.fields_json is not None else (
+        json.loads(row["fields_json"]) if row["fields_json"] else {})
+    if req.transmittal_options is not None:
+        fields["transmittal_options"] = req.transmittal_options
+    fields["subject_matter"] = infer_subject_matter(fields)
+    normalize_parents(fields)
+    ci, _ai = _filing_case_info(row, fields)
+    opts = fields.get("transmittal_options") or {}
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    # 1) 重建 final/ 生成三件成品
+    final_dir = _submission_final_dir(task_id)
+    if final_dir.exists():
+        shutil.rmtree(final_dir)
+    final_dir.mkdir(parents=True, exist_ok=True)
+    warnings = []
+    try:
+        docs = [generate_poa(ci, final_dir),
+                generate_transmittal(ci, final_dir, options=opts),
+                generate_ads(ci, final_dir)]
+        for d in docs:
+            warnings.extend(d.get("warnings") or [])
+    except Exception as exc:
+        shutil.rmtree(final_dir, ignore_errors=True)
+        raise HTTPException(500, f"成品生成失败：{exc}")
+
+    # 2) 附件 = 三件成品 + 人工上传的定稿
+    attach_paths = [Path(d["file_path"]) for d in docs]
+    fdir = _filing_final_docs_dir(task_id)
+    if fdir.exists():
+        attach_paths += [p for p in sorted(fdir.glob("*")) if p.is_file()]
+
+    # 3) 给美代理邮件（固定模板，可被 req 覆盖）+ 实发
+    case_volume = row["case_volume"]
+    mail = build_agent_email(case_volume, req.recipient_name or "X总/X律师")
+    subject = req.subject or mail["subject"]
+    body = req.body or mail["body"]
+    msg = MIMEMultipart()
+    msg["Subject"] = subject
+    msg.attach(MIMEText(body, "plain", "utf-8"))
+    for p in attach_paths:
+        part = MIMEApplication(p.read_bytes())
+        part.add_header("Content-Disposition", "attachment", filename=("utf-8", "", p.name))
+        msg.attach(part)
+    account_cfg, _cc = _submission_send_config()
+    try:
+        _send_smtp(msg, account_cfg, recipients, req.cc or None)
+    except Exception as exc:
+        raise HTTPException(502, f"邮件发送失败（任务保留 pending，成品已存 final/）：{exc}")
+
+    # 4) 落库 done + 存编辑后的 fields + 插 agent_followup（供环节6 跟进美代理回邮）
+    execute_params(
+        "UPDATE submission_tasks SET status='done', fields_json=%s, confirmed_at=%s, updated_at=%s WHERE id=%s",
+        (json.dumps(fields, ensure_ascii=False), now, now, task_id))
+    followup_fields = json.dumps({
+        "source_task_id": task_id, "files": [p.name for p in attach_paths],
+        "sent_to": recipients, "sent_cc": req.cc, "sent_at": now,
+    }, ensure_ascii=False)
+    exist = execute_params(
+        "SELECT id FROM submission_tasks WHERE task_type='agent_followup' AND case_volume=%s",
+        (case_volume,))
+    if exist:
+        execute_params(
+            "UPDATE submission_tasks SET fields_json=%s, status='pending', updated_at=%s WHERE id=%s",
+            (followup_fields, now, exist[0]["id"]))
+        followup_id = exist[0]["id"]
+    else:
+        followup_id = str(uuid.uuid4())
+        execute_params(
+            "INSERT INTO submission_tasks (id, task_type, case_volume, fields_json, contact_email, status, created_at) "
+            "VALUES (%s, 'agent_followup', %s, %s, %s, 'pending', %s)",
+            (followup_id, case_volume, followup_fields, row.get("contact_email"), now))
+
+    return {"ok": True, "task_id": task_id, "status": "done", "sent_to": recipients,
+            "files": [p.name for p in attach_paths], "followup_task_id": followup_id, "warnings": warnings}
+
+
+@app.post("/api/submission/filing/{task_id}/skip")
+def skip_filing_task(task_id: str):
+    _load_submission_task(task_id)
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    execute_params("UPDATE submission_tasks SET status='skipped', updated_at=%s WHERE id=%s", (now, task_id))
     return {"ok": True, "task_id": task_id, "status": "skipped"}
 
 
