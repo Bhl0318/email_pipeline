@@ -59,7 +59,7 @@ ROOT = SCRIPT_DIR.parent                       # DS/汇报信流程/
 TEMPLATES_DIR = ROOT / "templates" / "md"
 WEB_DIR = ROOT / "web"
 PROTOTYPE_HTML = WEB_DIR / "prototype.html"
-EMAIL_CONFIG_PATH = SCRIPT_DIR / "email_config.json"
+EMAIL_CONFIG_PATH = ROOT / "email_config.json"   # 与 main.py 同源（scripts/email_config.json），消除 report/ 副本重复
 
 sys.path.insert(0, str(SCRIPT_DIR))
 from db_query import execute_params  # noqa: E402
