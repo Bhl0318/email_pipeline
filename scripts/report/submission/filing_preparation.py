@@ -17,11 +17,14 @@ from .transmittal_generator import generate_transmittal
 
 
 def build_filing_documents(fields: dict, output_dir, final_docs=None,
-                           agent_recipient: str = "X总/X律师") -> dict:
+                           agent_recipient: str = "X总/X律师",
+                           transmittal_options: dict = None) -> dict:
     """生成递交三件 + 给美代理邮件。
     :param fields: submission_tasks.fields_json
     :param output_dir: 输出目录（建议 output/{案号}/filing/）
     :param final_docs: 人工上传的定稿文件路径列表（说明书/权要/附图），原样纳入清单
+    :param transmittal_options: 递交清单（实体/页数/POA·IDS·序列表·PA·Assignment·ADS·备注），
+           操作员在审核页填，见 transmittal_generator 模块 docstring
     :return: {case_volume, documents:[{file_path,file_name,type}], final_docs, agent_email, case_info, warnings}
     """
     case_volume = fields.get("case_volume", "")
@@ -34,9 +37,17 @@ def build_filing_documents(fields: dict, output_dir, final_docs=None,
 
     output_dir = Path(output_dir)
     documents = []
-    for gen in (generate_poa, generate_transmittal, generate_ads):
+    # POA / ADS 无额外选项；Transmittal 吃递交清单 options
+    jobs = [
+        (generate_poa, {}),
+        (generate_transmittal, {"options": transmittal_options}),
+        (generate_ads, {}),
+    ]
+    for gen, kw in jobs:
         try:
-            documents.append(gen(case_info, output_dir))
+            doc = gen(case_info, output_dir, **kw)
+            documents.append(doc)
+            warnings.extend(doc.get("warnings", []) if isinstance(doc, dict) else [])
         except Exception as e:
             warnings.append(f"{gen.__name__} 生成失败: {e}")
 
