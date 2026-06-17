@@ -193,16 +193,21 @@ def build_ads_datasets_xml(case_info: dict) -> str:
 
     assignee_applicant = ""
     for idx, applicant in enumerate(case_info.get("Applicants", []), start=1):
+        # XFA 单位申请人需 chkOrg 命中才显示 orgName 子表单；有单位名时兜底勾选，
+        # 否则裸 case_info（未过 fields_mapping）会丢单位名。
+        org_name = applicant.get("Organization Name", '') or applicant.get("Name", '')
+        chk_org = applicant.get("chkOrg", '') or (1 if org_name else '')
+        legal = applicant.get("Assigneebtn", '') or ("assignee" if org_name else '')
         assignee_applicant += f"""
     <sfAssigneeInformation>
       <sfAssigneebtn>
         <appSeq>{idx}</appSeq>
         <lstInvType/>
-        <LegalRadio>{applicant.get("Assigneebtn", '')}</LegalRadio>
+        <LegalRadio>{legal}</LegalRadio>
       </sfAssigneebtn>
       <sfAssigneorgChoice>
-        <chkOrg>{applicant.get("chkOrg", '')}</chkOrg>
-        <sforgName><orgName>{applicant.get("Organization Name", '')}</orgName></sforgName>
+        <chkOrg>{chk_org}</chkOrg>
+        <sforgName><orgName>{org_name}</orgName></sforgName>
       </sfAssigneorgChoice>
       <sfApplicantName>
         <prefix/><first-name/><middle-name/><last-name/><suffix/>
@@ -384,6 +389,32 @@ def generate_ads(case_info: dict, output_dir, template_pdf=None) -> dict:
     datasets_xml = build_ads_datasets_xml(case_info)
     inject_ads_datasets(template_pdf, datasets_xml, file_path)
     return {"file_path": str(file_path), "file_name": file_name, "type": "ADS"}
+
+
+def generate_ads_flat(case_info: dict, output_dir) -> dict:
+    """ADS 在线浏览版：本地 XFA 注入 → pdfRest 扁平化成静态 PDF（普通查看器可见）。
+
+    同时产出 XFA 版（下载/发送用，数据不出本机）。扁平化走云端（会上传文件）；
+    失败则回退到"数据核对版 docx"，保证在线浏览不中断。
+    :return: {"file_path"(扁平化或回退版,内联用), "file_name", "type":"ADS-flat"|"ADS-preview",
+              "xfa_file_path", "xfa_file_name", "warnings"}
+    """
+    from .common import flatten_pdf
+    output_dir = Path(output_dir)
+    xfa = generate_ads(case_info, output_dir)
+    today = datetime.datetime.now().strftime("%Y-%m-%d")
+    ref = case_info.get("Our Ref.", "UNKNOWN")
+    flat_path = output_dir / f"{today}-ADS-{ref}-flat.pdf"
+    warnings = []
+    try:
+        flatten_pdf(xfa["file_path"], flat_path)
+        return {"file_path": str(flat_path), "file_name": flat_path.name, "type": "ADS-flat",
+                "xfa_file_path": xfa["file_path"], "xfa_file_name": xfa["file_name"], "warnings": warnings}
+    except Exception as e:
+        warnings.append(f"ADS 扁平化失败（{e}），在线浏览回退为数据核对版")
+        prev = generate_ads_preview(case_info, output_dir)
+        return {"file_path": prev["file_path"], "file_name": prev["file_name"], "type": "ADS-preview",
+                "xfa_file_path": xfa["file_path"], "xfa_file_name": xfa["file_name"], "warnings": warnings}
 
 
 def _build_ads_preview_docx(case_info: dict, out_dir):

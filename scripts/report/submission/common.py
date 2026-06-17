@@ -5,6 +5,7 @@
 字段加工函数只读 fields、不做网络/数据库访问；另提供本地 PDF AcroForm 填表工具
 fill_pdf_form（仅本地文件 I/O，供 POA/Transmittal 等生成器共用）。
 """
+import os
 import re
 from pathlib import Path
 
@@ -12,6 +13,10 @@ import fitz  # PyMuPDF
 
 # 模板自包含在本包内（部署单元是汇报信流程目录，不依赖仓库其他路径）
 TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
+
+# pdfRest 表单扁平化（仅用于把动态 XFA 渲染成静态 PDF 供在线浏览；可被环境变量覆盖）
+PDFREST_FLATTEN_URL = os.environ.get("PDFREST_FLATTEN_URL", "https://api.pdfrest.com/flattened-forms-pdf")
+PDFREST_API_KEY = os.environ.get("PDFREST_API_KEY", "4b177438-f97c-4a4f-b0d1-ee91bea77b80")
 
 ASSIGNMENT_TEMPLATE = TEMPLATES_DIR / "Assignment.docx"
 DECLARATION_EN_TEMPLATE = TEMPLATES_DIR / "DECLARATION_en.pdf"
@@ -45,6 +50,44 @@ def fill_pdf_form(template_pdf, output_pdf, field_updates: dict) -> None:
                 field.update()
     doc.save(str(output_pdf))
     doc.close()
+
+
+def flatten_pdf(input_pdf, output_pdf, timeout: int = 60) -> str:
+    """把含表单/动态 XFA 的 PDF 扁平化成静态 PDF（pdfRest flattened-forms-pdf 云端）。
+
+    ⚠️ 会把文件上传到 pdfRest 服务器——仅用于在线浏览版（动态 XFA 浏览器/LibreOffice
+    渲染不出，必须靠带 XFA 排版引擎的服务扁平化）；正式递交/发送仍用本地注入的 XFA 版。
+    需要 requests + requests_toolbelt（见 requirements.txt）。
+    成功返回 output_pdf 路径字符串；失败抛异常由调用方决定回退。"""
+    import requests
+    from requests_toolbelt import MultipartEncoder
+
+    input_pdf = Path(input_pdf)
+    if not input_pdf.is_file():
+        raise FileNotFoundError(f"待扁平化文件不存在: {input_pdf}")
+    with open(input_pdf, "rb") as f:
+        enc = MultipartEncoder(fields={
+            "file": (input_pdf.name, f, "application/pdf"),
+            "output": "flattened",
+        })
+        resp = requests.post(
+            PDFREST_FLATTEN_URL, data=enc,
+            headers={"Accept": "application/json", "Api-Key": PDFREST_API_KEY,
+                     "Content-Type": enc.content_type},
+            timeout=timeout)
+    if not resp.ok:
+        raise RuntimeError(f"pdfRest 扁平化失败 HTTP {resp.status_code}: {resp.text[:200]}")
+    out_url = (resp.json() or {}).get("outputUrl")
+    if not out_url:
+        raise RuntimeError("pdfRest 响应缺 outputUrl")
+    dl = requests.get(out_url, timeout=timeout)
+    if not dl.ok:
+        raise RuntimeError(f"pdfRest 结果下载失败 HTTP {dl.status_code}")
+    output_pdf = Path(output_pdf)
+    output_pdf.parent.mkdir(parents=True, exist_ok=True)
+    output_pdf.write_bytes(dl.content)
+    return str(output_pdf)
+
 
 # 特例客户清单（方案 2.3 全局配置）：方案号前缀命中 → Declaration 用英文版模板、
 # Assignment 公司转公司时保留受让人签字页

@@ -67,7 +67,7 @@ from submission.preview import docx_to_pdf  # noqa: E402
 from submission.fields_mapping import fields_to_case_info, load_agent_info  # noqa: E402
 from submission.poa_generator import generate_poa  # noqa: E402
 from submission.transmittal_generator import generate_transmittal  # noqa: E402
-from submission.ads_generator import generate_ads, generate_ads_preview  # noqa: E402
+from submission.ads_generator import generate_ads, generate_ads_flat  # noqa: E402
 from submission.agent_email import build_agent_email  # noqa: E402
 
 SUBMISSION_HTML = WEB_DIR / "submission.html"
@@ -1076,13 +1076,13 @@ def preview_filing_task(task_id: str, req: FilingPreviewReq):
             warnings.extend(d.get("warnings") or [])
             files = [{"name": d["file_name"], "pdf_url": _output_url(d["file_path"]), "type": d.get("type")}]
         elif req.target == "ads":
-            # 数据核对版（可内联浏览）+ XFA 版（下载/发送用）
-            xfa = generate_ads(ci, preview_dir)
-            prev = generate_ads_preview(ci, preview_dir)
-            warnings.append("ADS 在线为数据核对版；正式递交/发送用 XFA 版（需 Adobe 打开）")
+            # 在线浏览版（XFA 注入→pdfRest 扁平化，静态可见）+ XFA 版（下载/发送用）
+            ads = generate_ads_flat(ci, preview_dir)
+            warnings.extend(ads.get("warnings") or [])
+            warnings.append("ADS 在线为扁平化预览版；正式递交/发送用 XFA 版（需 Adobe 打开）")
             files = [{
-                "name": prev["file_name"], "pdf_url": _output_url(prev["file_path"]), "type": "ADS-preview",
-                "download_url": _output_url(xfa["file_path"]), "download_name": xfa["file_name"],
+                "name": ads["file_name"], "pdf_url": _output_url(ads["file_path"]), "type": ads["type"],
+                "download_url": _output_url(ads["xfa_file_path"]), "download_name": ads["xfa_file_name"],
             }]
         else:
             raise HTTPException(400, f"未知 target: {req.target}")

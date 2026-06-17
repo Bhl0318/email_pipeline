@@ -3,6 +3,7 @@ uvicorn
 pymysql
 pymssql
 requests
+requests-toolbelt
 python-multipart
 openai
 pymupdf
