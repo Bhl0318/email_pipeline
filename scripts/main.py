@@ -73,9 +73,10 @@ def main(dry_run=False):
         print("[email_pipeline] 汇报信 sink 关闭（sinks.report=false）", file=sys.stderr)
 
     # ③ 归档（只一次，用 report 副本的 archive_emails）。
+    #    命中（OA/汇报信任一）→ TEST_AUTO；未命中（两者都不是）→ TEST_SKIPPED。
     with rpt as RPT:
         RPT.set_config_path(SHARED_EMAIL_CONFIG)
-        RPT.archive_emails(all_emails, dry_run=dry_run)
+        RPT.archive_emails(all_emails, all_results, dry_run=dry_run)
     print("[email_pipeline] 归档完成" + ("（dry-run，未实际归档）" if dry_run else ""), file=sys.stderr)
 
 
