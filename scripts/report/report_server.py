@@ -942,6 +942,14 @@ def _send_filing_review_link(case_volume: str, link: str) -> bool:
         return False
 
 
+@app.get("/submission/filing")
+def filing_review_home():
+    """落地页（不带 task_id）：列表 + 转入入口，供首次进入/没有链接时使用。"""
+    if not FILING_HTML.exists():
+        return PlainTextResponse("递交准备审核页前端尚未部署（web/filing.html 缺失）。", status_code=503)
+    return FileResponse(str(FILING_HTML))
+
+
 @app.get("/submission/filing/{task_id}")
 def filing_review_page(task_id: str):
     if not FILING_HTML.exists():
