@@ -83,7 +83,10 @@
       <button class="sidebar-toggle" onclick="document.getElementById('sidebar').classList.toggle('collapsed')">&#9776;</button>
     </div>
     <div class="sidebar-search"><input id="sidebarSearch" placeholder="按案号筛选..." oninput="renderSidebar()"></div>
-    <div style="padding:0 10px 8px;"><button class="primary" style="width:100%;padding:6px;" onclick="transferIn()">+ 转入递交准备</button></div>
+    <div style="padding:0 10px 8px;display:flex;gap:6px;">
+      <button class="primary" style="flex:1;padding:6px;" onclick="transferIn()">+ 转入递交准备</button>
+      <button style="padding:6px 8px;white-space:nowrap;" onclick="openSignModal()" title="客户回签后在此勾选，自动转入递交准备">待回签</button>
+    </div>
     <div class="sidebar-list" id="sidebarList"><div class="sidebar-empty">加载中...</div></div>
   </aside>
 
@@ -132,6 +135,15 @@
     </div>
   </div>
 </div>
+
+<div class="modal-mask" id="signModal">
+  <div class="modal">
+    <h3>待回签案件（已发客户签署）</h3>
+    <p style="font-size:12px;color:#64748b;margin:4px 0 10px;">客户签回 POA/Transmittal 后点「已收到签署」，该案自动转入递交准备并发审阅链接。定时任务也会自动转入已标记的案件。</p>
+    <div id="signList" style="max-height:50vh;overflow-y:auto;">加载中...</div>
+    <div class="actions"><button onclick="closeSignModal()">关闭</button></div>
+  </div>
+</div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -178,6 +190,34 @@ async function transferIn(){
     await loadTaskList();
     await openTask(j.task_id);
   } catch(e){ toast("转入失败: "+e.message); }
+}
+
+function closeSignModal(){ $("signModal").classList.remove("show"); }
+async function openSignModal(){
+  $("signModal").classList.add("show");
+  $("signList").innerHTML = "加载中...";
+  try {
+    const j = await api("GET", "/api/submission/signatures?status=pending");
+    const rows = j.tasks || [];
+    $("signList").innerHTML = rows.length ? rows.map(t => `
+      <div style="display:flex;align-items:center;gap:8px;padding:8px;border-bottom:1px solid #f1f5f9;">
+        <div style="flex:1;">
+          <div style="font-size:13px;font-weight:500;">${esc(t.case_volume)}</div>
+          <div style="font-size:11px;color:#94a3b8;">发出 ${esc((t.updated_at||t.created_at||"").slice(0,16))}${t.transferred?" · <span style='color:#16a34a'>已转入</span>":""}</div>
+        </div>
+        <button class="success" style="padding:5px 10px;" onclick="markSigned('${esc(t.id)}')">已收到签署</button>
+      </div>`).join("") : '<div style="padding:20px;text-align:center;color:#cbd5e1;">无待回签案件</div>';
+  } catch(e){ $("signList").innerHTML = '<div style="padding:20px;color:#dc2626;">加载失败: '+esc(e.message)+'</div>'; }
+}
+async function markSigned(id){
+  try {
+    const j = await api("POST", `/api/submission/signatures/${encodeURIComponent(id)}/mark-signed`);
+    toast(j.existed ? "已标记签署（该案此前已转入）"
+                    : (j.notified ? "已签署并转入、发出审阅链接" : "已签署并转入（未配审阅人，未发链接）"));
+    closeSignModal();
+    await loadTaskList();
+    if (j.filing_task_id) await openTask(j.filing_task_id);
+  } catch(e){ toast("标记失败: "+e.message); }
 }
 
 async function openTask(id){

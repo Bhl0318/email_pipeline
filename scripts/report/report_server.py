@@ -27,6 +27,12 @@ US 递交在线审核（/submission 路由组，表 submission_tasks）:
   POST /api/submission/tasks/{task_id}/preview-send  硬校验+生成三件成品+返回发送清单（modal用）
   POST /api/submission/tasks/{task_id}/confirm  发送成品邮件 → done + 插 signature_followup
   POST /api/submission/tasks/{task_id}/skip  UPDATE status='skipped'
+
+环节4 准备递交文件（task_type='filing_preparation'）相关：
+  POST /api/submission/filing/create         手动转入（按案号从 filing_confirmation 建 filing_preparation）
+  GET  /api/submission/signatures            待回签列表（signature_followup pending，附 transferred 标记）
+  POST /api/submission/signatures/{id}/mark-signed  「已收到签署」→ 置 done 并立即转入递交准备
+  POST /api/submission/filing/auto-transfer  cron：扫已回签且未转入的案件批量建 filing_preparation
 """
 import json
 import shutil
@@ -961,10 +967,13 @@ def filing_review_page(task_id: str):
     return FileResponse(str(FILING_HTML))
 
 
-@app.post("/api/submission/filing/create")
-def create_filing_task(case_volume: str):
-    """从同案的 filing_confirmation 任务复制 fields_json，建一条 filing_preparation 任务。
-    （本期手动转入用；cron 触发后置。已存在则返回现有。）"""
+def _transfer_to_filing(case_volume: str) -> dict:
+    """从同案 filing_confirmation 复制 fields_json，建 filing_preparation（幂等）。
+
+    手动转入 / 「已收到签署」/ cron auto-transfer 三处共用。
+    已存在则返回现有；无 filing_confirmation 任务抛 404。
+    :return: {task_id, existed, review_link, notified}
+    """
     existing = execute_params(
         "SELECT id FROM submission_tasks WHERE task_type='filing_preparation' AND case_volume=%s",
         (case_volume,))
@@ -987,6 +996,79 @@ def create_filing_task(case_volume: str):
     link = f"{_filing_review_base()}/submission/filing/{new_id}"
     notified = _send_filing_review_link(case_volume, link)
     return {"task_id": new_id, "existed": False, "review_link": link, "notified": notified}
+
+
+@app.post("/api/submission/filing/create")
+def create_filing_task(case_volume: str):
+    """手动转入：从同案 filing_confirmation 建 filing_preparation（已存在则返回现有）。"""
+    return _transfer_to_filing(case_volume)
+
+
+@app.get("/api/submission/signatures")
+def list_signature_followups(status: str = "pending"):
+    """待回签列表（signature_followup）。附 transferred=该案是否已建 filing_preparation。"""
+    statuses = [s.strip() for s in status.split(",") if s.strip()]
+    placeholders = ",".join(["%s"] * len(statuses))
+    rows = execute_params(
+        f"SELECT id, case_volume, contact_email, status, created_at, updated_at "
+        f"FROM submission_tasks WHERE task_type='signature_followup' AND status IN ({placeholders}) "
+        f"ORDER BY created_at DESC", tuple(statuses))
+    out = []
+    for r in rows:
+        for key in ("created_at", "updated_at"):
+            if r.get(key) is not None:
+                r[key] = str(r[key])
+        ex = execute_params(
+            "SELECT id FROM submission_tasks WHERE task_type='filing_preparation' AND case_volume=%s",
+            (r["case_volume"],))
+        out.append({**r, "transferred": bool(ex), "filing_task_id": ex[0]["id"] if ex else None})
+    return {"tasks": out}
+
+
+@app.post("/api/submission/signatures/{task_id}/mark-signed")
+def mark_signature_signed(task_id: str):
+    """手动「已收到签署」：signature_followup 置 done 并立即转入递交准备（幂等）。
+    cron(auto-transfer) 兜底覆盖由回签检测 skill 标 done 的记录。"""
+    row = _load_submission_task(task_id)
+    if row["task_type"] != "signature_followup":
+        raise HTTPException(400, f"任务 {task_id} 不是 signature_followup（实际 {row['task_type']}）")
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    try:
+        ff = json.loads(row["fields_json"]) if row["fields_json"] else {}
+    except Exception:
+        ff = {}
+    ff["signed_at"] = now
+    execute_params(
+        "UPDATE submission_tasks SET status='done', confirmed_at=%s, fields_json=%s, updated_at=%s WHERE id=%s",
+        (now, json.dumps(ff, ensure_ascii=False), now, task_id))
+    res = _transfer_to_filing(row["case_volume"])
+    return {"ok": True, "case_volume": row["case_volume"], "signed_at": now,
+            "filing_task_id": res["task_id"], "existed": res["existed"],
+            "review_link": res["review_link"], "notified": res["notified"]}
+
+
+@app.post("/api/submission/filing/auto-transfer")
+def auto_transfer_filing():
+    """cron 入口：扫已回签(signature_followup=done)且未转入的案件 → 建 filing_preparation。
+    供定时器周期调用（schtasks/crontab → curl 本路由）。幂等，可重复跑。"""
+    rows = execute_params(
+        "SELECT DISTINCT case_volume FROM submission_tasks "
+        "WHERE task_type='signature_followup' AND status='done'")
+    created, skipped, failed = [], [], []
+    for r in rows:
+        cv = r["case_volume"]
+        exists = execute_params(
+            "SELECT id FROM submission_tasks WHERE task_type='filing_preparation' AND case_volume=%s", (cv,))
+        if exists:
+            skipped.append(cv)
+            continue
+        try:
+            res = _transfer_to_filing(cv)
+            created.append({"case_volume": cv, "task_id": res["task_id"], "notified": res["notified"]})
+        except HTTPException as e:
+            failed.append({"case_volume": cv, "error": str(e.detail)})
+    return {"created": created, "skipped": skipped, "failed": failed,
+            "summary": f"新建 {len(created)}，已存在 {len(skipped)}，失败 {len(failed)}"}
 
 
 @app.get("/api/submission/filing/{task_id}")
