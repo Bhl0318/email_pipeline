@@ -383,7 +383,7 @@ def generate_ads(case_info: dict, output_dir, template_pdf=None) -> dict:
     file_path = output_dir / file_name
     datasets_xml = build_ads_datasets_xml(case_info)
     inject_ads_datasets(template_pdf, datasets_xml, file_path)
-    return {"file_path": str(file_path), "file_name": file_name}
+    return {"file_path": str(file_path), "file_name": file_name, "type": "ADS"}
 
 
 if __name__ == "__main__":
