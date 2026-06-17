@@ -946,30 +946,43 @@ def dispatch_oa(all_results, all_emails=None, dry_run=False, test_project_prefix
         send_notification(all_results)
 
 
-def archive_emails(all_emails, dry_run=False):
-    """单次归档：按账号把处理过的邮件 move 到 TEST_AUTO。
+def archive_emails(all_emails, all_results=None, dry_run=False):
+    """单次归档：分类命中的邮件 move 到 TEST_AUTO，未命中（既非OA也非汇报信）的 move 到 TEST_SKIPPED。
+
+    命中判定按 message_id 是否出现在 all_results（分类结果，OA/汇报信共用）。
+    all_results 不传时退回旧行为：全部归 TEST_AUTO（兼容单 sink 直调）。
     email_pipeline 模式下归档只在这里发生一次（各 sink 内不再 move）。
     dry_run=True 时只打印不真正 move。"""
+    matched_mids = {item.get("message_id", "") for item in (all_results or []) if item.get("message_id")}
+    # groups[(account, folder)] = [acc, 命中 mids[], 跳过 mids[]]
     groups = {}
     for acc, em in all_emails:
         key = (acc["account"], acc["folder"])
         if key not in groups:
-            groups[key] = [acc, []]
+            groups[key] = [acc, [], []]
         mid = em.get("message_id", "")
-        if mid:
+        if not mid:
+            continue
+        # all_results 未提供 → 一律按命中（旧行为：全归 TEST_AUTO）
+        if all_results is None or mid in matched_mids:
             groups[key][1].append(mid)
-    for (account_name, folder), (acc, message_ids) in groups.items():
-        if not message_ids:
-            continue
-        if dry_run:
-            print(f"  [dry-run] 跳过归档 {len(message_ids)} 封（{account_name}/{folder} → TEST_AUTO）", file=sys.stderr)
-            continue
-        cfg = get_account_config(account_name)
-        move_emails(cfg, folder, message_ids, target_folder="TEST_AUTO")
+        else:
+            groups[key][2].append(mid)
+    for (account_name, folder), (acc, matched, skipped) in groups.items():
+        cfg = None
+        for target_folder, mids in (("TEST_AUTO", matched), ("TEST_SKIPPED", skipped)):
+            if not mids:
+                continue
+            if dry_run:
+                print(f"  [dry-run] 跳过归档 {len(mids)} 封（{account_name}/{folder} → {target_folder}）", file=sys.stderr)
+                continue
+            if cfg is None:
+                cfg = get_account_config(account_name)
+            move_emails(cfg, folder, mids, target_folder=target_folder)
 
 
 if __name__ == "__main__":
     # 单独运行：读取 → 分类 → OA 下游 → 归档
     _all_emails, _all_results = read_and_classify_oa()
     dispatch_oa(_all_results, _all_emails)
-    archive_emails(_all_emails)
+    archive_emails(_all_emails, _all_results)
