@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Declaration PDF 生成（消费 fields_json，移植自 old_submission/assignment/func_normal_form.py）。
 
-每位发明人一份；模板按特例客户清单选择：
+每位发明人一页，合并为一份多页 PDF；模板按特例客户清单选择：
 - 特例客户（20618 类）→ DECLARATION_en.pdf（英文版，含 PCT 勾选与申请号/日期栏）
 - 其余 → DECLARATION_encn.pdf（中英对照版，Text16-28 + Check Box17/18）
 """
@@ -72,11 +72,11 @@ def _build_field_dict(special: bool, title: str, inventor: str,
 
 
 def generate_declarations(fields: dict, output_dir) -> list:
-    """按发明人逐份生成 Declaration PDF。
+    """生成 Declaration：每位发明人一页，合并为一份多页 PDF（USPTO 每人各签一页）。
 
     :param fields: submission_tasks.fields_json
     :param output_dir: 输出目录
-    :return: [{"file_path", "file_name", "inventor"}]
+    :return: [{"file_path", "file_name", "inventors": [...]}]（单元素列表，调用方按列表处理）
     """
     case_volume = fields.get("case_volume") or ""
     title = (fields.get("case_info") or {}).get("case_name_en") or ""
@@ -96,11 +96,19 @@ def generate_declarations(fields: dict, output_dir) -> list:
     output_dir.mkdir(parents=True, exist_ok=True)
     today_str = datetime.now().strftime("%Y-%m-%d")
 
-    results = []
-    for inventor in names:
-        template_path, field_dict = _build_field_dict(special, title, inventor, pct_app_no, pct_app_date)
-        file_name = f"{today_str}-Declaration-{case_volume}-{inventor.replace(', ', '_').replace(',', '_')}.pdf"
+    # 逐位发明人填一页 → 合并为一份多页 PDF（每页一位）
+    merged = fitz.open()
+    try:
+        for idx, inventor in enumerate(names):
+            template_path, field_dict = _build_field_dict(special, title, inventor, pct_app_no, pct_app_date)
+            tmp_path = output_dir / f".decl_tmp_{idx}.pdf"
+            _fill_pdf_form(template_path, tmp_path, field_dict)
+            with fitz.open(str(tmp_path)) as one:
+                merged.insert_pdf(one)
+            tmp_path.unlink()
+        file_name = f"{today_str}-Declaration-{case_volume}.pdf"
         file_path = output_dir / file_name
-        _fill_pdf_form(template_path, file_path, field_dict)
-        results.append({"file_path": str(file_path), "file_name": file_name, "inventor": inventor})
-    return results
+        merged.save(str(file_path))
+    finally:
+        merged.close()
+    return [{"file_path": str(file_path), "file_name": file_name, "inventors": names}]
