@@ -14,6 +14,8 @@ MICRO_ENTITY_INCOME_LIMIT = "$251,190"   # 美国中等家庭收入的3倍，每
 EXCESS_CLAIM_FEE = 50      # 每超1个权要（美元）
 EXCESS_PAGE_FEE = 210      # 每超50页（美元）
 CLAIM_LIMIT = 20           # 权要免费上限
+CAF_FEE_6YR = "2,700"      # 延续申请费：最早受益日后超6年（大实体，美元）
+CAF_FEE_9YR = "4,000"      # 延续申请费：最早受益日后超9年（大实体，美元）
 
 # 字体格式对齐汇报信实际邮件：宋体/Times New Roman，12pt，行距150%（内联样式随邮件发出）
 _FONT = "font-family:宋体,'SimSun','Times New Roman',serif;font-size:12pt;color:#000000;"
@@ -226,6 +228,18 @@ def build_email_modules(fields: dict, params: dict = None) -> list:
         "id": "excess_pages", "title": "超页费", "checked": bool(pages_total and pages_excess),
         "html": pages_html, "note": "输入总页数 + 超页数量", "input": "pages",
         "input_value": "",
+    })
+
+    # 11b. 延续申请费 CAF（续案在最早受益日期后超 6/9 年；默认不勾，由审核人判断）
+    modules.append({
+        "id": "continuing_application_fee",
+        "title": "延续申请费（Continuing Application Fee, CAF）",
+        "checked": False,
+        "html": _h("延续申请费（Continuing Application Fee, CAF）") +
+                _p(f"根据美国专利商标局的规定，若本延续申请的递交日距最早受益日期"
+                   f"（即申请人可以主张的最早优先权日期）超过6年，需缴纳延续申请费{CAF_FEE_6YR}美元（大实体）；"
+                   f"超过9年的，需缴纳{CAF_FEE_9YR}美元（大实体）。"),
+        "note": "续案且距最早受益日超6/9年时适用",
     })
 
     # 12. IDS
