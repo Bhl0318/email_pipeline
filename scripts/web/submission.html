@@ -83,6 +83,7 @@
   .mod-rowinput { display: flex; gap: 8px; align-items: center; padding: 8px 10px 0; flex-wrap: wrap; }
   .mod-rowinput label { font-size: 11.5px; color: #64748b; }
   .mod-rowinput input { flex: 1; min-width: 200px; padding: 5px 9px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 12.5px; }
+  .mod-rowinput textarea { flex: 1 1 100%; min-height: 70px; padding: 6px 9px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 12.5px; font-family: inherit; resize: vertical; }
   .mod-head input[type=checkbox] { width: 15px; height: 15px; cursor: pointer; }
   .mod-title { font-size: 12.5px; font-weight: 600; color: #334155; flex: 1; }
   .mod-item.off .mod-title { color: #94a3b8; font-weight: 400; }
@@ -305,6 +306,8 @@ function regenerateModules() {
   moduleParams.claims_total = ($("modClaims") || {}).value || "";
   moduleParams.pages_total = ($("modPagesTotal") || {}).value || "";
   moduleParams.pages_excess = ($("modPagesExcess") || {}).value || "";
+  moduleParams.custom_text = ($("modCustom") || {}).value || "";
+  moduleChecked.custom = !!moduleParams.custom_text;   // 有内容即勾选，清空即取消
   loadEmailModules();
 }
 function renderEmailModules() {
@@ -319,6 +322,9 @@ function renderEmailModules() {
     if (m.id === "app_info")
       rowInput = `<div class="mod-rowinput"><label>落地方式话术</label>
         <input id="modRoutePhrase" placeholder="落地方式话术" value="${esc(moduleParams.route_phrase || m.input_value || "")}" onchange="regenerateModules()"></div>`;
+    if (m.id === "custom")
+      rowInput = `<div class="mod-rowinput"><label>自定义内容</label>
+        <textarea id="modCustom" placeholder="在此输入要加进邮件的内容，每行一段，自动套正文样式" onclick="event.stopPropagation()" onchange="regenerateModules()">${esc(moduleParams.custom_text || "")}</textarea></div>`;
     if (m.id === "entity_repeat") {
       const cur = moduleParams.repeat_entity || m.select_value || "大";
       inputs = `<select class="mod-num" id="modRepeatEntity" onclick="event.stopPropagation()" onchange="regenerateModules()">` +
