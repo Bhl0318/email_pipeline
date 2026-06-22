@@ -377,6 +377,19 @@ def inject_ads_datasets(template_pdf, datasets_xml: str, out_path) -> None:
     pdf.save(str(out_path))
 
 
+def _free_output_path(output_dir: Path, file_name: str) -> Path:
+    """返回可安全写入的输出路径：目标已存在且能删则删（覆盖）；删不掉（Windows 上文件被
+    Adobe/浏览器打开或杀软占用）则换唯一名——避免 pikepdf 保存时 os.replace 撞上被锁文件
+    报 [WinError 5] 拒绝访问（重复点预览时常见）。"""
+    p = output_dir / file_name
+    if p.exists():
+        try:
+            p.unlink()
+        except OSError:
+            p = output_dir / f"{p.stem}-{datetime.datetime.now().strftime('%H%M%S%f')}{p.suffix}"
+    return p
+
+
 def generate_ads(case_info: dict, output_dir, template_pdf=None) -> dict:
     """生成 ADS PDF（本地 XFA 注入）。
     :return: {"file_path", "file_name"}
@@ -386,8 +399,8 @@ def generate_ads(case_info: dict, output_dir, template_pdf=None) -> dict:
     output_dir.mkdir(parents=True, exist_ok=True)
     today = datetime.datetime.now().strftime("%Y-%m-%d")
     ref = case_info.get("Our Ref.", "UNKNOWN")
-    file_name = f"{today}-ADS-{ref}.pdf"
-    file_path = output_dir / file_name
+    file_path = _free_output_path(output_dir, f"{today}-ADS-{ref}.pdf")
+    file_name = file_path.name
     datasets_xml = build_ads_datasets_xml(case_info)
     inject_ads_datasets(template_pdf, datasets_xml, file_path)
     return {"file_path": str(file_path), "file_name": file_name, "type": "ADS"}
@@ -406,7 +419,7 @@ def generate_ads_flat(case_info: dict, output_dir) -> dict:
     xfa = generate_ads(case_info, output_dir)
     today = datetime.datetime.now().strftime("%Y-%m-%d")
     ref = case_info.get("Our Ref.", "UNKNOWN")
-    flat_path = output_dir / f"{today}-ADS-{ref}-flat.pdf"
+    flat_path = _free_output_path(output_dir, f"{today}-ADS-{ref}-flat.pdf")
     warnings = []
     try:
         flatten_pdf(xfa["file_path"], flat_path)
