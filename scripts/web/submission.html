@@ -88,7 +88,9 @@
   .slot-add { font-size: 11.5px; color: #94a3b8; background: none; border: 1px dashed #e2e8f0; border-radius: 6px; padding: 2px 10px; cursor: pointer; }
   .slot-add:hover { color: #2563eb; border-color: #93c5fd; }
   .slot-box { display: flex; gap: 6px; align-items: flex-start; }
-  .slot-box textarea { flex: 1; min-height: 56px; padding: 6px 9px; border: 1px solid #bfdbfe; border-radius: 6px; font-size: 12.5px; font-family: inherit; resize: vertical; background: #f8fbff; }
+  .slot-fields { flex: 1; display: flex; flex-direction: column; gap: 5px; }
+  .slot-title { padding: 5px 9px; border: 1px solid #bfdbfe; border-radius: 6px; font-size: 12.5px; background: #f8fbff; }
+  .slot-fields textarea { width: 100%; min-height: 56px; padding: 6px 9px; border: 1px solid #bfdbfe; border-radius: 6px; font-size: 12.5px; font-family: inherit; resize: vertical; background: #f8fbff; }
   .slot-del { font-size: 11px; color: #dc2626; background: none; border: none; cursor: pointer; padding: 4px; }
   .mod-head input[type=checkbox] { width: 15px; height: 15px; cursor: pointer; }
   .mod-title { font-size: 12.5px; font-weight: 600; color: #334155; flex: 1; }
@@ -353,24 +355,34 @@ function renderEmailModules() {
 /* 模块之后的自定义内容插入槽：未打开显示"＋"，打开显示文本框 */
 function slotHtml(id) {
   if (id in customSlots) {
+    const s = customSlots[id] || {};
     return `<div class="slot"><div class="slot-box">
-      <textarea placeholder="在此输入自定义内容，每行一段，自动套正文样式"
-        oninput="customSlots['${esc(id)}']=this.value;if(previewTarget==='email')renderEmailPreview()">${esc(customSlots[id])}</textarea>
+      <div class="slot-fields">
+        <input class="slot-title" placeholder="标题（可留空；加粗小标题，同其他模块）"
+          oninput="customSlots['${esc(id)}'].title=this.value;if(previewTarget==='email')renderEmailPreview()" value="${esc(s.title || "")}">
+        <textarea placeholder="正文内容，每行一段，自动套正文样式"
+          oninput="customSlots['${esc(id)}'].body=this.value;if(previewTarget==='email')renderEmailPreview()">${esc(s.body || "")}</textarea>
+      </div>
       <button class="slot-del" title="删除此段" onclick="removeSlot('${esc(id)}')">✕</button>
     </div></div>`;
   }
   return `<div class="slot"><button class="slot-add" onclick="addSlot('${esc(id)}')">＋ 在此插入自定义内容</button></div>`;
 }
-function addSlot(id) { customSlots[id] = ""; renderEmailModules(); }
+function addSlot(id) { customSlots[id] = { title: "", body: "" }; renderEmailModules(); }
 function removeSlot(id) {
   delete customSlots[id]; renderEmailModules();
   if (previewTarget === "email") renderEmailPreview();
 }
-/* 自定义文本 → 套正文样式的段落（与 email_modules._P 一致）*/
-function customToHtml(text) {
-  const style = "margin:0 0 12px 0;line-height:150%;font-family:宋体,'SimSun','Times New Roman',serif;font-size:12pt;color:#000000;";
-  return (text || "").split("\n").map(s => s.trim()).filter(Boolean)
-    .map(line => `<p style="${style}">${esc(line)}</p>`).join("");
+/* 自定义槽 → 加粗小标题(_H) + 正文段落(_P)，样式与 email_modules 一致 */
+function customToHtml(slot) {
+  const pStyle = "margin:0 0 12px 0;line-height:150%;font-family:宋体,'SimSun','Times New Roman',serif;font-size:12pt;color:#000000;";
+  const hStyle = "margin:16px 0 8px 0;line-height:150%;font-family:宋体,'SimSun','Times New Roman',serif;font-size:12pt;color:#000000;";
+  const s = slot || {};
+  let html = "";
+  if ((s.title || "").trim()) html += `<p style="${hStyle}"><b>${esc(s.title.trim())}</b></p>`;
+  html += (s.body || "").split("\n").map(x => x.trim()).filter(Boolean)
+    .map(line => `<p style="${pStyle}">${esc(line)}</p>`).join("");
+  return html;
 }
 function toggleModuleBody(id) { document.getElementById("mod-" + id).classList.toggle("open"); }
 function assembleEmailBody() {
@@ -378,8 +390,8 @@ function assembleEmailBody() {
   const parts = [];
   for (const m of emailModules) {
     if (moduleChecked[m.id]) parts.push(m.html);
-    const c = (customSlots[m.id] || "").trim();
-    if (c) parts.push(customToHtml(c));
+    const s = customSlots[m.id];
+    if (s && ((s.title || "").trim() || (s.body || "").trim())) parts.push(customToHtml(s));
   }
   return parts.join("\n");
 }
