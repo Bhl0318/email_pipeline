@@ -65,6 +65,10 @@
   .preview-body { flex: 1; position: relative; }
   .preview-body iframe { width: 100%; height: 100%; border: none; }
   .preview-placeholder { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #cbd5e1; font-size: 13px; text-align: center; padding: 0 20px; line-height: 2; }
+  .preview-loading { position: absolute; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 12px; background: rgba(255,255,255,.9); z-index: 6; color: #475569; font-size: 13px; }
+  .preview-loading.show { display: flex; }
+  .spinner { width: 32px; height: 32px; border: 3px solid #dbeafe; border-top-color: #2563eb; border-radius: 50%; animation: spin .7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
   .modal-mask { position: fixed; inset: 0; background: rgba(15,23,42,.45); display: none; align-items: center; justify-content: center; z-index: 50; }
   .modal-mask.show { display: flex; }
   .modal { background: #fff; border-radius: 12px; width: 560px; max-width: 92vw; max-height: 88vh; overflow-y: auto; padding: 18px 20px; }
@@ -106,14 +110,15 @@
     <div class="preview-pane">
       <div class="preview-head">
         <span style="font-size:12px;color:#64748b;">预览：</span>
-        <button class="tab" onclick="preview('poa')">POA</button>
-        <button class="tab" onclick="preview('transmittal')">Transmittal</button>
-        <button class="tab" onclick="preview('ads')">ADS</button>
+        <button class="tab" data-target="poa" onclick="preview('poa')">POA</button>
+        <button class="tab" data-target="transmittal" onclick="preview('transmittal')">Transmittal</button>
+        <button class="tab" data-target="ads" onclick="preview('ads')">ADS</button>
       </div>
       <div id="dlBar" style="display:none;padding:6px 12px;background:#fef3c7;border-bottom:1px solid #fcd34d;font-size:12px;"></div>
       <div class="preview-body">
         <iframe id="previewFrame" style="display:none"></iframe>
         <div class="preview-placeholder" id="previewPlaceholder">填好递交清单后点上方按钮生成预览<br>POA/Transmittal 内联显示；ADS 在线为扁平化预览版、下载用 XFA 版</div>
+        <div class="preview-loading" id="previewLoading"><div class="spinner"></div><div id="previewLoadingText">生成中…</div></div>
       </div>
     </div>
   </div>
@@ -320,7 +325,10 @@ async function delFinal(name){
 
 async function preview(target){
   collectOpts();
-  toast("生成中...");
+  // 高亮当前 tab + 显示 loading 遮罩（ADS 走 pdfRest 扁平化，较慢，文案区分）
+  document.querySelectorAll(".preview-head .tab").forEach(b => b.classList.toggle("active", b.dataset.target === target));
+  $("previewLoadingText").textContent = target === "ads" ? "生成中…（ADS 扁平化稍慢）" : "生成中…";
+  $("previewLoading").classList.add("show");
   try {
     const j = await api("POST", `${API}/${taskId}/preview`, { target, fields_json: fields, transmittal_options: opts });
     const file = (j.files||[])[0];
@@ -338,6 +346,7 @@ async function preview(target){
     }
     if ((j.warnings||[]).length) toast(j.warnings[0]);
   } catch(e){ toast("预览失败: "+e.message); }
+  finally { $("previewLoading").classList.remove("show"); }
 }
 
 function buildMail(){
