@@ -195,7 +195,8 @@
 const API = "/api/submission";
 let taskId = null, task = null, fields = {}, taskList = [];
 let emailModules = [], moduleChecked = {}, moduleParams = {};
-let customSlots = {};   // {模块id: 自定义文本}——插在该模块之后；key 存在即"已打开槽"（含空串）
+let customSlots = {};   // {模块id: {title,body}}——插在该模块之后；key 存在即"已打开槽"
+let openModules = {};   // {模块id: true}——记住展开状态，重建后恢复（否则每次刷新塌回收起）
 
 /* ───────── 工具 ───────── */
 const $ = id => document.getElementById(id);
@@ -288,7 +289,7 @@ async function openTask(id) {
   try { task = await api("GET", `${API}/tasks/${id}`); }
   catch (e) { $("formSections").innerHTML = `<div class="banner error">任务加载失败：${esc(problemsOf(e).join("；"))}</div>`; return; }
   fields = task.fields_json || {};
-  emailModules = []; moduleChecked = {}; moduleParams = {}; customSlots = {};
+  emailModules = []; moduleChecked = {}; moduleParams = {}; customSlots = {}; openModules = {};
   $("caseTitle").textContent = task.case_volume || id;
   const b = $("statusBadge"); b.textContent = task.status; b.className = "badge " + task.status;
   renderMissing(); renderForm(); renderSidebar(); resetPreview();
@@ -339,7 +340,7 @@ function renderEmailModules() {
     if (m.id === "excess_pages")
       inputs = `<input class="mod-num" id="modPagesTotal" placeholder="总页数" value="${esc(moduleParams.pages_total || "")}" onclick="event.stopPropagation()" onchange="regenerateModules()">
                 <input class="mod-num" id="modPagesExcess" placeholder="超页数" value="${esc(moduleParams.pages_excess || "")}" onclick="event.stopPropagation()" onchange="regenerateModules()">`;
-    return `<div class="mod-item ${on ? "" : "off"}" id="mod-${esc(m.id)}">
+    return `<div class="mod-item ${on ? "" : "off"} ${openModules[m.id] ? "open" : ""}" id="mod-${esc(m.id)}">
       <div class="mod-head" onclick="toggleModuleBody('${esc(m.id)}')">
         <input type="checkbox" ${on ? "checked" : ""} onclick="event.stopPropagation()" onchange="moduleChecked['${esc(m.id)}']=this.checked;document.getElementById('mod-${esc(m.id)}').classList.toggle('off',!this.checked);if(previewTarget==='email')renderEmailPreview()">
         <span class="mod-title">${esc(m.title)}</span>
@@ -384,7 +385,10 @@ function customToHtml(slot) {
     .map(line => `<p style="${pStyle}">${esc(line)}</p>`).join("");
   return html;
 }
-function toggleModuleBody(id) { document.getElementById("mod-" + id).classList.toggle("open"); }
+function toggleModuleBody(id) {
+  openModules[id] = !openModules[id];
+  document.getElementById("mod-" + id).classList.toggle("open", openModules[id]);
+}
 function assembleEmailBody() {
   // 按模块顺序拼装：勾选的模块正文 + 该模块之后插入槽的自定义内容
   const parts = [];
