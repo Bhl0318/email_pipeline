@@ -83,7 +83,13 @@
   .mod-rowinput { display: flex; gap: 8px; align-items: center; padding: 8px 10px 0; flex-wrap: wrap; }
   .mod-rowinput label { font-size: 11.5px; color: #64748b; }
   .mod-rowinput input { flex: 1; min-width: 200px; padding: 5px 9px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 12.5px; }
-  .mod-rowinput textarea { flex: 1 1 100%; min-height: 70px; padding: 6px 9px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 12.5px; font-family: inherit; resize: vertical; }
+  /* 模块间自定义内容插入槽 */
+  .slot { padding: 2px 0 2px 24px; }
+  .slot-add { font-size: 11.5px; color: #94a3b8; background: none; border: 1px dashed #e2e8f0; border-radius: 6px; padding: 2px 10px; cursor: pointer; }
+  .slot-add:hover { color: #2563eb; border-color: #93c5fd; }
+  .slot-box { display: flex; gap: 6px; align-items: flex-start; }
+  .slot-box textarea { flex: 1; min-height: 56px; padding: 6px 9px; border: 1px solid #bfdbfe; border-radius: 6px; font-size: 12.5px; font-family: inherit; resize: vertical; background: #f8fbff; }
+  .slot-del { font-size: 11px; color: #dc2626; background: none; border: none; cursor: pointer; padding: 4px; }
   .mod-head input[type=checkbox] { width: 15px; height: 15px; cursor: pointer; }
   .mod-title { font-size: 12.5px; font-weight: 600; color: #334155; flex: 1; }
   .mod-item.off .mod-title { color: #94a3b8; font-weight: 400; }
@@ -187,6 +193,7 @@
 const API = "/api/submission";
 let taskId = null, task = null, fields = {}, taskList = [];
 let emailModules = [], moduleChecked = {}, moduleParams = {};
+let customSlots = {};   // {模块id: 自定义文本}——插在该模块之后；key 存在即"已打开槽"（含空串）
 
 /* ───────── 工具 ───────── */
 const $ = id => document.getElementById(id);
@@ -279,7 +286,7 @@ async function openTask(id) {
   try { task = await api("GET", `${API}/tasks/${id}`); }
   catch (e) { $("formSections").innerHTML = `<div class="banner error">任务加载失败：${esc(problemsOf(e).join("；"))}</div>`; return; }
   fields = task.fields_json || {};
-  emailModules = []; moduleChecked = {}; moduleParams = {};
+  emailModules = []; moduleChecked = {}; moduleParams = {}; customSlots = {};
   $("caseTitle").textContent = task.case_volume || id;
   const b = $("statusBadge"); b.textContent = task.status; b.className = "badge " + task.status;
   renderMissing(); renderForm(); renderSidebar(); resetPreview();
@@ -306,8 +313,6 @@ function regenerateModules() {
   moduleParams.claims_total = ($("modClaims") || {}).value || "";
   moduleParams.pages_total = ($("modPagesTotal") || {}).value || "";
   moduleParams.pages_excess = ($("modPagesExcess") || {}).value || "";
-  moduleParams.custom_text = ($("modCustom") || {}).value || "";
-  moduleChecked.custom = !!moduleParams.custom_text;   // 有内容即勾选，清空即取消
   loadEmailModules();
 }
 function renderEmailModules() {
@@ -322,9 +327,6 @@ function renderEmailModules() {
     if (m.id === "app_info")
       rowInput = `<div class="mod-rowinput"><label>落地方式话术</label>
         <input id="modRoutePhrase" placeholder="落地方式话术" value="${esc(moduleParams.route_phrase || m.input_value || "")}" onchange="regenerateModules()"></div>`;
-    if (m.id === "custom")
-      rowInput = `<div class="mod-rowinput"><label>自定义内容</label>
-        <textarea id="modCustom" placeholder="在此输入要加进邮件的内容，每行一段，自动套正文样式" onclick="event.stopPropagation()" onchange="regenerateModules()">${esc(moduleParams.custom_text || "")}</textarea></div>`;
     if (m.id === "entity_repeat") {
       const cur = moduleParams.repeat_entity || m.select_value || "大";
       inputs = `<select class="mod-num" id="modRepeatEntity" onclick="event.stopPropagation()" onchange="regenerateModules()">` +
@@ -345,12 +347,41 @@ function renderEmailModules() {
       </div>
       ${rowInput}
       <div class="mod-body">${m.html}</div>
-    </div>`;
+    </div>${slotHtml(m.id)}`;
   }).join("");
+}
+/* 模块之后的自定义内容插入槽：未打开显示"＋"，打开显示文本框 */
+function slotHtml(id) {
+  if (id in customSlots) {
+    return `<div class="slot"><div class="slot-box">
+      <textarea placeholder="在此输入自定义内容，每行一段，自动套正文样式"
+        oninput="customSlots['${esc(id)}']=this.value;if(previewTarget==='email')renderEmailPreview()">${esc(customSlots[id])}</textarea>
+      <button class="slot-del" title="删除此段" onclick="removeSlot('${esc(id)}')">✕</button>
+    </div></div>`;
+  }
+  return `<div class="slot"><button class="slot-add" onclick="addSlot('${esc(id)}')">＋ 在此插入自定义内容</button></div>`;
+}
+function addSlot(id) { customSlots[id] = ""; renderEmailModules(); }
+function removeSlot(id) {
+  delete customSlots[id]; renderEmailModules();
+  if (previewTarget === "email") renderEmailPreview();
+}
+/* 自定义文本 → 套正文样式的段落（与 email_modules._P 一致）*/
+function customToHtml(text) {
+  const style = "margin:0 0 12px 0;line-height:150%;font-family:宋体,'SimSun','Times New Roman',serif;font-size:12pt;color:#000000;";
+  return (text || "").split("\n").map(s => s.trim()).filter(Boolean)
+    .map(line => `<p style="${style}">${esc(line)}</p>`).join("");
 }
 function toggleModuleBody(id) { document.getElementById("mod-" + id).classList.toggle("open"); }
 function assembleEmailBody() {
-  return emailModules.filter(m => moduleChecked[m.id]).map(m => m.html).join("\n");
+  // 按模块顺序拼装：勾选的模块正文 + 该模块之后插入槽的自定义内容
+  const parts = [];
+  for (const m of emailModules) {
+    if (moduleChecked[m.id]) parts.push(m.html);
+    const c = (customSlots[m.id] || "").trim();
+    if (c) parts.push(customToHtml(c));
+  }
+  return parts.join("\n");
 }
 function renderMissing() {
   const list = task.missing_json || [];

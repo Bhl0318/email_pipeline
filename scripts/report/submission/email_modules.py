@@ -30,8 +30,8 @@ def _h(text):
 
 
 def build_email_modules(fields: dict, params: dict = None) -> list:
-    """返回 [{id, title, html, checked, note, editable?}]；checked 为推导的默认勾选。
-    editable=True 的模块（custom）正文由 params.custom_text 现拼，审核页渲染为可输入文本框。"""
+    """返回 [{id, title, html, checked, note}]；checked 为推导的默认勾选。
+    （自定义正文内容由审核页在模块之间的"插入槽"提供，不在此生成。）"""
     params = params or {}
     case_volume = fields.get("case_volume") or "（案号）"
     filing_route = fields.get("filing_route") or "（落地方式）"
@@ -239,16 +239,7 @@ def build_email_modules(fields: dict, params: dict = None) -> list:
         "note": "",
     })
 
-    # 13. 自定义内容（空白模块，审核人手动填写；每行一段，自动套正文样式）
-    custom_text = (params.get("custom_text") or "").strip()
-    modules.append({
-        "id": "custom", "title": "自定义内容（手动填写）", "checked": bool(custom_text),
-        "html": "".join(_p(line.strip()) for line in custom_text.splitlines() if line.strip()),
-        "note": "在下方输入框填写，每行一段；勾选后随正文发送",
-        "editable": True,
-    })
-
-    # 14. 结尾
+    # 13. 结尾
     modules.append({
         "id": "closing", "title": "结尾", "checked": True,
         "html": _p("待贵司回复后，我司会进行后续递交事宜，谢谢。") + _p("顺祝商祺！"),
