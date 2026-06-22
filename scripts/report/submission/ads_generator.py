@@ -24,6 +24,8 @@ Adobe 打开时按"模板+datasets"重渲染出填好的 ADS。
 """
 import datetime
 import re
+import sys
+import traceback
 from pathlib import Path
 
 import pikepdf
@@ -411,6 +413,8 @@ def generate_ads_flat(case_info: dict, output_dir) -> dict:
         return {"file_path": str(flat_path), "file_name": flat_path.name, "type": "ADS-flat",
                 "xfa_file_path": xfa["file_path"], "xfa_file_name": xfa["file_name"], "warnings": warnings}
     except Exception as e:
+        print(f"[ADS] pdfRest 扁平化失败，回退数据核对版 docx：{e}", file=sys.stderr)
+        traceback.print_exc()
         warnings.append(f"ADS 扁平化失败（{e}），在线浏览回退为数据核对版")
         prev = generate_ads_preview(case_info, output_dir)
         return {"file_path": prev["file_path"], "file_name": prev["file_name"], "type": "ADS-preview",
