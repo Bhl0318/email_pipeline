@@ -316,6 +316,7 @@ function regenerateModules() {
   moduleParams.claims_total = ($("modClaims") || {}).value || "";
   moduleParams.pages_total = ($("modPagesTotal") || {}).value || "";
   moduleParams.pages_excess = ($("modPagesExcess") || {}).value || "";
+  moduleParams.caf_tier = ($("modCafTier") || {}).value || "";
   loadEmailModules();
 }
 function renderEmailModules() {
@@ -340,6 +341,11 @@ function renderEmailModules() {
     if (m.id === "excess_pages")
       inputs = `<input class="mod-num" id="modPagesTotal" placeholder="总页数" value="${esc(moduleParams.pages_total || "")}" onclick="event.stopPropagation()" onchange="regenerateModules()">
                 <input class="mod-num" id="modPagesExcess" placeholder="超页数" value="${esc(moduleParams.pages_excess || "")}" onclick="event.stopPropagation()" onchange="regenerateModules()">`;
+    if (m.id === "continuing_application_fee") {
+      const cur = moduleParams.caf_tier || m.select_value || "6-9";
+      inputs = `<select class="mod-num" id="modCafTier" onclick="event.stopPropagation()" onchange="regenerateModules()">` +
+        [["6-9", "超6年未超9年（$2,700）"], ["9+", "超9年（$4,000）"]].map(o => `<option value="${o[0]}" ${o[0] === cur ? "selected" : ""}>${o[1]}</option>`).join("") + `</select>`;
+    }
     return `<div class="mod-item ${on ? "" : "off"} ${openModules[m.id] ? "open" : ""}" id="mod-${esc(m.id)}">
       <div class="mod-head" onclick="toggleModuleBody('${esc(m.id)}')">
         <input type="checkbox" ${on ? "checked" : ""} onclick="event.stopPropagation()" onchange="moduleChecked['${esc(m.id)}']=this.checked;document.getElementById('mod-${esc(m.id)}').classList.toggle('off',!this.checked);if(previewTarget==='email')renderEmailPreview()">

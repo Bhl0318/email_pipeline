@@ -230,16 +230,21 @@ def build_email_modules(fields: dict, params: dict = None) -> list:
         "input_value": "",
     })
 
-    # 11b. 延续申请费 CAF（续案在最早受益日期后超 6/9 年；默认不勾，由审核人判断）
+    # 11b. 延续申请费 CAF（续案在最早受益日期后超 6/9 年；默认不勾，由审核人选档位）
+    caf_tier = (params.get("caf_tier") or "").strip() or "6-9"
+    if caf_tier == "9+":
+        caf_fee, caf_span = CAF_FEE_9YR, "超过9年"
+    else:
+        caf_fee, caf_span = CAF_FEE_6YR, "超过6年但未超过9年"
     modules.append({
         "id": "continuing_application_fee",
         "title": "延续申请费（Continuing Application Fee, CAF）",
         "checked": False,
         "html": _h("延续申请费（Continuing Application Fee, CAF）") +
-                _p(f"根据美国专利商标局的规定，若本延续申请的递交日距最早受益日期"
-                   f"（即申请人可以主张的最早优先权日期）超过6年但未超过9年，需缴纳延续申请费{CAF_FEE_6YR}美元（大实体）；"
-                   f"超过9年的，需缴纳{CAF_FEE_9YR}美元（大实体）。"),
-        "note": "续案且距最早受益日超6/9年时适用",
+                _p(f"根据美国专利商标局的规定，本延续申请的递交日距最早受益日期"
+                   f"（即申请人可以主张的最早优先权日期）{caf_span}，需缴纳延续申请费{caf_fee}美元（大实体）。"),
+        "note": "续案适用时勾选；在右侧选适用档位",
+        "select": "caf_tier", "select_options": ["6-9", "9+"], "select_value": caf_tier,
     })
 
     # 12. IDS
