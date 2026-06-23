@@ -626,19 +626,24 @@ def get_submission_task(task_id: str):
     }
 
 
-# 原始文档预览：可直接内联的扩展名 / 需先转 PDF 的 Word 类扩展名
+# 原始文档预览：可直接内联的扩展名 / Markdown / 需先转 PDF 的 Word 类扩展名
 _INLINE_EXT = {".pdf", ".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".svg", ".txt", ".html", ".htm"}
+_MD_EXT = {".md", ".markdown"}
 _WORD_EXT = {".doc", ".docx", ".rtf", ".odt"}
 # Word 转 PDF 的缓存目录（在 /output 下，可直接 URL 访问）
 _SOURCE_PREVIEW_DIR = SUBMISSION_OUTPUT_DIR / "source_preview"
 
 
-def _source_doc_preview_url(case_volume: str, f: Path):
-    """返回该原始文件可内联预览的 URL；不可预览返回 None。
-    Word 类（doc/docx/rtf/odt）按需转 PDF 并按源文件 mtime 缓存。"""
+def _source_doc_preview(case_volume: str, f: Path):
+    """返回 (preview_url, kind)：
+      kind="inline"   → preview_url 直接嵌 iframe（PDF/图片/txt/html，Word 已转 PDF）
+      kind="markdown" → preview_url 指向原始 .md 文本，前端用 marked 渲染
+      kind="none"     → 不可预览，preview_url=None（前端给下载链接）"""
     ext = f.suffix.lower()
+    if ext in _MD_EXT:
+        return f"/source-docs/{quote(case_volume)}/{quote(f.name)}", "markdown"
     if ext in _INLINE_EXT:
-        return f"/source-docs/{quote(case_volume)}/{quote(f.name)}"
+        return f"/source-docs/{quote(case_volume)}/{quote(f.name)}", "inline"
     if ext in _WORD_EXT:
         try:
             cache_dir = _SOURCE_PREVIEW_DIR / case_volume
@@ -646,11 +651,11 @@ def _source_doc_preview_url(case_volume: str, f: Path):
             if not pdf.exists() or pdf.stat().st_mtime < f.stat().st_mtime:
                 docx_to_pdf(f, out_dir=cache_dir)
             rel = pdf.relative_to(_OUTPUT_DIR_FOR_MOUNT)
-            return "/output/" + "/".join(quote(p) for p in rel.parts)
+            return "/output/" + "/".join(quote(p) for p in rel.parts), "inline"
         except Exception as e:
             print(f"[source-doc] Word→PDF 预览失败 {f.name}: {e}", file=sys.stderr)
-            return None
-    return None
+            return None, "none"
+    return None, "none"
 
 
 @app.get("/api/submission/tasks/{task_id}/source-docs")
@@ -666,10 +671,12 @@ def get_submission_source_docs(task_id: str):
         if case_dir.is_dir():
             for f in sorted(case_dir.iterdir()):
                 if f.is_file() and not f.name.startswith("."):
+                    preview_url, kind = _source_doc_preview(case_volume, f)
                     docs.append({
                         "filename": f.name,
                         "url": f"/source-docs/{quote(case_volume)}/{quote(f.name)}",
-                        "preview_url": _source_doc_preview_url(case_volume, f),
+                        "preview_url": preview_url,
+                        "kind": kind,
                     })
     return {"case_volume": case_volume, "docs": docs}
 

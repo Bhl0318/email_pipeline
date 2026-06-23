@@ -191,6 +191,7 @@
 
 <div class="toast" id="toast"></div>
 
+<script src="/static/marked.min.js" onerror="window.MARKED_FAILED=true"></script>
 <script>
 "use strict";
 const API = "/api/submission";
@@ -610,17 +611,52 @@ function renderSourceChips(activeIdx) {
     `<span class="file-chip ${i === activeIdx ? "active" : ""}" onclick="showSourceDoc(${i})" title="${esc(f.filename)}">${esc(f.filename)}</span>`
   ).join("") + dl;
 }
-function showSourceDoc(i) {
+function mdIframeDoc(html) {
+  return `<!doctype html><html><head><meta charset="utf-8"><style>
+    body{margin:0;background:#f0f2f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
+    .md-body{background:#fff;max-width:860px;margin:18px auto;padding:32px 44px;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.06);line-height:1.75;font-size:14.5px;color:#24292e;word-wrap:break-word;}
+    .md-body h1,.md-body h2{border-bottom:1px solid #eaecef;padding-bottom:.25em;}
+    .md-body code{background:#f3f4f6;padding:2px 6px;border-radius:3px;color:#c0392b;font-size:90%;}
+    .md-body pre{background:#f6f8fa;border:1px solid #eaecef;border-radius:6px;padding:12px;overflow-x:auto;}
+    .md-body pre code{background:none;color:inherit;padding:0;}
+    .md-body blockquote{border-left:4px solid #dfe2e5;padding:.2em 1em;background:#fafbfc;color:#6a737d;margin:0 0 12px;}
+    .md-body table{border-collapse:collapse;display:block;overflow-x:auto;}
+    .md-body th,.md-body td{border:1px solid #dfe2e5;padding:6px 12px;}
+    .md-body img{max-width:100%;}
+  </style></head><body><div class="md-body">${html}</div></body></html>`;
+}
+async function showSourceDoc(i) {
   const f = sourceDocList[i];
   if (!f) return;
   renderSourceChips(i);
+  const frame = $("previewFrame");
+  if (f.kind === "markdown") {
+    try {
+      const r = await fetch(f.preview_url);
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      const text = await r.text();
+      const html = (window.MARKED_FAILED || typeof marked === "undefined")
+        ? `<pre>${esc(text)}</pre>` : marked.parse(text);
+      frame.removeAttribute("src");
+      frame.srcdoc = mdIframeDoc(html);
+      frame.style.display = "block";
+      $("previewPlaceholder").style.display = "none";
+    } catch (e) {
+      frame.style.display = "none";
+      $("previewPlaceholder").style.display = "flex";
+      $("previewPlaceholder").innerHTML =
+        `Markdown 加载失败<br><a class="dl-link" href="${esc(f.url)}" download>点此下载查看</a>`;
+    }
+    return;
+  }
   if (f.preview_url) {
-    $("previewFrame").src = f.preview_url + (f.preview_url.includes("?") ? "&" : "?") + "t=" + Date.now();
-    $("previewFrame").style.display = "block";
+    frame.removeAttribute("srcdoc");
+    frame.src = f.preview_url + (f.preview_url.includes("?") ? "&" : "?") + "t=" + Date.now();
+    frame.style.display = "block";
     $("previewPlaceholder").style.display = "none";
   } else {
     const ext = (f.filename.split(".").pop() || "").toLowerCase();
-    $("previewFrame").style.display = "none";
+    frame.style.display = "none";
     $("previewPlaceholder").style.display = "flex";
     $("previewPlaceholder").innerHTML =
       `该格式（.${esc(ext)}）暂无法在线预览<br><a class="dl-link" href="${esc(f.url)}" download>点此下载查看</a>`;
