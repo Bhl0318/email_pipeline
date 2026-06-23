@@ -626,25 +626,31 @@ def get_submission_task(task_id: str):
     }
 
 
-# 原始文档预览：可直接内联的扩展名 / Markdown / 需先转 PDF 的 Word 类扩展名
+# 原始文档预览：可直接内联的扩展名 / Markdown / CSV / 需 LibreOffice 转 PDF 的 Office 文档
 _INLINE_EXT = {".pdf", ".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".svg", ".txt", ".html", ".htm"}
 _MD_EXT = {".md", ".markdown"}
+_CSV_EXT = {".csv", ".tsv"}
 _WORD_EXT = {".doc", ".docx", ".rtf", ".odt"}
+_SHEET_EXT = {".xlsx", ".xls", ".ods"}
+_CONVERT_EXT = _WORD_EXT | _SHEET_EXT   # 经 LibreOffice 转 PDF 内联预览
 # Word 转 PDF 的缓存目录（在 /output 下，可直接 URL 访问）
 _SOURCE_PREVIEW_DIR = SUBMISSION_OUTPUT_DIR / "source_preview"
 
 
 def _source_doc_preview(case_volume: str, f: Path):
     """返回 (preview_url, kind)：
-      kind="inline"   → preview_url 直接嵌 iframe（PDF/图片/txt/html，Word 已转 PDF）
+      kind="inline"   → preview_url 直接嵌 iframe（PDF/图片/txt/html，Word/Excel 已转 PDF）
       kind="markdown" → preview_url 指向原始 .md 文本，前端用 marked 渲染
+      kind="csv"      → preview_url 指向原始 csv/tsv 文本，前端解析成表格
       kind="none"     → 不可预览，preview_url=None（前端给下载链接）"""
     ext = f.suffix.lower()
     if ext in _MD_EXT:
         return f"/source-docs/{quote(case_volume)}/{quote(f.name)}", "markdown"
+    if ext in _CSV_EXT:
+        return f"/source-docs/{quote(case_volume)}/{quote(f.name)}", "csv"
     if ext in _INLINE_EXT:
         return f"/source-docs/{quote(case_volume)}/{quote(f.name)}", "inline"
-    if ext in _WORD_EXT:
+    if ext in _CONVERT_EXT:
         try:
             cache_dir = _SOURCE_PREVIEW_DIR / case_volume
             pdf = cache_dir / (f.stem + ".pdf")
@@ -653,7 +659,7 @@ def _source_doc_preview(case_volume: str, f: Path):
             rel = pdf.relative_to(_OUTPUT_DIR_FOR_MOUNT)
             return "/output/" + "/".join(quote(p) for p in rel.parts), "inline"
         except Exception as e:
-            print(f"[source-doc] Word→PDF 预览失败 {f.name}: {e}", file=sys.stderr)
+            print(f"[source-doc] Office→PDF 预览失败 {f.name}: {e}", file=sys.stderr)
             return None, "none"
     return None, "none"
 

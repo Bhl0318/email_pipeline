@@ -625,27 +625,54 @@ function mdIframeDoc(html) {
     .md-body img{max-width:100%;}
   </style></head><body><div class="md-body">${html}</div></body></html>`;
 }
+function parseDSV(text, delim) {
+  const rows = []; let row = [], cur = "", inQ = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inQ) {
+      if (c === '"') { if (text[i + 1] === '"') { cur += '"'; i++; } else inQ = false; }
+      else cur += c;
+    } else if (c === '"') inQ = true;
+    else if (c === delim) { row.push(cur); cur = ""; }
+    else if (c === '\n') { row.push(cur); rows.push(row); row = []; cur = ""; }
+    else if (c !== '\r') cur += c;
+  }
+  if (cur !== "" || row.length) { row.push(cur); rows.push(row); }
+  return rows.filter(r => !(r.length === 1 && r[0] === ""));
+}
+function dsvToTableHtml(text, delim) {
+  const rows = parseDSV(text, delim);
+  if (!rows.length) return "<p>（空文件）</p>";
+  const th = (rows[0] || []).map(c => `<th>${esc(c)}</th>`).join("");
+  const trs = rows.slice(1).map(r => `<tr>${r.map(c => `<td>${esc(c)}</td>`).join("")}</tr>`).join("");
+  return `<table><thead><tr>${th}</tr></thead><tbody>${trs}</tbody></table>`;
+}
 async function showSourceDoc(i) {
   const f = sourceDocList[i];
   if (!f) return;
   renderSourceChips(i);
   const frame = $("previewFrame");
-  if (f.kind === "markdown") {
+  if (f.kind === "markdown" || f.kind === "csv") {
     try {
       const r = await fetch(f.preview_url);
       if (!r.ok) throw new Error("HTTP " + r.status);
       const text = await r.text();
-      const html = (window.MARKED_FAILED || typeof marked === "undefined")
-        ? `<pre>${esc(text)}</pre>` : marked.parse(text);
+      let inner;
+      if (f.kind === "csv") {
+        inner = dsvToTableHtml(text, f.filename.toLowerCase().endsWith(".tsv") ? "\t" : ",");
+      } else {
+        inner = (window.MARKED_FAILED || typeof marked === "undefined")
+          ? `<pre>${esc(text)}</pre>` : marked.parse(text);
+      }
       frame.removeAttribute("src");
-      frame.srcdoc = mdIframeDoc(html);
+      frame.srcdoc = mdIframeDoc(inner);
       frame.style.display = "block";
       $("previewPlaceholder").style.display = "none";
     } catch (e) {
       frame.style.display = "none";
       $("previewPlaceholder").style.display = "flex";
       $("previewPlaceholder").innerHTML =
-        `Markdown 加载失败<br><a class="dl-link" href="${esc(f.url)}" download>点此下载查看</a>`;
+        `加载失败<br><a class="dl-link" href="${esc(f.url)}" download>点此下载查看</a>`;
     }
     return;
   }
