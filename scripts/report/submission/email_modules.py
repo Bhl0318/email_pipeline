@@ -237,7 +237,7 @@ def build_email_modules(fields: dict, params: dict = None) -> list:
         "checked": False,
         "html": _h("延续申请费（Continuing Application Fee, CAF）") +
                 _p(f"根据美国专利商标局的规定，若本延续申请的递交日距最早受益日期"
-                   f"（即申请人可以主张的最早优先权日期）超过6年，需缴纳延续申请费{CAF_FEE_6YR}美元（大实体）；"
+                   f"（即申请人可以主张的最早优先权日期）超过6年但未超过9年，需缴纳延续申请费{CAF_FEE_6YR}美元（大实体）；"
                    f"超过9年的，需缴纳{CAF_FEE_9YR}美元（大实体）。"),
         "note": "续案且距最早受益日超6/9年时适用",
     })
