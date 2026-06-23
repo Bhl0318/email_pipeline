@@ -144,7 +144,6 @@
         <h1 id="caseTitle">—</h1>
         <span class="badge pending" id="statusBadge">…</span>
         <span class="spacer"></span>
-        <button onclick="openSourceDocs()" title="查看系统提取数据写入 IPEasy 的原始文档（NAS）">原始页</button>
         <button onclick="saveTask()">保存</button>
         <button class="primary" onclick="refreshPreview()">刷新预览</button>
         <button class="success" onclick="openSendModal()">确认发送</button>
@@ -160,6 +159,7 @@
         <button class="tab" data-target="assignment" onclick="switchPreviewTab(this)">Assignment</button>
         <button class="tab" data-target="declaration" onclick="switchPreviewTab(this)">Declaration</button>
         <button class="tab" data-target="email" onclick="switchPreviewTab(this)">确认邮件</button>
+        <button class="tab" data-target="source" onclick="switchPreviewTab(this)" title="系统提取数据写入 IPEasy 的原始文档（NAS），用于对照核对">原始页</button>
       </div>
       <div class="preview-files" id="previewFiles"></div>
       <div class="preview-body">
@@ -582,15 +582,49 @@ async function skipTask() {
   catch (e) { toast("操作失败：" + problemsOf(e).join("；"), 4000); }
 }
 
-/* 原始页：打开 NAS 上系统提取数据写入 IPEasy 的源文件，供对照核对 */
-async function openSourceDocs() {
-  if (!taskId) { toast("请先选择任务"); return; }
+/* 原始页：把 NAS 上系统提取数据写入 IPEasy 的源文件嵌入右侧预览，左边字段对照核对 */
+let sourceDocList = [];
+async function loadSourceDocsPreview() {
+  if (!taskId) return;
+  $("previewFrame").style.display = "none";
+  $("previewFiles").style.display = "none";
+  $("previewPlaceholder").style.display = "flex";
+  $("previewPlaceholder").textContent = "加载原始文档…";
   try {
     const d = await api("GET", `${API}/tasks/${taskId}/source-docs`);
-    const docs = (d && d.docs) || [];
-    if (!docs.length) { toast("暂无原始文档（NAS 未配置或该案无源文件）"); return; }
-    docs.forEach(doc => window.open(doc.url, "_blank"));
-  } catch (e) { toast("打开原始文档失败：" + problemsOf(e).join("；")); }
+    sourceDocList = (d && d.docs) || [];
+    if (!sourceDocList.length) {
+      $("previewPlaceholder").innerHTML = "暂无原始文档<br>（NAS 未配置，或该案号下无源文件）";
+      return;
+    }
+    $("previewFiles").style.display = "block";
+    showSourceDoc(0);
+  } catch (e) {
+    $("previewPlaceholder").innerHTML = `<div>加载失败：<br>${problemsOf(e).map(esc).join("<br>")}</div>`;
+  }
+}
+function renderSourceChips(activeIdx) {
+  const cur = sourceDocList[activeIdx];
+  const dl = cur ? `<a class="dl-link" href="${esc(cur.url)}" download style="margin-left:8px;">下载</a>` : "";
+  $("previewFiles").innerHTML = sourceDocList.map((f, i) =>
+    `<span class="file-chip ${i === activeIdx ? "active" : ""}" onclick="showSourceDoc(${i})" title="${esc(f.filename)}">${esc(f.filename)}</span>`
+  ).join("") + dl;
+}
+function showSourceDoc(i) {
+  const f = sourceDocList[i];
+  if (!f) return;
+  renderSourceChips(i);
+  if (f.preview_url) {
+    $("previewFrame").src = f.preview_url + (f.preview_url.includes("?") ? "&" : "?") + "t=" + Date.now();
+    $("previewFrame").style.display = "block";
+    $("previewPlaceholder").style.display = "none";
+  } else {
+    const ext = (f.filename.split(".").pop() || "").toLowerCase();
+    $("previewFrame").style.display = "none";
+    $("previewPlaceholder").style.display = "flex";
+    $("previewPlaceholder").innerHTML =
+      `该格式（.${esc(ext)}）暂无法在线预览<br><a class="dl-link" href="${esc(f.url)}" download>点此下载查看</a>`;
+  }
 }
 
 /* ───────── 预览 ───────── */
@@ -619,6 +653,7 @@ function switchPreviewTab(btn) {
   previewTarget = btn.dataset.target;
   if (previewTarget === "email") { renderEmailPreview(); return; }
   $("emailPreview").style.display = "none";
+  if (previewTarget === "source") { loadSourceDocsPreview(); return; }
   refreshPreview();
 }
 function renderEmailPreview() {

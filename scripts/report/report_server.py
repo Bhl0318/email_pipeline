@@ -626,10 +626,38 @@ def get_submission_task(task_id: str):
     }
 
 
+# 原始文档预览：可直接内联的扩展名 / 需先转 PDF 的 Word 类扩展名
+_INLINE_EXT = {".pdf", ".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".svg", ".txt", ".html", ".htm"}
+_WORD_EXT = {".doc", ".docx", ".rtf", ".odt"}
+# Word 转 PDF 的缓存目录（在 /output 下，可直接 URL 访问）
+_SOURCE_PREVIEW_DIR = SUBMISSION_OUTPUT_DIR / "source_preview"
+
+
+def _source_doc_preview_url(case_volume: str, f: Path):
+    """返回该原始文件可内联预览的 URL；不可预览返回 None。
+    Word 类（doc/docx/rtf/odt）按需转 PDF 并按源文件 mtime 缓存。"""
+    ext = f.suffix.lower()
+    if ext in _INLINE_EXT:
+        return f"/source-docs/{quote(case_volume)}/{quote(f.name)}"
+    if ext in _WORD_EXT:
+        try:
+            cache_dir = _SOURCE_PREVIEW_DIR / case_volume
+            pdf = cache_dir / (f.stem + ".pdf")
+            if not pdf.exists() or pdf.stat().st_mtime < f.stat().st_mtime:
+                docx_to_pdf(f, out_dir=cache_dir)
+            rel = pdf.relative_to(_OUTPUT_DIR_FOR_MOUNT)
+            return "/output/" + "/".join(quote(p) for p in rel.parts)
+        except Exception as e:
+            print(f"[source-doc] Word→PDF 预览失败 {f.name}: {e}", file=sys.stderr)
+            return None
+    return None
+
+
 @app.get("/api/submission/tasks/{task_id}/source-docs")
 def get_submission_source_docs(task_id: str):
     """原始文档列表：系统最初提取数据写入 IPEasy 的源文件（NAS），供审核人对照核对著录项目。
-    测试期从 SOURCE_DOC_DIR/<case_volume>/ 读取；NAS 挂载后改环境变量 SOURCE_DOC_DIR 即可。"""
+    测试期从 SOURCE_DOC_DIR/<case_volume>/ 读取；NAS 挂载后改环境变量 SOURCE_DOC_DIR 即可。
+    每个文件返回 url（原件下载）+ preview_url（可内联预览的 URL，Word 已转 PDF；不可预览为 null）。"""
     row = _load_submission_task(task_id)
     case_volume = (row.get("case_volume") or "").strip()
     docs = []
@@ -641,6 +669,7 @@ def get_submission_source_docs(task_id: str):
                     docs.append({
                         "filename": f.name,
                         "url": f"/source-docs/{quote(case_volume)}/{quote(f.name)}",
+                        "preview_url": _source_doc_preview_url(case_volume, f),
                     })
     return {"case_volume": case_volume, "docs": docs}
 
