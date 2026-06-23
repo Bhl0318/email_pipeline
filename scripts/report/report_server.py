@@ -35,9 +35,11 @@ US 递交在线审核（/submission 路由组，表 submission_tasks）:
   POST /api/submission/filing/auto-transfer  cron：扫已回签且未转入的案件批量建 filing_preparation
 """
 import json
+import os
 import shutil
 import sys
 import re
+from urllib.parse import quote
 import base64
 import smtplib
 import uuid
@@ -90,6 +92,13 @@ app.mount("/output", StaticFiles(directory=str(_OUTPUT_DIR_FOR_MOUNT)), name="ou
 
 # US 递交预览/成品输出目录（挂载在 /output 下，PDF 可直接 URL 访问）
 SUBMISSION_OUTPUT_DIR = _OUTPUT_DIR_FOR_MOUNT / "submission"
+
+# 原始文档预览目录：系统最初提取数据写入 IPEasy 的源文件（存于 NAS）。
+# 测试期指向本地 test_source_docs/<case_volume>/；NAS 挂载好后，只需把环境变量
+# SOURCE_DOC_DIR 指到挂载点（如 /mnt/nas/patent_docs），无需改代码。
+SOURCE_DOC_DIR = Path(os.environ.get("SOURCE_DOC_DIR", str(ROOT / "test_source_docs")))
+SOURCE_DOC_DIR.mkdir(parents=True, exist_ok=True)
+app.mount("/source-docs", StaticFiles(directory=str(SOURCE_DOC_DIR)), name="source-docs")
 
 
 # ─── 健康检查 ────────────────────────────────────────────
@@ -615,6 +624,25 @@ def get_submission_task(task_id: str):
         "updated_at": str(row["updated_at"]) if row["updated_at"] else None,
         "confirmed_at": str(row["confirmed_at"]) if row["confirmed_at"] else None,
     }
+
+
+@app.get("/api/submission/tasks/{task_id}/source-docs")
+def get_submission_source_docs(task_id: str):
+    """原始文档列表：系统最初提取数据写入 IPEasy 的源文件（NAS），供审核人对照核对著录项目。
+    测试期从 SOURCE_DOC_DIR/<case_volume>/ 读取；NAS 挂载后改环境变量 SOURCE_DOC_DIR 即可。"""
+    row = _load_submission_task(task_id)
+    case_volume = (row.get("case_volume") or "").strip()
+    docs = []
+    if case_volume:
+        case_dir = SOURCE_DOC_DIR / case_volume
+        if case_dir.is_dir():
+            for f in sorted(case_dir.iterdir()):
+                if f.is_file() and not f.name.startswith("."):
+                    docs.append({
+                        "filename": f.name,
+                        "url": f"/source-docs/{quote(case_volume)}/{quote(f.name)}",
+                    })
+    return {"case_volume": case_volume, "docs": docs}
 
 
 class SubmissionSaveReq(BaseModel):

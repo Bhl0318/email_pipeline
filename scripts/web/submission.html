@@ -144,6 +144,7 @@
         <h1 id="caseTitle">—</h1>
         <span class="badge pending" id="statusBadge">…</span>
         <span class="spacer"></span>
+        <button onclick="openSourceDocs()" title="查看系统提取数据写入 IPEasy 的原始文档（NAS）">原始页</button>
         <button onclick="saveTask()">保存</button>
         <button class="primary" onclick="refreshPreview()">刷新预览</button>
         <button class="success" onclick="openSendModal()">确认发送</button>
@@ -579,6 +580,17 @@ async function skipTask() {
   if (!taskId || !confirm("确认跳过该任务？")) return;
   try { await api("POST", `${API}/tasks/${taskId}/skip`); toast("已跳过"); await loadTaskList(); openTask(taskId); }
   catch (e) { toast("操作失败：" + problemsOf(e).join("；"), 4000); }
+}
+
+/* 原始页：打开 NAS 上系统提取数据写入 IPEasy 的源文件，供对照核对 */
+async function openSourceDocs() {
+  if (!taskId) { toast("请先选择任务"); return; }
+  try {
+    const d = await api("GET", `${API}/tasks/${taskId}/source-docs`);
+    const docs = (d && d.docs) || [];
+    if (!docs.length) { toast("暂无原始文档（NAS 未配置或该案无源文件）"); return; }
+    docs.forEach(doc => window.open(doc.url, "_blank"));
+  } catch (e) { toast("打开原始文档失败：" + problemsOf(e).join("；")); }
 }
 
 /* ───────── 预览 ───────── */
