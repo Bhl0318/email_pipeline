@@ -70,7 +70,7 @@ from submission.email_modules import build_email_modules  # noqa: E402
 from submission.confirmation_sheet import generate_confirmation_sheet  # noqa: E402
 from submission.assignment_generator import generate_assignments  # noqa: E402
 from submission.declaration_generator import generate_declarations  # noqa: E402
-from submission.preview import docx_to_pdf  # noqa: E402
+from submission.preview import docx_to_pdf, office_convert  # noqa: E402
 # 环节4（递交文件）生成器 —— 与环节2 互不影响
 from submission.fields_mapping import fields_to_case_info, load_agent_info  # noqa: E402
 from submission.poa_generator import generate_poa  # noqa: E402
@@ -630,16 +630,15 @@ def get_submission_task(task_id: str):
 _INLINE_EXT = {".pdf", ".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".svg", ".txt", ".html", ".htm"}
 _MD_EXT = {".md", ".markdown"}
 _CSV_EXT = {".csv", ".tsv"}
-_WORD_EXT = {".doc", ".docx", ".rtf", ".odt"}
-_SHEET_EXT = {".xlsx", ".xls", ".ods"}
-_CONVERT_EXT = _WORD_EXT | _SHEET_EXT   # 经 LibreOffice 转 PDF 内联预览
-# Word 转 PDF 的缓存目录（在 /output 下，可直接 URL 访问）
+_WORD_EXT = {".doc", ".docx", ".rtf", ".odt"}   # LibreOffice 转 PDF 内联预览
+_SHEET_EXT = {".xlsx", ".xls", ".ods"}          # LibreOffice 转 HTML（保留表格，效果优于 PDF）
+# LibreOffice 转换产物的缓存目录（在 /output 下，可直接 URL 访问）
 _SOURCE_PREVIEW_DIR = SUBMISSION_OUTPUT_DIR / "source_preview"
 
 
 def _source_doc_preview(case_volume: str, f: Path):
     """返回 (preview_url, kind)：
-      kind="inline"   → preview_url 直接嵌 iframe（PDF/图片/txt/html，Word/Excel 已转 PDF）
+      kind="inline"   → preview_url 直接嵌 iframe（PDF/图片/txt/html；Word→PDF、Excel→HTML）
       kind="markdown" → preview_url 指向原始 .md 文本，前端用 marked 渲染
       kind="csv"      → preview_url 指向原始 csv/tsv 文本，前端解析成表格
       kind="none"     → 不可预览，preview_url=None（前端给下载链接）"""
@@ -650,16 +649,21 @@ def _source_doc_preview(case_volume: str, f: Path):
         return f"/source-docs/{quote(case_volume)}/{quote(f.name)}", "csv"
     if ext in _INLINE_EXT:
         return f"/source-docs/{quote(case_volume)}/{quote(f.name)}", "inline"
-    if ext in _CONVERT_EXT:
+    if ext in _WORD_EXT or ext in _SHEET_EXT:
+        # 表格转 HTML（保留多 sheet/表格结构），其余 Office 文档转 PDF
+        to_fmt, out_ext = ("html", ".html") if ext in _SHEET_EXT else ("pdf", ".pdf")
         try:
             cache_dir = _SOURCE_PREVIEW_DIR / case_volume
-            pdf = cache_dir / (f.stem + ".pdf")
-            if not pdf.exists() or pdf.stat().st_mtime < f.stat().st_mtime:
-                docx_to_pdf(f, out_dir=cache_dir)
-            rel = pdf.relative_to(_OUTPUT_DIR_FOR_MOUNT)
+            out = cache_dir / (f.stem + out_ext)
+            if not out.exists() or out.stat().st_mtime < f.stat().st_mtime:
+                if ext in _SHEET_EXT:
+                    office_convert(f, "html", out_dir=cache_dir)
+                else:
+                    docx_to_pdf(f, out_dir=cache_dir)
+            rel = out.relative_to(_OUTPUT_DIR_FOR_MOUNT)
             return "/output/" + "/".join(quote(p) for p in rel.parts), "inline"
         except Exception as e:
-            print(f"[source-doc] Office→PDF 预览失败 {f.name}: {e}", file=sys.stderr)
+            print(f"[source-doc] Office→{to_fmt} 预览失败 {f.name}: {e}", file=sys.stderr)
             return None, "none"
     return None, "none"
 
