@@ -1,0 +1,116 @@
+{
+  "case_volume": "20608-0635US00",
+  "case_info": {
+    "title_en": "OPEN-EAR HEADPHONES",
+    "title_cn": "一种开放式耳机",
+    "foreign_filing_license": false,
+    "location_of_invention": "CN"
+  },
+  "pct_info": {
+    "pct_app_no": "PCT/CN2025/095581",
+    "pct_app_date": "2025-05-16",
+    "pct_pub_no": "WO 2026/016616 A1",
+    "pct_pub_date": "2026-01-22"
+  },
+  "inventors": [
+    {
+      "last_name_en": "ZHANG",
+      "first_name_en": "Lei",
+      "name_cn": "张磊",
+      "address1": "1-4F, Factory Bldg. 26, Shancheng Industrial Park",
+      "address2": "Langxin Community, Shiyan St., Bao'an Dist.",
+      "city": "Shenzhen",
+      "state": "Guangdong",
+      "postcode": "518108",
+      "country": "China",
+      "nationality": "CN",
+      "labor_contract": "SHENZHEN SHOKZ CO., LTD."
+    },
+    {
+      "last_name_en": "ZHOU",
+      "first_name_en": "Wenbing",
+      "name_cn": "周文兵",
+      "address1": "1-4F, Factory Bldg. 26, Shancheng Industrial Park",
+      "address2": "Langxin Community, Shiyan St., Bao'an Dist.",
+      "city": "Shenzhen",
+      "state": "Guangdong",
+      "postcode": "518108",
+      "country": "China",
+      "nationality": "CN",
+      "labor_contract": "SHENZHEN SHOKZ CO., LTD."
+    },
+    {
+      "last_name_en": "GUO",
+      "first_name_en": "Burui",
+      "name_cn": "郭卜瑞",
+      "address1": "1-4F, Factory Bldg. 26, Shancheng Industrial Park",
+      "address2": "Langxin Community, Shiyan St., Bao'an Dist.",
+      "city": "Shenzhen",
+      "state": "Guangdong",
+      "postcode": "518108",
+      "country": "China",
+      "nationality": "CN",
+      "labor_contract": "SHENZHEN SHOKZ CO., LTD."
+    },
+    {
+      "last_name_en": "LIU CHUN",
+      "first_name_en": "Zhiqing",
+      "name_cn": "刘志青",
+      "address1": "1-4F, Factory Bldg. 26, Shancheng Industrial Park",
+      "address2": "Langxin Community, Shiyan St., Bao'an Dist.",
+      "city": "Shenzhen",
+      "state": "Guangdong",
+      "postcode": "518108",
+      "country": "China",
+      "nationality": "CN",
+      "labor_contract": "SHENZHEN SHOKZ CO., LTD."
+    },
+    {
+      "last_name_en": "QI",
+      "first_name_en": "Xin",
+      "name_cn": "齐心",
+      "address1": "1-4F, Factory Bldg. 26, Shancheng Industrial Park",
+      "address2": "Langxin Community, Shiyan St., Bao'an Dist.",
+      "city": "Shenzhen",
+      "state": "Guangdong",
+      "postcode": "518108",
+      "country": "China",
+      "nationality": "CN",
+      "labor_contract": "SHENZHEN SHOKZ CO., LTD."
+    }
+  ],
+  "applicants": [
+    {
+      "applicant_name_en": "SHENZHEN SHOKZ CO., LTD.",
+      "applicant_name_cn": "深圳市韶音科技有限公司",
+      "address1": "1-4F, Factory Bldg. 26, Shancheng Industrial Park",
+      "address2": "Langxin Community, Shiyan St., Bao'an Dist.",
+      "city": "Shenzhen",
+      "state": "Guangdong",
+      "postcode": "518108",
+      "country": "China",
+      "nationality": "CN",
+      "entity": "Large Entity",
+      "entity_cn": "大实体"
+    }
+  ],
+  "priorities": [
+    {
+      "priority_number": "202410966001.5",
+      "priority_date": "2024-07-17",
+      "priority_country": "CN",
+      "das_code": "44D5"
+    }
+  ],
+  "filing_route": "By pass continuation",
+  "expedited_examination": "None",
+  "missing_fields": [],
+  "notes": [
+    "Title以定稿说明书为准：US申请",
+    "PCT请求书中LIU CHUN为姓，last_name_en保留为LIU CHUN",
+    "发明人地址默认同申请人地址",
+    "大客户（韶音）实体固定为Large Entity",
+    "DAS code来自PCT请求书VI-2查询码",
+    "By pass continuation为主，无美国母案，不输出parent_application"
+  ]
+}
