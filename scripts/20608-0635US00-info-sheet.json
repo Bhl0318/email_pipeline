@@ -1,0 +1,96 @@
+{
+  "case_volume": "20608-0635US00",
+  "application_type": "发明",
+  "case_info": {
+    "case_name_en": "OPEN-EAR HEADPHONES"
+  },
+  "applicants": [
+    {
+      "applicant_name_en": "SHENZHEN SHOKZ CO., LTD.",
+      "address1": "1-4F, Factory Bldg. 26, Shancheng Industrial Park",
+      "address2": "Langxin Community, Shiyan St., Bao'an Dist.",
+      "city_en": "Shenzhen",
+      "province_city_en_us": "Guangdong",
+      "postcode": "518108",
+      "country_en_us": "China",
+      "contact_address_en": "Floors 1-4, Factory Building 26, Shancheng Industrial Park, Langxin Community, Shiyan Street, Bao'an District, Shenzhen, Guangdong 518108 China"
+    }
+  ],
+  "inventors": [
+    {
+      "last_name_en": "ZHANG",
+      "first_name_en": "Lei",
+      "full_name_en": "ZHANG, Lei",
+      "name_cn": "张磊"
+    },
+    {
+      "last_name_en": "ZHOU",
+      "first_name_en": "Wenbing",
+      "full_name_en": "ZHOU, Wenbing",
+      "name_cn": "周文兵"
+    },
+    {
+      "last_name_en": "GUO",
+      "first_name_en": "Burui",
+      "full_name_en": "GUO, Burui",
+      "name_cn": "郭卜瑞"
+    },
+    {
+      "last_name_en": "LIU CHUN",
+      "first_name_en": "Zhiqing",
+      "full_name_en": "LIU CHUN, Zhiqing",
+      "name_cn": "刘志青"
+    },
+    {
+      "last_name_en": "QI",
+      "first_name_en": "Xin",
+      "full_name_en": "QI, Xin",
+      "name_cn": "齐心"
+    }
+  ],
+  "priorities": [
+    {
+      "priority_no": "202410966001.5",
+      "priority_country_id": "CN",
+      "priority_date": "2024-07-17"
+    }
+  ],
+  "case_advance_info": {
+    "pct_app_no": "PCT/CN2025/095581",
+    "pct_app_date": "2025-05-16"
+  },
+  "parent_applications": [],
+  "filing_route": "By pass continuation",
+  "expedited_examination": "None",
+  "assignments": [
+    {
+      "assignment_type": "个人转公司",
+      "assignor_inventors": [
+        "ZHANG, Lei",
+        "ZHOU, Wenbing",
+        "GUO, Burui",
+        "LIU CHUN, Zhiqing",
+        "QI, Xin"
+      ],
+      "assignee": "SHENZHEN SHOKZ CO., LTD."
+    }
+  ],
+  "info_sheet": {
+    "title_en": "OPEN-EAR HEADPHONES",
+    "title_cn": "一种开放式耳机",
+    "foreign_filing_license": false,
+    "location_of_invention": "CN",
+    "entity": "Large Entity",
+    "entity_cn": "大实体",
+    "das_code": "44D5"
+  },
+  "missing_fields": [],
+  "notes": [
+    "Title以定稿说明书为准：US申请",
+    "PCT请求书中LIU CHUN为姓，last_name_en保留为LIU CHUN",
+    "大客户（韶音）实体固定为Large Entity",
+    "DAS code来自PCT请求书VI-2查询码",
+    "By pass continuation，无美国母案，parent_applications留空",
+    "assignments：5位发明人统一转给SHENZHEN SHOKZ CO., LTD."
+  ]
+}
