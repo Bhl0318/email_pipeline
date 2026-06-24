@@ -1,19 +1,37 @@
 {
   "case_volume": "20608-0635US00",
   "application_type": "发明",
+  "filing_route": "By pass continuation",
+  "ae_methods": "None",
+  "business_type_zh_cn": "PCT-Bypass续案",
+  "subject_matter": "UTL",
+  "labor_contract_en": "",
+  "labor_contract_cn": "",
+  "inventor_residence_en": "",
+  "inventor_residence_cn": "",
   "case_info": {
-    "case_name_en": "OPEN-EAR HEADPHONES"
+    "case_name_en": "OPEN-EAR HEADPHONES",
+    "case_name": "一种开放式耳机",
+    "location_invention_en": "People's Republic of China (CN)",
+    "location_invention_cn": "中国"
   },
   "applicants": [
     {
       "applicant_name_en": "SHENZHEN SHOKZ CO., LTD.",
+      "applicant_name_cn": "深圳市韶音科技有限公司",
       "address1": "1-4F, Factory Bldg. 26, Shancheng Industrial Park",
       "address2": "Langxin Community, Shiyan St., Bao'an Dist.",
       "city_en": "Shenzhen",
+      "city_cn": "深圳",
       "province_city_en_us": "Guangdong",
+      "province_city_zh_cn": "广东",
       "postcode": "518108",
       "country_en_us": "China",
-      "contact_address_en": "Floors 1-4, Factory Building 26, Shancheng Industrial Park, Langxin Community, Shiyan Street, Bao'an District, Shenzhen, Guangdong 518108 China"
+      "country_zh_cn": "中国",
+      "contact_address_en": "1-4F, Factory Bldg. 26, Shancheng Industrial Park, Langxin Community, Shiyan St., Bao'an Dist., Shenzhen, Guangdong 518108 China",
+      "contact_address_cn": "广东省深圳市宝安区石岩街道浪心社区山城工业区26栋厂房一层至四层",
+      "entity_en": "Large Entity",
+      "entity_cn": "大实体"
     }
   ],
   "inventors": [
@@ -51,17 +69,21 @@
   "priorities": [
     {
       "priority_no": "202410966001.5",
+      "priority_num": "CN 202410966001.5",
       "priority_country_id": "CN",
-      "priority_date": "2024-07-17"
+      "priority_date": "2024-07-17",
+      "access_code": "44D5"
     }
   ],
   "case_advance_info": {
+    "original_app_no": "",
+    "original_app_date": "",
     "pct_app_no": "PCT/CN2025/095581",
-    "pct_app_date": "2025-05-16"
+    "pct_app_date": "2025-05-16",
+    "pct_pub_no": "WO 2026/016616 A1",
+    "pct_pub_date": "2026-01-22"
   },
   "parent_applications": [],
-  "filing_route": "By pass continuation",
-  "expedited_examination": "None",
   "assignments": [
     {
       "assignment_type": "个人转公司",
@@ -74,23 +96,5 @@
       ],
       "assignee": "SHENZHEN SHOKZ CO., LTD."
     }
-  ],
-  "info_sheet": {
-    "title_en": "OPEN-EAR HEADPHONES",
-    "title_cn": "一种开放式耳机",
-    "foreign_filing_license": false,
-    "location_of_invention": "CN",
-    "entity": "Large Entity",
-    "entity_cn": "大实体",
-    "das_code": "44D5"
-  },
-  "missing_fields": [],
-  "notes": [
-    "Title以定稿说明书为准：US申请",
-    "PCT请求书中LIU CHUN为姓，last_name_en保留为LIU CHUN",
-    "大客户（韶音）实体固定为Large Entity",
-    "DAS code来自PCT请求书VI-2查询码",
-    "By pass continuation，无美国母案，parent_applications留空",
-    "assignments：5位发明人统一转给SHENZHEN SHOKZ CO., LTD."
   ]
 }
