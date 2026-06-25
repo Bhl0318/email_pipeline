@@ -490,15 +490,22 @@ class PatentApplicationFormGenerator:
         _single = len(_groups) == 1
         for g in _groups:
             app = g["app"]
-            inv_label = "; ".join(g["names"])
             # 仅单组时允许审核页全局覆盖（labor_contract_*/inventor_residence_*）
             labor_en = (case_info.get("labor_contract_en") if _single else "") or app.get("applicant_name_en", "") or g["emp"]
             labor_cn = (case_info.get("labor_contract_cn") if _single else "") or app.get("applicant_name_cn", "")
             _res_en, _res_cn = _residence(app)
             res_en = (case_info.get("inventor_residence_en") if _single else "") or _res_en
             res_cn = (case_info.get("inventor_residence_cn") if _single else "") or _res_cn
-            data_rows2.append([f"Labor Contract/劳动合同归属 [{inv_label}]:", labor_en, labor_cn])
-            data_rows2.append([f"Residence/Mailing Address/住址 [{inv_label}]", res_en, res_cn])
+            # 单组（单公司）用 "for all inventors"；多组（多公司）按组带 [发明人名单]
+            if _single:
+                labor_label = "Labor Contract for all inventors/劳动合同归属:"
+                res_label = "Residence/Mailing Address for all inventors/所有发明人住址"
+            else:
+                inv_label = "; ".join(g["names"])
+                labor_label = f"Labor Contract/劳动合同归属 [{inv_label}]:"
+                res_label = f"Residence/Mailing Address/住址 [{inv_label}]"
+            data_rows2.append([labor_label, labor_en, labor_cn])
+            data_rows2.append([res_label, res_en, res_cn])
             for r in _detail_rows(app):
                 data_rows2.append(r)
 
