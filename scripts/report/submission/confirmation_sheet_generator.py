@@ -440,43 +440,72 @@ class PatentApplicationFormGenerator:
             inventor_index += 1
             data_rows2.append([f'Inventor{str(inventor_index)}', inventor.get('first_name_en', ''), inventor.get('last_name_en', '')])
         applicants_list = case_info.get("applicants", []) or []
-        LaborInfo = applicants_list[0] if applicants_list else {
-            "applicant_name_en": "",
-            "applicant_name_cn": "",
-            "address1": "",
-            "address2": "",
-            "city_en": "",
-            "city_cn": "",
-            "province_city_en_us": "",
-            "province_city_zh_cn": "",
-            "postcode": "",
-            "country_en_us": "",
-            "country_zh_cn": "",
-            "contact_address_cn": ""
-        }
-        # 劳动合同归属：审核页可覆盖，留空回退申请人[0] 名称
-        labor_en = case_info.get("labor_contract_en") or LaborInfo.get("applicant_name_en", "")
-        labor_cn = case_info.get("labor_contract_cn") or LaborInfo.get("applicant_name_cn", "")
-        data_rows2.append(
-            ["Labor Contract for all inventors/劳动合同归属:", labor_en, labor_cn]
-        )
-        # 发明人住址：单行显示，值=审核页覆盖值 or 申请人[0] 住址 6 项合并（地址1/2、城市、州省、邮编、国家）
-        _res_en = [LaborInfo.get("address1", ""), LaborInfo.get("address2", ""), LaborInfo.get("city_en", ""),
-                   LaborInfo.get("province_city_en_us", ""), LaborInfo.get("postcode", ""), LaborInfo.get("country_en_us", "")]
-        _res_cn = [LaborInfo.get("contact_address_cn", ""), LaborInfo.get("city_cn", ""),
-                   LaborInfo.get("province_city_zh_cn", ""), LaborInfo.get("country_zh_cn", "")]
-        residence_en = case_info.get("inventor_residence_en") or ", ".join([x for x in _res_en if x])
-        residence_cn = case_info.get("inventor_residence_cn") or ", ".join([x for x in _res_cn if x])
-        data_rows2.append(
-            ["Residence/Mailing Address for all inventors/所有发明人住址", residence_en, residence_cn]
-        )
-        # 合并行下保留原本 6 个分行，各行取自申请人[0]（LaborInfo）
-        data_rows2.append(["Address1/地址1:", LaborInfo.get("address1", ""), LaborInfo.get("contact_address_cn", "")])
-        data_rows2.append(["Address2/地址2:", LaborInfo.get("address2", ""), ''])
-        data_rows2.append(["City/城市:", LaborInfo.get("city_en", ""), LaborInfo.get("city_cn", "")])
-        data_rows2.append(["State/Province/州/省", LaborInfo.get("province_city_en_us", ""), LaborInfo.get("province_city_zh_cn", "")])
-        data_rows2.append(["Post/邮编:", LaborInfo.get("postcode", ""), ''])
-        data_rows2.append(["Nationality/国家:", LaborInfo.get("country_en_us", ""), LaborInfo.get("country_zh_cn", "")])
+        _EMPTY_APP = {k: "" for k in (
+            "applicant_name_en", "applicant_name_cn", "address1", "address2", "city_en", "city_cn",
+            "province_city_en_us", "province_city_zh_cn", "postcode", "country_en_us", "country_zh_cn",
+            "contact_address_cn")}
+        LaborInfo = applicants_list[0] if applicants_list else _EMPTY_APP
+
+        def _norm(s):
+            return (s or "").strip().lower()
+
+        # 申请人按英文名索引，供按 employer 取地址
+        _app_by_name = {_norm(a.get("applicant_name_en")): a for a in applicants_list}
+
+        def _residence(app):
+            res_en = ", ".join([x for x in [app.get("address1", ""), app.get("address2", ""), app.get("city_en", ""),
+                                            app.get("province_city_en_us", ""), app.get("postcode", ""), app.get("country_en_us", "")] if x])
+            res_cn = ", ".join([x for x in [app.get("contact_address_cn", ""), app.get("city_cn", ""),
+                                            app.get("province_city_zh_cn", ""), app.get("country_zh_cn", "")] if x])
+            return res_en, res_cn
+
+        def _detail_rows(app):
+            return [
+                ["Address1/地址1:", app.get("address1", ""), app.get("contact_address_cn", "")],
+                ["Address2/地址2:", app.get("address2", ""), ''],
+                ["City/城市:", app.get("city_en", ""), app.get("city_cn", "")],
+                ["State/Province/州/省", app.get("province_city_en_us", ""), app.get("province_city_zh_cn", "")],
+                ["Post/邮编:", app.get("postcode", ""), ''],
+                ["Nationality/国家:", app.get("country_en_us", ""), app.get("country_zh_cn", "")],
+            ]
+
+        # 全局覆盖（审核页填 labor_contract_*/inventor_residence_*）优先，保持旧版单行
+        _override = (case_info.get("labor_contract_en") or case_info.get("labor_contract_cn")
+                     or case_info.get("inventor_residence_en") or case_info.get("inventor_residence_cn"))
+        _all_have_emp = bool(inventors) and all((inv.get("employer") or "").strip() for inv in inventors)
+        _distinct_emp = {_norm(inv.get("employer")) for inv in inventors} if _all_have_emp else set()
+
+        if _all_have_emp and len(_distinct_emp) >= 2 and not _override:
+            # 多发明人分属不同公司：按 employer 分组，劳动合同归属/住址各组分别列
+            _groups, _seen = [], {}
+            for inv in inventors:
+                emp = (inv.get("employer") or "").strip()
+                key = _norm(emp)
+                nm = inv.get("full_name_en") or f"{inv.get('last_name_en', '')}, {inv.get('first_name_en', '')}"
+                if key not in _seen:
+                    _seen[key] = len(_groups)
+                    _groups.append([emp, []])
+                _groups[_seen[key]][1].append(nm)
+            for emp, names in _groups:
+                app = _app_by_name.get(_norm(emp), _EMPTY_APP)
+                inv_label = "; ".join(names)
+                res_en, res_cn = _residence(app)
+                data_rows2.append([f"Labor Contract/劳动合同归属 [{inv_label}]:",
+                                   app.get("applicant_name_en", "") or emp, app.get("applicant_name_cn", "")])
+                data_rows2.append([f"Residence/Mailing Address/住址 [{inv_label}]", res_en, res_cn])
+                for r in _detail_rows(app):
+                    data_rows2.append(r)
+        else:
+            # 单公司 / 无 employer / 有全局覆盖：沿用旧版单行（取 applicants[0] 或覆盖值）
+            labor_en = case_info.get("labor_contract_en") or LaborInfo.get("applicant_name_en", "")
+            labor_cn = case_info.get("labor_contract_cn") or LaborInfo.get("applicant_name_cn", "")
+            data_rows2.append(["Labor Contract for all inventors/劳动合同归属:", labor_en, labor_cn])
+            res_en, res_cn = _residence(LaborInfo)
+            residence_en = case_info.get("inventor_residence_en") or res_en
+            residence_cn = case_info.get("inventor_residence_cn") or res_cn
+            data_rows2.append(["Residence/Mailing Address for all inventors/所有发明人住址", residence_en, residence_cn])
+            for r in _detail_rows(LaborInfo):
+                data_rows2.append(r)
 
         applicants = case_info.get("applicants", []) or []
         data_rows3 = [['Applicant(s)/申请人']]
