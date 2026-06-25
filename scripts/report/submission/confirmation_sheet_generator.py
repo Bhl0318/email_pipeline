@@ -469,42 +469,37 @@ class PatentApplicationFormGenerator:
                 ["Nationality/国家:", app.get("country_en_us", ""), app.get("country_zh_cn", "")],
             ]
 
-        # 全局覆盖（审核页填 labor_contract_*/inventor_residence_*）优先，保持旧版单行
-        _override = (case_info.get("labor_contract_en") or case_info.get("labor_contract_cn")
-                     or case_info.get("inventor_residence_en") or case_info.get("inventor_residence_cn"))
+        # 统一模板：一律按 employer 分组（单公司=N=1，也用 [发明人名单] 写法）。
+        # 发明人均无 employer（存量任务）→ 全部归一组，公司取 applicants[0]。
         _all_have_emp = bool(inventors) and all((inv.get("employer") or "").strip() for inv in inventors)
-        _distinct_emp = {_norm(inv.get("employer")) for inv in inventors} if _all_have_emp else set()
-
-        if _all_have_emp and len(_distinct_emp) >= 2 and not _override:
-            # 多发明人分属不同公司：按 employer 分组，劳动合同归属/住址各组分别列
-            _groups, _seen = [], {}
+        _groups = []
+        if _all_have_emp:
+            _seen = {}
             for inv in inventors:
                 emp = (inv.get("employer") or "").strip()
                 key = _norm(emp)
                 nm = inv.get("full_name_en") or f"{inv.get('last_name_en', '')}, {inv.get('first_name_en', '')}"
                 if key not in _seen:
                     _seen[key] = len(_groups)
-                    _groups.append([emp, []])
-                _groups[_seen[key]][1].append(nm)
-            for emp, names in _groups:
-                app = _app_by_name.get(_norm(emp), _EMPTY_APP)
-                inv_label = "; ".join(names)
-                res_en, res_cn = _residence(app)
-                data_rows2.append([f"Labor Contract/劳动合同归属 [{inv_label}]:",
-                                   app.get("applicant_name_en", "") or emp, app.get("applicant_name_cn", "")])
-                data_rows2.append([f"Residence/Mailing Address/住址 [{inv_label}]", res_en, res_cn])
-                for r in _detail_rows(app):
-                    data_rows2.append(r)
+                    _groups.append({"emp": emp, "app": _app_by_name.get(key, _EMPTY_APP), "names": []})
+                _groups[_seen[key]]["names"].append(nm)
         else:
-            # 单公司 / 无 employer / 有全局覆盖：沿用旧版单行（取 applicants[0] 或覆盖值）
-            labor_en = case_info.get("labor_contract_en") or LaborInfo.get("applicant_name_en", "")
-            labor_cn = case_info.get("labor_contract_cn") or LaborInfo.get("applicant_name_cn", "")
-            data_rows2.append(["Labor Contract for all inventors/劳动合同归属:", labor_en, labor_cn])
-            res_en, res_cn = _residence(LaborInfo)
-            residence_en = case_info.get("inventor_residence_en") or res_en
-            residence_cn = case_info.get("inventor_residence_cn") or res_cn
-            data_rows2.append(["Residence/Mailing Address for all inventors/所有发明人住址", residence_en, residence_cn])
-            for r in _detail_rows(LaborInfo):
+            _names = [(inv.get("full_name_en") or f"{inv.get('last_name_en', '')}, {inv.get('first_name_en', '')}") for inv in inventors]
+            _groups.append({"emp": LaborInfo.get("applicant_name_en", ""), "app": LaborInfo, "names": _names})
+
+        _single = len(_groups) == 1
+        for g in _groups:
+            app = g["app"]
+            inv_label = "; ".join(g["names"])
+            # 仅单组时允许审核页全局覆盖（labor_contract_*/inventor_residence_*）
+            labor_en = (case_info.get("labor_contract_en") if _single else "") or app.get("applicant_name_en", "") or g["emp"]
+            labor_cn = (case_info.get("labor_contract_cn") if _single else "") or app.get("applicant_name_cn", "")
+            _res_en, _res_cn = _residence(app)
+            res_en = (case_info.get("inventor_residence_en") if _single else "") or _res_en
+            res_cn = (case_info.get("inventor_residence_cn") if _single else "") or _res_cn
+            data_rows2.append([f"Labor Contract/劳动合同归属 [{inv_label}]:", labor_en, labor_cn])
+            data_rows2.append([f"Residence/Mailing Address/住址 [{inv_label}]", res_en, res_cn])
+            for r in _detail_rows(app):
                 data_rows2.append(r)
 
         applicants = case_info.get("applicants", []) or []
