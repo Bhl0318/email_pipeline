@@ -25,6 +25,7 @@ from .common import (
     get_assignee,
     inventor_names,
     is_special_client,
+    resolve_assignee,
     split_address,
 )
 
@@ -256,8 +257,14 @@ def generate_assignment(fields: dict, assignment: dict, output_dir, seq: int = 1
     warnings = []
     case_volume = fields.get("case_volume") or ""
     title = (fields.get("case_info") or {}).get("case_name_en") or ""
-    assignee = get_assignee(fields)
-    names = inventor_names(fields)
+    # 受让人按本段 assignee 名字解析（匹配不到回退首位申请人并告警）
+    seg_assignee_name = (assignment.get("assignee") or "").strip()
+    assignee = resolve_assignee(fields, seg_assignee_name)
+    if seg_assignee_name and not assignee.get("matched"):
+        warnings.append(f"受让人「{seg_assignee_name}」未匹配到申请人，已回退首位申请人「{assignee['name']}」")
+    # 发明人按本段 assignor_inventors 子集（缺省时兜底全体，兼容存量数据）
+    seg_inventors = [str(n).strip() for n in (assignment.get("assignor_inventors") or []) if str(n).strip()]
+    names = seg_inventors or inventor_names(fields)
     app_type_eng, confirm_type = application_type_words(fields.get("application_type") or "")
     special = is_special_client(case_volume)
     today = datetime.now()

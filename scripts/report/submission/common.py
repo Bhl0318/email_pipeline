@@ -193,22 +193,43 @@ def full_mailing_address_en(applicant: dict) -> str:
     return ", ".join([str(p).strip() for p in parts if p and str(p).strip()])
 
 
-def get_assignee(fields: dict) -> dict:
-    """受让人（申请人第一位）：名称 + 完整通信地址（与确认函一致）。
+def _assignee_from_applicant(applicant: dict) -> dict:
+    """由一个申请人 dict 构造受让人结构：名称 + 完整通信地址。
 
-    地址取 full_mailing_address_en（六字段拼接），再按 40 字拆行：
+    地址取 full_mailing_address_en（六字段拼接），再拆行：
     - address1/address2：两行版（供 _replace_everywhere 路径，如 20618 受让公司）
     - address_lines：多行版（发明人签字表用，超 2 行时克隆地址行）
     """
-    applicants = fields.get("applicants") or []
-    first = applicants[0] if applicants else {}
-    name = (first.get("applicant_name_en") or "").strip()
-    full_en = full_mailing_address_en(first)
+    applicant = applicant or {}
+    name = (applicant.get("applicant_name_en") or "").strip()
+    full_en = full_mailing_address_en(applicant)
     if not full_en:
-        full_en = (first.get("contact_address_en") or "").strip()
+        full_en = (applicant.get("contact_address_en") or "").strip()
     lines = address_lines(full_en, "")
     bal1, bal2 = rebalance_address(full_en, "")
     return {"name": name, "address1": bal1, "address2": bal2, "address_lines": lines}
+
+
+def get_assignee(fields: dict) -> dict:
+    """受让人（申请人第一位）——兼容旧调用。"""
+    applicants = fields.get("applicants") or []
+    return _assignee_from_applicant(applicants[0] if applicants else {})
+
+
+def resolve_assignee(fields: dict, name: str) -> dict:
+    """按受让人名字在 applicants 里匹配取地址（归一化：去空格/大小写）；
+    匹配不到回退首位申请人。返回结构同 get_assignee，附 matched 标记。"""
+    applicants = fields.get("applicants") or []
+    key = (name or "").strip().lower()
+    if key:
+        for a in applicants:
+            if (a.get("applicant_name_en") or "").strip().lower() == key:
+                res = _assignee_from_applicant(a)
+                res["matched"] = True
+                return res
+    res = _assignee_from_applicant(applicants[0] if applicants else {})
+    res["matched"] = False
+    return res
 
 
 def application_type_words(application_type: str) -> tuple:
