@@ -407,14 +407,17 @@ function assembleEmailBody() {
   }
   return parts.join("\n");
 }
+// 缺失项兼容两种格式：纯字符串(字段路径) 或 对象{field/path/description}
+function missingLabel(m) { return typeof m === "string" ? m : (m.description || m.field || m.path || ""); }
+function missingField(m) { return typeof m === "string" ? m : (m.field || m.path || ""); }
 function renderMissing() {
   const list = task.missing_json || [];
   $("missingBanner").innerHTML = list.length
-    ? `<div class="banner warn"><b>入库时记录的缺失/待确认项（${list.length}）：</b><ul>${list.map(m => `<li>${esc(m.description || m.field)}</li>`).join("")}</ul></div>`
+    ? `<div class="banner warn"><b>入库时记录的缺失/待确认项（${list.length}）：</b><ul>${list.map(m => `<li>${esc(missingLabel(m))}</li>`).join("")}</ul></div>`
     : "";
 }
 function missingFieldSet() {
-  return new Set((task.missing_json || []).map(m => m.field || ""));
+  return new Set((task.missing_json || []).map(missingField).filter(Boolean));
 }
 
 /* 确认函补充字段的派生默认（须与 confirmation_sheet_generator 逐项对齐） */
