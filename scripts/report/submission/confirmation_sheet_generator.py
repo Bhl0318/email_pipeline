@@ -452,6 +452,22 @@ class PatentApplicationFormGenerator:
         # 申请人按英文名索引，供按 employer 取地址
         _app_by_name = {_norm(a.get("applicant_name_en")): a for a in applicants_list}
 
+        def _app_for_employer(key, emp):
+            """employer 命中申请人则取该申请人；否则（如前雇主，不在申请人列表）
+            从 assignments.assigning_company 兜底取其地址（company_address 按逗号拆 address1/2）。"""
+            app = _app_by_name.get(key)
+            if app:
+                return app
+            for a in (case_info.get("assignments") or []):
+                if _norm(a.get("assigning_company")) == key and (a.get("company_address") or "").strip():
+                    ca = a["company_address"].strip()
+                    parts = [p.strip() for p in re.split(r"[，,]", ca) if p.strip()]
+                    return {**_EMPTY_APP, "applicant_name_en": emp,
+                            "address1": parts[0] if parts else ca,
+                            "address2": ", ".join(parts[1:]) if len(parts) > 1 else "",
+                            "contact_address_en": ca}
+            return _EMPTY_APP
+
         def _residence(app):
             res_en = ", ".join([x for x in [app.get("address1", ""), app.get("address2", ""), app.get("city_en", ""),
                                             app.get("province_city_en_us", ""), app.get("postcode", ""), app.get("country_en_us", "")] if x])
@@ -481,7 +497,7 @@ class PatentApplicationFormGenerator:
                 nm = inv.get("full_name_en") or f"{inv.get('last_name_en', '')}, {inv.get('first_name_en', '')}"
                 if key not in _seen:
                     _seen[key] = len(_groups)
-                    _groups.append({"emp": emp, "app": _app_by_name.get(key, _EMPTY_APP), "names": []})
+                    _groups.append({"emp": emp, "app": _app_for_employer(key, emp), "names": []})
                 _groups[_seen[key]]["names"].append(nm)
         else:
             _names = [(inv.get("full_name_en") or f"{inv.get('last_name_en', '')}, {inv.get('first_name_en', '')}") for inv in inventors]
