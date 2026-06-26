@@ -93,12 +93,19 @@ app.mount("/output", StaticFiles(directory=str(_OUTPUT_DIR_FOR_MOUNT)), name="ou
 # US 递交预览/成品输出目录（挂载在 /output 下，PDF 可直接 URL 访问）
 SUBMISSION_OUTPUT_DIR = _OUTPUT_DIR_FOR_MOUNT / "submission"
 
-# 原始文档预览目录：系统最初提取数据写入 IPEasy 的源文件（存于 NAS）。
-# 测试期指向本地 test_source_docs/<case_volume>/；NAS 挂载好后，只需把环境变量
-# SOURCE_DOC_DIR 指到挂载点（如 /mnt/nas/patent_docs），无需改代码。
-SOURCE_DOC_DIR = Path(os.environ.get("SOURCE_DOC_DIR", str(ROOT / "test_source_docs")))
-SOURCE_DOC_DIR.mkdir(parents=True, exist_ok=True)
-app.mount("/source-docs", StaticFiles(directory=str(SOURCE_DOC_DIR)), name="source-docs")
+# 原始文档预览目录：审核服务按 SOURCE_DOC_DIR/<案号>/ 读原始材料。
+# 默认值按平台：正式审核服务在 Windows → P:\（即 P:\<案号>\，无需设环境变量）；
+# 其它环境（dev/Linux）→ 本地 test_source_docs/。环境变量 SOURCE_DOC_DIR 始终可覆盖。
+_DEFAULT_SOURCE_DIR = "P:\\" if os.name == "nt" else str(ROOT / "test_source_docs")
+SOURCE_DOC_DIR = Path(os.environ.get("SOURCE_DOC_DIR") or _DEFAULT_SOURCE_DIR)
+try:
+    SOURCE_DOC_DIR.mkdir(parents=True, exist_ok=True)
+except Exception as _e:  # noqa: BLE001  P: 未映射等不致命，原始页预览暂不可用即可
+    print(f"[source-docs] 目录不可用 {SOURCE_DOC_DIR}: {_e}", file=sys.stderr)
+if SOURCE_DOC_DIR.exists():
+    app.mount("/source-docs", StaticFiles(directory=str(SOURCE_DOC_DIR)), name="source-docs")
+else:
+    print(f"[source-docs] {SOURCE_DOC_DIR} 不存在，原始页预览暂不可用（挂载跳过）", file=sys.stderr)
 
 
 # ─── 健康检查 ────────────────────────────────────────────
