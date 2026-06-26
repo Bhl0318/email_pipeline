@@ -14,14 +14,23 @@ US 递交审核页「原始页」按钮读取的目录。原始文档 = 系统�
 - 后端接口：`GET /api/submission/tasks/{task_id}/source-docs`
 - 静态访问：`/source-docs/<case_volume>/<filename>`
 
-## 切换到正式 NAS
+## 切换到正式目录
 
-代码不用改，NAS 挂载好后设置环境变量指向挂载点即可：
+代码不用改，设环境变量 `SOURCE_DOC_DIR` 指向正式根目录即可（代码读 `SOURCE_DOC_DIR/<案号>/`）。
 
-```bash
-export SOURCE_DOC_DIR=/mnt/nas/patent_docs   # 改成实际挂载路径
+**正式（审核服务在 Windows）→ `P:\`**，案号 `<project>` 的原始页即 `P:\<project>\`：
+```powershell
+# 当前会话
+$env:SOURCE_DOC_DIR = "P:\"
+# 或永久（用户级）
+[Environment]::SetEnvironmentVariable("SOURCE_DOC_DIR", "P:\", "User")
 # 重启 report_server
 ```
 
-> 注意：正式 NAS 上的目录/命名规则若与「<case_volume>/」不同，
+Linux/NAS 挂载示例：
+```bash
+export SOURCE_DOC_DIR=/mnt/nas/patent_docs
+```
+
+> 注意：正式目录的子目录命名须为「<案号>/」（= case_volume）。若不同，
 > 需调整 report_server.py 中 get_submission_source_docs 的路径拼接逻辑。
