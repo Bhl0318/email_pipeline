@@ -407,9 +407,38 @@ function assembleEmailBody() {
   }
   return parts.join("\n");
 }
-// 缺失项兼容两种格式：纯字符串(字段路径) 或 对象{field/path/description}
-function missingLabel(m) { return typeof m === "string" ? m : (m.description || m.field || m.path || ""); }
+// 字段叶子名 → 中文标签（汇总各字段定义 + SECTIONS）
+const MISSING_LABELS = (() => {
+  const m = {};
+  [...APPLICANT_FIELDS, ...INVENTOR_FIELDS, ...PRIORITY_FIELDS, ...PARENT_FIELDS].forEach(([k, label]) => { m[k] = label; });
+  ASSIGN_QUAD.forEach(([k, label]) => { m[k] = label; });
+  Object.values(SECTIONS).forEach(sec => (sec.fields || []).forEach(f => { if (f.path) m[f.path[f.path.length - 1]] = f.label; }));
+  Object.assign(m, {
+    name_cn: "中文名", employer: "归属公司", application_type: "申请类型", subject_matter: "主题",
+    location_invention_en: "发明/设计地（英文）", location_invention_cn: "发明/设计地（中文）",
+    labor_contract_en: "劳动合同归属（英文）", labor_contract_cn: "劳动合同归属（中文）",
+    inventor_residence_en: "发明人住址（英文）", inventor_residence_cn: "发明人住址（中文）",
+    assignee: "受让人", assignor_inventors: "让与发明人", assignment_type: "转让类型",
+  });
+  return m;
+})();
+const MISSING_CONTAINERS = {
+  applicants: "申请人", inventors: "发明人", priorities: "优先权",
+  parent_applications: "母案", assignments: "转让", case_info: "案件", case_advance_info: "PCT/母案",
+};
+// 缺失项兼容两种格式：纯字符串(字段路径) 或 对象{field/path/description}；映射成中文
 function missingField(m) { return typeof m === "string" ? m : (m.field || m.path || ""); }
+function missingLabel(m) {
+  if (typeof m !== "string") return m.description || m.field || m.path || "";
+  const mt = m.match(/^([A-Za-z_]+)(?:\[(\d*)\])?(?:\.(.+))?$/);
+  if (!mt) return MISSING_LABELS[m] || m;
+  const [, container, idx, leaf] = mt;
+  if (!leaf) return MISSING_LABELS[container] || container;          // 顶层字段
+  const leafLabel = MISSING_LABELS[leaf] || leaf;
+  const cn = MISSING_CONTAINERS[container] || container;
+  const n = (idx !== undefined && idx !== "") ? Number(idx) + 1 : "";
+  return `${cn}${n} · ${leafLabel}`;
+}
 function renderMissing() {
   const list = task.missing_json || [];
   $("missingBanner").innerHTML = list.length
