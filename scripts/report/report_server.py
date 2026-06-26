@@ -93,14 +93,12 @@ app.mount("/output", StaticFiles(directory=str(_OUTPUT_DIR_FOR_MOUNT)), name="ou
 # US 递交预览/成品输出目录（挂载在 /output 下，PDF 可直接 URL 访问）
 SUBMISSION_OUTPUT_DIR = _OUTPUT_DIR_FOR_MOUNT / "submission"
 
-# 原始文档预览目录：审核服务按 SOURCE_DOC_DIR/<案号>/ 读原始材料。
-# 默认值按平台：正式审核服务在 Windows → P:\（即 P:\<案号>\，无需设环境变量）；
-# 其它环境（dev/Linux）→ 本地 test_source_docs/。环境变量 SOURCE_DOC_DIR 始终可覆盖。
-_DEFAULT_SOURCE_DIR = "P:\\" if os.name == "nt" else str(ROOT / "test_source_docs")
-SOURCE_DOC_DIR = Path(os.environ.get("SOURCE_DOC_DIR") or _DEFAULT_SOURCE_DIR)
+# 原始文档预览目录：审核服务（Windows）读 P:\<案号>\（P: 已映射到原始材料盘）。
+# 写死 P:\；挂载容错——非 Windows/盘未映射时跳过挂载、原始页暂不可用，服务不崩。
+SOURCE_DOC_DIR = Path("P:\\")
 try:
     SOURCE_DOC_DIR.mkdir(parents=True, exist_ok=True)
-except Exception as _e:  # noqa: BLE001  P: 未映射等不致命，原始页预览暂不可用即可
+except Exception as _e:  # noqa: BLE001
     print(f"[source-docs] 目录不可用 {SOURCE_DOC_DIR}: {_e}", file=sys.stderr)
 if SOURCE_DOC_DIR.exists():
     app.mount("/source-docs", StaticFiles(directory=str(SOURCE_DOC_DIR)), name="source-docs")
