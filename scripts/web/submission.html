@@ -543,14 +543,14 @@ function renderForm() {
     <div class="section">${head("发明人", "inventors", "发明人")}<div class="section-body" id="sec-inventors">
       ${arrayBlock("inventors", "发明人", INVENTOR_FIELDS)}</div></div>
 
-    <div class="section">${head("确认函补充（发明地 / 劳动合同归属 / 发明人住址）")}<div class="section-body"><div class="grid">
+    <div class="section">${head("确认函补充（发明地 / 劳动合同归属 / 发明人住址）— 劳动合同/住址仅单一公司时生效，多公司按发明人「归属公司」分组")}<div class="section-body"><div class="grid">
       ${[
         { path: ["case_info", "location_invention_en"], label: "发明/设计地（英文）", deriveDefault: () => "People's Republic of China (CN)", hintText: "默认 People's Republic of China (CN)" },
         { path: ["case_info", "location_invention_cn"], label: "发明/设计地（中文）", deriveDefault: () => "中国", hintText: "默认 中国" },
-        { path: ["labor_contract_en"], label: "劳动合同归属（英文）", deriveDefault: laborDefaultEn, hintText: "默认＝申请人[0] 英文名称" },
-        { path: ["labor_contract_cn"], label: "劳动合同归属（中文）", deriveDefault: laborDefaultCn, hintText: "默认＝申请人[0] 中文名称" },
-        { path: ["inventor_residence_en"], label: "发明人住址 Residence（英文）", wide: true, deriveDefault: residenceDefaultEn, hintText: "默认＝申请人[0] 地址六项合并" },
-        { path: ["inventor_residence_cn"], label: "发明人住址 Residence（中文）", wide: true, deriveDefault: residenceDefaultCn, hintText: "默认＝申请人[0] 中文地址合并" },
+        { path: ["labor_contract_en"], label: "劳动合同归属（英文）", deriveDefault: laborDefaultEn, hintText: "仅全员同一公司时生效；多公司按发明人「归属公司」分组、此栏忽略。默认＝申请人[0] 英文名称" },
+        { path: ["labor_contract_cn"], label: "劳动合同归属（中文）", deriveDefault: laborDefaultCn, hintText: "同上；默认＝申请人[0] 中文名称" },
+        { path: ["inventor_residence_en"], label: "发明人住址 Residence（英文）", wide: true, deriveDefault: residenceDefaultEn, hintText: "仅全员同一公司时生效；多公司按各发明人归属公司地址分组、此栏忽略。默认＝申请人[0] 地址六项合并" },
+        { path: ["inventor_residence_cn"], label: "发明人住址 Residence（中文）", wide: true, deriveDefault: residenceDefaultCn, hintText: "同上（中文）；默认＝申请人[0] 中文地址合并" },
       ].map(fieldInput).join("")}
     </div></div></div>
 
