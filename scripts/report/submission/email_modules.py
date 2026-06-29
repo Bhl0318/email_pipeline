@@ -75,17 +75,14 @@ def build_email_modules(fields: dict, params: dict = None) -> list:
         "input": "route_phrase", "input_value": route_phrase, "input_default": default_route_phrase,
     })
 
-    # 3. 签字文件（Declaration + Assignment + 见证人 + USPTO 签署提醒）
+    # 3. 签字文件（Declaration + Assignment + USPTO 签署提醒）
     modules.append({
-        "id": "signature_docs", "title": "签字文件（Declaration / Assignment / 见证人 / USPTO 签署提醒）", "checked": True,
+        "id": "signature_docs", "title": "签字文件（Declaration / Assignment / USPTO 签署提醒）", "checked": True,
         "html": _h("签字文件") +
                 _p("Declaration（发明人声明）。需要发明人签署，注：日期不需要填写。"
-                   "若Declaration不与申请一起递交，补交则会产生160美元的官费（大实体）。另附签字模板供参考。") +
+                   "若Declaration不与申请一起递交，补交则会产生170美元的官费（大实体）。") +
                 _p("Assignment（专利权转让书），是表明发明人将专利权转让的文件。我司根据优先权信息制作了相关转让文件。"
-                   "请注意，发明人和见证人均需签字，签名中英文均可，且发明人与其见证人的签署日期要保持一致，"
-                   "烦请贵司签署后反馈扫描件。另附签字模板供参考。") +
-                _p("见证人是见证签字人（如发明人、授权人/受让人或其代表）本人在自愿且清醒状态下签字过程的人员，"
-                   "且见证人的身份最好是不相关的非亲属人员，如同事等。") +
+                   "请注意，日期需要签署，签名中英文均可，烦请贵司签署后反馈扫描件。") +
                 _p("⚠️温馨提示：关于签字文件的要求") +
                 _p("根据美国专利商标局（USPTO）的政策要求，所有提交的文件必须由签字人本人亲自签署，"
                    "不得代签或使用非本人生成的电子签名。") +
