@@ -159,7 +159,7 @@
         <button class="tab" data-target="assignment" onclick="switchPreviewTab(this)">Assignment</button>
         <button class="tab" data-target="declaration" onclick="switchPreviewTab(this)">Declaration</button>
         <button class="tab" data-target="email" onclick="switchPreviewTab(this)">确认邮件</button>
-        <button class="tab" data-target="source" onclick="switchPreviewTab(this)" title="系统提取数据写入 IPEasy 的原始文档（NAS），用于对照核对">原始页</button>
+        <button class="tab" data-target="source" onclick="switchPreviewTab(this)" title="客户提供的参考文件（按案号读 P:\\&lt;案号&gt;\\），用于对照核对">参考文件</button>
       </div>
       <div class="preview-files" id="previewFiles"></div>
       <div class="preview-body">
@@ -615,19 +615,19 @@ async function skipTask() {
   catch (e) { toast("操作失败：" + problemsOf(e).join("；"), 4000); }
 }
 
-/* 原始页：把 NAS 上系统提取数据写入 IPEasy 的源文件嵌入右侧预览，左边字段对照核对 */
+/* 参考文件：把客户提供的参考材料嵌入右侧预览，左边字段对照核对 */
 let sourceDocList = [];
 async function loadSourceDocsPreview() {
   if (!taskId) return;
   $("previewFrame").style.display = "none";
   $("previewFiles").style.display = "none";
   $("previewPlaceholder").style.display = "flex";
-  $("previewPlaceholder").textContent = "加载原始文档…";
+  $("previewPlaceholder").textContent = "加载参考文件…";
   try {
     const d = await api("GET", `${API}/tasks/${taskId}/source-docs`);
     sourceDocList = (d && d.docs) || [];
     if (!sourceDocList.length) {
-      $("previewPlaceholder").innerHTML = "暂无原始文档<br>（NAS 未配置，或该案号下无源文件）";
+      $("previewPlaceholder").innerHTML = "暂无参考文件<br>（该案号下无文件，或目录未配置）";
       return;
     }
     $("previewFiles").style.display = "block";
