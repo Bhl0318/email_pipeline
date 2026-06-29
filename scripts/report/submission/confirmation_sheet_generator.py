@@ -434,11 +434,6 @@ class PatentApplicationFormGenerator:
         data_rows7.append(['Publication Date/公开日:', PCT_applications.get('pct_pub_date', '') or ''])
 
         inventors = case_info.get('inventors', []) or []
-        data_rows2 = [['Inventor(s)/发明人 (Given name - Family name)']]
-        inventor_index = 0
-        for inventor in inventors:
-            inventor_index += 1
-            data_rows2.append([f'Inventor{str(inventor_index)}', inventor.get('first_name_en', ''), inventor.get('last_name_en', '')])
         applicants_list = case_info.get("applicants", []) or []
         _EMPTY_APP = {k: "" for k in (
             "applicant_name_en", "applicant_name_cn", "address1", "address2", "city_en", "city_cn",
@@ -485,41 +480,54 @@ class PatentApplicationFormGenerator:
                 ["Nationality/国家:", app.get("country_en_us", ""), app.get("country_zh_cn", "")],
             ]
 
-        # 统一模板：一律按 employer 分组（单公司=N=1，也用 [发明人名单] 写法）。
-        # 发明人均无 employer（存量任务）→ 全部归一组，公司取 applicants[0]。
+        def _fmt_idxs(idxs):
+            """连续序号压成区间：[1,2,3]→1-3、[4,5,6,7]→4-7、[1,3,5]→1、3、5。"""
+            parts, i = [], 0
+            while i < len(idxs):
+                j = i
+                while j + 1 < len(idxs) and idxs[j + 1] == idxs[j] + 1:
+                    j += 1
+                parts.append(f"{idxs[i]}-{idxs[j]}" if j > i else str(idxs[i]))
+                i = j + 1
+            return "、".join(parts)
+
+        # 按 employer 分组（保留发明人全局序号）。无 employer（存量）→ 全部归一组、公司取 applicants[0]。
         _all_have_emp = bool(inventors) and all((inv.get("employer") or "").strip() for inv in inventors)
-        _groups = []
+        _groups = []  # 每组 {emp, app, members:[(全局序号, inventor)]}
         if _all_have_emp:
             _seen = {}
-            for inv in inventors:
+            for i, inv in enumerate(inventors, 1):
                 emp = (inv.get("employer") or "").strip()
                 key = _norm(emp)
-                nm = inv.get("full_name_en") or f"{inv.get('last_name_en', '')}, {inv.get('first_name_en', '')}"
                 if key not in _seen:
                     _seen[key] = len(_groups)
-                    _groups.append({"emp": emp, "app": _app_for_employer(key, emp), "names": []})
-                _groups[_seen[key]]["names"].append(nm)
+                    _groups.append({"emp": emp, "app": _app_for_employer(key, emp), "members": []})
+                _groups[_seen[key]]["members"].append((i, inv))
         else:
-            _names = [(inv.get("full_name_en") or f"{inv.get('last_name_en', '')}, {inv.get('first_name_en', '')}") for inv in inventors]
-            _groups.append({"emp": LaborInfo.get("applicant_name_en", ""), "app": LaborInfo, "names": _names})
+            _groups.append({"emp": LaborInfo.get("applicant_name_en", ""), "app": LaborInfo,
+                            "members": [(i, inv) for i, inv in enumerate(inventors, 1)]})
 
         _single = len(_groups) == 1
+        # 交叉布局：每组先列本组发明人（全局序号），紧跟该组劳动合同归属/住址；
+        # 单公司(N=1) 用 "for all inventors"；多公司每组用 "for inventors<序号>"。
+        data_rows2 = [['Inventor(s)/发明人 (Given name - Family name)']]
         for g in _groups:
             app = g["app"]
+            for idx, inv in g["members"]:
+                data_rows2.append([f'Inventor{idx}', inv.get('first_name_en', ''), inv.get('last_name_en', '')])
             # 仅单组时允许审核页全局覆盖（labor_contract_*/inventor_residence_*）
             labor_en = (case_info.get("labor_contract_en") if _single else "") or app.get("applicant_name_en", "") or g["emp"]
             labor_cn = (case_info.get("labor_contract_cn") if _single else "") or app.get("applicant_name_cn", "")
             _res_en, _res_cn = _residence(app)
             res_en = (case_info.get("inventor_residence_en") if _single else "") or _res_en
             res_cn = (case_info.get("inventor_residence_cn") if _single else "") or _res_cn
-            # 单组（单公司）用 "for all inventors"；多组（多公司）按组带 [发明人名单]
             if _single:
                 labor_label = "Labor Contract for all inventors/劳动合同归属:"
                 res_label = "Residence/Mailing Address for all inventors/所有发明人住址"
             else:
-                inv_label = "; ".join(g["names"])
-                labor_label = f"Labor Contract/劳动合同归属 [{inv_label}]:"
-                res_label = f"Residence/Mailing Address/住址 [{inv_label}]"
+                tag = _fmt_idxs([idx for idx, _ in g["members"]])
+                labor_label = f"Labor Contract for inventors{tag}/劳动合同归属:"
+                res_label = f"Residence/Mailing Address for inventors{tag}/发明人{tag}住址"
             data_rows2.append([labor_label, labor_en, labor_cn])
             data_rows2.append([res_label, res_en, res_cn])
             for r in _detail_rows(app):
