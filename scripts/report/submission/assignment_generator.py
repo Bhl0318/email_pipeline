@@ -22,6 +22,7 @@ from .common import (
     ASSIGNMENT_TEMPLATE,
     application_type_words,
     build_priority_rows,
+    effective_assignments,
     get_assignee,
     inventor_names,
     is_special_client,
@@ -350,12 +351,19 @@ def generate_assignment(fields: dict, assignment: dict, output_dir, seq: int = 1
 
 
 def generate_assignments(fields: dict, output_dir) -> list:
-    """按 fields_json.assignments 逐段生成，返回结果列表。"""
-    assignments = fields.get("assignments") or []
+    """按转让段逐段生成，返回结果列表。
+
+    转让段取 effective_assignments：发明人有 employer 时按归属公司分组派生个人转公司段
+    （与确认函同源，解决"多公司只出一份"），无 employer 时沿用上游 assignments。
+    派生过程的告警挂到首份结果的 warnings 上。"""
+    assignments, derive_warnings = effective_assignments(fields)
     if not assignments:
         raise ValueError("assignments 为空，无法生成 Assignment")
     total = len(assignments)
-    return [
+    results = [
         generate_assignment(fields, item, output_dir, seq=i, total=total)
         for i, item in enumerate(assignments, start=1)
     ]
+    if derive_warnings and results:
+        results[0]["warnings"] = derive_warnings + (results[0].get("warnings") or [])
+    return results

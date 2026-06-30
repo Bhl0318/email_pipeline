@@ -241,17 +241,78 @@ def application_type_words(application_type: str) -> tuple:
     return "", ""
 
 
+def _employer_groups(fields: dict) -> list:
+    """按 inventors[].employer 分组，返回 [(employer, [inventor,...]), ...]，保持出现顺序。
+    employer 归一化（去空格/大小写）判同组；空 employer 单独成 '' 组（归属由调用方决定）。"""
+    groups, index = [], {}
+    for inv in fields.get("inventors") or []:
+        emp = (inv.get("employer") or "").strip()
+        key = emp.lower()
+        if key not in index:
+            index[key] = len(groups)
+            groups.append((emp, []))
+        groups[index[key]][1].append(inv)
+    return groups
+
+
+def effective_assignments(fields: dict):
+    """生成/校验实际使用的转让段（让 Assignment 与确认函按同一套 employer 分组）。
+
+    规则（详见 us_submission/在线审核与文件生成方案.md §2.3.1）：
+    - 公司转公司段：永远保留（转让链无法自动派生，只能上游给）；
+    - 个人转公司段：发明人有可用 employer → 按 employer 分组重新派生并覆盖上游个人转公司段；
+      无任何 employer → 原样沿用上游 assignments（保持单公司老案行为不变）；
+    - 不擅改数据，边界只告警：employer 不在申请人列表（前雇主，地址回退首位申请人）、
+      多申请人但发明人缺 employer（暂归首位申请人）。
+    :return: (assignments:list, warnings:list)
+    """
+    explicit = fields.get("assignments") or []
+    warnings = []
+    groups = _employer_groups(fields)
+    if not any(emp for emp, _ in groups):
+        return explicit, warnings  # 无 employer：完全保持现行为
+
+    applicants = fields.get("applicants") or []
+    applicant_keys = {(a.get("applicant_name_en") or "").strip().lower() for a in applicants}
+    first_applicant = (applicants[0].get("applicant_name_en") or "").strip() if applicants else ""
+
+    derived = []
+    for emp, invs in groups:
+        names = [n for n in (format_inventor_name(i) for i in invs) if n]
+        if not names:
+            continue
+        if not emp:
+            assignee = first_applicant
+            if len(applicants) != 1:
+                warnings.append(f"发明人 {', '.join(names)} 未填归属公司（employer），已暂归首位申请人"
+                                f"「{assignee}」，请核对")
+        else:
+            assignee = emp
+            if emp.lower() not in applicant_keys:
+                warnings.append(f"归属公司「{emp}」不在申请人列表中，该段受让人地址将回退首位申请人，请核对")
+        derived.append({"assignment_type": "个人转公司", "assignee": assignee,
+                        "assignor_inventors": names})
+
+    explicit_p2c = [a for a in explicit if (a.get("assignment_type") or "") == "个人转公司"]
+    company2company = [a for a in explicit if (a.get("assignment_type") or "") == "公司转公司"]
+    if explicit_p2c and len(explicit_p2c) != len(derived):
+        warnings.append(f"按归属公司派生出 {len(derived)} 段个人转公司，与上游给的 {len(explicit_p2c)} 段不一致，"
+                        f"已以归属公司分组为准")
+    return derived + company2company, warnings
+
+
 def validate_for_confirm(fields: dict) -> list:
     """confirm 前的硬校验（方案 4.3）：返回问题清单，空列表=通过。
 
     确认函自身的必填字段由其生成器校验（missing_fields），此处补齐
     生成器覆盖不到的：申请类型、转让安排及公司转公司四件套。
+    转让段以 effective_assignments 为准（与实际生成的份数一致）。
     """
     problems = []
     if (fields.get("application_type") or "") not in ("发明", "外观"):
         problems.append("申请类型（application_type）缺失或非法，须为：发明 / 外观")
 
-    assignments = fields.get("assignments") or []
+    assignments, _w = effective_assignments(fields)
     if not assignments:
         problems.append("转让安排（assignments）为空，至少需要一段转让")
     for idx, item in enumerate(assignments, start=1):
