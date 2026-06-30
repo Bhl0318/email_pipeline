@@ -273,7 +273,7 @@ const APPLICANT_FIELDS = [
   ["postcode", "邮编", true], ["country_en_us", "国家（英文）", true], ["country_zh_cn", "国家（中文）", false],
   ["entity_en", "实体类型（英文）", false], ["entity_cn", "实体类型（中文）", false],
 ];
-const INVENTOR_FIELDS = [["last_name_en", "姓（大写）", true], ["first_name_en", "名", true], ["full_name_en", "全名", false], ["employer", "归属公司（须与某申请人名称一致）", false]];
+const INVENTOR_FIELDS = [["last_name_en", "姓（大写）", true], ["first_name_en", "名", true], ["full_name_en", "全名", false], ["employer", "归属公司", false, "applicantNames"]];
 const PRIORITY_FIELDS = [["priority_no", "优先权号", false], ["priority_num", "国别+号", false], ["priority_country_id", "国别", false], ["priority_date", "优先权日", false], ["access_code", "DAS 码", false]];
 const PARENT_FIELDS = [["Application No", "申请号", false], ["Filing Date", "申请日", false]];
 const ASSIGN_QUAD = [
@@ -470,6 +470,7 @@ function missingFieldSet() {
 
 /* 确认函补充字段的派生默认（须与 confirmation_sheet_generator 逐项对齐） */
 function _firstApplicant() { return (fields.applicants || [])[0] || {}; }
+function applicantNames() { return [...new Set((fields.applicants || []).map(a => (a.applicant_name_en || "").trim()).filter(Boolean))]; }
 function laborDefaultEn() { return _firstApplicant().applicant_name_en || ""; }
 function laborDefaultCn() { return _firstApplicant().applicant_name_cn || ""; }
 function residenceDefaultEn() {
@@ -489,12 +490,27 @@ function fieldInput(def) {
   // 惰性默认：未覆盖时显示派生值，但不写回 fields（留空＝生成器走派生，仍跟随源字段）
   if (!overridden && def.deriveDefault) val = def.deriveDefault();
   const dp = esc(JSON.stringify(def.path));
-  const hint = def.deriveDefault
-    ? `<div class="hint">${esc(def.hintText || "未填用默认值")}${overridden ? "（已手动覆盖，清空可恢复跟随）" : "（当前为默认值，改动即覆盖、清空恢复跟随）"}</div>`
-    : "";
+  let hint = "";
+  if (def.deriveDefault) {
+    hint = `<div class="hint">${esc(def.hintText || "未填用默认值")}${overridden ? "（已手动覆盖，清空可恢复跟随）" : "（当前为默认值，改动即覆盖、清空恢复跟随）"}</div>`;
+  } else if (def.hintText) {
+    hint = `<div class="hint">${esc(def.hintText)}</div>`;
+  }
+  let control;
+  if (def.options) {
+    const cur = (val ?? "").toString();
+    const known = def.options.includes(cur);
+    control = `<select data-path='${dp}' ${def.readonly ? "disabled" : ""}>
+      <option value=""${cur === "" ? " selected" : ""}>（未指定）</option>
+      ${def.options.map(o => `<option value="${esc(o)}"${o === cur ? " selected" : ""}>${esc(o)}</option>`).join("")}
+      ${(!known && cur !== "") ? `<option value="${esc(cur)}" selected>${esc(cur)}（不在申请人列表，请核对）</option>` : ""}
+    </select>`;
+  } else {
+    control = `<input data-path='${dp}' value="${esc(val ?? "")}" ${def.readonly ? "readonly" : ""}>`;
+  }
   return `<div class="field" style="${def.wide ? "grid-column: span 2;" : ""}">
     <label>${esc(def.label)}${def.req ? ' <span class="req">*</span>' : ""}</label>
-    <input data-path='${dp}' value="${esc(val ?? "")}" ${def.readonly ? "readonly" : ""}>${hint}</div>`;
+    ${control}${hint}</div>`;
 }
 function arrayBlock(key, title, defs, extraHTML) {
   const arr = fields[key] || [];
@@ -504,8 +520,11 @@ function arrayBlock(key, title, defs, extraHTML) {
         <button onclick="moveItem('${key}',${i},-1)" ${i === 0 ? "disabled" : ""}>↑</button>
         <button onclick="moveItem('${key}',${i},1)" ${i === arr.length - 1 ? "disabled" : ""}>↓</button>
         <button onclick="removeItem('${key}',${i})">删除</button></div>
-      <div class="grid">${defs.map(([k, label, req]) =>
-        fieldInput({ path: [key, i, k], label, req })).join("")}</div>
+      <div class="grid">${defs.map(([k, label, req, opt]) =>
+        fieldInput({ path: [key, i, k], label, req,
+          options: opt === "applicantNames" ? applicantNames() : undefined,
+          hintText: opt === "applicantNames" ? "从申请人英文名中选择；地址按所选公司取。改了申请人名请回来重选" : undefined,
+        })).join("")}</div>
       ${extraHTML ? extraHTML(item, i) : ""}
     </div>`).join("");
   return blocks || '<div style="color:#94a3b8;font-size:12px;padding:4px 0;">（空，点右上角「添加」）</div>';
