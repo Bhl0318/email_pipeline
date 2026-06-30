@@ -420,18 +420,26 @@ class PatentApplicationFormGenerator:
             ['Location of Invention/Design / 发明/设计地', loc_en, loc_cn],
         ]
 
-        data_rows6 = [['Parent Application/美国母案信息']]
+        # 美国母案：无母案数据则整段不渲染（不显示空的标题行）
         Parent_applications = case_info.get('parent_applications', []) or []
-        for parent in Parent_applications:
-            data_rows6.append(['Application No/申请号:', parent.get('Application No', '') or ''])
-            data_rows6.append(['Filing Date/申请日:', parent.get('Filing Date', '') or ''])
+        data_rows6 = []
+        if Parent_applications:
+            data_rows6 = [['Parent Application/美国母案信息']]
+            for parent in Parent_applications:
+                data_rows6.append(['Application No/申请号:', parent.get('Application No', '') or ''])
+                data_rows6.append(['Filing Date/申请日:', parent.get('Filing Date', '') or ''])
 
-        data_rows7 = [['PCT Application/PCT申请']]
+        # PCT：无任何 PCT 数据则整段不渲染
         PCT_applications = case_info.get('case_advance_info', {}) or {}
-        data_rows7.append(['Application No/申请号:', PCT_applications.get('pct_app_no', '') or ''])
-        data_rows7.append(['Filing Date/申请日:', PCT_applications.get('pct_app_date', '') or ''])
-        data_rows7.append(['Publication No/公开号:', PCT_applications.get('pct_pub_no', '') or ''])
-        data_rows7.append(['Publication Date/公开日:', PCT_applications.get('pct_pub_date', '') or ''])
+        data_rows7 = []
+        if any((PCT_applications.get(k) or '').strip() for k in ('pct_app_no', 'pct_app_date', 'pct_pub_no', 'pct_pub_date')):
+            data_rows7 = [
+                ['PCT Application/PCT申请'],
+                ['Application No/申请号:', PCT_applications.get('pct_app_no', '') or ''],
+                ['Filing Date/申请日:', PCT_applications.get('pct_app_date', '') or ''],
+                ['Publication No/公开号:', PCT_applications.get('pct_pub_no', '') or ''],
+                ['Publication Date/公开日:', PCT_applications.get('pct_pub_date', '') or ''],
+            ]
 
         inventors = case_info.get('inventors', []) or []
         applicants_list = case_info.get("applicants", []) or []
@@ -547,12 +555,15 @@ class PatentApplicationFormGenerator:
             data_rows3.append(['Nationality/国家:', applicant.get('country_en_us', ''), applicant.get('country_zh_cn', '')])
             data_rows3.append(['Entity/实体', applicant.get('entity_en', ''), applicant.get('entity_cn', '')])
 
+        # 优先权：无优先权数据则整段不渲染
         priorities = case_info.get('priorities', []) or []
-        data_rows4 = [['Priority Application (s)/优先权']]
-        for prioritie in priorities:
-            data_rows4.append(['Priority No./优先权号', prioritie.get('priority_num', '')])
-            data_rows4.append(['Priority Date/优先权日:', prioritie.get('priority_date', '')])
-            data_rows4.append(['DAS code/DAS码', prioritie.get('access_code', '')])
+        data_rows4 = []
+        if priorities:
+            data_rows4 = [['Priority Application (s)/优先权']]
+            for prioritie in priorities:
+                data_rows4.append(['Priority No./优先权号', prioritie.get('priority_num', '')])
+                data_rows4.append(['Priority Date/优先权日:', prioritie.get('priority_date', '')])
+                data_rows4.append(['DAS code/DAS码', prioritie.get('access_code', '')])
         data_rows5 = [
             ['Filing Route/落地方式'],
             ['Filing Route/落地方式', case_info.get('filing_route', '')] if case_info.get('filing_route') else ['Filing Route/落地方式', "371 Route (PCT national stage) \nBy pass continuation \nNew \nContinuation of \nContinuation in part of \nDivision of /nParis"],
