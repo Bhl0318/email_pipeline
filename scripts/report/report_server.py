@@ -778,6 +778,35 @@ def _submission_final_dir(task_id: str) -> Path:
     return SUBMISSION_OUTPUT_DIR / task_id / "final"
 
 
+def _submission_manual_dir(task_id: str) -> Path:
+    """操作员手动上传的附件目录（改后重传/额外附件）。
+
+    与 final/ 分开存：preview-send 每次 rmtree 重建 final/，manual/ 不受影响，否则
+    一点发送预览上传件就没了。发送时两边合并、manual 同名覆盖 final。"""
+    return SUBMISSION_OUTPUT_DIR / task_id / "manual"
+
+
+def _submission_attachment_set(task_id: str) -> list:
+    """合并 final/(生成) 与 manual/(手动上传)，返回有序去重列表。
+
+    manual 同名覆盖 final（操作员改后用原名重传即顶替生成版），保持生成件原有顺序；
+    manual 独有的文件追加在后。每项：{"filename", "source", "path"}，
+    source ∈ generated | manual-override | manual。"""
+    items = {}  # filename -> dict（dict 保序：覆盖时位置不变）
+    final_dir = _submission_final_dir(task_id)
+    if final_dir.exists():
+        for p in sorted(final_dir.glob("*")):
+            if p.is_file():
+                items[p.name] = {"filename": p.name, "source": "generated", "path": p}
+    manual_dir = _submission_manual_dir(task_id)
+    if manual_dir.exists():
+        for p in sorted(manual_dir.glob("*")):
+            if p.is_file():
+                items[p.name] = {"filename": p.name, "path": p,
+                                 "source": "manual-override" if p.name in items else "manual"}
+    return list(items.values())
+
+
 def _submission_send_config():
     """US 递交发送配置：email_config.json 的 submission 节（缺省回退 pa 账号、无抄送）。"""
     cfg = _load_email_config()
@@ -853,9 +882,9 @@ def preview_send_submission(task_id: str, req: SubmissionPreviewSendReq):
 
     account_cfg, cc_addrs = _submission_send_config()
     case_volume = row["case_volume"]
-    attachments = ([sheet["file_name"]]
-                   + [a["file_name"] for a in assignment_results]
-                   + [d["file_name"] for d in declaration_results])
+    # 合并生成件 + 手动上传件（manual 同名覆盖 final），供 modal 勾选/下载/替换
+    attachments = [{"filename": it["filename"], "source": it["source"], "url": _output_url(it["path"])}
+                   for it in _submission_attachment_set(task_id)]
 
     return {
         "from": account_cfg.get("user", ""),
@@ -874,12 +903,44 @@ def preview_send_submission(task_id: str, req: SubmissionPreviewSendReq):
     }
 
 
+@app.get("/api/submission/tasks/{task_id}/attachments")
+def list_submission_attachments(task_id: str):
+    """当前合并附件清单（生成件 + 手动上传件，manual 同名覆盖）。上传/删除后刷新用。"""
+    _load_submission_task(task_id)
+    return {"attachments": [
+        {"filename": it["filename"], "source": it["source"], "url": _output_url(it["path"])}
+        for it in _submission_attachment_set(task_id)]}
+
+
+@app.post("/api/submission/tasks/{task_id}/upload-attachment")
+def upload_submission_attachment(task_id: str, file: UploadFile = File(...)):
+    """上传附件到 manual/（改后重传同名件即覆盖生成版；新文件名则作为额外附件）。"""
+    _load_submission_task(task_id)
+    dest_dir = _submission_manual_dir(task_id)
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    name = re.sub(r'[\\/:*?"<>|\r\n\t]+', "_", file.filename or "upload.bin").strip() or "upload.bin"
+    dest = dest_dir / name
+    dest.write_bytes(file.file.read())
+    return {"ok": True, "name": name, "url": _output_url(dest)}
+
+
+@app.delete("/api/submission/tasks/{task_id}/attachment/{name}")
+def delete_submission_attachment(task_id: str, name: str):
+    """删除手动上传的附件（仅 manual/；生成件由"勾掉不发"控制，不在此删）。"""
+    safe = re.sub(r'[\\/:*?"<>|\r\n\t]+', "_", name)
+    p = _submission_manual_dir(task_id) / safe
+    if p.is_file():
+        p.unlink()
+    return {"ok": True, "name": safe}
+
+
 class SubmissionConfirmReq(BaseModel):
     fields_json: dict = None      # 可选：与 confirm 一并保存
     recipients: list = []         # modal 确认后的收件人（必填）
     cc: list = []
     subject: str = ""
     body_html: str = ""
+    attachments: list = None      # 勾选要发送的附件文件名；缺省=合并集全发（manual 覆盖 final）
 
 
 @app.post("/api/submission/tasks/{task_id}/confirm")
@@ -901,11 +962,17 @@ def confirm_submission_task(task_id: str, req: SubmissionConfirmReq):
             (json.dumps(req.fields_json, ensure_ascii=False), now, task_id),
         )
 
-    # 2) 取 preview-send 生成的成品
-    final_dir = _submission_final_dir(task_id)
-    files = sorted(p for p in final_dir.glob("*") if p.is_file()) if final_dir.exists() else []
-    if not files:
+    # 2) 取附件：合并 final/(生成) + manual/(手动上传)，manual 同名覆盖；
+    #    req.attachments 给定则只发勾选的，缺省全发。
+    all_items = {it["filename"]: it["path"] for it in _submission_attachment_set(task_id)}
+    if not all_items:
         raise HTTPException(status_code=400, detail="成品文件不存在，请先点击发送预览（preview-send）")
+    if req.attachments is not None:
+        files = [all_items[n] for n in req.attachments if n in all_items]
+        if not files:
+            raise HTTPException(status_code=400, detail="未选择任何附件")
+    else:
+        files = list(all_items.values())
 
     # 3) 组装邮件并实发
     case_volume = row["case_volume"]

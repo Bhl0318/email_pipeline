@@ -121,7 +121,16 @@
   .modal { background: #fff; border-radius: 12px; width: 560px; max-width: 92vw; max-height: 88vh; overflow-y: auto; padding: 18px 20px; }
   .modal h3 { font-size: 15px; margin-bottom: 12px; }
   .modal .field { margin-bottom: 10px; }
-  .modal .attach-list { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 12px; font-size: 12px; line-height: 1.9; margin-bottom: 10px; }
+  .modal .attach-list { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 12px; font-size: 12px; line-height: 1.7; margin-bottom: 6px; }
+  .modal .attach-row { display: flex; align-items: center; gap: 6px; }
+  .modal .attach-row .nm { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .modal .attach-row.dropped .nm { text-decoration: line-through; color: #94a3b8; }
+  .modal .attach-row a { color: #2563eb; text-decoration: none; }
+  .modal .attach-row .src { font-size: 10px; padding: 0 5px; border-radius: 6px; background: #e2e8f0; color: #475569; }
+  .modal .attach-row .src.manual, .modal .attach-row .src.override { background: #dcfce7; color: #15803d; }
+  .modal .attach-row .del { color: #dc2626; cursor: pointer; border: none; background: none; font-size: 13px; padding: 0 2px; }
+  .modal .attach-upload { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; font-size: 12px; }
+  .modal .attach-empty { color: #94a3b8; }
   .modal .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
 
   .toast { position: fixed; top: 14px; left: 50%; transform: translateX(-50%); background: #1e293b; color: #fff; padding: 9px 18px; border-radius: 8px; font-size: 12.5px; z-index: 99; display: none; }
@@ -180,7 +189,14 @@
     <div class="field"><label>抄送</label><input id="mCc"></div>
     <div class="field"><label>主题</label><input id="mSubject"></div>
     <div class="field"><label>正文（HTML）</label><textarea id="mBody" rows="5"></textarea></div>
-    <div class="field"><label>附件清单</label><div class="attach-list" id="mAttachments"></div></div>
+    <div class="field">
+      <label>附件清单（取消勾选则本次不发；同名上传覆盖生成版）</label>
+      <div class="attach-list" id="mAttachments"></div>
+      <div class="attach-upload">
+        <input type="file" id="mUploadFile">
+        <button type="button" id="mUploadBtn" onclick="uploadAttachment()">上传 / 替换</button>
+      </div>
+    </div>
     <div id="mWarnings"></div>
     <div class="actions">
       <button onclick="closeSendModal()">取消</button>
@@ -786,6 +802,50 @@ async function refreshPreview() {
 }
 
 /* ───────── 确认发送 ───────── */
+let attachItems = [];   // [{filename, source, url, checked}]
+const SRC_LABEL = { generated: "生成", "manual-override": "已替换", manual: "上传" };
+function renderAttachments() {
+  const box = $("mAttachments");
+  if (!attachItems.length) { box.innerHTML = '<span class="attach-empty">（暂无附件，点"发送预览"生成）</span>'; return; }
+  box.innerHTML = attachItems.map((a, i) => {
+    const sc = a.source === "manual" ? "manual" : (a.source === "manual-override" ? "override" : "");
+    const del = a.source === "generated" ? "" : `<button class="del" title="删除上传件" onclick="deleteAttachment(${i})">✕</button>`;
+    return `<div class="attach-row ${a.checked ? "" : "dropped"}">
+      <input type="checkbox" ${a.checked ? "checked" : ""} onchange="attachItems[${i}].checked=this.checked;renderAttachments()">
+      <span class="nm"><a href="${esc(a.url)}" target="_blank" rel="noopener">${esc(a.filename)}</a></span>
+      <span class="src ${sc}">${SRC_LABEL[a.source] || a.source}</span>${del}</div>`;
+  }).join("");
+}
+function applyAttachList(list) {
+  // 合并新清单，沿用已有勾选状态（默认勾选）
+  const prev = Object.fromEntries(attachItems.map(a => [a.filename, a.checked]));
+  attachItems = (list || []).map(a => ({ ...a, checked: prev[a.filename] !== undefined ? prev[a.filename] : true }));
+  renderAttachments();
+}
+async function refreshAttachments() {
+  try { const d = await api("GET", `${API}/tasks/${taskId}/attachments`); applyAttachList(d.attachments); }
+  catch (e) { toast("附件清单刷新失败：" + problemsOf(e).join("；"), 4000); }
+}
+async function uploadAttachment() {
+  const inp = $("mUploadFile");
+  if (!inp.files || !inp.files.length) { toast("请先选择文件"); return; }
+  const btn = $("mUploadBtn"); btn.disabled = true; btn.textContent = "上传中…";
+  try {
+    const fd = new FormData(); fd.append("file", inp.files[0]);
+    const r = await fetch(`${API}/tasks/${taskId}/upload-attachment`, { method: "POST", body: fd });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) { const err = new Error("upload"); err.status = r.status; err.data = data; throw err; }
+    inp.value = "";
+    await refreshAttachments();
+    toast("上传成功");
+  } catch (e) { toast("上传失败：" + problemsOf(e).join("；"), 5000); }
+  finally { btn.disabled = false; btn.textContent = "上传 / 替换"; }
+}
+async function deleteAttachment(i) {
+  const a = attachItems[i]; if (!a) return;
+  try { await api("DELETE", `${API}/tasks/${taskId}/attachment/${encodeURIComponent(a.filename)}`); await refreshAttachments(); }
+  catch (e) { toast("删除失败：" + problemsOf(e).join("；"), 4000); }
+}
 async function openSendModal() {
   if (!taskId) return;
   try {
@@ -795,7 +855,7 @@ async function openSendModal() {
     $("mCc").value = (d.cc || []).join(", ");
     $("mSubject").value = d.subject || "";
     $("mBody").value = emailModules.length ? assembleEmailBody() : (d.body_html || "");
-    $("mAttachments").innerHTML = (d.attachments || []).map(esc).join("<br>");
+    attachItems = []; applyAttachList(d.attachments);
     const warn = [...(d.warnings || []), ...(d.missing_optional_fields || []).map(m => "可选缺失：" + (m.description || m.field_name || m.field))];
     $("mWarnings").innerHTML = warn.length ? `<div class="banner warn"><ul>${warn.map(w => `<li>${esc(w)}</li>`).join("")}</ul></div>` : "";
     $("sendModal").classList.add("show");
@@ -809,12 +869,15 @@ function closeSendModal() { $("sendModal").classList.remove("show"); }
 async function doConfirm() {
   const recipients = $("mTo").value.split(/[,，;；]/).map(s => s.trim()).filter(Boolean);
   if (!recipients.length) { toast("收件人不能为空"); return; }
+  const chosen = attachItems.filter(a => a.checked).map(a => a.filename);
+  if (!chosen.length) { toast("至少要勾选一个附件"); return; }
   const btn = $("mConfirmBtn"); btn.disabled = true; btn.textContent = "发送中…";
   try {
     const d = await api("POST", `${API}/tasks/${taskId}/confirm`, {
       fields_json: fields, recipients,
       cc: $("mCc").value.split(/[,，;；]/).map(s => s.trim()).filter(Boolean),
       subject: $("mSubject").value.trim(), body_html: $("mBody").value,
+      attachments: chosen,
     });
     closeSendModal();
     $("missingBanner").innerHTML = `<div class="banner ok">✅ 已发送给 ${esc(d.sent_to.join(", "))}，共 ${d.files.length} 个附件；任务完成（followup: ${esc(d.followup_task_id.slice(0, 8))}…）</div>`;
