@@ -210,6 +210,15 @@ def _assignee_from_applicant(applicant: dict) -> dict:
     return {"name": name, "address1": bal1, "address2": bal2, "address_lines": lines}
 
 
+def _assignee_from_company_address(name: str, company_address: str) -> dict:
+    """由公司名 + company_address（逗号分隔的整串地址）构造受让人结构。
+    供转让链中间公司（不在 applicants 里、地址只在 公司转公司 段的 company_address）取地址用。"""
+    full = (company_address or "").strip()
+    lines = address_lines(full, "")
+    bal1, bal2 = rebalance_address(full, "")
+    return {"name": (name or "").strip(), "address1": bal1, "address2": bal2, "address_lines": lines}
+
+
 def get_assignee(fields: dict) -> dict:
     """受让人（申请人第一位）——兼容旧调用。"""
     applicants = fields.get("applicants") or []
@@ -225,8 +234,10 @@ def _norm_company(s: str) -> str:
 def resolve_assignee(fields: dict, name: str) -> dict:
     """按受让人名字在 applicants 里匹配取地址（归一化：去空格/大小写/标点）。
 
-    匹配不到时**名称仍用传入的受让人名**（= 发明人归属公司），只把地址回退首位申请人并标
-    matched=False —— 否则多公司各段会全部显示成首位申请人的名字（曾导致"公司名都一样"的 bug）。
+    匹配优先级：①applicants 里同名申请人取其地址；②转让链中间公司——applicants 里没有、
+    但有 公司转公司 段的 assigning_company == 该名字，则用该段 company_address 取地址
+    （发明人先转给自己公司 B、B 再转申请人时，X→B 这份的受让人 B 地址来源）；
+    ③都没有，名称仍用传入名（多公司各段名字保持各异）、地址回退首位申请人并标 matched=False。
     返回结构同 get_assignee，附 matched 标记。"""
     applicants = fields.get("applicants") or []
     key = _norm_company(name)
@@ -234,6 +245,14 @@ def resolve_assignee(fields: dict, name: str) -> dict:
         for a in applicants:
             if _norm_company(a.get("applicant_name_en")) == key:
                 res = _assignee_from_applicant(a)
+                res["matched"] = True
+                return res
+        # 转让链中间公司：地址在 公司转公司 段的 company_address
+        for asg in fields.get("assignments") or []:
+            if (asg.get("assignment_type") == "公司转公司"
+                    and _norm_company(asg.get("assigning_company")) == key
+                    and (asg.get("company_address") or "").strip()):
+                res = _assignee_from_company_address(name, asg["company_address"])
                 res["matched"] = True
                 return res
     res = _assignee_from_applicant(applicants[0] if applicants else {})
@@ -286,6 +305,9 @@ def effective_assignments(fields: dict):
     applicants = fields.get("applicants") or []
     # 与 resolve_assignee 同一套归一化匹配，避免"能解析到地址却仍误报告警"
     applicant_keys = {_norm_company(a.get("applicant_name_en")) for a in applicants}
+    # 转让链中间公司：有 公司转公司 段从它转出（B→申请人），则 employer=B 不算断链
+    bridge_keys = {_norm_company(a.get("assigning_company")) for a in explicit
+                   if (a.get("assignment_type") or "") == "公司转公司" and (a.get("assigning_company") or "").strip()}
     first_applicant = (applicants[0].get("applicant_name_en") or "").strip() if applicants else ""
 
     derived = []
@@ -301,7 +323,11 @@ def effective_assignments(fields: dict):
         else:
             assignee = emp
             if _norm_company(emp) not in applicant_keys:
-                warnings.append(f"归属公司「{emp}」不在申请人列表中，该段受让人地址将回退首位申请人，请核对")
+                if _norm_company(emp) in bridge_keys:
+                    pass  # 转让链完整：X→B(本段) + B→申请人(公司转公司段)；B 地址由 resolve_assignee 从 company_address 取
+                else:
+                    warnings.append(f"转让链断裂：发明人归属公司「{emp}」不在申请人中，且无「公司转公司」段将其转给申请人。"
+                                    f"请补一段公司转公司（{emp}→申请人），或确认该发明人可直接转让给申请人。")
         derived.append({"assignment_type": "个人转公司", "assignee": assignee,
                         "assignor_inventors": names})
 
