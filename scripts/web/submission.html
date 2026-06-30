@@ -468,17 +468,7 @@ function missingFieldSet() {
   return new Set((task.missing_json || []).map(missingField).filter(Boolean));
 }
 
-/* 确认函补充字段的派生默认（须与 confirmation_sheet_generator 逐项对齐） */
-function _firstApplicant() { return (fields.applicants || [])[0] || {}; }
 function applicantNames() { return [...new Set((fields.applicants || []).map(a => (a.applicant_name_en || "").trim()).filter(Boolean))]; }
-// 是否多公司：与生成器一致——全部发明人都填了 employer 且归属公司去重后≥2 家，才按归属公司分组（此时全局劳动合同/住址无效）
-function isMultiCompany() {
-  const invs = fields.inventors || [];
-  if (!invs.length) return false;
-  const emps = invs.map(i => (i.employer || "").trim());
-  if (!emps.every(Boolean)) return false;
-  return new Set(emps.map(e => e.toLowerCase())).size > 1;
-}
 // 申请人名改动后，原地刷新发明人「归属公司」下拉的选项（保留各 select 当前值；不在列表的值保留并标记）
 function refreshEmployerSelects() {
   const opts = applicantNames();
@@ -493,19 +483,6 @@ function refreshEmployerSelects() {
       ((!known && cur !== "") ? `<option value="${esc(cur)}" selected>${esc(cur)}（不在申请人列表，请核对）</option>` : "");
   });
 }
-function laborDefaultEn() { return _firstApplicant().applicant_name_en || ""; }
-function laborDefaultCn() { return _firstApplicant().applicant_name_cn || ""; }
-function residenceDefaultEn() {
-  const a = _firstApplicant();
-  return [a.address1, a.address2, a.city_en, a.province_city_en_us, a.postcode, a.country_en_us]
-    .filter(x => x && String(x).trim()).join(", ");
-}
-function residenceDefaultCn() {
-  const a = _firstApplicant();
-  return [a.contact_address_cn, a.city_cn, a.province_city_zh_cn, a.country_zh_cn]
-    .filter(x => x && String(x).trim()).join(", ");
-}
-
 function fieldInput(def) {
   let val = getPath(fields, def.path);
   const overridden = val != null && val !== "";
@@ -579,21 +556,13 @@ function renderForm() {
   const head = (title, addKey, addLabel) =>
     `<div class="section-head">${esc(title)}<span class="spacer"></span>${addKey && !ro ? `<button onclick="addItem('${addKey}')">＋ 添加${esc(addLabel || "")}</button>` : ""}</div>`;
 
-  // 确认函补充：发明地始终显示；劳动合同/住址仅单公司时显示（多公司按发明人「归属公司」分组、此处无效）
-  const _multi = isMultiCompany();
+  // 确认函补充：只填发明地。劳动合同归属/发明人住址不再在此录入——
+  // 单公司自动取申请人地址、多公司按发明人「归属公司」分组，均由生成器自动产出。
   const _suppFields = [
     { path: ["case_info", "location_invention_en"], label: "发明/设计地（英文）", deriveDefault: () => "People's Republic of China (CN)", hintText: "默认 People's Republic of China (CN)" },
     { path: ["case_info", "location_invention_cn"], label: "发明/设计地（中文）", deriveDefault: () => "中国", hintText: "默认 中国" },
   ];
-  if (!_multi) _suppFields.push(
-    { path: ["labor_contract_en"], label: "劳动合同归属（英文）", deriveDefault: laborDefaultEn, hintText: "全员同一公司时生效。默认＝申请人[0] 英文名称" },
-    { path: ["labor_contract_cn"], label: "劳动合同归属（中文）", deriveDefault: laborDefaultCn, hintText: "同上；默认＝申请人[0] 中文名称" },
-    { path: ["inventor_residence_en"], label: "发明人住址 Residence（英文）", wide: true, deriveDefault: residenceDefaultEn, hintText: "全员同一公司时生效。默认＝申请人[0] 地址六项合并" },
-    { path: ["inventor_residence_cn"], label: "发明人住址 Residence（中文）", wide: true, deriveDefault: residenceDefaultCn, hintText: "同上（中文）；默认＝申请人[0] 中文地址合并" },
-  );
-  const _suppTitle = _multi
-    ? "确认函补充（发明地）— 多公司：劳动合同/住址按发明人「归属公司」分组自动生成，无需在此填写"
-    : "确认函补充（发明地 / 劳动合同归属 / 发明人住址）— 单一公司，此处可全局覆盖劳动合同/住址";
+  const _suppTitle = "确认函补充（发明地）— 发明人住址/劳动合同归属由申请人地址（单公司）或归属公司分组（多公司）自动生成";
 
   $("formSections").innerHTML = `
     ${ro ? `<div class="banner ok">该任务状态为 ${esc(task.status)}，仅可查看。</div>` : ""}
@@ -652,8 +621,6 @@ function renderForm() {
     if (dp) {
       const p = JSON.parse(dp);
       if (p[0] === "applicants" && p[2] === "applicant_name_en") refreshEmployerSelects();
-      // 发明人归属公司变化可能切换单/多公司 → 重渲染，让"确认函补充"区跟着显隐劳动合同/住址
-      if (p[0] === "inventors" && p[2] === "employer") renderForm();
     }
   };
   if (ro) pane.querySelectorAll("input,select,button").forEach(el => { if (!el.closest(".section-head")) el.disabled = true; });
