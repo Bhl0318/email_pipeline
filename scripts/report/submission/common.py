@@ -216,18 +216,29 @@ def get_assignee(fields: dict) -> dict:
     return _assignee_from_applicant(applicants[0] if applicants else {})
 
 
+def _norm_company(s: str) -> str:
+    """公司名归一：小写 + 去掉所有非字母数字（空格/逗号/点/括号等），用于宽松匹配。
+    这样 "ABC Co., Ltd." 与 "ABC Co.,Ltd" / "abc co ltd" 视为同名。"""
+    return re.sub(r"[^0-9a-z]+", "", (s or "").lower())
+
+
 def resolve_assignee(fields: dict, name: str) -> dict:
-    """按受让人名字在 applicants 里匹配取地址（归一化：去空格/大小写）；
-    匹配不到回退首位申请人。返回结构同 get_assignee，附 matched 标记。"""
+    """按受让人名字在 applicants 里匹配取地址（归一化：去空格/大小写/标点）。
+
+    匹配不到时**名称仍用传入的受让人名**（= 发明人归属公司），只把地址回退首位申请人并标
+    matched=False —— 否则多公司各段会全部显示成首位申请人的名字（曾导致"公司名都一样"的 bug）。
+    返回结构同 get_assignee，附 matched 标记。"""
     applicants = fields.get("applicants") or []
-    key = (name or "").strip().lower()
+    key = _norm_company(name)
     if key:
         for a in applicants:
-            if (a.get("applicant_name_en") or "").strip().lower() == key:
+            if _norm_company(a.get("applicant_name_en")) == key:
                 res = _assignee_from_applicant(a)
                 res["matched"] = True
                 return res
     res = _assignee_from_applicant(applicants[0] if applicants else {})
+    if (name or "").strip():
+        res["name"] = name.strip()   # 名称不被首位申请人覆盖（多公司各段名字保持各异）
     res["matched"] = False
     return res
 
@@ -273,7 +284,8 @@ def effective_assignments(fields: dict):
         return explicit, warnings  # 无 employer：完全保持现行为
 
     applicants = fields.get("applicants") or []
-    applicant_keys = {(a.get("applicant_name_en") or "").strip().lower() for a in applicants}
+    # 与 resolve_assignee 同一套归一化匹配，避免"能解析到地址却仍误报告警"
+    applicant_keys = {_norm_company(a.get("applicant_name_en")) for a in applicants}
     first_applicant = (applicants[0].get("applicant_name_en") or "").strip() if applicants else ""
 
     derived = []
@@ -288,7 +300,7 @@ def effective_assignments(fields: dict):
                                 f"「{assignee}」，请核对")
         else:
             assignee = emp
-            if emp.lower() not in applicant_keys:
+            if _norm_company(emp) not in applicant_keys:
                 warnings.append(f"归属公司「{emp}」不在申请人列表中，该段受让人地址将回退首位申请人，请核对")
         derived.append({"assignment_type": "个人转公司", "assignee": assignee,
                         "assignor_inventors": names})
