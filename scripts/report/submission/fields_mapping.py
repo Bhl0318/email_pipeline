@@ -67,8 +67,8 @@ def fields_to_case_info(fields: dict, agent_info: dict = None) -> dict:
             "Mailing Address of Inventor State": "", "Mailing Address of Inventor Postal Code": "",
         })
 
-    # ── 申请人 / 受让人（受让人通常=申请人，镜像）──
-    applicants, assignees = [], []
+    # ── 申请人块（ADS sfAssigneeInformation；以 assignee 身份列出）──
+    applicants = []
     for ap in fields.get("applicants") or []:
         nm = (ap.get("applicant_name_en") or "").strip()
         applicants.append({
@@ -77,12 +77,38 @@ def fields_to_case_info(fields: dict, agent_info: dict = None) -> dict:
             "Applicant city": ap.get("city_en", ""), "Applicant Postal Code": ap.get("postcode", ""),
             "Nationality": ap.get("country_en_us", ""), "Entity": ap.get("entity_en", ""),
         })
-        assignees.append({
-            "Organization Name": nm, "chkOrg": 1,
-            "Address 1": ap.get("address1", ""), "Address 2": ap.get("address2", ""),
-            "City": ap.get("city_en", ""), "Country": ap.get("country_en_us", ""),
-            "Postal Code": ap.get("postcode", ""),
-        })
+
+    # ── 非申请人受让人块（ADS sfNonApplicantInfo）──
+    # 语义：仅列“不是申请人”的受让人。新 schema 受让人来自 assignments[].assignee，通常 = 某个申请人
+    # （已在上面的申请人块以 assignee 身份列出），此时本块应为空——不再镜像 applicants（旧行为会把每个
+    # 申请人重复列成非申请人受让人）。仅当某段转让的 assignee 不在申请人名单里（真·非申请人受让人）才列入，
+    # 使 ADS 受让人与 Assignment 文件对齐。无 assignments 的存量任务回退旧镜像行为。
+    assignees = []
+    _assignments = fields.get("assignments") or []
+    if _assignments:
+        _applicant_keys = {(ap.get("applicant_name_en") or "").strip().lower()
+                           for ap in fields.get("applicants") or []}
+        _seen = set()
+        for asg in _assignments:
+            nm = (asg.get("assignee") or "").strip()
+            key = nm.lower()
+            if not nm or key in _applicant_keys or key in _seen:
+                continue
+            _seen.add(key)
+            # 真·非申请人受让人：schema 无独立地址来源，仅填名称，地址留空待人工补
+            assignees.append({
+                "Organization Name": nm, "chkOrg": 1,
+                "Address 1": "", "Address 2": "", "City": "", "Country": "", "Postal Code": "",
+            })
+    else:
+        for ap in fields.get("applicants") or []:
+            nm = (ap.get("applicant_name_en") or "").strip()
+            assignees.append({
+                "Organization Name": nm, "chkOrg": 1,
+                "Address 1": ap.get("address1", ""), "Address 2": ap.get("address2", ""),
+                "City": ap.get("city_en", ""), "Country": ap.get("country_en_us", ""),
+                "Postal Code": ap.get("postcode", ""),
+            })
 
     # ── 优先权 ──
     priorities = []
