@@ -1005,23 +1005,27 @@ def confirm_submission_task(task_id: str, req: SubmissionConfirmReq):
         "sent_cc": req.cc,
         "sent_at": now,
     }, ensure_ascii=False)
+    # cc_email：本次确认函发送所用抄送（缺省回退配置默认抄送）→ 存入 followup，
+    # 供环节3 超时催办：客户满 2 自然日未回签时，往该地址发催办邮件。
+    cc_list = [c.strip() for c in (req.cc or _default_cc or []) if c and c.strip()]
+    cc_email = ",".join(cc_list)
     existing = execute_params(
         "SELECT id FROM submission_tasks WHERE task_type = 'signature_followup' AND case_volume = %s",
         (case_volume,),
     )
     if existing:
         execute_params(
-            "UPDATE submission_tasks SET fields_json = %s, status = 'pending', updated_at = %s WHERE id = %s",
-            (followup_fields, now, existing[0]["id"]),
+            "UPDATE submission_tasks SET fields_json = %s, cc_email = %s, status = 'pending', updated_at = %s WHERE id = %s",
+            (followup_fields, cc_email, now, existing[0]["id"]),
         )
         followup_id = existing[0]["id"]
     else:
         followup_id = str(uuid.uuid4())
         execute_params(
             "INSERT INTO submission_tasks "
-            "(id, task_type, case_volume, fields_json, contact_email, status, created_at) "
-            "VALUES (%s, 'signature_followup', %s, %s, %s, 'pending', %s)",
-            (followup_id, case_volume, followup_fields, row["contact_email"], now),
+            "(id, task_type, case_volume, fields_json, contact_email, cc_email, status, created_at) "
+            "VALUES (%s, 'signature_followup', %s, %s, %s, %s, 'pending', %s)",
+            (followup_id, case_volume, followup_fields, row["contact_email"], cc_email, now),
         )
 
     return {
