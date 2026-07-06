@@ -144,7 +144,7 @@
 <div class="modal-mask" id="signModal">
   <div class="modal">
     <h3>待回签案件（已发客户签署）</h3>
-    <p style="font-size:12px;color:#64748b;margin:4px 0 10px;">客户签回 POA/Transmittal 后点「已收到签署」，该案自动转入递交准备并发审阅链接。定时任务也会自动转入已标记的案件。</p>
+    <p style="font-size:12px;color:#64748b;margin:4px 0 10px;">客户签回 POA/Transmittal 后点「已收到签署」，该案自动转入递交准备并发审阅链接。定时任务也会自动转入已标记的案件。<br>机审判为「缺件」的案件也在下方列出（红标）：若确认是误判，点「确认无误·强制转入递交」即可推进。</p>
     <div id="signList" style="max-height:50vh;overflow-y:auto;">加载中...</div>
     <div class="actions"><button onclick="closeSignModal()">关闭</button></div>
   </div>
@@ -202,19 +202,25 @@ async function openSignModal(){
   $("signModal").classList.add("show");
   $("signList").innerHTML = "加载中...";
   try {
-    const j = await api("GET", "/api/submission/signatures?status=pending");
+    const j = await api("GET", "/api/submission/signatures?status=pending,needs_fix");
     const rows = j.tasks || [];
-    $("signList").innerHTML = rows.length ? rows.map(t => `
-      <div style="display:flex;align-items:center;gap:8px;padding:8px;border-bottom:1px solid #f1f5f9;">
+    $("signList").innerHTML = rows.length ? rows.map(t => {
+      const nf = t.status === "needs_fix";
+      const miss = (t.review_missing || []).map(m => esc(m)).join("；");
+      return `
+      <div style="display:flex;align-items:center;gap:8px;padding:8px;border-bottom:1px solid #f1f5f9;${nf?"background:#fef2f2;":""}">
         <div style="flex:1;">
-          <div style="font-size:13px;font-weight:500;">${esc(t.case_volume)}</div>
+          <div style="font-size:13px;font-weight:500;">${esc(t.case_volume)}${nf?" <span style='color:#dc2626;font-size:11px;'>机审：缺件</span>":""}</div>
           <div style="font-size:11px;color:#94a3b8;">发出 ${esc((t.updated_at||t.created_at||"").slice(0,16))}${t.transferred?" · <span style='color:#16a34a'>已转入</span>":""}</div>
+          ${nf&&miss?`<div style="font-size:11px;color:#dc2626;margin-top:2px;">判缺：${miss}</div>`:""}
         </div>
-        <button class="success" style="padding:5px 10px;" onclick="markSigned('${esc(t.id)}')">已收到签署</button>
-      </div>`).join("") : '<div style="padding:20px;text-align:center;color:#cbd5e1;">无待回签案件</div>';
+        <button class="success" style="padding:5px 10px;" onclick="markSigned('${esc(t.id)}', ${nf})">${nf?"确认无误·强制转入递交":"已收到签署"}</button>
+      </div>`;
+    }).join("") : '<div style="padding:20px;text-align:center;color:#cbd5e1;">无待回签案件</div>';
   } catch(e){ $("signList").innerHTML = '<div style="padding:20px;color:#dc2626;">加载失败: '+esc(e.message)+'</div>'; }
 }
-async function markSigned(id){
+async function markSigned(id, isNeedsFix){
+  if (isNeedsFix && !confirm("该案机审判为「缺件」。确认为误判、强制转入递交准备？")) return;
   try {
     const j = await api("POST", `/api/submission/signatures/${encodeURIComponent(id)}/mark-signed`);
     toast(j.existed ? "已标记签署（该案此前已转入）"

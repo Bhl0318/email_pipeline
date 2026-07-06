@@ -1160,7 +1160,7 @@ def list_signature_followups(status: str = "pending"):
     statuses = [s.strip() for s in status.split(",") if s.strip()]
     placeholders = ",".join(["%s"] * len(statuses))
     rows = execute_params(
-        f"SELECT id, case_volume, contact_email, status, created_at, updated_at "
+        f"SELECT id, case_volume, contact_email, status, fields_json, created_at, updated_at "
         f"FROM submission_tasks WHERE task_type='signature_followup' AND status IN ({placeholders}) "
         f"ORDER BY created_at DESC", tuple(statuses))
     out = []
@@ -1168,10 +1168,18 @@ def list_signature_followups(status: str = "pending"):
         for key in ("created_at", "updated_at"):
             if r.get(key) is not None:
                 r[key] = str(r[key])
+        # 机审结论（needs_fix 时供人工核对是否误判）
+        try:
+            review = (json.loads(r.get("fields_json") or "{}")).get("review") or {}
+        except Exception:
+            review = {}
+        r.pop("fields_json", None)
         ex = execute_params(
             "SELECT id FROM submission_tasks WHERE task_type='filing_preparation' AND case_volume=%s",
             (r["case_volume"],))
-        out.append({**r, "transferred": bool(ex), "filing_task_id": ex[0]["id"] if ex else None})
+        out.append({**r, "review_missing": review.get("missing") or [],
+                    "review_note": review.get("note") or "",
+                    "transferred": bool(ex), "filing_task_id": ex[0]["id"] if ex else None})
     return {"tasks": out}
 
 
