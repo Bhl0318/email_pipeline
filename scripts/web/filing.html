@@ -317,15 +317,23 @@ async function save(){
   catch(e){ toast("保存失败: "+e.message); }
 }
 
+// 只刷新定稿文件列表，保留内存里未保存的表单编辑（避免全量 openTask 重载打回服务器状态）
+async function refreshFinalDocs(){
+  const fresh = await api("GET", `${API}/${taskId}`);
+  data.final_docs = fresh.final_docs || [];
+  renderForm();
+}
 async function uploadFinal(){
   const f = $("finalFile").files[0];
   if (!f) { toast("请先选择文件"); return; }
+  collectOpts();                                   // 快照当前编辑，防重渲染丢失
   const fd = new FormData(); fd.append("file", f);
-  try { await api("POST", `${API}/${taskId}/upload-final`, fd, true); toast("上传成功"); await openTask(taskId); }
+  try { await api("POST", `${API}/${taskId}/upload-final`, fd, true); toast("上传成功"); await refreshFinalDocs(); }
   catch(e){ toast("上传失败: "+e.message); }
 }
 async function delFinal(name){
-  try { await api("DELETE", `${API}/${taskId}/final/${encodeURIComponent(name)}`); await openTask(taskId); }
+  collectOpts();                                   // 同上，删除也只刷新文件列表
+  try { await api("DELETE", `${API}/${taskId}/final/${encodeURIComponent(name)}`); await refreshFinalDocs(); }
   catch(e){ toast("删除失败: "+e.message); }
 }
 
