@@ -63,11 +63,14 @@ def fields_to_case_info(fields: dict, agent_info: dict = None) -> dict:
         last = (inv.get("last_name_en") or "").strip()
         full = (inv.get("full_name_en") or "").strip() or f"{first} {last}".strip()
         addr = inv_addrs[idx] if idx < len(inv_addrs) else {}
+        res_ctry = (addr.get("residence_country") or "").strip()
+        # ResidencyRadio：参照旧实现——非美国居住地→"non-us-residency"（美国/留空则不选）
+        residency = "non-us-residency" if res_ctry and res_ctry.upper() not in ("US", "USA", "UNITED STATES") else ""
         inventors.append({
             "name": full, "firstName": first, "middleName": "", "lastName": last,
-            "Residence Information": addr.get("residence", ""),
+            "Residence Information": residency,
             "City": addr.get("residence_city", ""),
-            "Country of Residence": addr.get("residence_country", ""),
+            "Country of Residence": res_ctry,
             "Mailing Address of Inventor address_1": addr.get("mail_address1", ""),
             "Mailing Address of Inventor address_2": addr.get("mail_address2", ""),
             "Mailing Address of Inventor Country": addr.get("mail_country", ""),
