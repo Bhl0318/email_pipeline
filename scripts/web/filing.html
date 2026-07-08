@@ -259,6 +259,32 @@ function renderForm(){
     ? `<div class="docrow">📄 <a href="${esc(scan.url)}" target="_blank">${esc(scan.name)}</a><button class="del" onclick="delPoaScan()">删除</button></div>`
     : '<div style="color:#94a3b8;font-size:12px;">尚未上传（POA 仅表单一页）</div>';
   const ck = (k)=> opts[k] ? "checked" : "";
+  // 递交特有可编辑字段（存 fields.filing_extra）
+  const fx = fields.filing_extra || {};
+  const ag = fx.agent_info || {};
+  const FIRMS = ["Lai Runzhi","Poseidon Advanced IP LLC","Metis IP LLC","Porus IP LLC"];
+  const firmOpts = `<option value=""${fx.agent_firm?"":" selected"}>（选代理所）</option>` +
+    FIRMS.map(f=>`<option ${fx.agent_firm===f?"selected":""}>${esc(f)}</option>`).join("");
+  const invAddrRows = (fields.inventors||[]).map((inv,i)=>{
+    const a = (fx.inventor_addresses||[])[i] || {};
+    const nm = inv.full_name_en||`${inv.first_name_en||""} ${inv.last_name_en||""}`.trim();
+    return `<div style="border:1px solid #e2e8f0;border-radius:6px;padding:8px;margin-bottom:8px;">
+      <div style="font-size:12px;font-weight:600;margin-bottom:6px;">${esc(nm)||("发明人"+(i+1))}</div>
+      <div class="grid">
+        <div class="field"><label>居住城市</label><input id="fx-inv-${i}-rescity" value="${esc(a.residence_city||"")}"></div>
+        <div class="field"><label>居住国</label><input id="fx-inv-${i}-resctry" value="${esc(a.residence_country||"")}"></div>
+        <div class="field"><label>通信地址1</label><input id="fx-inv-${i}-a1" value="${esc(a.mail_address1||"")}"></div>
+        <div class="field"><label>通信地址2</label><input id="fx-inv-${i}-a2" value="${esc(a.mail_address2||"")}"></div>
+        <div class="field"><label>城市</label><input id="fx-inv-${i}-city" value="${esc(a.mail_city||"")}"></div>
+        <div class="field"><label>州/省</label><input id="fx-inv-${i}-state" value="${esc(a.mail_state||"")}"></div>
+        <div class="field"><label>国家</label><input id="fx-inv-${i}-ctry" value="${esc(a.mail_country||"")}"></div>
+        <div class="field"><label>邮编</label><input id="fx-inv-${i}-zip" value="${esc(a.mail_postcode||"")}"></div>
+      </div></div>`;
+  }).join("") || '<div style="color:#94a3b8;font-size:12px;">无发明人</div>';
+  const parentRows = (fields.parent_applications||[]).map((p,i)=>
+    `<div class="field"><label>母案 ${esc(p["Application No"]||("#"+(i+1)))} 续案类型</label>
+      <input id="fx-par-${i}-cont" value="${esc(p["Continuity Type"]||"")}" placeholder="如 Continuation of / Continuation in part of / Division of"></div>`
+  ).join("") || '<div style="color:#94a3b8;font-size:12px;">无母案（新申请）</div>';
   $("formSections").innerHTML = `
     <div class="section"><div class="section-head">案件信息（来自 fields_json，只读）</div><div class="section-body grid">
       <div class="field"><label>代理所案号</label><input readonly value="${esc(fields.case_volume||"")}"></div>
@@ -266,6 +292,30 @@ function renderForm(){
       <div class="field"><label>申请人</label><input readonly value="${esc(ap.applicant_name_en||"")}"></div>
       <div class="field"><label>发明人</label><input readonly value="${esc(invs)}"></div>
       <div class="field"><label>主题(Subject Matter)</label><input readonly value="${esc(fields.subject_matter||"")}"></div>
+    </div></div>
+
+    <div class="section"><div class="section-head">签字代理人（选代理所/代理人「查库带出」，可手改；用于 POA/ADS/Transmittal 签字块）</div><div class="section-body">
+      <div class="grid">
+        <div class="field"><label>代理所</label><select id="fx-firm">${firmOpts}</select></div>
+        <div class="field"><label>代理人</label><input id="fx-person" value="${esc(fx.agent_person||"")}"></div>
+      </div>
+      <div style="margin:6px 0;"><button class="primary" onclick="fetchAgentInfo()">查库带出</button></div>
+      <div class="grid">
+        <div class="field"><label>签字人姓名</label><input id="fx-ag-name" value="${esc(ag["Name"]||"")}"></div>
+        <div class="field"><label>执业号(Reg. No.)</label><input id="fx-ag-reg" value="${esc(ag["Registration Number"]||"")}"></div>
+        <div class="field"><label>Title</label><input id="fx-ag-title" value="${esc(ag["title"]||"")}"></div>
+        <div class="field"><label>Customer Number</label><input id="fx-ag-cust" value="${esc(ag["Customer Number"]||"")}"></div>
+        <div class="field"><label>Deposit Account</label><input id="fx-ag-deposit" value="${esc(ag["Deposit Account No"]||"")}"></div>
+        <div class="field"><label>通信邮箱(逗号分隔)</label><input id="fx-ag-email" value="${esc((ag["Email Address"]||[]).join(", "))}"></div>
+      </div>
+    </div></div>
+
+    <div class="section"><div class="section-head">发明人居住地/通信地址（ADS 用；姓名取著录项只读）</div><div class="section-body">
+      ${invAddrRows}
+    </div></div>
+
+    <div class="section"><div class="section-head">母案续案类型（ADS 用）</div><div class="section-body">
+      ${parentRows}
     </div></div>
 
     <div class="section"><div class="section-head">递交清单（transmittal_options）</div><div class="section-body">
@@ -325,7 +375,55 @@ function collectOpts(){
     has_ads: $("o-has_ads").checked,
     remark: $("o-remark").value.trim(),
   };
+  collectExtra();               // 一并快照递交特有字段（签字人/发明人地址/续案类型）
   return opts;
+}
+
+// 快照递交特有可编辑字段 → fields.filing_extra / parent_applications（随「保存」落库）
+function collectExtra(){
+  if (!$("fx-firm")) return;
+  fields.filing_extra = fields.filing_extra || {};
+  const fx = fields.filing_extra;
+  fx.agent_firm = $("fx-firm").value;
+  fx.agent_person = $("fx-person").value.trim();
+  fx.agent_info = Object.assign({}, fx.agent_info, {
+    "Name": $("fx-ag-name").value.trim(),
+    "Registration Number": $("fx-ag-reg").value.trim(),
+    "title": $("fx-ag-title").value.trim(),
+    "Customer Number": $("fx-ag-cust").value.trim(),
+    "Deposit Account No": $("fx-ag-deposit").value.trim(),
+    "Email Address": $("fx-ag-email").value.split(/[,，;；]/).map(s=>s.trim()).filter(Boolean),
+  });
+  const val = id => { const el = $(id); return el ? el.value.trim() : ""; };
+  fx.inventor_addresses = (fields.inventors||[]).map((_,i)=>({
+    residence_city: val(`fx-inv-${i}-rescity`), residence_country: val(`fx-inv-${i}-resctry`),
+    mail_address1: val(`fx-inv-${i}-a1`), mail_address2: val(`fx-inv-${i}-a2`),
+    mail_city: val(`fx-inv-${i}-city`), mail_state: val(`fx-inv-${i}-state`),
+    mail_country: val(`fx-inv-${i}-ctry`), mail_postcode: val(`fx-inv-${i}-zip`),
+  }));
+  (fields.parent_applications||[]).forEach((p,i)=>{
+    const el = $(`fx-par-${i}-cont`);
+    if (el) p["Continuity Type"] = el.value.trim();
+  });
+}
+
+// 「查库带出」：按代理所+代理人查 agent_info，回填签字人快照（可再手改）
+async function fetchAgentInfo(){
+  if (!taskId) return;
+  const firm = $("fx-firm").value, person = ($("fx-person").value||"").trim();
+  if (!firm) { toast("请先选代理所"); return; }
+  if (!person) { toast("请先填代理人"); return; }
+  collectOpts();                // 快照当前编辑，避免重渲染丢失
+  try {
+    const j = await api("GET", `/api/submission/agent-info?case_volume=${encodeURIComponent(data.case_volume||"")}`
+      + `&firm=${encodeURIComponent(firm)}&person=${encodeURIComponent(person)}`);
+    fields.filing_extra = fields.filing_extra || {};
+    fields.filing_extra.agent_firm = firm;
+    fields.filing_extra.agent_person = person;
+    fields.filing_extra.agent_info = j.agent_info || {};
+    renderForm();
+    toast(j.matched ? "已带出签字人信息" : (j.note || "未命中 agent_info（可手填）"));
+  } catch(e){ toast("查库失败: "+e.message); }
 }
 
 async function save(){
