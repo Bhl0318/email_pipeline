@@ -318,28 +318,61 @@ function renderForm(){
       ${parentRows}
     </div></div>
 
-    <div class="section"><div class="section-head">递交清单（transmittal_options）</div><div class="section-body">
+    <div class="section"><div class="section-head">Transmittal 递交清单（编号对应 PTO/AIA/15 表单条目；勾选本次实际递交的）</div><div class="section-body">
       <div class="grid">
-        <div class="field"><label>实体</label><select id="o-entity">
+        <div class="field"><label>2/3 实体</label><select id="o-entity">
           <option value="large" ${opts.entity==="large"?"selected":""}>大实体</option>
           <option value="small" ${opts.entity==="small"?"selected":""}>小实体</option>
           <option value="micro" ${opts.entity==="micro"?"selected":""}>微实体</option>
         </select></div>
-        <div class="field"><label>说明书页数</label><input id="o-spec" value="${esc(opts.spec_pages||"")}"></div>
-        <div class="field"><label>附图页数</label><input id="o-draw" value="${esc(opts.drawing_sheets||"")}"></div>
-        <div class="field"><label>Declaration 页数</label><input id="o-decl" value="${esc(opts.declaration_pages||"")}"></div>
+        <div class="field"><label>4 说明书总页数</label><input id="o-spec" value="${esc(opts.spec_pages||"")}"></div>
+        <div class="field"><label>5 附图总页数(sheets)</label><input id="o-draw" value="${esc(opts.drawing_sheets||"")}"></div>
       </div>
-      <div style="margin:10px 0 6px;font-size:11.5px;color:#64748b;">随附文件（勾选本次实际递交的）</div>
+
+      <div style="margin:10px 0 4px;font-size:11.5px;color:#64748b;">6 Inventor's Oath / Declaration</div>
+      <div class="checks"><label><input type="checkbox" id="o-has_declaration" ${ck("has_declaration")}>6 递交声明</label></div>
+      <div class="grid">
+        <div class="field"><label>6 类型</label><select id="o-decl_kind">
+          <option value="new" ${opts.declaration_kind==="copy"?"":"selected"}>a 新签署(original/copy)</option>
+          <option value="copy" ${opts.declaration_kind==="copy"?"selected":""}>b 来自在先申请</option>
+        </select></div>
+        <div class="field"><label>6 Declaration 总页数</label><input id="o-decl" value="${esc(opts.declaration_pages||"")}"></div>
+      </div>
+
+      <div class="checks" style="margin-top:8px;">
+        <label><input type="checkbox" id="o-has_ads" ${opts.has_ads!==false?"checked":""}>7 ADS</label>
+        <label><input type="checkbox" id="o-has_preliminary_amendment" ${ck("has_preliminary_amendment")}>14 Preliminary Amendment</label>
+      </div>
+
+      <div style="margin:10px 0 4px;font-size:11.5px;color:#64748b;">9 核酸/氨基酸序列提交</div>
       <div class="checks">
-        <label><input type="checkbox" id="o-has_declaration" ${ck("has_declaration")}>Declaration（声明）</label>
-        <label><input type="checkbox" id="o-has_poa" ${ck("has_poa")}>POA（委托书）</label>
-        <label><input type="checkbox" id="o-has_ids" ${ck("has_ids")}>IDS</label>
-        <label><input type="checkbox" id="o-has_preliminary_amendment" ${ck("has_preliminary_amendment")}>Preliminary Amendment</label>
-        <label><input type="checkbox" id="o-has_sequence_listing" ${ck("has_sequence_listing")}>序列表</label>
-        <label><input type="checkbox" id="o-has_assignment" ${ck("has_assignment")}>Assignment</label>
-        <label><input type="checkbox" id="o-has_ads" ${opts.has_ads!==false?"checked":""}>ADS</label>
+        <label><input type="checkbox" id="o-has_seq_crf" ${ck("has_seq_crf")}>9a CRF</label>
+        <label><input type="checkbox" id="o-has_seq_listing" ${ck("has_seq_listing")}>9b 序列表</label>
+        <label><input type="checkbox" id="o-has_seq_statements" ${ck("has_seq_statements")}>9c 一致性声明</label>
       </div>
-      <div class="field" style="margin-top:10px;"><label>备注</label><input id="o-remark" value="${esc(opts.remark||"")}"></div>
+      <div class="grid"><div class="field"><label>9b 序列表载体</label><select id="o-seq_media">
+        <option value="" ${opts.seq_media?"":"selected"}>—</option>
+        <option value="cd" ${opts.seq_media==="cd"?"selected":""}>i CD-ROM/CD-R(2份)</option>
+        <option value="paper" ${opts.seq_media==="paper"?"selected":""}>ii Paper</option>
+      </select></div></div>
+
+      <div style="margin:10px 0 4px;font-size:11.5px;color:#64748b;">11 声明 / 委托</div>
+      <div class="checks">
+        <label><input type="checkbox" id="o-has_373_statement" ${ck("has_373_statement")}>11 37 CFR 3.73(c) 声明</label>
+        <label><input type="checkbox" id="o-has_poa" ${ck("has_poa")}>11 Power of Attorney</label>
+      </div>
+
+      <div style="margin:10px 0 4px;font-size:11.5px;color:#64748b;">13 IDS</div>
+      <div class="checks">
+        <label><input type="checkbox" id="o-has_ids" ${ck("has_ids")}>13 IDS</label>
+        <label><input type="checkbox" id="o-has_ids_copies" ${ck("has_ids_copies")}>13 Copies of citations attached</label>
+      </div>
+
+      <div class="checks" style="margin-top:8px;">
+        <label><input type="checkbox" id="o-use_customer_number" ${opts.use_customer_number!==false?"checked":""}>19 通信地址用 Customer Number（号码取签字人 Customer No）</label>
+      </div>
+
+      <div class="field" style="margin-top:10px;"><label>18 Other（备注，勾选并填文本）</label><input id="o-remark" value="${esc(opts.remark||"")}"></div>
     </div></div>
 
     <div class="section"><div class="section-head">定稿文件（说明书/权要/附图终版，手动上传）</div><div class="section-body">
@@ -365,14 +398,20 @@ function collectOpts(){
     entity: $("o-entity").value,
     spec_pages: $("o-spec").value.trim(),
     drawing_sheets: $("o-draw").value.trim(),
-    declaration_pages: $("o-decl").value.trim(),
     has_declaration: $("o-has_declaration").checked,
+    declaration_kind: $("o-decl_kind").value,
+    declaration_pages: $("o-decl").value.trim(),
+    has_ads: $("o-has_ads").checked,
+    has_seq_crf: $("o-has_seq_crf").checked,
+    has_seq_listing: $("o-has_seq_listing").checked,
+    seq_media: $("o-seq_media").value,
+    has_seq_statements: $("o-has_seq_statements").checked,
+    has_373_statement: $("o-has_373_statement").checked,
     has_poa: $("o-has_poa").checked,
     has_ids: $("o-has_ids").checked,
+    has_ids_copies: $("o-has_ids_copies").checked,
     has_preliminary_amendment: $("o-has_preliminary_amendment").checked,
-    has_sequence_listing: $("o-has_sequence_listing").checked,
-    has_assignment: $("o-has_assignment").checked,
-    has_ads: $("o-has_ads").checked,
+    use_customer_number: $("o-use_customer_number").checked,
     remark: $("o-remark").value.trim(),
   };
   collectExtra();               // 一并快照递交特有字段（签字人/发明人地址/续案类型）

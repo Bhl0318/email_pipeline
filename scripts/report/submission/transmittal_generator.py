@@ -9,11 +9,18 @@
 - 清单字段来自 options（transmittal_options，操作员在审核页填，fields_json 无）；
 - 三模板复选框字段名不同，本模块各自映射（UTL 的 Check Box54-80 已按表单实物对号）。
 
-options（transmittal_options）schema（全部可选，缺省不勾/不填）：
-  { "entity": "large|small|micro", "spec_pages": "", "drawing_sheets": "",
-    "declaration_pages": "", "has_declaration": bool, "has_poa": bool, "has_ids": bool,
-    "has_preliminary_amendment": bool, "has_sequence_listing": bool,
-    "has_assignment": bool, "has_ads": bool, "remark": "" }
+options（transmittal_options）schema（全部可选，缺省不勾/不填；编号=PTO/AIA/15 条目）：
+  { "entity": "large|small|micro",              # item2/3 小/微实体
+    "spec_pages": "", "drawing_sheets": "",      # item4 说明书 / item5 附图
+    "has_declaration": bool, "declaration_kind": "new|copy", "declaration_pages": "",  # item6(+a/b)
+    "has_ads": bool,                             # item7
+    "has_seq_crf": bool, "has_seq_listing": bool, "seq_media": "cd|paper",
+    "has_seq_statements": bool,                  # item9 序列提交(9a / 9b i·ii / 9c)
+    "has_373_statement": bool, "has_poa": bool,  # item11 3.73(c)声明 / 委托书
+    "has_ids": bool, "has_ids_copies": bool,     # item13 IDS(+copies attached)
+    "has_preliminary_amendment": bool,           # item14
+    "remark": "",                                # item18 Other
+    "use_customer_number": bool }                # item19 通信地址用 Customer Number
 """
 import datetime
 from pathlib import Path
@@ -42,33 +49,56 @@ def _options_fields(ttype: str, opts: dict) -> dict:
     entity = (o.get("entity") or "").lower()
     f = {}
 
-    if ttype == "Transmittal":  # UTL，Check Box54-80 已按表单实物对号
+    if ttype == "Transmittal":  # UTL，Check Box54-80 已按 PTO/AIA/15 条目对号
+        # item2/3 小/微实体
         if entity == "small":
             f["Check Box55"] = "Yes"
         elif entity == "micro":
             f["Check Box56"] = "Yes"
+        # item4 说明书
         if o.get("spec_pages"):
             f["Check Box57"] = "Yes"; f["Total Pages"] = o["spec_pages"]
+        # item5 附图
         if o.get("drawing_sheets"):
             f["Check Box58"] = "Yes"; f["Total Sheets"] = o["drawing_sheets"]
+        # item6 Oath/Declaration（a 新签署 / b 来自在先申请）
         if o.get("has_declaration"):
-            f["Check Box59"] = "Yes"  # Newly executed（原始声明）
+            f["Check Box60" if o.get("declaration_kind") == "copy" else "Check Box59"] = "Yes"
             if o.get("declaration_pages"):
                 f["Total Pages_2"] = o["declaration_pages"]
-        if o.get("has_assignment"):
-            f["Check Box68"] = "Yes"
-        if o.get("has_poa"):
-            f["Check Box70"] = "Yes"
-        if o.get("has_ids"):
-            f["Check Box72"] = "Yes"
-        if o.get("has_preliminary_amendment"):
-            f["Check Box74"] = "Yes"
+        # item7 ADS
         if o.get("has_ads"):
             f["Check Box61"] = "Yes"
-        if o.get("has_sequence_listing"):
-            f["Check Box64"] = "Yes"; f["Check Box66"] = "Yes"  # 序列表 + Paper
+        # item9 序列提交（9a CRF / 9b 序列表 + i CD·ii Paper / 9c 声明）
+        if o.get("has_seq_crf"):
+            f["Check Box63"] = "Yes"
+        if o.get("has_seq_listing"):
+            f["Check Box64"] = "Yes"
+            if o.get("seq_media") == "cd":
+                f["Check Box65"] = "Yes"
+            elif o.get("seq_media") == "paper":
+                f["Check Box66"] = "Yes"
+        if o.get("has_seq_statements"):
+            f["Check Box67"] = "Yes"
+        # item11 37 CFR 3.73(c) 声明 / 委托书
+        if o.get("has_373_statement"):
+            f["Check Box69"] = "Yes"
+        if o.get("has_poa"):
+            f["Check Box70"] = "Yes"
+        # item13 IDS（+ copies of citations attached）
+        if o.get("has_ids"):
+            f["Check Box72"] = "Yes"
+            if o.get("has_ids_copies"):
+                f["Check Box73"] = "Yes"
+        # item14 Preliminary Amendment
+        if o.get("has_preliminary_amendment"):
+            f["Check Box74"] = "Yes"
+        # item18 Other
         if o.get("remark"):
             f["Check Box78"] = "Yes"; f["Other 1"] = o["remark"]
+        # item19 通信地址：使用 Customer Number（号码由 explicit 的 corr Customer Number 填）
+        if o.get("use_customer_number"):
+            f["Check Box79"] = "Yes"
 
     elif ttype == "Design-Transmittal":  # 字段名自描述
         if entity == "small":
