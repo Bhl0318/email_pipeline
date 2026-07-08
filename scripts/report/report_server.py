@@ -1064,6 +1064,21 @@ def _filing_final_docs_dir(task_id: str) -> Path:
     return SUBMISSION_OUTPUT_DIR / task_id / "final-docs"
 
 
+def _filing_poa_scan_dir(task_id: str) -> Path:
+    """POA 第二页扫描件目录（人工上传，单张 PDF，重传覆盖）。"""
+    return SUBMISSION_OUTPUT_DIR / task_id / "poa-scan"
+
+
+def _filing_poa_scan_path(task_id: str):
+    """当前 POA 扫描件路径（无则 None）。"""
+    d = _filing_poa_scan_dir(task_id)
+    if d.exists():
+        pdfs = sorted(p for p in d.glob("*.pdf") if p.is_file())
+        if pdfs:
+            return pdfs[0]
+    return None
+
+
 def _filing_case_info(row: dict, fields: dict):
     """fields_json → case_info（注入 agent_config 的签字人/Customer Number/Deposit）。"""
     ai = load_agent_info(row["case_volume"])
@@ -1237,6 +1252,8 @@ def get_filing_task(task_id: str):
     final_docs = ([{"name": p.name, "url": _output_url(p)}
                    for p in sorted(final_dir.glob("*")) if p.is_file()]
                   if final_dir.exists() else [])
+    scan = _filing_poa_scan_path(task_id)
+    poa_scan = {"name": scan.name, "url": _output_url(scan)} if scan else None
     return {
         "id": row["id"],
         "task_type": row["task_type"],
@@ -1245,6 +1262,7 @@ def get_filing_task(task_id: str):
         "fields_json": fields,
         "transmittal_options": fields.get("transmittal_options") or {},
         "final_docs": final_docs,
+        "poa_scan": poa_scan,
     }
 
 
@@ -1287,6 +1305,31 @@ def delete_final_doc(task_id: str, name: str):
     return {"ok": True, "name": safe}
 
 
+@app.post("/api/submission/filing/{task_id}/upload-poa-scan")
+def upload_poa_scan(task_id: str, file: UploadFile = File(...)):
+    """上传 POA 第二页扫描件（单张 PDF，重传覆盖）。生成/发送 POA 时追加为第二页。"""
+    _load_submission_task(task_id)
+    raw = file.file.read()
+    name = re.sub(r'[\\/:*?"<>|\r\n\t]+', "_", file.filename or "poa-scan.pdf").strip() or "poa-scan.pdf"
+    if not name.lower().endswith(".pdf") or not raw.startswith(b"%PDF"):
+        raise HTTPException(400, "POA 扫描件必须是 PDF 文件")
+    dest_dir = _filing_poa_scan_dir(task_id)
+    if dest_dir.exists():
+        shutil.rmtree(dest_dir)          # 单张，重传即覆盖
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    dest = dest_dir / name
+    dest.write_bytes(raw)
+    return {"ok": True, "name": name, "url": _output_url(dest)}
+
+
+@app.delete("/api/submission/filing/{task_id}/poa-scan")
+def delete_poa_scan(task_id: str):
+    d = _filing_poa_scan_dir(task_id)
+    if d.exists():
+        shutil.rmtree(d)
+    return {"ok": True}
+
+
 class FilingPreviewReq(BaseModel):
     target: str                    # poa | transmittal | ads
     fields_json: dict = None       # 页面当前编辑值；缺省用库中值
@@ -1309,7 +1352,8 @@ def preview_filing_task(task_id: str, req: FilingPreviewReq):
     warnings = []
     try:
         if req.target == "poa":
-            d = generate_poa(ci, preview_dir)
+            scan = _filing_poa_scan_path(task_id)
+            d = generate_poa(ci, preview_dir, scan_pdf=str(scan) if scan else None)
             files = [{"name": d["file_name"], "pdf_url": _output_url(d["file_path"]), "type": d.get("type")}]
         elif req.target == "transmittal":
             d = generate_transmittal(ci, preview_dir, options=opts)
@@ -1370,7 +1414,8 @@ def confirm_filing_task(task_id: str, req: FilingConfirmReq):
     final_dir.mkdir(parents=True, exist_ok=True)
     warnings = []
     try:
-        docs = [generate_poa(ci, final_dir),
+        _poa_scan = _filing_poa_scan_path(task_id)
+        docs = [generate_poa(ci, final_dir, scan_pdf=str(_poa_scan) if _poa_scan else None),
                 generate_transmittal(ci, final_dir, options=opts),
                 generate_ads(ci, final_dir)]
         for d in docs:

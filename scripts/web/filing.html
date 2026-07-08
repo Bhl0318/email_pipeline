@@ -254,6 +254,10 @@ function renderForm(){
   const ap = (fields.applicants||[])[0] || {};
   const invs = (fields.inventors||[]).map(i=>i.full_name_en||`${i.first_name_en||""} ${i.last_name_en||""}`).filter(Boolean).join("；");
   const docs = (data.final_docs||[]).map(d=>`<div class="docrow">📄 <a href="${esc(d.url)}" target="_blank">${esc(d.name)}</a><button class="del" onclick="delFinal('${esc(d.name)}')">删除</button></div>`).join("") || '<div style="color:#94a3b8;font-size:12px;">尚未上传定稿</div>';
+  const scan = data.poa_scan;
+  const scanRow = scan
+    ? `<div class="docrow">📄 <a href="${esc(scan.url)}" target="_blank">${esc(scan.name)}</a><button class="del" onclick="delPoaScan()">删除</button></div>`
+    : '<div style="color:#94a3b8;font-size:12px;">尚未上传（POA 仅表单一页）</div>';
   const ck = (k)=> opts[k] ? "checked" : "";
   $("formSections").innerHTML = `
     <div class="section"><div class="section-head">案件信息（来自 fields_json，只读）</div><div class="section-body grid">
@@ -293,6 +297,11 @@ function renderForm(){
       <div style="margin-top:8px;"><input type="file" id="finalFile"> <button onclick="uploadFinal()">上传定稿</button></div>
     </div></div>
 
+    <div class="section"><div class="section-head">POA 扫描页（PDF，作为 POA 第二页；可选）</div><div class="section-body">
+      <div id="poaScanDoc">${scanRow}</div>
+      <div style="margin-top:8px;"><input type="file" id="poaScanFile" accept="application/pdf"> <button onclick="uploadPoaScan()">上传扫描页</button></div>
+    </div></div>
+
     <div class="section"><div class="section-head">给美代理邮件（正文可编辑，右侧「美代理邮件」tab 预览；随「保存」落库）</div><div class="section-body">
       <div class="field"><label>主题</label><input id="m-subject" style="width:100%;box-sizing:border-box;" value="${esc(mailState.subject)}" oninput="setMail({subject:this.value});syncEmailPreview()"></div>
       <div class="field"><label>正文</label><textarea id="m-body" rows="9" style="width:100%;box-sizing:border-box;font-family:inherit;" oninput="setMail({body:this.value});syncEmailPreview()">${esc(mailState.body)}</textarea></div>
@@ -329,6 +338,7 @@ async function save(){
 async function refreshFinalDocs(){
   const fresh = await api("GET", `${API}/${taskId}`);
   data.final_docs = fresh.final_docs || [];
+  data.poa_scan = fresh.poa_scan || null;
   renderForm();
 }
 async function uploadFinal(){
@@ -342,6 +352,19 @@ async function uploadFinal(){
 async function delFinal(name){
   collectOpts();                                   // 同上，删除也只刷新文件列表
   try { await api("DELETE", `${API}/${taskId}/final/${encodeURIComponent(name)}`); await refreshFinalDocs(); }
+  catch(e){ toast("删除失败: "+e.message); }
+}
+async function uploadPoaScan(){
+  const f = $("poaScanFile").files[0];
+  if (!f) { toast("请先选择 PDF"); return; }
+  collectOpts();                                   // 快照当前编辑，防重渲染丢失
+  const fd = new FormData(); fd.append("file", f);
+  try { await api("POST", `${API}/${taskId}/upload-poa-scan`, fd, true); toast("扫描页已上传"); await refreshFinalDocs(); }
+  catch(e){ toast("上传失败: "+e.message); }
+}
+async function delPoaScan(){
+  collectOpts();
+  try { await api("DELETE", `${API}/${taskId}/poa-scan`); await refreshFinalDocs(); }
   catch(e){ toast("删除失败: "+e.message); }
 }
 

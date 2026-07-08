@@ -12,11 +12,29 @@
 import datetime
 from pathlib import Path
 
+import fitz  # PyMuPDF
+
 from .common import POA_TEMPLATE, fill_pdf_form
 
 
-def generate_poa(case_info: dict, output_dir, template_pdf=None) -> dict:
-    """生成 POA PDF。:return: {"file_path", "file_name", "type"}"""
+def _append_scan_page(poa_pdf: Path, scan_pdf: Path) -> None:
+    """把扫描件 PDF 追加到 POA 之后（作为第二页起），本地完成、数据不出本机。
+    保留 POA 表单页已填字段（整份重存一次）。"""
+    tmp = poa_pdf.with_suffix(poa_pdf.suffix + ".tmp")
+    doc = fitz.open(str(poa_pdf))
+    scan = fitz.open(str(scan_pdf))
+    try:
+        doc.insert_pdf(scan)
+        doc.save(str(tmp))
+    finally:
+        doc.close()
+        scan.close()
+    tmp.replace(poa_pdf)
+
+
+def generate_poa(case_info: dict, output_dir, template_pdf=None, scan_pdf=None) -> dict:
+    """生成 POA PDF。scan_pdf 给定则追加为第二页（人工上传的扫描件）。
+    :return: {"file_path", "file_name", "type"}"""
     template_pdf = template_pdf or POA_TEMPLATE
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -40,6 +58,8 @@ def generate_poa(case_info: dict, output_dir, template_pdf=None) -> dict:
     file_name = f"{today}-POA-{ref}.pdf"
     file_path = output_dir / file_name
     fill_pdf_form(template_pdf, file_path, field_updates)
+    if scan_pdf and Path(scan_pdf).is_file():
+        _append_scan_page(file_path, Path(scan_pdf))
     return {"file_path": str(file_path), "file_name": file_name, "type": "POA"}
 
 
