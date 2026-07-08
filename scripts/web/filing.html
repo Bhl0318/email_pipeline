@@ -113,11 +113,13 @@
         <button class="tab" data-target="poa" onclick="preview('poa')">POA</button>
         <button class="tab" data-target="transmittal" onclick="preview('transmittal')">Transmittal</button>
         <button class="tab" data-target="ads" onclick="preview('ads')">ADS</button>
+        <button class="tab" data-target="email" onclick="previewEmail()">美代理邮件</button>
       </div>
       <div id="dlBar" style="display:none;padding:6px 12px;background:#fef3c7;border-bottom:1px solid #fcd34d;font-size:12px;"></div>
       <div class="preview-body">
         <iframe id="previewFrame" style="display:none"></iframe>
         <div class="preview-placeholder" id="previewPlaceholder">填好递交清单后点上方按钮生成预览<br>POA/Transmittal 内联显示；ADS 在线为扁平化预览版、下载用 XFA 版</div>
+        <div id="emailPreview" style="display:none;position:absolute;inset:0;overflow:auto;padding:16px;background:#f1f5f9;"></div>
         <div class="preview-loading" id="previewLoading"><div class="spinner"></div><div id="previewLoadingText">生成中…</div></div>
       </div>
     </div>
@@ -339,6 +341,7 @@ async function delFinal(name){
 
 async function preview(target){
   collectOpts();
+  $("emailPreview").style.display = "none";
   // 高亮当前 tab + 显示 loading 遮罩（ADS 走 pdfRest 扁平化，较慢，文案区分）
   document.querySelectorAll(".preview-head .tab").forEach(b => b.classList.toggle("active", b.dataset.target === target));
   $("previewLoadingText").textContent = target === "ads" ? "生成中…（ADS 扁平化稍慢）" : "生成中…";
@@ -363,14 +366,44 @@ async function preview(target){
   finally { $("previewLoading").classList.remove("show"); }
 }
 
-function buildMail(){
+// 美代理邮件模板（弹窗 buildMail 与右侧 previewEmail 共用，保证预览==实发）
+function mailTemplate(name){
   const cv = data.case_volume || "";
-  const name = $("mName").value || "X总/X律师";
-  $("mSubject").value = `${cv} 递交文件签署`;
-  $("mBody").value = `${name}，您好，\n\n烦请签署题述 POA、Transmittal 文件，其他文件已通过 DocuSign 发送，谢谢。\n\n祝好！\n成萍`;
+  return {
+    subject: `${cv} 递交文件签署`,
+    body: `${name}，您好，\n\n烦请签署题述 POA、Transmittal 文件，其他文件已通过 DocuSign 发送，谢谢。\n\n祝好！\n成萍`,
+  };
+}
+function attachSummaryHtml(){
   const gen = ["POA", "Transmittal", "ADS（需 Adobe）"];
   const finals = (data.final_docs||[]).map(d=>d.name);
-  $("mAttach").innerHTML = "生成成品：" + gen.join("、") + (finals.length ? "<br>定稿：" + finals.map(esc).join("、") : "<br>定稿：（未上传）");
+  return "生成成品：" + gen.join("、") + "<br>定稿：" + (finals.length ? finals.map(esc).join("、") : "（未上传）");
+}
+function buildMail(){
+  const name = $("mName").value || "X总/X律师";
+  const t = mailTemplate(name);
+  $("mSubject").value = t.subject;
+  $("mBody").value = t.body;
+  $("mAttach").innerHTML = attachSummaryHtml();
+}
+// 右侧预览美代理邮件（白纸卡片，宋体/Times 12pt，与环节2 确认邮件预览同款）
+function previewEmail(){
+  if (!taskId) { toast("请先从左侧选择任务"); return; }
+  document.querySelectorAll(".preview-head .tab").forEach(b => b.classList.toggle("active", b.dataset.target === "email"));
+  $("previewFrame").style.display = "none";
+  $("dlBar").style.display = "none";
+  $("previewPlaceholder").style.display = "none";
+  $("previewLoading").classList.remove("show");
+  const name = ($("mName").value || "").trim() || "X总/X律师";
+  const t = mailTemplate(name);
+  const bodyHtml = esc(t.body).replace(/\n/g, "<br>");
+  const div = $("emailPreview");
+  div.style.display = "block";
+  div.innerHTML = `<div style="background:#fff;min-height:620px;padding:36px 40px;box-shadow:0 1px 4px rgba(0,0,0,.08);border-radius:4px;font-family:宋体,'SimSun','Times New Roman',serif;font-size:12pt;line-height:1.5;color:#000;">
+    <div style="font-weight:600;border-bottom:1px solid #e2e8f0;padding-bottom:8px;margin-bottom:16px;">主题：${esc(t.subject)}</div>
+    <div>${bodyHtml}</div>
+    <div style="margin-top:24px;padding-top:12px;border-top:1px dashed #cbd5e1;font-size:10.5pt;color:#64748b;">附件 —— ${attachSummaryHtml()}</div>
+  </div>`;
 }
 function openSendModal(){
   if (!taskId) return;
