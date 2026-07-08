@@ -52,19 +52,28 @@ def fields_to_case_info(fields: dict, agent_info: dict = None) -> dict:
     fields = fields or {}
     ai = agent_info or {}
     case_meta = fields.get("case_info") or {}
+    # 递交特有的可编辑字段（审核页 filing.html 填，存 fields_json.filing_extra）
+    extra = fields.get("filing_extra") or {}
+    inv_addrs = extra.get("inventor_addresses") or []
 
-    # ── 发明人：fields_json 只有姓名，地址/居住地是缺口（留空）──
+    # ── 发明人：姓名来自著录项（只读）；居住地/通信地址来自 filing_extra（审核页补）──
     inventors = []
-    for inv in fields.get("inventors") or []:
+    for idx, inv in enumerate(fields.get("inventors") or []):
         first = (inv.get("first_name_en") or "").strip()
         last = (inv.get("last_name_en") or "").strip()
         full = (inv.get("full_name_en") or "").strip() or f"{first} {last}".strip()
+        addr = inv_addrs[idx] if idx < len(inv_addrs) else {}
         inventors.append({
             "name": full, "firstName": first, "middleName": "", "lastName": last,
-            "Residence Information": "", "City": "", "Country of Residence": "",
-            "Mailing Address of Inventor address_1": "", "Mailing Address of Inventor address_2": "",
-            "Mailing Address of Inventor Country": "", "Mailing Address of Inventor city": "",
-            "Mailing Address of Inventor State": "", "Mailing Address of Inventor Postal Code": "",
+            "Residence Information": addr.get("residence", ""),
+            "City": addr.get("residence_city", ""),
+            "Country of Residence": addr.get("residence_country", ""),
+            "Mailing Address of Inventor address_1": addr.get("mail_address1", ""),
+            "Mailing Address of Inventor address_2": addr.get("mail_address2", ""),
+            "Mailing Address of Inventor Country": addr.get("mail_country", ""),
+            "Mailing Address of Inventor city": addr.get("mail_city", ""),
+            "Mailing Address of Inventor State": addr.get("mail_state", ""),
+            "Mailing Address of Inventor Postal Code": addr.get("mail_postcode", ""),
         })
 
     # ── 申请人块（ADS sfAssigneeInformation；以 assignee 身份列出）──
@@ -122,6 +131,12 @@ def fields_to_case_info(fields: dict, agent_info: dict = None) -> dict:
 
     subject = fields.get("subject_matter") or infer_subject_matter(fields) or ""
 
+    # 图纸页数复用递交清单的附图页数；Small Entity 由实体派生（small/micro→Yes）
+    _opts = fields.get("transmittal_options") or {}
+    _entity = (_opts.get("entity") or "").lower()
+    small_entity = "Yes" if _entity in ("small", "micro") else ""
+    drawing_sheets = _opts.get("drawing_sheets", "") or ""
+
     case_info = {
         "Our Ref.": fields.get("case_volume", ""),
         "Title": case_meta.get("case_name_en", ""),
@@ -135,9 +150,9 @@ def fields_to_case_info(fields: dict, agent_info: dict = None) -> dict:
         "Application Information": {
             "Application Type": "REGULAR",
             "Subject Matter": subject,
-            "Small Entity Status Claimed": "",          # 缺口：entity_en→small 规则待定
-            "Total Number of Drawing Sheets": "",       # 缺口：来自定稿文件
-            "Suggested Figure for Publication": "",
+            "Small Entity Status Claimed": small_entity,       # 由递交清单实体派生
+            "Total Number of Drawing Sheets": drawing_sheets,  # 复用递交清单附图页数
+            "Suggested Figure for Publication": "",            # ADS 生成器暂不消费
         },
         "Filing_By_Reference": {"app": "", "date": "", "intellectual": ""},
         # ── agent_info 注入（缺省留空）──

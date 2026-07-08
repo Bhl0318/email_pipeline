@@ -1131,8 +1131,9 @@ def query_agent_info(case_volume: str, firm: str, person: str) -> dict:
 
 
 def _filing_case_info(row: dict, fields: dict):
-    """fields_json → case_info（注入 agent_config 的签字人/Customer Number/Deposit）。"""
-    ai = load_agent_info(row["case_volume"])
+    """fields_json → case_info。签字人/Customer Number/Deposit 优先用审核页「查库带出」并存进
+    fields_json.filing_extra.agent_info 的快照；无则回退 agent_config（load_agent_info）。"""
+    ai = (fields.get("filing_extra") or {}).get("agent_info") or load_agent_info(row["case_volume"])
     ci = fields_to_case_info(fields, ai)
     return ci, ai
 
