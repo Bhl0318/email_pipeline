@@ -131,9 +131,8 @@
     <h3>发送给美国代理人</h3>
     <div class="field"><label>收件人（美代理，多个用逗号分隔）<span style="color:#dc2626">*</span></label><input id="mTo" placeholder="agent@example.com"></div>
     <div class="field"><label>抄送</label><input id="mCc"></div>
-    <div class="field"><label>称呼</label><input id="mName" value="X总/X律师"></div>
     <div class="field"><label>主题</label><input id="mSubject"></div>
-    <div class="field"><label>正文</label><textarea id="mBody" rows="6"></textarea></div>
+    <div class="field"><label>正文（与页面「给美代理邮件」同步，此处可最后微调）</label><textarea id="mBody" rows="6"></textarea></div>
     <div class="field"><label>附件（确认发送时生成）</label><div class="attach-list" id="mAttach"></div></div>
     <div id="mWarn"></div>
     <div class="actions">
@@ -156,7 +155,7 @@
 <script>
 const LIST_API = "/api/submission/tasks";   // 复用环节2 列表（按 type 过滤）
 const API = "/api/submission/filing";
-let taskId = null, taskList = [], data = null, fields = {}, opts = {};
+let taskId = null, taskList = [], data = null, fields = {}, opts = {}, mailState = {subject:"", body:""};
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;" }[c]));
 function toast(m, ms=2600){ const t=$("toast"); t.textContent=m; t.style.display="block"; clearTimeout(t._h); t._h=setTimeout(()=>t.style.display="none", ms); }
@@ -239,6 +238,7 @@ async function openTask(id){
   catch(e){ toast("加载失败: "+e.message); return; }
   fields = data.fields_json || {};
   opts = data.transmittal_options || {};
+  initMail();
   $("caseTitle").textContent = data.case_volume || "—";
   const b = $("statusBadge"); b.textContent = data.status; b.className = "badge " + data.status;
   const ro = data.status !== "pending";
@@ -291,6 +291,12 @@ function renderForm(){
     <div class="section"><div class="section-head">定稿文件（说明书/权要/附图终版，手动上传）</div><div class="section-body">
       <div id="finalDocs">${docs}</div>
       <div style="margin-top:8px;"><input type="file" id="finalFile"> <button onclick="uploadFinal()">上传定稿</button></div>
+    </div></div>
+
+    <div class="section"><div class="section-head">给美代理邮件（正文可编辑，右侧「美代理邮件」tab 预览；随「保存」落库）</div><div class="section-body">
+      <div class="field"><label>主题</label><input id="m-subject" style="width:100%;box-sizing:border-box;" value="${esc(mailState.subject)}" oninput="setMail({subject:this.value});syncEmailPreview()"></div>
+      <div class="field"><label>正文</label><textarea id="m-body" rows="9" style="width:100%;box-sizing:border-box;font-family:inherit;" oninput="setMail({body:this.value});syncEmailPreview()">${esc(mailState.body)}</textarea></div>
+      <div style="font-size:11px;color:#94a3b8;margin-top:6px;">附件：POA / Transmittal / ADS（确认发送时生成）+ 已上传定稿</div>
     </div></div>`;
 }
 
@@ -366,7 +372,7 @@ async function preview(target){
   finally { $("previewLoading").classList.remove("show"); }
 }
 
-// 美代理邮件模板（弹窗 buildMail 与右侧 previewEmail 共用，保证预览==实发）
+// 美代理邮件默认模板（首次进入用；之后以编辑后的 mailState 为准）
 function mailTemplate(name){
   const cv = data.case_volume || "";
   return {
@@ -374,19 +380,25 @@ function mailTemplate(name){
     body: `${name}，您好，\n\n烦请签署题述 POA、Transmittal 文件，其他文件已通过 DocuSign 发送，谢谢。\n\n祝好！\n成萍`,
   };
 }
+// 初始化邮件：已存 fields.agent_mail 则恢复编辑值，否则用默认模板
+function initMail(){
+  const saved = (fields && fields.agent_mail) || null;
+  mailState = (saved && (saved.body || saved.subject))
+    ? { subject: saved.subject || "", body: saved.body || "" }
+    : mailTemplate("X总/X律师");
+}
+// 写编辑值到 mailState 并镜像进 fields.agent_mail（随「保存」落库）
+function setMail(patch){
+  Object.assign(mailState, patch);
+  fields.agent_mail = { subject: mailState.subject, body: mailState.body };
+}
+function syncEmailPreview(){ if ($("emailPreview") && $("emailPreview").style.display !== "none") previewEmail(); }
 function attachSummaryHtml(){
   const gen = ["POA", "Transmittal", "ADS（需 Adobe）"];
   const finals = (data.final_docs||[]).map(d=>d.name);
   return "生成成品：" + gen.join("、") + "<br>定稿：" + (finals.length ? finals.map(esc).join("、") : "（未上传）");
 }
-function buildMail(){
-  const name = $("mName").value || "X总/X律师";
-  const t = mailTemplate(name);
-  $("mSubject").value = t.subject;
-  $("mBody").value = t.body;
-  $("mAttach").innerHTML = attachSummaryHtml();
-}
-// 右侧预览美代理邮件（白纸卡片，宋体/Times 12pt，与环节2 确认邮件预览同款）
+// 右侧预览美代理邮件（白纸卡片，宋体/Times 12pt，与环节2 确认邮件预览同款；渲染 mailState）
 function previewEmail(){
   if (!taskId) { toast("请先从左侧选择任务"); return; }
   document.querySelectorAll(".preview-head .tab").forEach(b => b.classList.toggle("active", b.dataset.target === "email"));
@@ -394,13 +406,11 @@ function previewEmail(){
   $("dlBar").style.display = "none";
   $("previewPlaceholder").style.display = "none";
   $("previewLoading").classList.remove("show");
-  const name = ($("mName").value || "").trim() || "X总/X律师";
-  const t = mailTemplate(name);
-  const bodyHtml = esc(t.body).replace(/\n/g, "<br>");
+  const bodyHtml = esc(mailState.body).replace(/\n/g, "<br>");
   const div = $("emailPreview");
   div.style.display = "block";
   div.innerHTML = `<div style="background:#fff;min-height:620px;padding:36px 40px;box-shadow:0 1px 4px rgba(0,0,0,.08);border-radius:4px;font-family:宋体,'SimSun','Times New Roman',serif;font-size:12pt;line-height:1.5;color:#000;">
-    <div style="font-weight:600;border-bottom:1px solid #e2e8f0;padding-bottom:8px;margin-bottom:16px;">主题：${esc(t.subject)}</div>
+    <div style="font-weight:600;border-bottom:1px solid #e2e8f0;padding-bottom:8px;margin-bottom:16px;">主题：${esc(mailState.subject)}</div>
     <div>${bodyHtml}</div>
     <div style="margin-top:24px;padding-top:12px;border-top:1px dashed #cbd5e1;font-size:10.5pt;color:#64748b;">附件 —— ${attachSummaryHtml()}</div>
   </div>`;
@@ -408,9 +418,12 @@ function previewEmail(){
 function openSendModal(){
   if (!taskId) return;
   collectOpts();
-  $("mName").value = "X总/X律师"; $("mTo").value = ""; $("mCc").value = "";
-  buildMail();
-  $("mName").oninput = buildMail;
+  $("mTo").value = ""; $("mCc").value = "";
+  $("mSubject").value = mailState.subject;
+  $("mBody").value = mailState.body;
+  $("mSubject").oninput = () => { setMail({subject: $("mSubject").value}); syncEmailPreview(); };
+  $("mBody").oninput = () => { setMail({body: $("mBody").value}); syncEmailPreview(); };
+  $("mAttach").innerHTML = attachSummaryHtml();
   $("sendModal").classList.add("show");
 }
 function closeSendModal(){ $("sendModal").classList.remove("show"); }
@@ -422,7 +435,7 @@ async function doConfirm(){
   try {
     const j = await api("POST", `${API}/${taskId}/confirm`, {
       fields_json: fields, transmittal_options: opts, recipients, cc,
-      recipient_name: $("mName").value, subject: $("mSubject").value, body: $("mBody").value,
+      recipient_name: "", subject: mailState.subject, body: mailState.body,
     });
     toast("已发送，任务完成");
     closeSendModal(); await loadTaskList(); await openTask(taskId);
