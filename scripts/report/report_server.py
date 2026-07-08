@@ -1079,6 +1079,57 @@ def _filing_poa_scan_path(task_id: str):
     return None
 
 
+# 代理所固定 4 家（与旧确认函流程一致）；前端下拉用此列表，值即 agent_info.agent 的匹配串
+FILING_AGENT_FIRMS = ["Lai Runzhi", "Poseidon Advanced IP LLC", "Metis IP LLC", "Porus IP LLC"]
+
+
+def _resolve_agent_cus_code(case_volume: str, firm: str) -> str:
+    """按代理所把客户码(案号前缀)重映射为 agent_info.cus_code（对齐旧 single_parse_confirm）。"""
+    code = (case_volume or "").split("-")[0]
+    f = (firm or "").lower()
+    if "lai" in f or "runzhi" in f:
+        return "all"
+    if "poseidon" in f:
+        return code if code in ("20618", "20608", "20664") else "other"
+    if "metis" in f:
+        return code if code in ("20615", "20618") else "other"
+    if "porus" in f:
+        return "all"
+    return code
+
+
+def query_agent_info(case_volume: str, firm: str, person: str) -> dict:
+    """查 atw.agent_info 取签字代理人信息（代理所 + 客户码 + 代理人）。
+
+    对齐旧 single_parse_confirm.py:1157：cus_code 按代理所重映射，代理人按 CNname 精确或
+    othername 模糊。**参数化查询**（不拼字符串）。命中返回可注入 fields_to_case_info 的 dict；
+    未命中返回 {"_matched": False, "_note": ...}。
+    """
+    cus_code = _resolve_agent_cus_code(case_volume, firm)
+    rows = execute_params(
+        "SELECT cus_code, reg_no, firstname, lastname, agent_cus_no, mail, CNname, typed_name, deposit "
+        "FROM agent_info WHERE cus_code=%s AND agent LIKE %s AND (CNname=%s OR othername LIKE %s)",
+        (cus_code, f"%{firm}%", person, f"%{person}%"))
+    if not rows:
+        return {"_matched": False,
+                "_note": f"未在 agent_info 命中（代理所={firm} 客户码={cus_code} 代理人={person}）"}
+    r = rows[0]
+    first = (r.get("firstname") or "").strip()
+    last = (r.get("lastname") or "").strip()
+    mail = r.get("mail") or ""
+    return {
+        "_matched": True,
+        "Name": f"{first} {last}".strip(),
+        "First Name": first,
+        "Last Name": last,
+        "Registration Number": r.get("reg_no") or "",
+        "title": r.get("typed_name") or "",
+        "Customer Number": r.get("agent_cus_no") or "",
+        "Deposit Account No": r.get("deposit") or "",
+        "Email Address": [m.strip() for m in mail.split(",") if m.strip()],
+    }
+
+
 def _filing_case_info(row: dict, fields: dict):
     """fields_json → case_info（注入 agent_config 的签字人/Customer Number/Deposit）。"""
     ai = load_agent_info(row["case_volume"])
@@ -1242,6 +1293,23 @@ def auto_transfer_filing():
             failed.append({"case_volume": cv, "error": str(e.detail)})
     return {"created": created, "skipped": skipped, "failed": failed,
             "summary": f"新建 {len(created)}，已存在 {len(skipped)}，失败 {len(failed)}"}
+
+
+@app.get("/api/submission/agent-firms")
+def list_agent_firms():
+    """代理所候选（固定 4 家），供 filing 审核页下拉。"""
+    return {"firms": FILING_AGENT_FIRMS}
+
+
+@app.get("/api/submission/agent-info")
+def get_agent_info(case_volume: str, firm: str, person: str):
+    """按代理所/代理人查 agent_info，供 filing 审核页「查库带出」签字人/Customer No/Deposit/邮箱。"""
+    ai = query_agent_info(case_volume, firm, person)
+    return {
+        "matched": ai.get("_matched", False),
+        "note": ai.get("_note", ""),
+        "agent_info": {k: v for k, v in ai.items() if not k.startswith("_")},
+    }
 
 
 @app.get("/api/submission/filing/{task_id}")
