@@ -249,6 +249,16 @@ async function openTask(id){
 }
 
 function _v(path){ return path.split(".").reduce((o,k)=> o==null?undefined:o[k], fields); }
+// 按母案续案类型派生 Declaration 6a/6b：续案/分案→copy(6b)；CIP/bypass/巴黎/371/新→new(6a)
+function deriveDeclKind(){
+  const ct = (((fields.parent_applications||[])[0]||{})["Continuity Type"]||"").trim().toLowerCase();
+  if (!ct) return "new";
+  if (ct.includes("part") || ct.includes("cip")) return "new";   // CIP 部分续案
+  if (ct.includes("bypass")) return "new";                       // Bypass Continuation
+  if (ct.includes("division") || ct.includes("div")) return "copy";        // 分案
+  if (ct.includes("continuation") || ct === "con" || ct === "cont") return "copy";  // 续案
+  return "new";                                                  // Paris / 371 Route / New / 其他
+}
 function renderForm(){
   const ci = fields.case_info || {};
   const ap = (fields.applicants||[])[0] || {};
@@ -259,6 +269,7 @@ function renderForm(){
     ? `<div class="docrow">📄 <a href="${esc(scan.url)}" target="_blank">${esc(scan.name)}</a><button class="del" onclick="delPoaScan()">删除</button></div>`
     : '<div style="color:#94a3b8;font-size:12px;">尚未上传（POA 仅表单一页）</div>';
   const ck = (k)=> opts[k] ? "checked" : "";
+  const declKind = opts.declaration_kind || deriveDeclKind();   // 6a/6b：存过用存的，否则按续案类型派生
   // 递交特有可编辑字段（存 fields.filing_extra）
   const fx = fields.filing_extra || {};
   const ag = fx.agent_info || {};
@@ -332,9 +343,9 @@ function renderForm(){
       <div style="margin:10px 0 4px;font-size:11.5px;color:#64748b;">6 Inventor's Oath / Declaration</div>
       <div class="checks"><label><input type="checkbox" id="o-has_declaration" ${ck("has_declaration")}>6 递交声明</label></div>
       <div class="grid">
-        <div class="field"><label>6 类型</label><select id="o-decl_kind">
-          <option value="new" ${opts.declaration_kind==="copy"?"":"selected"}>a 新签署(original/copy)</option>
-          <option value="copy" ${opts.declaration_kind==="copy"?"selected":""}>b 来自在先申请</option>
+        <div class="field"><label>6 类型（按续案类型自动预选，可改）</label><select id="o-decl_kind">
+          <option value="new" ${declKind==="copy"?"":"selected"}>a 新签署(original/copy)</option>
+          <option value="copy" ${declKind==="copy"?"selected":""}>b 来自在先申请</option>
         </select></div>
         <div class="field"><label>6 Declaration 总页数</label><input id="o-decl" value="${esc(opts.declaration_pages||"")}"></div>
       </div>
