@@ -293,6 +293,9 @@ function renderForm(){
     const a = (fx.inventor_addresses||[])[i] || {};
     const app = invApplicantAddr(inv);               // employer 对应申请人地址（同确认函）
     const g = (mk, ak) => esc(a[mk] || app[ak] || "");   // 手填优先，否则派生
+    // 通信 City 放「城市, 省份」；州/省默认留空（美国州下拉，外国不填）
+    const mailCity = esc(a.mail_city || [app.city_en, app.province_city_en_us].filter(Boolean).join(", "));
+    const mailState = esc(a.mail_state || "");
     const nm = inv.full_name_en||`${inv.first_name_en||""} ${inv.last_name_en||""}`.trim();
     return `<div style="border:1px solid #e2e8f0;border-radius:6px;padding:8px;margin-bottom:8px;">
       <div style="font-size:12px;font-weight:600;margin-bottom:6px;">${esc(nm)||("发明人"+(i+1))}</div>
@@ -301,8 +304,8 @@ function renderForm(){
         <div class="field"><label>居住国</label><input id="fx-inv-${i}-resctry" value="${g('residence_country','country_en_us')}"></div>
         <div class="field"><label>通信地址1</label><input id="fx-inv-${i}-a1" value="${g('mail_address1','address1')}"></div>
         <div class="field"><label>通信地址2</label><input id="fx-inv-${i}-a2" value="${g('mail_address2','address2')}"></div>
-        <div class="field"><label>城市</label><input id="fx-inv-${i}-city" value="${g('mail_city','city_en')}"></div>
-        <div class="field"><label>州/省</label><input id="fx-inv-${i}-state" value="${g('mail_state','province_city_en_us')}"></div>
+        <div class="field"><label>城市, 省份</label><input id="fx-inv-${i}-city" value="${mailCity}"></div>
+        <div class="field"><label>州/省(美国州;外国留空)</label><input id="fx-inv-${i}-state" value="${mailState}"></div>
         <div class="field"><label>国家</label><input id="fx-inv-${i}-ctry" value="${g('mail_country','country_en_us')}"></div>
         <div class="field"><label>邮编</label><input id="fx-inv-${i}-zip" value="${g('mail_postcode','postcode')}"></div>
       </div></div>`;

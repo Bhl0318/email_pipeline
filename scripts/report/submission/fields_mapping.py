@@ -120,16 +120,21 @@ def fields_to_case_info(fields: dict, agent_info: dict = None) -> dict:
         res_ctry = _country_code(pick("residence_country", "country_en_us"))
         # ResidencyRadio：参照旧实现——非美国居住地→"non-us-residency"（美国/留空则不选）
         residency = "non-us-residency" if res_ctry and res_ctry.upper() not in ("US", "USA", "UNITED STATES") else ""
+        # 通信地址 City 放「城市, 省份」；State/Province 外国地址留空（该栏是美国州下拉）
+        _prov = (app.get("province_city_en_us") or "").strip()
+        _mail_city = (manual.get("mail_city") or "").strip() or ", ".join(
+            [x for x in [(app.get("city_en") or "").strip(), _prov] if x])
+        _mail_state = (manual.get("mail_state") or "").strip()   # 默认留空，不自动填省
         inventors.append({
             "name": full, "firstName": first, "middleName": "", "lastName": last,
             "Residence Information": residency,
-            "City": pick("residence_city", "city_en"),
+            "City": pick("residence_city", "city_en"),           # Residence：纯城市
             "Country of Residence": res_ctry,
             "Mailing Address of Inventor address_1": pick("mail_address1", "address1"),
             "Mailing Address of Inventor address_2": pick("mail_address2", "address2"),
             "Mailing Address of Inventor Country": _country_code(pick("mail_country", "country_en_us")),
-            "Mailing Address of Inventor city": pick("mail_city", "city_en"),
-            "Mailing Address of Inventor State": pick("mail_state", "province_city_en_us"),
+            "Mailing Address of Inventor city": _mail_city,       # 城市, 省份
+            "Mailing Address of Inventor State": _mail_state,     # 外国留空
             "Mailing Address of Inventor Postal Code": pick("mail_postcode", "postcode"),
         })
 
