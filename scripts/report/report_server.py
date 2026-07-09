@@ -75,7 +75,7 @@ from submission.preview import docx_to_pdf, office_convert  # noqa: E402
 from submission.fields_mapping import fields_to_case_info, load_agent_info  # noqa: E402
 from submission.poa_generator import generate_poa  # noqa: E402
 from submission.transmittal_generator import generate_transmittal  # noqa: E402
-from submission.ads_generator import generate_ads, generate_ads_preview  # noqa: E402
+from submission.ads_generator import generate_ads, generate_ads_preview, generate_ads_flat  # noqa: E402
 from submission.agent_email import build_agent_email  # noqa: E402
 
 SUBMISSION_HTML = WEB_DIR / "submission.html"
@@ -1481,6 +1481,28 @@ def preview_filing_task(task_id: str, req: FilingPreviewReq):
     except Exception as exc:
         raise HTTPException(500, f"预览生成失败：{exc}")
     return {"target": req.target, "files": files, "warnings": warnings}
+
+
+@app.post("/api/submission/filing/{task_id}/ads-xfa")
+def filing_ads_xfa(task_id: str, online: int = 0):
+    """按需生成 ADS XFA 版：默认本地 XFA 供下载（Adobe 打开，不上云）；
+    online=1 时额外走 pdfRest 扁平化，产出可在线看的真实排版 PDF。"""
+    row = _load_submission_task(task_id)
+    fields = json.loads(row["fields_json"]) if row["fields_json"] else {}
+    fields["subject_matter"] = infer_subject_matter(fields)
+    normalize_parents(fields)
+    ci, _ai = _filing_case_info(row, fields)
+    out_dir = SUBMISSION_OUTPUT_DIR / task_id / "preview"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        if online:
+            ads = generate_ads_flat(ci, out_dir)
+            return {"download_url": _output_url(ads["xfa_file_path"]), "download_name": ads["xfa_file_name"],
+                    "online_pdf_url": _output_url(ads["file_path"]), "warnings": ads.get("warnings") or []}
+        ads = generate_ads(ci, out_dir)
+        return {"download_url": _output_url(ads["file_path"]), "download_name": ads["file_name"]}
+    except Exception as exc:
+        raise HTTPException(500, f"ADS XFA 生成失败：{exc}")
 
 
 class FilingConfirmReq(BaseModel):
