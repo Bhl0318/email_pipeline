@@ -168,10 +168,13 @@ def fields_to_case_info(fields: dict, agent_info: dict = None) -> dict:
     applicants = []
     for ap in fields.get("applicants") or []:
         nm = (ap.get("applicant_name_en") or "").strip()
+        _ap_city = ", ".join([x for x in [(ap.get("city_en") or "").strip(),
+                                          (ap.get("province_city_en_us") or "").strip()] if x])
         applicants.append({
             "Name": nm, "Organization Name": nm, "chkOrg": 1, "Assigneebtn": "assignee",
             "Address": ap.get("address1", ""), "Applicant address2": ap.get("address2", ""),
-            "Applicant city": ap.get("city_en", ""), "Applicant Postal Code": ap.get("postcode", ""),
+            "Applicant city": _ap_city,   # 城市, 省（外国地址 State 留空）
+            "Applicant Postal Code": ap.get("postcode", ""),
             "Nationality": _country_code(ap.get("country_en_us", "")), "Entity": ap.get("entity_en", ""),
         })
 
