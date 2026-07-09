@@ -46,7 +46,6 @@ def generate_poa(case_info: dict, output_dir, template_pdf=None, scan_pdf=None) 
         "First Named Inventor": inventors[0].get("name", ""),
         "Title": case_info.get("Title", ""),
         "Attorney Docket Number": case_info.get("Our Ref.", ""),
-        "Date Optional": sig.get("Date", ""),
         "Name": sig.get("Name", ""),
         "Registration Number": str(sig.get("Registration Number", "")),
         "Title if Applicant is a juristic entity": sig.get("title", ""),
