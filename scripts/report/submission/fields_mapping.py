@@ -228,24 +228,28 @@ def fields_to_case_info(fields: dict, agent_info: dict = None) -> dict:
 
     # Domestic Benefit / National Stage：parent_applications 的 Continuity Type 规范成代码；
     # Bypass/371 时把 PCT(case_advance_info) 合成一条（bypass→CON、371→NST）
+    # 父案/PCT 的号是「在先申请号」→ domPriorAppNum（表单 Prior Application Number）；
+    # domappNumber（Application Number=当前申请号，未分配）留空。
     parents = []
     for p in fields.get("parent_applications") or []:
-        q = dict(p)
-        q["Continuity Type"] = _continuity_display(p.get("Continuity Type"))
-        # Prior Application Status：对齐旧版，默认 Pending（可被文档实际状态覆盖）
-        q["Prior Application Status"] = (p.get("Prior Application Status") or "").strip() or "Pending"
-        parents.append(q)
+        prior_no = (p.get("Prior Application Number") or p.get("Application No") or "").strip()
+        parents.append({
+            "Application No": "",                       # 当前申请号，留空
+            "Prior Application Number": prior_no,        # 父案号 → Prior Application Number
+            "Filing Date": p.get("Filing Date", ""),
+            "Continuity Type": _continuity_display(p.get("Continuity Type")),
+            "Prior Application Status": (p.get("Prior Application Status") or "").strip() or "Pending",
+        })
     _route = _norm(fields.get("filing_route"))
     _pct = fields.get("case_advance_info") or {}
     _pct_no = (_pct.get("pct_app_no") or "").strip()
     if _pct_no and not parents:
         _pct_date = (_pct.get("pct_app_date") or "").strip()
-        if "bypass" in _route:
-            parents.append({"Application No": _pct_no, "Filing Date": _pct_date,
-                            "Continuity Type": "Continuation of", "Prior Application Status": "Pending"})
-        elif "371" in _route:
-            parents.append({"Application No": _pct_no, "Filing Date": _pct_date,
-                            "Continuity Type": "a 371 of international", "Prior Application Status": "Pending"})
+        _ct = "Continuation of" if "bypass" in _route else ("a 371 of international" if "371" in _route else "")
+        if _ct:
+            parents.append({"Application No": "", "Prior Application Number": _pct_no,
+                            "Filing Date": _pct_date, "Continuity Type": _ct,
+                            "Prior Application Status": "Pending"})
 
     case_info = {
         "Our Ref.": fields.get("case_volume", ""),
