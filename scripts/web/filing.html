@@ -565,7 +565,8 @@ async function preview(target){
 // 按需看 ADS 的 XFA 版：online=false 本地生成下载(Adobe打开)；online=true 上云扁平化后在线看真实排版
 async function adsXfa(online){
   if (!taskId) return;
-  toast(online ? "生成真实排版中（上云，稍慢）…" : "生成 XFA 版中…", 4000);
+  $("previewLoadingText").textContent = online ? "生成真实排版中（上云，稍慢）…" : "生成 XFA 版中…";
+  $("previewLoading").classList.add("show");
   try {
     const j = await api("POST", `${API}/${taskId}/ads-xfa${online ? "?online=1" : ""}`);
     if (online && j.online_pdf_url){
@@ -576,6 +577,7 @@ async function adsXfa(online){
     }
     if (j.download_url) window.open(j.download_url, "_blank");
   } catch(e){ toast("失败: " + e.message); }
+  finally { $("previewLoading").classList.remove("show"); }
 }
 // 美代理邮件默认模板（首次进入用；之后以编辑后的 mailState 为准）
 function mailTemplate(name){
