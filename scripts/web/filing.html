@@ -119,7 +119,7 @@
       <div id="dlBar" style="display:none;padding:6px 12px;background:#fef3c7;border-bottom:1px solid #fcd34d;font-size:12px;"></div>
       <div class="preview-body">
         <iframe id="previewFrame" style="display:none"></iframe>
-        <div class="preview-placeholder" id="previewPlaceholder">填好递交清单后点上方按钮生成预览<br>POA/Transmittal 内联显示；ADS 在线为扁平化预览版、下载用 XFA 版</div>
+        <div class="preview-placeholder" id="previewPlaceholder">填好递交清单后点上方按钮生成预览<br>POA/Transmittal 内联显示；ADS 在线为数据核对版（本地），正式 XFA 版在确认发送时生成</div>
         <div id="emailPreview" style="display:none;position:absolute;inset:0;overflow:auto;padding:16px;background:#f1f5f9;"></div>
         <div class="preview-loading" id="previewLoading"><div class="spinner"></div><div id="previewLoadingText">生成中…</div></div>
       </div>
@@ -539,7 +539,7 @@ async function preview(target){
   $("emailPreview").style.display = "none";
   // 高亮当前 tab + 显示 loading 遮罩（ADS 走 pdfRest 扁平化，较慢，文案区分）
   document.querySelectorAll(".preview-head .tab").forEach(b => b.classList.toggle("active", b.dataset.target === target));
-  $("previewLoadingText").textContent = target === "ads" ? "生成中…（ADS 扁平化稍慢）" : "生成中…";
+  $("previewLoadingText").textContent = target === "ads" ? "生成中…（ADS 数据核对版）" : "生成中…";
   $("previewLoading").classList.add("show");
   try {
     const j = await api("POST", `${API}/${taskId}/preview`, { target, fields_json: fields, transmittal_options: opts });
