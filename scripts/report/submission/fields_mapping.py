@@ -74,6 +74,29 @@ def _country_code(v):
     return _COUNTRY_CODES.get(key, s)
 
 
+# ADS domesContList 下拉的保存值为代码：CON/DIV/CIP/NST/SUB/REI/PRO
+_CONTINUITY_CODES = {
+    "continuation": "CON", "continuation of": "CON",
+    "division": "DIV", "division of": "DIV", "divisional": "DIV", "divisional of": "DIV",
+    "continuation in part": "CIP", "continuation in part of": "CIP",
+    "371": "NST", "371 route": "NST", "a 371 of international": "NST", "national stage": "NST",
+    "bypass": "CON", "bypass continuation": "CON",   # bypass=365(c) 国际申请的 continuation
+    "provisional": "PRO", "claims benefit of provisional": "PRO",
+    "substitution": "SUB", "substitution of": "SUB", "reissue": "REI", "reissue of": "REI",
+}
+
+
+def _continuity_code(v):
+    """续案关系规范成 ADS domesContList 代码（已是合法代码则保留；长文/filing_route 转码；未知原样）。"""
+    s = (v or "").strip()
+    if not s:
+        return ""
+    if s.upper() in ("CON", "DIV", "CIP", "NST", "SUB", "REI", "PRO"):
+        return s.upper()
+    key = " ".join(s.lower().replace("-", " ").split())
+    return _CONTINUITY_CODES.get(key, s)
+
+
 def _inventor_applicant_addr(inv: dict, applicants: list, assignments: list) -> dict:
     """按发明人 employer 取对应申请人的地址（对齐确认函 confirmation_sheet_generator._app_for_employer）。
 
@@ -199,13 +222,30 @@ def fields_to_case_info(fields: dict, agent_info: dict = None) -> dict:
     small_entity = "Yes" if _entity in ("small", "micro") else ""
     drawing_sheets = _opts.get("drawing_sheets", "") or ""
 
+    # Domestic Benefit / National Stage：parent_applications 的 Continuity Type 规范成代码；
+    # Bypass/371 时把 PCT(case_advance_info) 合成一条（bypass→CON、371→NST）
+    parents = []
+    for p in fields.get("parent_applications") or []:
+        q = dict(p)
+        q["Continuity Type"] = _continuity_code(p.get("Continuity Type"))
+        parents.append(q)
+    _route = _norm(fields.get("filing_route"))
+    _pct = fields.get("case_advance_info") or {}
+    _pct_no = (_pct.get("pct_app_no") or "").strip()
+    if _pct_no and not parents:
+        _pct_date = (_pct.get("pct_app_date") or "").strip()
+        if "bypass" in _route:
+            parents.append({"Application No": _pct_no, "Filing Date": _pct_date, "Continuity Type": "CON"})
+        elif "371" in _route:
+            parents.append({"Application No": _pct_no, "Filing Date": _pct_date, "Continuity Type": "NST"})
+
     case_info = {
         "Our Ref.": fields.get("case_volume", ""),
         "Title": case_meta.get("case_name_en", ""),
         "Inventors": inventors,
         "Applicants": applicants,
         "Assignees": assignees,
-        "Parent Applications": fields.get("parent_applications") or [],
+        "Parent Applications": parents,
         "Priorities": priorities,
         # 顶层 Subject Matter：Transmittal 选模板用
         "Subject Matter": subject,
