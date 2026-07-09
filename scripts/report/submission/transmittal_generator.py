@@ -93,9 +93,14 @@ def _options_fields(ttype: str, opts: dict) -> dict:
         # item14 Preliminary Amendment
         if o.get("has_preliminary_amendment"):
             f["Check Box74"] = "Yes"
-        # item18 Other
+        # item18 Other：备注按英文分号 ; 拆行，逐行填 Other 1~5（表单该项有 5 行）
         if o.get("remark"):
-            f["Check Box78"] = "Yes"; f["Other 1"] = o["remark"]
+            f["Check Box78"] = "Yes"
+            segs = [s.strip() for s in str(o["remark"]).split(";") if s.strip()] or [str(o["remark"]).strip()]
+            if len(segs) > 5:                       # 超 5 段合并到第 5 行，避免丢内容
+                segs = segs[:4] + ["; ".join(segs[4:])]
+            for i, s in enumerate(segs):
+                f[f"Other {i + 1}"] = s
         # item19 通信地址：使用 Customer Number（号码由 explicit 的 corr Customer Number 填）
         if o.get("use_customer_number"):
             f["Check Box79"] = "Yes"
