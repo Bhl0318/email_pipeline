@@ -175,37 +175,38 @@ def fields_to_case_info(fields: dict, agent_info: dict = None) -> dict:
             "Nationality": _country_code(ap.get("country_en_us", "")), "Entity": ap.get("entity_en", ""),
         })
 
-    # ── 非申请人受让人块（ADS sfNonApplicantInfo）──
-    # 语义：仅列“不是申请人”的受让人。新 schema 受让人来自 assignments[].assignee，通常 = 某个申请人
-    # （已在上面的申请人块以 assignee 身份列出），此时本块应为空——不再镜像 applicants（旧行为会把每个
-    # 申请人重复列成非申请人受让人）。仅当某段转让的 assignee 不在申请人名单里（真·非申请人受让人）才列入，
-    # 使 ADS 受让人与 Assignment 文件对齐。无 assignments 的存量任务回退旧镜像行为。
+    # ── 受让人块（ADS sfNonApplicantInfo：Assignee Information incl Non-Applicant）──
+    # 对齐旧版：列出所有转让的受让人公司（受让人=申请人也列出，用于公开署名）；地址取同名申请人，
+    # 否则 assignments.company_address 兜底。无 assignments 的存量任务→镜像申请人。City 放「城市, 省份」。
+    def _assignee_entry(nm, ap, company_address=""):
+        prov = (ap.get("province_city_en_us") or "").strip()
+        city = ", ".join([x for x in [(ap.get("city_en") or "").strip(), prov] if x])
+        ca_parts = [p.strip() for p in company_address.split(",", 1)] if company_address else []
+        return {
+            "Organization Name": nm, "chkOrg": 1,
+            "Address 1": ap.get("address1", "") or (ca_parts[0] if ca_parts else ""),
+            "Address 2": ap.get("address2", "") or (ca_parts[1] if len(ca_parts) > 1 else ""),
+            "City": city,
+            "Country": _country_code(ap.get("country_en_us", "")),
+            "Postal Code": ap.get("postcode", ""),
+        }
+
     assignees = []
     _assignments = fields.get("assignments") or []
+    _app_by_name = {(ap.get("applicant_name_en") or "").strip().lower(): ap
+                    for ap in fields.get("applicants") or []}
     if _assignments:
-        _applicant_keys = {(ap.get("applicant_name_en") or "").strip().lower()
-                           for ap in fields.get("applicants") or []}
         _seen = set()
         for asg in _assignments:
             nm = (asg.get("assignee") or "").strip()
             key = nm.lower()
-            if not nm or key in _applicant_keys or key in _seen:
+            if not nm or key in _seen:
                 continue
             _seen.add(key)
-            # 真·非申请人受让人：schema 无独立地址来源，仅填名称，地址留空待人工补
-            assignees.append({
-                "Organization Name": nm, "chkOrg": 1,
-                "Address 1": "", "Address 2": "", "City": "", "Country": "", "Postal Code": "",
-            })
+            assignees.append(_assignee_entry(nm, _app_by_name.get(key, {}), asg.get("company_address", "")))
     else:
         for ap in fields.get("applicants") or []:
-            nm = (ap.get("applicant_name_en") or "").strip()
-            assignees.append({
-                "Organization Name": nm, "chkOrg": 1,
-                "Address 1": ap.get("address1", ""), "Address 2": ap.get("address2", ""),
-                "City": ap.get("city_en", ""), "Country": _country_code(ap.get("country_en_us", "")),
-                "Postal Code": ap.get("postcode", ""),
-            })
+            assignees.append(_assignee_entry((ap.get("applicant_name_en") or "").strip(), ap))
 
     # ── 优先权 ──
     priorities = []
