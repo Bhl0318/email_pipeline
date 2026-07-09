@@ -74,27 +74,30 @@ def _country_code(v):
     return _COUNTRY_CODES.get(key, s)
 
 
-# ADS domesContList 下拉的保存值为代码：CON/DIV/CIP/NST/SUB/REI/PRO
-_CONTINUITY_CODES = {
-    "continuation": "CON", "continuation of": "CON",
-    "division": "DIV", "division of": "DIV", "divisional": "DIV", "divisional of": "DIV",
-    "continuation in part": "CIP", "continuation in part of": "CIP",
-    "371": "NST", "371 route": "NST", "a 371 of international": "NST", "national stage": "NST",
-    "bypass": "CON", "bypass continuation": "CON",   # bypass=365(c) 国际申请的 continuation
-    "provisional": "PRO", "claims benefit of provisional": "PRO",
-    "substitution": "SUB", "substitution of": "SUB", "reissue": "REI", "reissue of": "REI",
+# ADS domesContList：对齐旧版(fill_xfa_form)——填下拉的**显示文本**，非代码
+_CONTINUITY_DISPLAY = {
+    "con": "Continuation of", "continuation": "Continuation of", "continuation of": "Continuation of",
+    "div": "Division of", "division": "Division of", "division of": "Division of",
+    "divisional": "Division of", "divisional of": "Division of",
+    "cip": "Continuation in part of", "continuation in part": "Continuation in part of",
+    "continuation in part of": "Continuation in part of",
+    "nst": "a 371 of international", "371": "a 371 of international", "371 route": "a 371 of international",
+    "a 371 of international": "a 371 of international", "national stage": "a 371 of international",
+    "bypass": "Continuation of", "bypass continuation": "Continuation of",  # bypass=365(c) 国际申请的 continuation
+    "pro": "Claims benefit of provisional", "provisional": "Claims benefit of provisional",
+    "claims benefit of provisional": "Claims benefit of provisional",
+    "sub": "substitution of", "substitution": "substitution of", "substitution of": "substitution of",
+    "rei": "reissue of", "reissue": "reissue of", "reissue of": "reissue of",
 }
 
 
-def _continuity_code(v):
-    """续案关系规范成 ADS domesContList 代码（已是合法代码则保留；长文/filing_route 转码；未知原样）。"""
+def _continuity_display(v):
+    """续案关系规范成 ADS domesContList 显示文本（对齐旧版；已知代码/长文转文本；未知原样）。"""
     s = (v or "").strip()
     if not s:
         return ""
-    if s.upper() in ("CON", "DIV", "CIP", "NST", "SUB", "REI", "PRO"):
-        return s.upper()
     key = " ".join(s.lower().replace("-", " ").split())
-    return _CONTINUITY_CODES.get(key, s)
+    return _CONTINUITY_DISPLAY.get(key, s)
 
 
 def _inventor_applicant_addr(inv: dict, applicants: list, assignments: list) -> dict:
@@ -227,7 +230,7 @@ def fields_to_case_info(fields: dict, agent_info: dict = None) -> dict:
     parents = []
     for p in fields.get("parent_applications") or []:
         q = dict(p)
-        q["Continuity Type"] = _continuity_code(p.get("Continuity Type"))
+        q["Continuity Type"] = _continuity_display(p.get("Continuity Type"))
         parents.append(q)
     _route = _norm(fields.get("filing_route"))
     _pct = fields.get("case_advance_info") or {}
@@ -235,9 +238,11 @@ def fields_to_case_info(fields: dict, agent_info: dict = None) -> dict:
     if _pct_no and not parents:
         _pct_date = (_pct.get("pct_app_date") or "").strip()
         if "bypass" in _route:
-            parents.append({"Application No": _pct_no, "Filing Date": _pct_date, "Continuity Type": "CON"})
+            parents.append({"Application No": _pct_no, "Filing Date": _pct_date,
+                            "Continuity Type": "Continuation of"})
         elif "371" in _route:
-            parents.append({"Application No": _pct_no, "Filing Date": _pct_date, "Continuity Type": "NST"})
+            parents.append({"Application No": _pct_no, "Filing Date": _pct_date,
+                            "Continuity Type": "a 371 of international"})
 
     case_info = {
         "Our Ref.": fields.get("case_volume", ""),
