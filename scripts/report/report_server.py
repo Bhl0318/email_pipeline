@@ -1079,6 +1079,22 @@ def _filing_poa_scan_path(task_id: str):
     return None
 
 
+def _find_confirmation_original(conf_task_id: str):
+    """在同案 filing_confirmation 任务的 manual/(优先，同名覆盖) / final/ 里找确认函原件。
+    确认函文件名含 'Application Information Sheet'（排除 Assignment/Declaration）。返回 Path 或 None。"""
+    def pick(d: Path):
+        if not d.exists():
+            return None
+        for p in sorted(d.glob("*")):
+            if not p.is_file() or p.suffix.lower() not in (".docx", ".pdf"):
+                continue
+            nm = p.name.lower()
+            if "application information sheet" in nm or "确认函" in p.name:
+                return p
+        return None
+    return pick(_submission_manual_dir(conf_task_id)) or pick(_submission_final_dir(conf_task_id))
+
+
 # 代理所固定 4 家（与旧确认函流程一致）；前端下拉用此列表，值即 agent_info.agent 的匹配串
 FILING_AGENT_FIRMS = ["Lai Runzhi", "Poseidon Advanced IP LLC", "Metis IP LLC", "Porus IP LLC"]
 
@@ -1311,6 +1327,31 @@ def get_agent_info(case_volume: str, firm: str, person: str):
         "note": ai.get("_note", ""),
         "agent_info": {k: v for k, v in ai.items() if not k.startswith("_")},
     }
+
+
+@app.get("/api/submission/filing/{task_id}/confirmation-original")
+def filing_confirmation_original(task_id: str):
+    """预览客户实际收到的那份确认函原件（同案 filing_confirmation 的 final/ 成品；docx→PDF）。
+    不重新生成，找不到则返回 available=False + 说明。"""
+    row = _load_submission_task(task_id)
+    cv = row["case_volume"]
+    conf = execute_params(
+        "SELECT id FROM submission_tasks WHERE task_type='filing_confirmation' AND case_volume=%s "
+        "ORDER BY created_at DESC LIMIT 1", (cv,))
+    if not conf:
+        return {"available": False, "note": "无同案确认函(filing_confirmation)任务"}
+    src = _find_confirmation_original(conf[0]["id"])
+    if not src:
+        return {"available": False, "note": "确认函原件不存在（环节2 未生成/发送，或成品已清理）"}
+    if src.suffix.lower() == ".pdf":
+        return {"available": True, "name": src.name, "pdf_url": _output_url(src)}
+    try:
+        out_dir = SUBMISSION_OUTPUT_DIR / task_id / "conf_ref"
+        out_dir.mkdir(parents=True, exist_ok=True)
+        pdf = docx_to_pdf(str(src), out_dir)
+        return {"available": True, "name": src.name, "pdf_url": _output_url(pdf)}
+    except Exception as exc:
+        return {"available": False, "note": f"确认函转 PDF 失败：{exc}"}
 
 
 @app.get("/api/submission/filing/{task_id}")

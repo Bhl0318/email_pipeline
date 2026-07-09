@@ -114,6 +114,7 @@
         <button class="tab" data-target="transmittal" onclick="preview('transmittal')">Transmittal</button>
         <button class="tab" data-target="ads" onclick="preview('ads')">ADS</button>
         <button class="tab" data-target="email" onclick="previewEmail()">美代理邮件</button>
+        <button class="tab" data-target="confref" onclick="confRef()" title="客户实际收到的确认函原件（环节2生成，非重新生成）">确认函(原件)</button>
       </div>
       <div id="dlBar" style="display:none;padding:6px 12px;background:#fef3c7;border-bottom:1px solid #fcd34d;font-size:12px;"></div>
       <div class="preview-body">
@@ -601,6 +602,28 @@ function previewEmail(){
     <div>${bodyHtml}</div>
     <div style="margin-top:24px;padding-top:12px;border-top:1px dashed #cbd5e1;font-size:10.5pt;color:#64748b;">附件 —— ${attachSummaryHtml()}</div>
   </div>`;
+}
+// 预览客户实际收到的确认函原件（同案环节2 成品，docx→PDF；非重新生成）
+async function confRef(){
+  if (!taskId) return;
+  document.querySelectorAll(".preview-head .tab").forEach(b => b.classList.toggle("active", b.dataset.target === "confref"));
+  $("emailPreview").style.display = "none";
+  $("dlBar").style.display = "none";
+  $("previewFrame").style.display = "none";
+  $("previewLoadingText").textContent = "加载确认函原件…";
+  $("previewLoading").classList.add("show");
+  try {
+    const j = await api("GET", `${API}/${taskId}/confirmation-original`);
+    if (!j.available){
+      $("previewFrame").style.display = "none";
+      $("previewPlaceholder").style.display = "flex";
+      $("previewPlaceholder").textContent = j.note || "确认函原件不可用";
+      return;
+    }
+    $("previewPlaceholder").style.display = "none";
+    const fr = $("previewFrame"); fr.style.display = "block"; fr.src = j.pdf_url + "?t=" + Date.now();
+  } catch(e){ toast("加载失败: "+e.message); }
+  finally { $("previewLoading").classList.remove("show"); }
 }
 function openSendModal(){
   if (!taskId) return;
