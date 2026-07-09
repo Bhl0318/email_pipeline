@@ -561,8 +561,8 @@ async function preview(target){
 function mailTemplate(name){
   const cv = data.case_volume || "";
   return {
-    subject: `${cv} 递交文件签署`,
-    body: `${name}，您好，\n\n烦请签署题述 POA、Transmittal 文件，其他文件已通过 DocuSign 发送，谢谢。\n\n祝好！\n成萍`,
+    subject: `【US递交签字】期限YYYY/MM/DD-${cv}-新申请递交`,
+    body: `${name} ，您好，\n\n烦请签署题述申请的ADS文件，其他文件已通过docusign发送，谢谢。\n\n\n祝好！\n递交人姓名`,
   };
 }
 // 初始化邮件：已存 fields.agent_mail 则恢复编辑值，否则用默认模板
