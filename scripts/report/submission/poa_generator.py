@@ -50,6 +50,9 @@ def generate_poa(case_info: dict, output_dir, template_pdf=None, scan_pdf=None) 
         "Registration Number": str(sig.get("Registration Number", "")),
         "Title if Applicant is a juristic entity": sig.get("title", ""),
         "Applicant Name if Applicant is a juristic entity": applicants[0].get("Name", ""),
+        # "*Total of ___ forms are submitted." 默认勾选、份数填 1
+        "Number of forms being submitted": True,   # checkbox：出现即勾选（fill_pdf_form 置 Yes）
+        "Number of forms": "1",
     }
 
     today = datetime.datetime.now().strftime("%Y-%m-%d")
