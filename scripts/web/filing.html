@@ -560,8 +560,10 @@ async function preview(target){
 // 美代理邮件默认模板（首次进入用；之后以编辑后的 mailState 为准）
 function mailTemplate(name){
   const cv = data.case_volume || "";
+  const d = new Date();
+  const today = `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,"0")}/${String(d.getDate()).padStart(2,"0")}`;
   return {
-    subject: `【US递交签字】期限YYYY/MM/DD-${cv}-新申请递交`,
+    subject: `【US递交签字】期限${today}-${cv}-新申请递交`,
     body: `${name} ，您好，\n\n烦请签署题述申请的ADS文件，其他文件已通过docusign发送，谢谢。\n\n\n祝好！\n递交人姓名`,
   };
 }
