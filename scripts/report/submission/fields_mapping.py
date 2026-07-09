@@ -51,6 +51,29 @@ def _norm(s):
     return (s or "").strip().lower()
 
 
+# 国家名 → ISO-2 代码（ADS 国家为下拉，需 CN/US 等代码，而非 "China"）
+_COUNTRY_CODES = {
+    "cn": "CN", "china": "CN", "prchina": "CN", "peoplesrepublicofchina": "CN", "中国": "CN",
+    "us": "US", "usa": "US", "unitedstates": "US", "unitedstatesofamerica": "US", "美国": "US",
+    "jp": "JP", "japan": "JP", "日本": "JP",
+    "kr": "KR", "korea": "KR", "southkorea": "KR", "republicofkorea": "KR",
+    "de": "DE", "germany": "DE",
+    "gb": "GB", "uk": "GB", "unitedkingdom": "GB",
+    "fr": "FR", "france": "FR",
+}
+
+
+def _country_code(v):
+    """国家值规范成 ISO-2 代码（已是两位字母则大写；已知国名转代码；未知原样返回）。"""
+    s = (v or "").strip()
+    if not s:
+        return ""
+    if len(s) == 2 and s.isalpha():
+        return s.upper()
+    key = "".join(ch for ch in s.lower() if ch.isalnum())
+    return _COUNTRY_CODES.get(key, s)
+
+
 def _inventor_applicant_addr(inv: dict, applicants: list, assignments: list) -> dict:
     """按发明人 employer 取对应申请人的地址（对齐确认函 confirmation_sheet_generator._app_for_employer）。
 
@@ -94,7 +117,7 @@ def fields_to_case_info(fields: dict, agent_info: dict = None) -> dict:
         # 每项：手填优先，否则取该发明人 employer 对应申请人的地址
         def pick(mk, ak):
             return (manual.get(mk) or "").strip() or (app.get(ak) or "").strip()
-        res_ctry = pick("residence_country", "country_en_us")
+        res_ctry = _country_code(pick("residence_country", "country_en_us"))
         # ResidencyRadio：参照旧实现——非美国居住地→"non-us-residency"（美国/留空则不选）
         residency = "non-us-residency" if res_ctry and res_ctry.upper() not in ("US", "USA", "UNITED STATES") else ""
         inventors.append({
@@ -104,7 +127,7 @@ def fields_to_case_info(fields: dict, agent_info: dict = None) -> dict:
             "Country of Residence": res_ctry,
             "Mailing Address of Inventor address_1": pick("mail_address1", "address1"),
             "Mailing Address of Inventor address_2": pick("mail_address2", "address2"),
-            "Mailing Address of Inventor Country": pick("mail_country", "country_en_us"),
+            "Mailing Address of Inventor Country": _country_code(pick("mail_country", "country_en_us")),
             "Mailing Address of Inventor city": pick("mail_city", "city_en"),
             "Mailing Address of Inventor State": pick("mail_state", "province_city_en_us"),
             "Mailing Address of Inventor Postal Code": pick("mail_postcode", "postcode"),
@@ -118,7 +141,7 @@ def fields_to_case_info(fields: dict, agent_info: dict = None) -> dict:
             "Name": nm, "Organization Name": nm, "chkOrg": 1, "Assigneebtn": "assignee",
             "Address": ap.get("address1", ""), "Applicant address2": ap.get("address2", ""),
             "Applicant city": ap.get("city_en", ""), "Applicant Postal Code": ap.get("postcode", ""),
-            "Nationality": ap.get("country_en_us", ""), "Entity": ap.get("entity_en", ""),
+            "Nationality": _country_code(ap.get("country_en_us", "")), "Entity": ap.get("entity_en", ""),
         })
 
     # ── 非申请人受让人块（ADS sfNonApplicantInfo）──
@@ -149,7 +172,7 @@ def fields_to_case_info(fields: dict, agent_info: dict = None) -> dict:
             assignees.append({
                 "Organization Name": nm, "chkOrg": 1,
                 "Address 1": ap.get("address1", ""), "Address 2": ap.get("address2", ""),
-                "City": ap.get("city_en", ""), "Country": ap.get("country_en_us", ""),
+                "City": ap.get("city_en", ""), "Country": _country_code(ap.get("country_en_us", "")),
                 "Postal Code": ap.get("postcode", ""),
             })
 
