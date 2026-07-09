@@ -47,6 +47,30 @@ def load_agent_info(case_volume: str, config_path=None) -> dict:
     return base
 
 
+def _norm(s):
+    return (s or "").strip().lower()
+
+
+def _inventor_applicant_addr(inv: dict, applicants: list, assignments: list) -> dict:
+    """按发明人 employer 取对应申请人的地址（对齐确认函 confirmation_sheet_generator._app_for_employer）。
+
+    无 employer / 单申请人 → applicants[0]；employer 命中申请人英文名 → 该申请人；
+    否则前雇主 → assignments.assigning_company 的 company_address（逗号拆 address1/2）。
+    :return: 含 address1/address2/city_en/country_en_us/postcode/province_city_en_us 的申请人 dict（或子集）。
+    """
+    emp = _norm(inv.get("employer"))
+    if not emp:
+        return applicants[0] if applicants else {}
+    for a in applicants:
+        if _norm(a.get("applicant_name_en")) == emp:
+            return a
+    for asg in assignments:
+        if _norm(asg.get("assigning_company")) == emp and (asg.get("company_address") or "").strip():
+            parts = [p.strip() for p in asg["company_address"].strip().split(",", 1)]
+            return {"address1": parts[0], "address2": parts[1] if len(parts) > 1 else ""}
+    return applicants[0] if applicants else {}
+
+
 def fields_to_case_info(fields: dict, agent_info: dict = None) -> dict:
     """把一条 fields_json 映射成 case_info。agent_info 可选（签字人/Customer Number/Deposit）。"""
     fields = fields or {}
@@ -56,27 +80,34 @@ def fields_to_case_info(fields: dict, agent_info: dict = None) -> dict:
     extra = fields.get("filing_extra") or {}
     inv_addrs = extra.get("inventor_addresses") or []
 
-    # ── 发明人：姓名来自著录项（只读）；居住地/通信地址来自 filing_extra（审核页补）──
+    # ── 发明人：姓名来自著录项；居住地/通信地址默认按 employer 取对应申请人地址（同确认函），
+    #    filing_extra.inventor_addresses 手填则覆盖 ──
+    raw_applicants = fields.get("applicants") or []
+    raw_assignments = fields.get("assignments") or []
     inventors = []
     for idx, inv in enumerate(fields.get("inventors") or []):
         first = (inv.get("first_name_en") or "").strip()
         last = (inv.get("last_name_en") or "").strip()
         full = (inv.get("full_name_en") or "").strip() or f"{first} {last}".strip()
-        addr = inv_addrs[idx] if idx < len(inv_addrs) else {}
-        res_ctry = (addr.get("residence_country") or "").strip()
+        manual = inv_addrs[idx] if idx < len(inv_addrs) else {}
+        app = _inventor_applicant_addr(inv, raw_applicants, raw_assignments)
+        # 每项：手填优先，否则取该发明人 employer 对应申请人的地址
+        def pick(mk, ak):
+            return (manual.get(mk) or "").strip() or (app.get(ak) or "").strip()
+        res_ctry = pick("residence_country", "country_en_us")
         # ResidencyRadio：参照旧实现——非美国居住地→"non-us-residency"（美国/留空则不选）
         residency = "non-us-residency" if res_ctry and res_ctry.upper() not in ("US", "USA", "UNITED STATES") else ""
         inventors.append({
             "name": full, "firstName": first, "middleName": "", "lastName": last,
             "Residence Information": residency,
-            "City": addr.get("residence_city", ""),
+            "City": pick("residence_city", "city_en"),
             "Country of Residence": res_ctry,
-            "Mailing Address of Inventor address_1": addr.get("mail_address1", ""),
-            "Mailing Address of Inventor address_2": addr.get("mail_address2", ""),
-            "Mailing Address of Inventor Country": addr.get("mail_country", ""),
-            "Mailing Address of Inventor city": addr.get("mail_city", ""),
-            "Mailing Address of Inventor State": addr.get("mail_state", ""),
-            "Mailing Address of Inventor Postal Code": addr.get("mail_postcode", ""),
+            "Mailing Address of Inventor address_1": pick("mail_address1", "address1"),
+            "Mailing Address of Inventor address_2": pick("mail_address2", "address2"),
+            "Mailing Address of Inventor Country": pick("mail_country", "country_en_us"),
+            "Mailing Address of Inventor city": pick("mail_city", "city_en"),
+            "Mailing Address of Inventor State": pick("mail_state", "province_city_en_us"),
+            "Mailing Address of Inventor Postal Code": pick("mail_postcode", "postcode"),
         })
 
     # ── 申请人块（ADS sfAssigneeInformation；以 assignee 身份列出）──
