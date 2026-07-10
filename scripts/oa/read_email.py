@@ -859,6 +859,45 @@ def dispatch_oa(all_results, all_emails=None, dry_run=False, test_project_prefix
                     print(f"[Wiki 附件] {item.get('project','')} 上传失败 {fp}: {e}", file=sys.stderr)
         print(f"[Wiki 附件] 上传完成: {uploaded} 个文件", file=sys.stderr)
 
+    # 对比文件（仅 CN）：解析审查意见通知书官文 PDF「本通知书引用下列对比文件」表，
+    # 填到该案 OA信息记录表页「OA过程」表对应 OA{N} 行的「对比文件链接」列。
+    cn_items = [r for r in all_results if r.get("region") == "CN"]
+    if cn_items:
+        from parse_cn_pdf import extract_cn_ref_docs, parse_oa_seq
+        from oainfo_cli import fill_ref_docs_in_oa_row
+        # msgid -> 邮件保存的官文 PDF（report 读取层存到 _inbox 的）
+        cn_msgid_to_pdfs = {}
+        for _acc, _em in (all_emails or []):
+            mid = _em.get("message_id", "")
+            if mid and _em.get("saved_pdfs"):
+                cn_msgid_to_pdfs[mid] = _em.get("saved_pdfs", [])
+        for item in cn_items:
+            pdfs = cn_msgid_to_pdfs.get(item.get("message_id", ""), [])
+            if not pdfs:
+                continue
+            # 从该邮件的官文 PDF 里挑出解析到对比文件的那份（通知书 PDF）
+            parsed = None
+            for fp in pdfs:
+                try:
+                    r = extract_cn_ref_docs(fp)
+                except Exception as e:
+                    print(f"[对比文件] {item.get('project','')} 解析失败 {fp}: {e}", file=sys.stderr)
+                    continue
+                if r.get("ref_docs"):
+                    parsed = r
+                    break
+            if not parsed:
+                continue
+            # OA 次数：优先用 PDF 里解析到的，其次从立项名称「第N次」推
+            oa_seq = parsed.get("oa_seq") or parse_oa_seq(item.get("project_name", "") or "")
+            docs = parsed["ref_docs"]
+            print(f"[对比文件] {item.get('project','')} OA{oa_seq}: {docs}", file=sys.stderr)
+            try:
+                title = f"{item.get('project','')}-OA信息记录表"
+                fill_ref_docs_in_oa_row(title, oa_seq, docs, dry_run=dry_run)
+            except Exception as e:
+                print(f"[对比文件] {item.get('project','')} 写回失败: {e}", file=sys.stderr)
+
     print(f"\n{'='*40}", file=sys.stderr)
     print(f"汇总: {len(all_results)} 条立项结果", file=sys.stderr)
     print("results:", all_results)

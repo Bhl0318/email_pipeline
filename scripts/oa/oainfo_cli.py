@@ -15,8 +15,8 @@ import logging
 import argparse
 
 import requests
-import pymssql
-import pymysql
+# pymssql / pymysql 延迟到用到 DB 的函数里再 import：
+# 让 WikiClient、对比文件写回等纯 HTTP/字符串逻辑在缺 DB 驱动的环境也能导入。
 
 # ============================================================
 # 日志配置
@@ -88,6 +88,7 @@ ZUCON = """<ac:layout><ac:layout-section ac:type="two_right_sidebar"><ac:layout-
 # 数据库查询
 # ============================================================
 def get_mysql_connection():
+    import pymysql
     return pymysql.connect(
         host=MYSQL_HOST, port=MYSQL_PORT,
         user=MYSQL_USER, password=MYSQL_PWD,
@@ -111,6 +112,7 @@ def get_cus_space_map():
 
 def find_project_info(project):
     """从 IPEasy 查询案件名称和公开号（参数化查询）"""
+    import pymssql
     conn = pymssql.connect(MSSQL_HOST, MSSQL_USER, MSSQL_PWD, MSSQL_DB, charset='utf8')
     try:
         cur = conn.cursor()
@@ -611,6 +613,139 @@ def append_oa_to_wiki(results):
         return {"code": 0, "msg": f"写入成功 {count} 条", "count": count}
     else:
         return {"code": 1, "msg": f"页面更新失败 (HTTP {status})", "count": 0}
+
+
+# ============================================================
+# 对比文件写回 OA信息记录表页（填「OA过程」表 OA{N} 行的「对比文件链接」列）
+# ============================================================
+def _strip_tags(s):
+    """去 HTML 标签 + 常见转义/空白，用于判断单元格是否为空、比对首列文本。"""
+    t = re.sub(r'<[^>]+>', '', s or '')
+    t = t.replace('&nbsp;', '').replace('\xa0', '')
+    return t.strip()
+
+
+def _ref_docs_cell_html(ref_docs):
+    """把对比文件列表拼成单元格 HTML：文件号超链到 Google Patent，带公开日，多件用「；」分隔。"""
+    parts = []
+    for d in ref_docs:
+        doc_no = (d.get("doc_no") or "").strip()
+        if not doc_no:
+            continue
+        pub = (d.get("pub_date") or "").strip()
+        link = (f'<a href="https://patents.google.com/patent/{doc_no}">{doc_no}</a>')
+        parts.append(f'{link}（{pub}）' if pub else link)
+    return '；'.join(parts)
+
+
+def _split_cells(row_html):
+    """把一个 <tr>…</tr> 拆成完整的 <td>…</td> 列表（td 不嵌套 td，非贪婪安全）。"""
+    return re.findall(r'<td\b[^>]*>.*?</td>', row_html, re.DOTALL)
+
+
+def _splice_ref_docs_into_body(body, oa_seq, cell_html):
+    """把对比文件单元格填进「OA过程」表 OA{oa_seq} 行的「对比文件链接」列（纯字符串处理，便于测试）。
+
+    Returns:
+        (new_body, status)。status ∈
+          filled          成功填入已有 OA{N} 行
+          added_row        无 OA{N} 行，自动补一行并填入
+          skip_no_column   页面无「对比文件链接」列（简版模板）
+          skip_nonempty    目标单元格已有内容，不覆盖
+    """
+    # 1. 找含「对比文件链接」的那张表（table 不嵌套，非贪婪安全）
+    target = None
+    for m in re.finditer(r'<table\b.*?</table>', body, re.DOTALL):
+        if '对比文件链接' in m.group(0):
+            target = m
+            break
+    if target is None:
+        return body, "skip_no_column"
+    tbl = target.group(0)
+
+    # 2. 表头定位「对比文件链接」列序号
+    ths = re.findall(r'<th\b[^>]*>.*?</th>', tbl, re.DOTALL)
+    col_count = len(ths)
+    col_index = next((i for i, th in enumerate(ths) if '对比文件链接' in _strip_tags(th)), None)
+    if col_index is None:
+        return body, "skip_no_column"
+
+    tb = re.search(r'<tbody\b[^>]*>(.*?)</tbody>', tbl, re.DOTALL)
+    if not tb:
+        return body, "skip_no_column"
+    tbody_inner = tb.group(1)
+
+    new_cell = f'<td>{cell_html}</td>'
+    want = f'OA{oa_seq}'
+
+    # 3. 找 OA{N} 行并替换目标单元格
+    rows = re.findall(r'<tr\b[^>]*>.*?</tr>', tbody_inner, re.DOTALL)
+    for row in rows:
+        cells = _split_cells(row)
+        if not cells or _strip_tags(cells[0]) != want:
+            continue
+        if col_index >= len(cells):
+            break  # 该行列数不够（异常），走补行
+        if _strip_tags(cells[col_index]):
+            return body, "skip_nonempty"
+        new_cells = cells[:]
+        new_cells[col_index] = new_cell
+        # 用新单元格串按序重建该行（保留原 <tr ...> 开标签）
+        tr_open = re.match(r'<tr\b[^>]*>', row).group(0)
+        new_row = tr_open + ''.join(new_cells) + '</tr>'
+        new_tbody = tbody_inner.replace(row, new_row, 1)
+        new_tbl = tbl.replace(tbody_inner, new_tbody, 1)
+        return body[:target.start()] + new_tbl + body[target.end():], "filled"
+
+    # 4. 无 OA{N} 行 → 自动补一行（首列 OA{N}，目标列填对比文件，其余留空）
+    cells = []
+    for i in range(col_count):
+        if i == 0:
+            cells.append(f'<td>{want}</td>')
+        elif i == col_index:
+            cells.append(new_cell)
+        else:
+            cells.append('<td></td>')
+    add_row = '<tr>' + ''.join(cells) + '</tr>'
+    new_tbody = tbody_inner + add_row
+    new_tbl = tbl.replace(tbody_inner, new_tbody, 1)
+    return body[:target.start()] + new_tbl + body[target.end():], "added_row"
+
+
+def fill_ref_docs_in_oa_row(page_title, oa_seq, ref_docs, dry_run=False):
+    """把对比文件写到 `案号-OA信息记录表` 页「OA过程」表 OA{oa_seq} 行的「对比文件链接」列。
+
+    仅完整版模板有该列；简版模板 skip_no_column。幂等：单元格已有内容不覆盖。
+    Returns: dict {status, http?}
+    """
+    if not ref_docs:
+        return {"status": "no_ref_docs"}
+    if not oa_seq:
+        logger.warning(f"[对比文件] {page_title} 无法确定 OA 次数，跳过")
+        return {"status": "no_oa_seq"}
+
+    wiki = WikiClient()
+    page = wiki.get_page(page_title)
+    if not page:
+        logger.warning(f"[对比文件] 未找到页面: {page_title}")
+        return {"status": "page_not_found"}
+
+    cell_html = _ref_docs_cell_html(ref_docs)
+    if not cell_html:
+        return {"status": "no_ref_docs"}
+
+    new_body, status = _splice_ref_docs_into_body(page["body"], oa_seq, cell_html)
+    if status.startswith("skip") or new_body == page["body"]:
+        logger.info(f"[对比文件] {page_title} OA{oa_seq}: {status}")
+        return {"status": status}
+
+    if dry_run:
+        logger.info(f"[对比文件][dry-run] {page_title} OA{oa_seq}: {status} → {cell_html}")
+        return {"status": status, "dry_run": True}
+
+    code = wiki.update_page(page["id"], page_title, new_body, page["version"])
+    logger.info(f"[对比文件] {page_title} OA{oa_seq}: {status} (HTTP {code})")
+    return {"status": status, "http": code}
 
 
 # ============================================================
