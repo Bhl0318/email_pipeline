@@ -643,15 +643,21 @@ def _split_cells(row_html):
     return re.findall(r'<td\b[^>]*>.*?</td>', row_html, re.DOTALL)
 
 
-def _splice_ref_docs_into_body(body, oa_seq, cell_html):
-    """把对比文件单元格填进「OA过程」表 OA{oa_seq} 行的「对比文件链接」列（纯字符串处理，便于测试）。
+def _splice_oa_row(body, oa_seq, cells_by_header):
+    """在「OA过程」表 OA{oa_seq} 行按列名填多个单元格（纯字符串处理，便于测试）。
+
+    cells_by_header: {列名关键字: 单元格内 HTML/文本}，如
+        {"OA收文日": "2026-07-09", "期限": "2026-09-09", "对比文件链接": "<a…>…</a>"}
+    只填空单元格（逐列幂等，不覆盖已有内容）。
+    该表以「含『对比文件链接』列」判定（= 完整版模板；简版无此列 → skip_no_column），
+    同时避开简版「答复期限」列被「期限」误命中。
 
     Returns:
         (new_body, status)。status ∈
-          filled          成功填入已有 OA{N} 行
+          filled          至少填入一个空单元格
           added_row        无 OA{N} 行，自动补一行并填入
           skip_no_column   页面无「对比文件链接」列（简版模板）
-          skip_nonempty    目标单元格已有内容，不覆盖
+          skip_nonempty    OA{N} 行存在但目标单元格都已有内容，不覆盖
     """
     # 1. 找含「对比文件链接」的那张表（table 不嵌套，非贪婪安全）
     target = None
@@ -663,47 +669,56 @@ def _splice_ref_docs_into_body(body, oa_seq, cell_html):
         return body, "skip_no_column"
     tbl = target.group(0)
 
-    # 2. 表头定位「对比文件链接」列序号
+    # 2. 表头 → 每个待填列名的列序号
     ths = re.findall(r'<th\b[^>]*>.*?</th>', tbl, re.DOTALL)
     col_count = len(ths)
-    col_index = next((i for i, th in enumerate(ths) if '对比文件链接' in _strip_tags(th)), None)
-    if col_index is None:
+    header_texts = [_strip_tags(th) for th in ths]
+    col_of = {}
+    for key in cells_by_header:
+        idx = next((i for i, h in enumerate(header_texts) if key in h), None)
+        if idx is not None:
+            col_of[key] = idx
+    if '对比文件链接' not in col_of:
         return body, "skip_no_column"
 
     tb = re.search(r'<tbody\b[^>]*>(.*?)</tbody>', tbl, re.DOTALL)
     if not tb:
         return body, "skip_no_column"
     tbody_inner = tb.group(1)
-
-    new_cell = f'<td>{cell_html}</td>'
     want = f'OA{oa_seq}'
 
-    # 3. 找 OA{N} 行并替换目标单元格
+    # 3. 找 OA{N} 行，逐列填空单元格
     rows = re.findall(r'<tr\b[^>]*>.*?</tr>', tbody_inner, re.DOTALL)
     for row in rows:
         cells = _split_cells(row)
         if not cells or _strip_tags(cells[0]) != want:
             continue
-        if col_index >= len(cells):
-            break  # 该行列数不够（异常），走补行
-        if _strip_tags(cells[col_index]):
-            return body, "skip_nonempty"
         new_cells = cells[:]
-        new_cells[col_index] = new_cell
-        # 用新单元格串按序重建该行（保留原 <tr ...> 开标签）
+        changed = False
+        for key, idx in col_of.items():
+            val = cells_by_header.get(key)
+            if not val or idx >= len(new_cells):
+                continue
+            if _strip_tags(new_cells[idx]):
+                continue  # 已有内容不覆盖
+            new_cells[idx] = f'<td>{val}</td>'
+            changed = True
+        if not changed:
+            return body, "skip_nonempty"
         tr_open = re.match(r'<tr\b[^>]*>', row).group(0)
         new_row = tr_open + ''.join(new_cells) + '</tr>'
         new_tbody = tbody_inner.replace(row, new_row, 1)
         new_tbl = tbl.replace(tbody_inner, new_tbody, 1)
         return body[:target.start()] + new_tbl + body[target.end():], "filled"
 
-    # 4. 无 OA{N} 行 → 自动补一行（首列 OA{N}，目标列填对比文件，其余留空）
+    # 4. 无 OA{N} 行 → 自动补一行（首列 OA{N}，待填列各就位，其余留空）
+    idx_to_key = {idx: key for key, idx in col_of.items()}
     cells = []
     for i in range(col_count):
         if i == 0:
             cells.append(f'<td>{want}</td>')
-        elif i == col_index:
-            cells.append(new_cell)
+        elif i in idx_to_key and cells_by_header.get(idx_to_key[i]):
+            cells.append(f'<td>{cells_by_header[idx_to_key[i]]}</td>')
         else:
             cells.append('<td></td>')
     add_row = '<tr>' + ''.join(cells) + '</tr>'
@@ -712,10 +727,17 @@ def _splice_ref_docs_into_body(body, oa_seq, cell_html):
     return body[:target.start()] + new_tbl + body[target.end():], "added_row"
 
 
-def fill_ref_docs_in_oa_row(page_title, oa_seq, ref_docs, dry_run=False):
-    """把对比文件写到 `案号-OA信息记录表` 页「OA过程」表 OA{oa_seq} 行的「对比文件链接」列。
+def _splice_ref_docs_into_body(body, oa_seq, cell_html):
+    """向后兼容包装：只填「对比文件链接」列。"""
+    return _splice_oa_row(body, oa_seq, {"对比文件链接": cell_html})
 
-    仅完整版模板有该列；简版模板 skip_no_column。幂等：单元格已有内容不覆盖。
+
+def fill_ref_docs_in_oa_row(page_title, oa_seq, ref_docs,
+                            oa_doc_date="", project_deadline="", dry_run=False):
+    """把对比文件 + OA收文日 + 期限写到 `案号-OA信息记录表` 页「OA过程」表 OA{oa_seq} 行。
+
+    列映射：对比文件链接 ← ref_docs（Google Patent 链接）、OA收文日 ← oa_doc_date（官文发文日）、
+    期限 ← project_deadline。仅完整版模板有这些列；简版 skip_no_column。逐列幂等：已有内容不覆盖。
     Returns: dict {status, http?}
     """
     if not ref_docs:
@@ -734,7 +756,13 @@ def fill_ref_docs_in_oa_row(page_title, oa_seq, ref_docs, dry_run=False):
     if not cell_html:
         return {"status": "no_ref_docs"}
 
-    new_body, status = _splice_ref_docs_into_body(page["body"], oa_seq, cell_html)
+    cells_by_header = {"对比文件链接": cell_html}
+    if oa_doc_date:
+        cells_by_header["OA收文日"] = oa_doc_date
+    if project_deadline:
+        cells_by_header["期限"] = project_deadline
+
+    new_body, status = _splice_oa_row(page["body"], oa_seq, cells_by_header)
     if status.startswith("skip") or new_body == page["body"]:
         logger.info(f"[对比文件] {page_title} OA{oa_seq}: {status}")
         return {"status": status}

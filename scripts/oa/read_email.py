@@ -894,7 +894,12 @@ def dispatch_oa(all_results, all_emails=None, dry_run=False, test_project_prefix
             print(f"[对比文件] {item.get('project','')} OA{oa_seq}: {docs}", file=sys.stderr)
             try:
                 title = f"{item.get('project','')}-OA信息记录表"
-                fill_ref_docs_in_oa_row(title, oa_seq, docs, dry_run=dry_run)
+                fill_ref_docs_in_oa_row(
+                    title, oa_seq, docs,
+                    oa_doc_date=item.get("oa_doc_date", ""),      # OA收文日 ← 官文发文日
+                    project_deadline=item.get("project_deadline", ""),  # 期限
+                    dry_run=dry_run,
+                )
             except Exception as e:
                 print(f"[对比文件] {item.get('project','')} 写回失败: {e}", file=sys.stderr)
 

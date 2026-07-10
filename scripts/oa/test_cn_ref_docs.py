@@ -13,7 +13,7 @@ sys.path.insert(0, SCRIPT_DIR)
 from parse_cn_pdf import extract_cn_ref_docs, _cn2int, parse_oa_seq
 from oainfo_cli import (
     build_full_template, build_simple_template,
-    _splice_ref_docs_into_body, _ref_docs_cell_html,
+    _splice_ref_docs_into_body, _splice_oa_row, _ref_docs_cell_html,
 )
 
 # 拉取到的真实样本
@@ -91,6 +91,38 @@ def test_auto_add_row():
     ok("CN216192880U" in body, "补行里填入了对比文件")
 
 
+def test_fill_multi_columns():
+    cells = {
+        "对比文件链接": _ref_docs_cell_html(DOCS),
+        "OA收文日": "2026-07-09",
+        "期限": "2026-09-09",
+    }
+    body, status = _splice_oa_row(_full_body(), 2, cells)
+    ok(status == "filled", f"多列同行填入 (status={status})")
+    # 定位 OA2 行，确认三列都进去了
+    import re as _re
+    row = _re.search(r'<tr\b[^>]*>(?:(?!</tr>).)*?<td>OA2</td>.*?</tr>', body, _re.DOTALL).group(0)
+    ok("2026-07-09" in row, "OA2 行含 OA收文日")
+    ok("2026-09-09" in row, "OA2 行含 期限")
+    ok("CN216192880U" in row, "OA2 行含 对比文件")
+    # 简版「期限」不被误命中：期限只填在 OA2 行的「期限」列（正文出现1次）
+    ok(body.count("2026-09-09") == 1, "期限只填一处")
+
+
+def test_add_row_multi_columns():
+    cells = {
+        "对比文件链接": _ref_docs_cell_html(DOCS),
+        "OA收文日": "2026-07-09",
+        "期限": "2026-09-09",
+    }
+    body, status = _splice_oa_row(_full_body(), 4, cells)
+    ok(status == "added_row", f"OA4 补行(多列) (status={status})")
+    import re as _re
+    row = _re.search(r'<tr\b[^>]*>(?:(?!</tr>).)*?<td>OA4</td>.*?</tr>', body, _re.DOTALL).group(0)
+    ok("2026-07-09" in row and "2026-09-09" in row and "CN216192880U" in row,
+       "补出的 OA4 行三列齐全")
+
+
 def test_simple_template_skip():
     _p1, p2, _p3, p4 = build_simple_template("20664-0072CN00", "", "", "")
     cell = _ref_docs_cell_html(DOCS)
@@ -102,7 +134,8 @@ def test_simple_template_skip():
 if __name__ == "__main__":
     for fn in [test_cn2int, test_extract_real_pdf, test_cell_html,
                test_fill_existing_row, test_idempotent,
-               test_auto_add_row, test_simple_template_skip]:
+               test_auto_add_row, test_fill_multi_columns,
+               test_add_row_multi_columns, test_simple_template_skip]:
         print(f"[{fn.__name__}]")
         fn()
     print(f"\n全部通过：{_passed} 项断言")
