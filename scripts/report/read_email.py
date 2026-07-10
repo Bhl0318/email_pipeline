@@ -988,8 +988,6 @@ def dispatch_report(all_results, all_emails, dry_run=False):
                     values.append(row_id)
                     continue
                 v = item.get(f, "")
-                if f == 'project':
-                    v = '90009-0003US03'
                 if v is None:
                     v = ""
                 # oa_doc_date 为 date 类型，空值用 NULL

@@ -776,13 +776,6 @@ def dispatch_oa(all_results, all_emails=None, dry_run=False, test_project_prefix
                 _item["_orig_customer_code"] = _p[:5]
                 _item["project"] = f"{test_project_prefix}-{_p.split('-', 1)[1]}"
         print(f"  [测试] 案号前缀已替换为 {test_project_prefix}", file=sys.stderr)
-    # email_pipeline 测试标记：给 OA 立项的 project_name 统一加后缀，便于在
-    # 数据表 / Wiki 里识别哪些是本管线（测试）生成的。只影响 OA 线，不动汇报信。
-    PROJECT_NAME_SUFFIX = "_by_email_pipline"
-    for _item in all_results:
-        _pn = _item.get("project_name", "") or ""
-        if _pn and not _pn.endswith(PROJECT_NAME_SUFFIX):
-            _item["project_name"] = _pn + PROJECT_NAME_SUFFIX
     # 为每条立项结果创建 Wiki OA信息记录表页面（按案号建族页面+子页）
     if all_results and dry_run:
         print(f"  [dry-run] 跳过创建 OA 信息记录表 Wiki 页面（{len(all_results)} 条）", file=sys.stderr)
