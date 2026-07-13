@@ -284,7 +284,7 @@ const ASSIGN_QUAD = [
 /* ───────── sidebar ───────── */
 async function loadTaskList() {
   try {
-    const d = await api("GET", `${API}/tasks?type=filing_confirmation&status=pending,skipped`);
+    const d = await api("GET", `${API}/tasks?type=filing_confirmation&status=pending,skipped,done`);
     taskList = d.tasks || [];
   } catch (e) { taskList = []; }
   renderSidebar();
@@ -565,7 +565,7 @@ function renderForm() {
   const _suppTitle = "确认函补充（发明地）— 发明人住址/劳动合同归属由申请人地址（单公司）或归属公司分组（多公司）自动生成";
 
   $("formSections").innerHTML = `
-    ${ro ? `<div class="banner ok">该任务状态为 ${esc(task.status)}，仅可查看。</div>` : ""}
+    ${ro ? `<div class="banner ok">该任务状态为 ${esc(task.status)}，仅可查看。${task.status === "done" ? ` <button onclick="reopenTask()" style="margin-left:8px">退回重编</button>` : ""}</div>` : ""}
     <div class="section">${head(SECTIONS.caseInfo.title)}<div class="section-body"><div class="grid">
       ${SECTIONS.caseInfo.fields.map(fieldInput).join("")}
       <div class="field"><label>申请类型 <span class="req">*</span></label>
@@ -659,6 +659,22 @@ async function skipTask() {
   if (!taskId || !confirm("确认跳过该任务？")) return;
   try { await api("POST", `${API}/tasks/${taskId}/skip`); toast("已跳过"); await loadTaskList(); openTask(taskId); }
   catch (e) { toast("操作失败：" + problemsOf(e).join("；"), 4000); }
+}
+async function reopenTask(force) {
+  if (!taskId) return;
+  if (!force && !confirm("退回重编：该确认函将回到「待确认」，可重新编辑并重发。确认？")) return;
+  try {
+    const d = await api("POST", `${API}/tasks/${taskId}/reopen`, { force: !!force });
+    const extra = (d.reset_followups || []).length ? `（已重置 ${d.reset_followups.length} 条待回签记录，客户须重签）` : "";
+    toast("已退回待确认 ✅" + extra);
+    await loadTaskList(); openTask(taskId);
+  } catch (e) {
+    if (e.status === 409 && !force) {
+      if (confirm(problemsOf(e).join("；") + "\n\n仍要强制退回吗？")) return reopenTask(true);
+      return;
+    }
+    toast("退回失败：" + problemsOf(e).join("；"), 4000);
+  }
 }
 
 /* 参考文件：把客户提供的参考材料嵌入右侧预览，左边字段对照核对 */

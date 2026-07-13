@@ -27,6 +27,7 @@ US 递交在线审核（/submission 路由组，表 submission_tasks）:
   POST /api/submission/tasks/{task_id}/preview-send  硬校验+生成三件成品+返回发送清单（modal用）
   POST /api/submission/tasks/{task_id}/confirm  发送成品邮件 → done + 插 signature_followup
   POST /api/submission/tasks/{task_id}/skip  UPDATE status='skipped'
+  POST /api/submission/tasks/{task_id}/reopen  done→pending 退回重编（客户已签须 force）
 
 环节4 准备递交文件（task_type='filing_preparation'）相关：
   POST /api/submission/filing/create         手动转入（按案号从 filing_confirmation 建 filing_preparation）
@@ -584,7 +585,7 @@ def submission_review_page(task_id: str):
 
 
 @app.get("/api/submission/tasks")
-def list_submission_tasks(type: str = "filing_confirmation", status: str = "pending,skipped"):
+def list_submission_tasks(type: str = "filing_confirmation", status: str = "pending,skipped,done"):
     statuses = [s.strip() for s in status.split(",") if s.strip()]
     placeholders = ",".join(["%s"] * len(statuses))
     rows = execute_params(
@@ -1047,6 +1048,62 @@ def skip_submission_task(task_id: str):
         (now, task_id),
     )
     return {"ok": True, "task_id": task_id, "status": "skipped"}
+
+
+class SubmissionReopenReq(BaseModel):
+    # 客户已签（派生 signature_followup 已 received/done）时须显式 force=True 才放行
+    force: bool = False
+
+
+@app.post("/api/submission/tasks/{task_id}/reopen")
+def reopen_submission_task(task_id: str, req: SubmissionReopenReq):
+    """退回重编：done 的 filing_confirmation → pending，重新可编辑/预览/重发。
+
+    护栏：若同案派生的 signature_followup 已收到签署（received/done），说明旧签署件基于
+    旧数据，退回会使其失效——须 force=True，并把该 followup 重置回 pending（客户须重签）。
+    注：force 不会自动回滚已建的环节4 filing_preparation，需人工核。
+    """
+    row = _load_submission_task(task_id)
+    if row["task_type"] != "filing_confirmation":
+        raise HTTPException(status_code=400, detail=f"仅 filing_confirmation 可退回重编，当前 {row['task_type']}")
+    if row["status"] != "done":
+        raise HTTPException(status_code=400, detail=f"任务状态为 {row['status']}，仅 done 可退回重编")
+
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    followup = execute_params(
+        "SELECT id, status FROM submission_tasks "
+        "WHERE task_type = 'signature_followup' AND case_volume = %s",
+        (row["case_volume"],),
+    )
+    signed_followup = [f for f in followup if f["status"] in ("received", "done")]
+    if signed_followup and not req.force:
+        raise HTTPException(
+            status_code=409,
+            detail=(f"客户已签署（signature_followup 状态 {signed_followup[0]['status']}），"
+                    "退回将使已签件失效、客户须重签；如确需退回请以 force=true 重试。"),
+        )
+
+    # 1) 确认函任务退回 pending，清 confirmed_at
+    execute_params(
+        "UPDATE submission_tasks SET status = 'pending', confirmed_at = NULL, updated_at = %s WHERE id = %s",
+        (now, task_id),
+    )
+    # 2) 已签的 followup 重置回 pending（客户须重签）；pending 的保持不动，等重发时 confirm 自动刷新
+    reset_followups = []
+    if req.force:
+        for f in signed_followup:
+            execute_params(
+                "UPDATE submission_tasks SET status = 'pending', updated_at = %s WHERE id = %s",
+                (now, f["id"]),
+            )
+            reset_followups.append(f["id"])
+
+    return {
+        "ok": True,
+        "task_id": task_id,
+        "status": "pending",
+        "reset_followups": reset_followups,
+    }
 
 
 # ═══════════════════════════════════════════════════════════════════
