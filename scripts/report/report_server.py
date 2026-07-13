@@ -1029,6 +1029,25 @@ def confirm_submission_task(task_id: str, req: SubmissionConfirmReq):
             (followup_id, case_volume, followup_fields, row["contact_email"], cc_email, now),
         )
 
+    # 5) 退回重编后重发的场景：若同案环节4（filing_preparation）已存在且 pending，
+    #    用本次确认的改正后数据【原地刷新】其 fields_json（审阅人链接不变、数据更新）。
+    #    环节4 若已 done（递交件已发美代理）在 reopen 阶段就被硬拦，不会走到这里。
+    refreshed_prep = []
+    prep_rows = execute_params(
+        "SELECT id FROM submission_tasks "
+        "WHERE task_type = 'filing_preparation' AND case_volume = %s AND status = 'pending'",
+        (case_volume,),
+    )
+    if prep_rows:
+        cur = execute_params("SELECT fields_json FROM submission_tasks WHERE id = %s", (task_id,))
+        new_fields = cur[0]["fields_json"] if cur else None
+        for p in prep_rows:
+            execute_params(
+                "UPDATE submission_tasks SET fields_json = %s, updated_at = %s WHERE id = %s",
+                (new_fields, now, p["id"]),
+            )
+            refreshed_prep.append(p["id"])
+
     return {
         "ok": True,
         "task_id": task_id,
@@ -1036,6 +1055,7 @@ def confirm_submission_task(task_id: str, req: SubmissionConfirmReq):
         "sent_to": recipients,
         "files": [p.name for p in files],
         "followup_task_id": followup_id,
+        "refreshed_filing_prep": refreshed_prep,
     }
 
 
@@ -1059,9 +1079,13 @@ class SubmissionReopenReq(BaseModel):
 def reopen_submission_task(task_id: str, req: SubmissionReopenReq):
     """退回重编：done 的 filing_confirmation → pending，重新可编辑/预览/重发。
 
-    护栏：若同案派生的 signature_followup 已收到签署（received/done），说明旧签署件基于
-    旧数据，退回会使其失效——须 force=True，并把该 followup 重置回 pending（客户须重签）。
-    注：force 不会自动回滚已建的环节4 filing_preparation，需人工核。
+    护栏：
+    - 同案环节4 filing_preparation 已 done（递交件已发美代理，环节5 已完成）→ 硬禁止退回，
+      走人工处置（force 也不放行）。
+    - 同案 filing_preparation 仍 pending → 允许退回；重发确认函时（confirm）会用改正后的
+      新数据原地刷新该 filing_preparation 的 fields_json（审阅人链接不变）。
+    - 同案 signature_followup 已收到签署（received/done）→ 旧签署件基于旧数据，退回会使其失效，
+      须 force=True，并把该 followup 重置回 pending（客户须重签）。
     """
     row = _load_submission_task(task_id)
     if row["task_type"] != "filing_confirmation":
@@ -1070,6 +1094,18 @@ def reopen_submission_task(task_id: str, req: SubmissionReopenReq):
         raise HTTPException(status_code=400, detail=f"任务状态为 {row['status']}，仅 done 可退回重编")
 
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    # 环节4 已 done（递交件已发美代理）→ 硬禁止，无法用 force 覆盖，须人工处置
+    filing_prep = execute_params(
+        "SELECT id, status FROM submission_tasks "
+        "WHERE task_type = 'filing_preparation' AND case_volume = %s",
+        (row["case_volume"],),
+    )
+    if any(f["status"] == "done" for f in filing_prep):
+        raise HTTPException(
+            status_code=409,
+            detail="该案递交件已发美代理（环节4/5 已完成），不能退回重编，请人工处理。",
+        )
+
     followup = execute_params(
         "SELECT id, status FROM submission_tasks "
         "WHERE task_type = 'signature_followup' AND case_volume = %s",
@@ -1103,6 +1139,8 @@ def reopen_submission_task(task_id: str, req: SubmissionReopenReq):
         "task_id": task_id,
         "status": "pending",
         "reset_followups": reset_followups,
+        # pending 的环节4 任务：重发确认函时会用新数据原地刷新其 fields_json
+        "filing_prep_pending": [f["id"] for f in filing_prep if f["status"] == "pending"],
     }
 
 

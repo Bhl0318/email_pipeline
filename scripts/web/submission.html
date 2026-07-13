@@ -665,15 +665,19 @@ async function reopenTask(force) {
   if (!force && !confirm("退回重编：该确认函将回到「待确认」，可重新编辑并重发。确认？")) return;
   try {
     const d = await api("POST", `${API}/tasks/${taskId}/reopen`, { force: !!force });
-    const extra = (d.reset_followups || []).length ? `（已重置 ${d.reset_followups.length} 条待回签记录，客户须重签）` : "";
-    toast("已退回待确认 ✅" + extra);
+    const parts = ["已退回待确认 ✅"];
+    if ((d.reset_followups || []).length) parts.push(`已重置 ${d.reset_followups.length} 条待回签记录（客户须重签）`);
+    if ((d.filing_prep_pending || []).length) parts.push("重发确认函后将同步刷新环节4 递交数据");
+    toast(parts.join("；"));
     await loadTaskList(); openTask(taskId);
   } catch (e) {
-    if (e.status === 409 && !force) {
-      if (confirm(problemsOf(e).join("；") + "\n\n仍要强制退回吗？")) return reopenTask(true);
+    const msg = problemsOf(e).join("；");
+    // 含 "force" 的 409 = 客户已签、可强制退回；其余 409（如递交件已发美代理）为硬禁止，不重试
+    if (e.status === 409 && !force && /force/i.test(msg)) {
+      if (confirm(msg + "\n\n仍要强制退回吗？")) return reopenTask(true);
       return;
     }
-    toast("退回失败：" + problemsOf(e).join("；"), 4000);
+    toast("退回失败：" + msg, 4000);
   }
 }
 
