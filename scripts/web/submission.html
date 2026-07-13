@@ -565,7 +565,7 @@ function renderForm() {
   const _suppTitle = "确认函补充（发明地）— 发明人住址/劳动合同归属由申请人地址（单公司）或归属公司分组（多公司）自动生成";
 
   $("formSections").innerHTML = `
-    ${ro ? `<div class="banner ok">该任务状态为 ${esc(task.status)}，仅可查看。${task.status === "done" ? ` <button onclick="reopenTask()" style="margin-left:8px">退回重编</button>` : ""}</div>` : ""}
+    ${ro ? `<div class="banner ok">该任务状态为 ${esc(task.status)}，仅可查看。${task.status === "done" ? ` <button class="reopen-btn" onclick="reopenTask()" style="margin-left:8px">退回重编</button>` : ""}</div>` : ""}
     <div class="section">${head(SECTIONS.caseInfo.title)}<div class="section-body"><div class="grid">
       ${SECTIONS.caseInfo.fields.map(fieldInput).join("")}
       <div class="field"><label>申请类型 <span class="req">*</span></label>
@@ -623,7 +623,7 @@ function renderForm() {
       if (p[0] === "applicants" && p[2] === "applicant_name_en") refreshEmployerSelects();
     }
   };
-  if (ro) pane.querySelectorAll("input,select,button").forEach(el => { if (!el.closest(".section-head")) el.disabled = true; });
+  if (ro) pane.querySelectorAll("input,select,button").forEach(el => { if (!el.closest(".section-head") && !el.classList.contains("reopen-btn")) el.disabled = true; });
   // 入库缺失项高亮（精确路径匹配：assignments[1].assignment_type → assignments.1.assignment_type）
   const miss = [...missingFieldSet()].filter(Boolean).map(m => m.replace(/\[(\d+)\]/g, ".$1"));
   pane.querySelectorAll("[data-path],[data-mpath]").forEach(el => {
