@@ -313,7 +313,7 @@ class PatentApplicationFormGenerator:
         else:
             # 检查优先权信息的完整性
             for idx, priority in enumerate(priorities):
-                if not priority.get('priority_num'):
+                if not (priority.get('priority_no') or priority.get('priority_num')):
                     missing_optional_fields.append({
                         'field': f'priorities[{idx}].priority_num',
                         'field_name': f'优先权号',
@@ -561,7 +561,7 @@ class PatentApplicationFormGenerator:
         if priorities:
             data_rows4 = [['Priority Application (s)/优先权']]
             for prioritie in priorities:
-                data_rows4.append(['Priority No./优先权号', prioritie.get('priority_num', '')])
+                data_rows4.append(['Priority No./优先权号', prioritie.get('priority_no') or prioritie.get('priority_num') or ''])
                 data_rows4.append(['Priority Date/优先权日:', prioritie.get('priority_date', '')])
                 data_rows4.append(['DAS code/DAS码', prioritie.get('access_code', '')])
         data_rows5 = [
