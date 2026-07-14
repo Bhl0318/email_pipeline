@@ -207,18 +207,54 @@ def _clone_address_rows(table, ref_row, extra_lines):
         addr_cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.BOTTOM
 
 
+def _inventor_signature_tables(doc):
+    """所有含"发明人打印版名字"占位的签字表（含克隆出来的）。"""
+    return [
+        table for table in doc.tables
+        if any("发明人打印版名字" in cell.text for row in table.rows for cell in row.cells)
+    ]
+
+
+def _preceding_spacer_paragraphs(tbl_el):
+    """签字表前紧邻的空行段落（作为表间距样板），按文档顺序返回。"""
+    out = []
+    prev = tbl_el.getprevious()
+    while prev is not None and prev.tag == qn("w:p"):
+        out.append(prev)
+        prev = prev.getprevious()
+    return list(reversed(out))
+
+
 def _fill_inventor_tables(doc, names, addr_lines):
     """个人转公司：按序把发明人填入签字表（含"发明人打印版名字"占位的表）。
 
+    发明人数超过模板签字表数时，克隆最后一个签字表（连同其前的空行间隔）补足，
+    避免超出部分无处签字（A 方案）。
     addr_lines 为地址多行列表：地址1/地址2 填前两行，超 2 行则克隆地址2行补足。
+    返回 (填入发明人数, 克隆补足的签字表数)。
     """
     line1 = addr_lines[0] if addr_lines else ""
     line2 = addr_lines[1] if len(addr_lines) > 1 else ""
     extra = addr_lines[2:] if len(addr_lines) > 2 else []
-    inventor_tables = [
-        table for table in doc.tables
-        if any("发明人打印版名字" in cell.text for row in table.rows for cell in row.cells)
-    ]
+
+    inventor_tables = _inventor_signature_tables(doc)
+    added = 0
+    if inventor_tables and len(names) > len(inventor_tables):
+        last_tbl = inventor_tables[-1]._tbl
+        spacer_tmpls = _preceding_spacer_paragraphs(last_tbl)
+        anchor = last_tbl
+        for _ in range(len(names) - len(inventor_tables)):
+            for sp in spacer_tmpls:  # 先补间距空行，保持表与表间距一致
+                new_sp = copy.deepcopy(sp)
+                anchor.addnext(new_sp)
+                anchor = new_sp
+            new_tbl = copy.deepcopy(last_tbl)  # 克隆的是未填充的占位表
+            anchor.addnext(new_tbl)
+            anchor = new_tbl
+            added += 1
+        inventor_tables = _inventor_signature_tables(doc)  # 重新收集（含克隆）
+
+    filled = 0
     for name, table in zip(names, inventor_tables):
         addr2_row = None
         for row in table.rows:
@@ -235,7 +271,8 @@ def _fill_inventor_tables(doc, names, addr_lines):
                     addr2_row = row
         if extra and addr2_row is not None:
             _clone_address_rows(table, addr2_row, extra)
-    return len(inventor_tables)
+        filled += 1
+    return filled, added
 
 
 # ─── 主入口 ──────────────────────────────────────────────
@@ -307,9 +344,11 @@ def generate_assignment(fields: dict, assignment: dict, output_dir, seq: int = 1
 
     # 6. 签字分区填充
     if assignment_type == "个人转公司":
-        capacity = _fill_inventor_tables(doc, names, assignee["address_lines"])
-        if len(names) > capacity:
-            warnings.append(f"发明人 {len(names)} 名超出模板签字表容量 {capacity}，超出部分未填入")
+        filled, added = _fill_inventor_tables(doc, names, assignee["address_lines"])
+        if added:
+            warnings.append(f"发明人 {len(names)} 名，签字表已自动扩容补足 {added} 个")
+        if filled < len(names):
+            warnings.append(f"发明人 {len(names)} 名超出模板签字表容量且扩容失败，仅填入 {filled} 名")
     else:
         company_addr = split_address(assignment.get("company_address") or "")
         _replace_everywhere(doc, "转让公司名称", assignment.get("assigning_company") or "")
