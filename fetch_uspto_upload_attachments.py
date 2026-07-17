@@ -16,7 +16,13 @@
 处理完把邮件归位：成功（有附件入库）-> FilingSignatures-done，未落任何附件
 -> FilingSignatures-skipped（两个文件夹自动创建）。传 move=False 可只抓不移。
 
-⚠️ 会移动邮件（copy+删除原件+expunge），非只读；连真实邮箱，请在受控环境运行。
+销账（环节6）：附件归档后，按案号命中 atw.submission_tasks 里该案的 agent_followup
+（环节5 发美代理后插的占位）→ 置 status='done'、把归档目录/文件写进 fields_json.reply，
+与环节3 finalize_signed_review 销 signature_followup 对称。best-effort：无 pymysql/无匹配
+都不影响归档；传 settle=False 可只抓不销账。DB 走 scripts/report/db_query.py（atw）。
+
+⚠️ 会移动邮件（copy+删除原件+expunge）并写库（agent_followup 置 done），非只读；
+   连真实邮箱/数据库，请在受控环境运行。
 """
 import sys
 import os
@@ -32,6 +38,15 @@ CONFIG_PATH = os.path.join(SCRIPT_DIR, "scripts", "email_config.json")
 
 # 案号格式：[0-9A-Z]{5}-[0-9A-Z]{4}[A-Z]{2}[0-9A-Z]{2}（如 20609-0083US01）
 CASE_RE = re.compile(r"[0-9A-Z]{5}-[0-9A-Z]{4}[A-Z]{2}[0-9A-Z]{2}")
+
+# 销账用 DB：复用 report 端 db_query（atw.submission_tasks）。best-effort——
+# 导入失败（无 pymysql / 在无 DB 环境跑）只跳过销账，不影响抓文件归档。
+_SETTLE_OK = True
+try:
+    sys.path.insert(0, os.path.join(SCRIPT_DIR, "scripts", "report"))
+    from db_query import execute_params as _db_exec
+except Exception:
+    _SETTLE_OK = False
 
 # 内置账号：美代理回邮所在邮箱（agent@metis-ip.com）。metis-ip.com 在世纪互联
 # partner.outlook.cn，IMAP 基本认证已被停用，必须走 OAuth2 的 ROPC（密码）授权：
@@ -220,9 +235,41 @@ def _unique_path(dir_path, filename):
     return path
 
 
-def fetch(folder, account_key="agent", output_root="uspto_upload", move=True):
-    """读 folder 抓附件归档；move=True 时把处理成功的邮件移到 {folder}-done、
-    未落任何附件的移到 {folder}-skipped（两个兜底文件夹自动创建）。"""
+def _settle_agent_followup(case_no, case_dir, filenames):
+    """回邮附件已归档 → 命中该案 agent_followup（环节6）置 done、回填归档信息。
+    与环节3 finalize_signed_review 对称（那边销 signature_followup）。
+    返回一句状态串；无匹配/DB 失败都不抛（销账是 best-effort，不影响归档）。"""
+    import datetime
+    now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    rows = _db_exec(
+        "SELECT id, fields_json, status FROM submission_tasks "
+        "WHERE task_type='agent_followup' AND case_volume=%s ORDER BY created_at DESC LIMIT 1",
+        (case_no,))
+    if not rows:
+        return "无 agent_followup（环节5 可能尚未发美代理）"
+    row = rows[0]
+    if row.get("status") == "done":
+        return "agent_followup 已 done，跳过"
+    try:
+        fj = json.loads(row.get("fields_json") or "{}")
+    except Exception:
+        fj = {}
+    # 保留环节5 写入的 sent_* 信息，追加回邮归档块（对称 signature_followup.reply）
+    fj["reply"] = {
+        "archived_dir": case_dir,
+        "attachments": filenames,
+        "received_at": now,
+        "by": "fetch_uspto_upload_attachments",
+    }
+    _db_exec(
+        "UPDATE submission_tasks SET status='done', fields_json=%s, confirmed_at=%s, updated_at=%s WHERE id=%s",
+        (json.dumps(fj, ensure_ascii=False), now, now, row["id"]))
+    return f"agent_followup 置 done（原 {row.get('status')}）"
+
+
+def fetch(folder, account_key="agent", output_root="uspto_upload", move=True, settle=True):
+    """读 folder 抓附件归档；move=True 把成功邮件移 {folder}-done、未落附件移 {folder}-skipped；
+    settle=True 把已归档案号的 agent_followup（环节6）置 done 并回填归档信息（best-effort）。"""
     cfg = load_account(account_key)
     out_root = output_root if os.path.isabs(output_root) else os.path.join(SCRIPT_DIR, output_root)
     done_folder = f"{folder}-done"
@@ -237,6 +284,7 @@ def fetch(folder, account_key="agent", output_root="uspto_upload", move=True):
         print(f"文件夹「{folder}」共 {len(msg_list)} 封邮件")
 
         saved_by_case = {}       # 案号 -> 存了几个附件
+        saved_files_by_case = {} # 案号 -> [文件名]（销账回填用）
         done_nums = []           # 至少存下 1 个附件的邮件（成功）
         skipped_nums = []        # 未落任何附件的邮件（无附件 / 附件名都无案号）
         skipped_no_case = 0      # 附件名无案号被跳过的附件数
@@ -263,6 +311,7 @@ def fetch(folder, account_key="agent", output_root="uspto_upload", move=True):
                 with open(dest, "wb") as f:
                     f.write(payload)
                 saved_by_case[case_no] = saved_by_case.get(case_no, 0) + 1
+                saved_files_by_case.setdefault(case_no, []).append(os.path.basename(dest))
                 saved_this_email += 1
                 print(f"  [存] {case_no}/ <- {os.path.basename(dest)}")
 
@@ -276,6 +325,20 @@ def fetch(folder, account_key="agent", output_root="uspto_upload", move=True):
             if moved_done or moved_skipped:
                 imap.expunge()
 
+        # 销账：已归档案号 → 命中 agent_followup 置 done（best-effort，失败不影响归档）
+        settle_notes = {}
+        if settle and saved_by_case:
+            if not _SETTLE_OK:
+                settle_notes["_"] = "未装 pymysql / 无法导入 db_query，跳过销账（文件已归档）"
+            else:
+                for case_no in sorted(saved_by_case):
+                    try:
+                        settle_notes[case_no] = _settle_agent_followup(
+                            case_no, os.path.join(out_root, case_no),
+                            saved_files_by_case.get(case_no, []))
+                    except Exception as ex:
+                        settle_notes[case_no] = f"销账失败（不影响归档）：{ex}"
+
         print("\n===== 汇总 =====")
         print(f"成功（有附件入库）：{len(done_nums)} 封  未落附件：{len(skipped_nums)} 封")
         print(f"归档案号：{len(saved_by_case)} 个 -> {out_root}")
@@ -287,6 +350,12 @@ def fetch(folder, account_key="agent", output_root="uspto_upload", move=True):
             print(f"已移动：{moved_done} 封 -> {done_folder}，{moved_skipped} 封 -> {skipped_folder}")
         else:
             print("（move=False，未移动邮件）")
+        if settle:
+            print("销账 agent_followup：")
+            for k, v in settle_notes.items():
+                print(f"  {k}: {v}")
+        else:
+            print("（settle=False，未销账）")
     finally:
         try:
             imap.logout()
