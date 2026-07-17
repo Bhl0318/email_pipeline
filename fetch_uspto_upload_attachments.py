@@ -18,7 +18,7 @@
 
 销账（环节6）：附件归档后，按案号命中 atw.submission_tasks 里该案的 agent_followup
 （环节5 发美代理后插的占位），**先比对发出/回收附件**（agent_followup.files vs 本次回邮件，
-都去掉开头 'signed' 前缀后按名对应；美代理"发多少回多少"）：
+按「原名主体作子串出现在回邮名里」对应，%原名%，兼容加前/后缀改名；美代理"发多少回多少"）：
   - 逐件对应、不缺不多 → 置 status='done'；
   - 有缺件/多出对不上 → 置 status='received'（不 done），差异记 fields_json.reply.{missing,extra} 待人工。
 把归档目录/文件/比对结果写进 fields_json.reply，与环节3 finalize_signed_review 销 signature_followup 对称。
@@ -238,12 +238,11 @@ def _unique_path(dir_path, filename):
     return path
 
 
-def _norm_attach_name(n):
-    """归一化附件名用于比对：取 basename、去开头 'signed' 前缀（美代理改名习惯：原名前加
-    signed，忽略大小写/空格/_/-）、小写。如 'Signed_POA-x.pdf' 与 'POA-x.pdf' 归一后相同。"""
-    base = os.path.basename((n or "").replace("\\", "/"))
-    base = re.sub(r"^\s*signed[\s_\-]*", "", base, flags=re.I)
-    return base.strip().lower()
+def _name_stem(n):
+    """取附件名主体用于比对：basename 去扩展名、小写、去首尾空白。
+    美代理改名要么加前缀要么加后缀，原名主体一定完整保留，故用「包含」比对
+    （原名主体 in 回邮名主体，%原名%），比精确去 signed 前缀更稳，且容忍扩展名变化。"""
+    return os.path.splitext(os.path.basename((n or "").replace("\\", "/")))[0].strip().lower()
 
 
 def _settle_agent_followup(case_no, case_dir, filenames):
@@ -267,13 +266,20 @@ def _settle_agent_followup(case_no, case_dir, filenames):
     except Exception:
         fj = {}
 
-    # 比对：环节5 发出的附件名(fields_json.files) vs 本次回邮存下的附件名（都去 signed 前缀）
+    # 比对：环节5 发出的附件名(fields_json.files) vs 本次回邮存下的附件名。
+    # 规则：发送件名主体作为**子串**出现在某回邮件名主体里即算对应（%原名%，兼容加前/后缀改名）。
     sent = fj.get("files") or []
-    sent_map = {_norm_attach_name(s): s for s in sent}
-    saved_map = {_norm_attach_name(s): s for s in (filenames or [])}
-    missing = [orig for k, orig in sent_map.items() if k not in saved_map]   # 发了没回
-    extra = [orig for k, orig in saved_map.items() if k not in sent_map]     # 回了对不上发送件
-    matched = [orig for k, orig in sent_map.items() if k in saved_map]
+    saved_stems = [(s, _name_stem(s)) for s in (filenames or [])]
+
+    def _has_match(sent_stem):
+        return bool(sent_stem) and any(sent_stem in rst for _o, rst in saved_stems)
+
+    missing, matched = [], []
+    for s in sent:
+        (matched if _has_match(_name_stem(s)) else missing).append(s)   # 发了没回 → missing
+    sent_stems = [_name_stem(s) for s in sent]
+    # 回了却对不上任何发送件 → extra（原名主体不含任一发送件主体）
+    extra = [o for o, rst in saved_stems if not any(ss and ss in rst for ss in sent_stems)]
     ok = bool(sent) and not missing and not extra
 
     fj["reply"] = {
