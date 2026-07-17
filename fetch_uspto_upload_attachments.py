@@ -17,9 +17,12 @@
 -> FilingSignatures-skipped（两个文件夹自动创建）。传 move=False 可只抓不移。
 
 销账（环节6）：附件归档后，按案号命中 atw.submission_tasks 里该案的 agent_followup
-（环节5 发美代理后插的占位）→ 置 status='done'、把归档目录/文件写进 fields_json.reply，
-与环节3 finalize_signed_review 销 signature_followup 对称。best-effort：无 pymysql/无匹配
-都不影响归档；传 settle=False 可只抓不销账。DB 走 scripts/report/db_query.py（atw）。
+（环节5 发美代理后插的占位），**先比对发出/回收附件**（agent_followup.files vs 本次回邮件，
+都去掉开头 'signed' 前缀后按名对应；美代理"发多少回多少"）：
+  - 逐件对应、不缺不多 → 置 status='done'；
+  - 有缺件/多出对不上 → 置 status='received'（不 done），差异记 fields_json.reply.{missing,extra} 待人工。
+把归档目录/文件/比对结果写进 fields_json.reply，与环节3 finalize_signed_review 销 signature_followup 对称。
+best-effort：无 pymysql/无匹配/连库失败都不影响归档；传 settle=False 可只抓不销账。DB 走 scripts/report/db_query.py（atw）。
 
 ⚠️ 会移动邮件（copy+删除原件+expunge）并写库（agent_followup 置 done），非只读；
    连真实邮箱/数据库，请在受控环境运行。
@@ -235,10 +238,19 @@ def _unique_path(dir_path, filename):
     return path
 
 
+def _norm_attach_name(n):
+    """归一化附件名用于比对：取 basename、去开头 'signed' 前缀（美代理改名习惯：原名前加
+    signed，忽略大小写/空格/_/-）、小写。如 'Signed_POA-x.pdf' 与 'POA-x.pdf' 归一后相同。"""
+    base = os.path.basename((n or "").replace("\\", "/"))
+    base = re.sub(r"^\s*signed[\s_\-]*", "", base, flags=re.I)
+    return base.strip().lower()
+
+
 def _settle_agent_followup(case_no, case_dir, filenames):
-    """回邮附件已归档 → 命中该案 agent_followup（环节6）置 done、回填归档信息。
-    与环节3 finalize_signed_review 对称（那边销 signature_followup）。
-    返回一句状态串；无匹配/DB 失败都不抛（销账是 best-effort，不影响归档）。"""
+    """回邮附件已归档 → 命中该案 agent_followup（环节6），先**比对发出/回收附件**再决定：
+    - 发多少回多少、逐件对应（允许加 signed 前缀）→ 置 done；
+    - 有缺件(missing)/多出对不上(extra) → 置 received（不 done），差异写 fields_json.reply，待人工。
+    与环节3 finalize_signed_review 对称。返回一句状态串；无匹配/DB 失败不抛（best-effort）。"""
     import datetime
     now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     rows = _db_exec(
@@ -254,17 +266,35 @@ def _settle_agent_followup(case_no, case_dir, filenames):
         fj = json.loads(row.get("fields_json") or "{}")
     except Exception:
         fj = {}
-    # 保留环节5 写入的 sent_* 信息，追加回邮归档块（对称 signature_followup.reply）
+
+    # 比对：环节5 发出的附件名(fields_json.files) vs 本次回邮存下的附件名（都去 signed 前缀）
+    sent = fj.get("files") or []
+    sent_map = {_norm_attach_name(s): s for s in sent}
+    saved_map = {_norm_attach_name(s): s for s in (filenames or [])}
+    missing = [orig for k, orig in sent_map.items() if k not in saved_map]   # 发了没回
+    extra = [orig for k, orig in saved_map.items() if k not in sent_map]     # 回了对不上发送件
+    matched = [orig for k, orig in sent_map.items() if k in saved_map]
+    ok = bool(sent) and not missing and not extra
+
     fj["reply"] = {
         "archived_dir": case_dir,
         "attachments": filenames,
         "received_at": now,
         "by": "fetch_uspto_upload_attachments",
+        "match": ok, "matched": matched, "missing": missing, "extra": extra,
     }
+    if ok:
+        _db_exec(
+            "UPDATE submission_tasks SET status='done', fields_json=%s, confirmed_at=%s, updated_at=%s WHERE id=%s",
+            (json.dumps(fj, ensure_ascii=False), now, now, row["id"]))
+        return f"比对一致（{len(matched)} 件），agent_followup 置 done（原 {row.get('status')}）"
+    # 不一致：置 received（不 done），留差异待人工
     _db_exec(
-        "UPDATE submission_tasks SET status='done', fields_json=%s, confirmed_at=%s, updated_at=%s WHERE id=%s",
-        (json.dumps(fj, ensure_ascii=False), now, now, row["id"]))
-    return f"agent_followup 置 done（原 {row.get('status')}）"
+        "UPDATE submission_tasks SET status='received', fields_json=%s, updated_at=%s WHERE id=%s",
+        (json.dumps(fj, ensure_ascii=False), now, row["id"]))
+    if not sent:
+        return "agent_followup.files 为空（环节5 未记发送件），无法比对；已置 received 待人工"
+    return f"比对不一致（缺{len(missing)}:{missing} 多{len(extra)}:{extra}），未 done，置 received 待人工"
 
 
 def fetch(folder, account_key="agent", output_root="uspto_upload", move=True, settle=True):
