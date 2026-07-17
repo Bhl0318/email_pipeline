@@ -30,8 +30,10 @@ CONFIG_PATH = os.path.join(SCRIPT_DIR, "scripts", "email_config.json")
 # 案号格式：[0-9A-Z]{5}-[0-9A-Z]{4}[A-Z]{2}[0-9A-Z]{2}（如 20609-0083US01）
 CASE_RE = re.compile(r"[0-9A-Z]{5}-[0-9A-Z]{4}[A-Z]{2}[0-9A-Z]{2}")
 
-# 内置账号：美代理回邮所在邮箱（agent@metis-ip.com）。metis-ip.com 走世纪互联
-# partner.outlook.cn，IMAP 用 smtp.partner.outlook.cn:993，支持明文密码登录（无需 OAuth2）。
+# 内置账号：美代理回邮所在邮箱（agent@metis-ip.com）。metis-ip.com 在世纪互联
+# partner.outlook.cn，IMAP 基本认证已被停用，必须走 OAuth2 的 ROPC（密码）授权：
+# 账号口令喂 token 端点换 access_token，再用 XOAUTH2 登 IMAP smtp.partner.outlook.cn:993。
+# Azure 应用（client_id/secret/tenant/resource）沿用 downUSPTO/single_parse_uspto.py 那套。
 # 明文口令按用户偏好直接内置，不抽到 gitignore。
 BUILTIN_ACCOUNTS = {
     "agent": {
@@ -39,7 +41,14 @@ BUILTIN_ACCOUNTS = {
         "imap_port": "993",
         "user": "agent@metis-ip.com",
         "password": "Metisip@2026",
-        "oauth2": {"enabled": False},
+        "oauth2": {
+            "enabled": True,
+            "token_url": "https://login.partner.microsoftonline.cn/"
+                         "7ca924ee-7831-4688-9f0f-369a714e8514/oauth2/token",
+            "client_id": "52ac8b85-7f91-4507-8750-393c9ea91300",
+            "client_secret": "dJESX3wTl2_KRpgnTDL4Bz3g-7-QiHje4-",
+            "resource": "https://partner.outlook.cn",
+        },
     },
 }
 
