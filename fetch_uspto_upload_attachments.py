@@ -177,8 +177,14 @@ def iter_attachments(msg):
 
 
 def _safe_name(name):
-    """去掉路径分隔符，避免附件名里带 / \\ 造成越界写入。"""
-    return os.path.basename(name.replace("\\", "/")).strip() or "attachment"
+    """清洗附件名，得到跨平台安全的文件名：
+    - 取 basename（去路径分隔符，防越界写入）；
+    - 折叠换行/制表等空白为单空格（MIME 头折行会带 \\r\\n，Windows 不允许文件名含换行）；
+    - 替换 Windows 非法字符 <>:"/\\|?* 和控制字符为 _。"""
+    base = os.path.basename(name.replace("\\", "/"))
+    base = re.sub(r"\s+", " ", base)                  # 换行/多空白 → 单空格
+    base = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", base)  # 非法/控制字符 → _
+    return base.strip().strip(".") or "attachment"
 
 
 def _unique_path(dir_path, filename):
