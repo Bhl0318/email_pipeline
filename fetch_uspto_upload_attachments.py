@@ -6,13 +6,12 @@
 存到同一个文件夹（以案号命名）。这些文件即环节7 要上传 Patent Center 的件。
 
 参考 projects/set_skill/skill-catalog/skills/email/scripts/read_email.py 的 IMAP
-登录 / UTF-7 文件夹名 / 邮件头解码。凭据复用本目录 scripts/email_config.json（多账号）。
+登录 / UTF-7 文件夹名 / 邮件头解码。默认账号 agent@metis-ip.com 内置于本脚本
+（明文口令，走 partner.outlook.cn 密码认证）；其它账号可退回 scripts/email_config.json。
 
-用法：
-  python3 fetch_uspto_upload_attachments.py <邮箱文件夹> [账号=docketing] [输出根目录=uspto_upload]
-例：
-  python3 fetch_uspto_upload_attachments.py "美代理签字回邮"
-  python3 fetch_uspto_upload_attachments.py "美代理签字回邮" docketing uspto_upload
+用法（默认读 agent@metis-ip.com 的 FilingSignatures 文件夹）：
+  python3 fetch_uspto_upload_attachments.py                          # 用默认
+  python3 fetch_uspto_upload_attachments.py FilingSignatures agent uspto_upload
 
 ⚠️ 只读邮箱、只落本地文件；不移动/删除任何邮件。连真实邮箱，请在受控环境运行。
 """
@@ -31,14 +30,32 @@ CONFIG_PATH = os.path.join(SCRIPT_DIR, "scripts", "email_config.json")
 # 案号格式：[0-9A-Z]{5}-[0-9A-Z]{4}[A-Z]{2}[0-9A-Z]{2}（如 20609-0083US01）
 CASE_RE = re.compile(r"[0-9A-Z]{5}-[0-9A-Z]{4}[A-Z]{2}[0-9A-Z]{2}")
 
+# 内置账号：美代理回邮所在邮箱（agent@metis-ip.com）。metis-ip.com 走世纪互联
+# partner.outlook.cn，IMAP 用 smtp.partner.outlook.cn:993，支持明文密码登录（无需 OAuth2）。
+# 明文口令按用户偏好直接内置，不抽到 gitignore。
+BUILTIN_ACCOUNTS = {
+    "agent": {
+        "imap_host": "smtp.partner.outlook.cn",
+        "imap_port": "993",
+        "user": "agent@metis-ip.com",
+        "password": "Metisip@2026",
+        "oauth2": {"enabled": False},
+    },
+}
+
 
 def load_account(account_key):
-    """从 scripts/email_config.json 取指定账号配置（含 imap/oauth2）。"""
+    """取账号配置：先查内置账号，再退回 scripts/email_config.json 的 accounts。"""
+    if account_key in BUILTIN_ACCOUNTS:
+        return BUILTIN_ACCOUNTS[account_key]
+    if not os.path.exists(CONFIG_PATH):
+        raise SystemExit(f"账号 '{account_key}' 不是内置账号，且 {CONFIG_PATH} 不存在")
     with open(CONFIG_PATH, "r", encoding="utf-8") as f:
         cfg = json.load(f)
     accounts = cfg.get("accounts") or {}
     if account_key not in accounts:
-        raise SystemExit(f"email_config.json 中找不到账号 '{account_key}'，可用：{list(accounts)}")
+        raise SystemExit(f"找不到账号 '{account_key}'，内置：{list(BUILTIN_ACCOUNTS)}，"
+                         f"email_config.json：{list(accounts)}")
     return accounts[account_key]
 
 
@@ -166,7 +183,7 @@ def _unique_path(dir_path, filename):
     return path
 
 
-def fetch(folder, account_key="docketing", output_root="uspto_upload"):
+def fetch(folder, account_key="agent", output_root="uspto_upload"):
     cfg = load_account(account_key)
     out_root = output_root if os.path.isabs(output_root) else os.path.join(SCRIPT_DIR, output_root)
 
@@ -224,10 +241,8 @@ def fetch(folder, account_key="docketing", output_root="uspto_upload"):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("用法: python3 fetch_uspto_upload_attachments.py <邮箱文件夹> [账号=docketing] [输出根目录=uspto_upload]")
-        sys.exit(1)
-    folder_arg = sys.argv[1]
-    account_arg = sys.argv[2] if len(sys.argv) > 2 else "docketing"
+    # 默认：agent@metis-ip.com 的 FilingSignatures 文件夹 → uspto_upload/{案号}/
+    folder_arg = sys.argv[1] if len(sys.argv) > 1 else "FilingSignatures"
+    account_arg = sys.argv[2] if len(sys.argv) > 2 else "agent"
     output_arg = sys.argv[3] if len(sys.argv) > 3 else "uspto_upload"
     fetch(folder_arg, account_arg, output_arg)
