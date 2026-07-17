@@ -13,7 +13,10 @@
   python3 fetch_uspto_upload_attachments.py                          # 用默认
   python3 fetch_uspto_upload_attachments.py FilingSignatures agent uspto_upload
 
-⚠️ 只读邮箱、只落本地文件；不移动/删除任何邮件。连真实邮箱，请在受控环境运行。
+处理完把邮件归位：成功（有附件入库）-> FilingSignatures-done，未落任何附件
+-> FilingSignatures-skipped（两个文件夹自动创建）。传 move=False 可只抓不移。
+
+⚠️ 会移动邮件（copy+删除原件+expunge），非只读；连真实邮箱，请在受控环境运行。
 """
 import sys
 import os
@@ -137,11 +140,30 @@ def imap_utf7_encode(s):
     return "".join(out)
 
 
-def select_folder(imap, folder):
-    status, data = imap.select(f'"{imap_utf7_encode(folder)}"', readonly=True)
+def select_folder(imap, folder, readonly=True):
+    status, data = imap.select(f'"{imap_utf7_encode(folder)}"', readonly=readonly)
     if status != "OK":
         detail = data[0].decode(errors="replace") if data and data[0] else "不存在或无权限"
         raise SystemExit(f"无法打开文件夹 {folder}：{detail}")
+
+
+def _move_nums(imap, nums, target_folder):
+    """把 nums（当前所选源文件夹的序号列表）复制到 target_folder 并标记删除（不 expunge）。
+    目标不存在则创建。返回成功复制数。调用方在两类都移完后统一 expunge 一次
+    （expunge 前序号不变，故先 copy+store、最后一次 expunge 是安全的）。"""
+    if not nums:
+        return 0
+    enc = imap_utf7_encode(target_folder)
+    imap.create(f'"{enc}"')  # 已存在会返回 NO，忽略
+    moved = 0
+    for num in nums:
+        status, _ = imap.copy(num, f'"{enc}"')
+        if status == "OK":
+            imap.store(num, "+FLAGS", "\\Deleted")
+            moved += 1
+        else:
+            print(f"  [移动失败] 序号 {num} 复制到 {target_folder} 未成功，保留原处")
+    return moved
 
 
 def decode_str(s):
@@ -198,20 +220,26 @@ def _unique_path(dir_path, filename):
     return path
 
 
-def fetch(folder, account_key="agent", output_root="uspto_upload"):
+def fetch(folder, account_key="agent", output_root="uspto_upload", move=True):
+    """读 folder 抓附件归档；move=True 时把处理成功的邮件移到 {folder}-done、
+    未落任何附件的移到 {folder}-skipped（两个兜底文件夹自动创建）。"""
     cfg = load_account(account_key)
     out_root = output_root if os.path.isabs(output_root) else os.path.join(SCRIPT_DIR, output_root)
+    done_folder = f"{folder}-done"
+    skipped_folder = f"{folder}-skipped"
 
     imap = login_imap(cfg)
     try:
-        select_folder(imap, folder)
+        # move 需读写模式（copy/store/expunge）；仅抓取用只读
+        select_folder(imap, folder, readonly=not move)
         _, msg_nums = imap.search(None, "ALL")
         msg_list = msg_nums[0].split()
         print(f"文件夹「{folder}」共 {len(msg_list)} 封邮件")
 
-        saved_by_case = {}   # 案号 -> 存了几个附件
-        emails_with_att = 0
-        skipped_no_case = 0
+        saved_by_case = {}       # 案号 -> 存了几个附件
+        done_nums = []           # 至少存下 1 个附件的邮件（成功）
+        skipped_nums = []        # 未落任何附件的邮件（无附件 / 附件名都无案号）
+        skipped_no_case = 0      # 附件名无案号被跳过的附件数
 
         for num in msg_list:
             _, data = imap.fetch(num, "(RFC822)")
@@ -220,12 +248,8 @@ def fetch(folder, account_key="agent", output_root="uspto_upload"):
             msg = email.message_from_bytes(data[0][1])
             subject = decode_str(msg.get("Subject", ""))
 
-            atts = list(iter_attachments(msg))
-            if not atts:
-                continue  # 无附件，跳过
-            emails_with_att += 1
-
-            for filename, payload in atts:
+            saved_this_email = 0
+            for filename, payload in iter_attachments(msg):
                 fname = _safe_name(filename)
                 m = CASE_RE.search(fname)
                 if not m:
@@ -239,15 +263,30 @@ def fetch(folder, account_key="agent", output_root="uspto_upload"):
                 with open(dest, "wb") as f:
                     f.write(payload)
                 saved_by_case[case_no] = saved_by_case.get(case_no, 0) + 1
+                saved_this_email += 1
                 print(f"  [存] {case_no}/ <- {os.path.basename(dest)}")
 
+            (done_nums if saved_this_email else skipped_nums).append(num)
+
+        # 移动：成功 -> {folder}-done，未落附件 -> {folder}-skipped，最后统一 expunge
+        moved_done = moved_skipped = 0
+        if move:
+            moved_done = _move_nums(imap, done_nums, done_folder)
+            moved_skipped = _move_nums(imap, skipped_nums, skipped_folder)
+            if moved_done or moved_skipped:
+                imap.expunge()
+
         print("\n===== 汇总 =====")
-        print(f"含附件邮件：{emails_with_att} 封")
+        print(f"成功（有附件入库）：{len(done_nums)} 封  未落附件：{len(skipped_nums)} 封")
         print(f"归档案号：{len(saved_by_case)} 个 -> {out_root}")
         for case_no, n in sorted(saved_by_case.items()):
             print(f"  {case_no}: {n} 个附件")
         if skipped_no_case:
             print(f"附件名无案号被跳过：{skipped_no_case} 个")
+        if move:
+            print(f"已移动：{moved_done} 封 -> {done_folder}，{moved_skipped} 封 -> {skipped_folder}")
+        else:
+            print("（move=False，未移动邮件）")
     finally:
         try:
             imap.logout()
