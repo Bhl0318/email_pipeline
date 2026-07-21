@@ -988,19 +988,20 @@ def dispatch_oa(all_results, all_emails=None, dry_run=False, test_project_prefix
 
 
 def archive_emails(all_emails, all_results=None, dry_run=False):
-    """单次归档：分类命中的邮件 move 到 TEST_AUTO，未命中（既非OA也非汇报信）的 move 到 TEST_SKIPPED。
+    """单次归档：仅把分类命中的邮件 move 到 TEST_AUTO；未命中（既非OA也非汇报信）的保持不动。
 
     命中判定按 message_id 是否出现在 all_results（分类结果，OA/汇报信共用）。
-    all_results 不传时退回旧行为：全部归 TEST_AUTO（兼容单 sink 直调）。
+    all_results 不传时退回旧行为：全部按命中处理（兼容单 sink 直调）。
+    未命中邮件不移动（留在原文件夹），靠 checkpoint 去重避免下次重复处理。
     email_pipeline 模式下归档只在这里发生一次（各 sink 内不再 move）。
     dry_run=True 时只打印不真正 move。"""
     matched_mids = {item.get("message_id", "") for item in (all_results or []) if item.get("message_id")}
-    # groups[(account, folder)] = [acc, 命中 mids[], 跳过 mids[]]
+    # groups[(account, folder)] = [acc, 命中 mids[], 未命中计数]
     groups = {}
     for acc, em in all_emails:
         key = (acc["account"], acc["folder"])
         if key not in groups:
-            groups[key] = [acc, [], []]
+            groups[key] = [acc, [], 0]
         mid = em.get("message_id", "")
         if not mid:
             continue
@@ -1008,18 +1009,17 @@ def archive_emails(all_emails, all_results=None, dry_run=False):
         if all_results is None or mid in matched_mids:
             groups[key][1].append(mid)
         else:
-            groups[key][2].append(mid)
-    for (account_name, folder), (acc, matched, skipped) in groups.items():
-        cfg = None
-        for target_folder, mids in (("TEST_AUTO", matched), ("TEST_SKIPPED", skipped)):
-            if not mids:
-                continue
-            if dry_run:
-                print(f"  [dry-run] 跳过归档 {len(mids)} 封（{account_name}/{folder} → {target_folder}）", file=sys.stderr)
-                continue
-            if cfg is None:
-                cfg = get_account_config(account_name)
-            move_emails(cfg, folder, mids, target_folder=target_folder)
+            groups[key][2] += 1  # 未命中：不动
+    for (account_name, folder), (acc, matched, skipped_n) in groups.items():
+        if skipped_n:
+            print(f"  未命中 {skipped_n} 封保持不动（{account_name}/{folder}）", file=sys.stderr)
+        if not matched:
+            continue
+        if dry_run:
+            print(f"  [dry-run] 跳过归档 {len(matched)} 封（{account_name}/{folder} → TEST_AUTO）", file=sys.stderr)
+            continue
+        cfg = get_account_config(account_name)
+        move_emails(cfg, folder, matched, target_folder="TEST_AUTO")
 
 
 if __name__ == "__main__":
