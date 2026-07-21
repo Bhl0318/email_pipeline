@@ -265,45 +265,46 @@ function deriveDeclKind(){
 function buildChecklist(declKind){
   const sm = (fields.subject_matter||"").toUpperCase();
   const ck = (k)=> opts[k] ? "checked" : "";
-  const entitySel = `<div class="field"><label>实体</label><select id="o-entity">
+  // 以下 entitySel/specDraw/declBlock 仅 DES 分支使用（编号=Design-Transmittal 表实物条目号）
+  const entitySel = `<div class="field"><label>2/3 实体</label><select id="o-entity">
       <option value="large" ${opts.entity==="large"?"selected":""}>大实体</option>
       <option value="small" ${opts.entity==="small"?"selected":""}>小实体</option>
       <option value="micro" ${opts.entity==="micro"?"selected":""}>微实体</option></select></div>`;
-  const specDraw = `<div class="field"><label>说明书总页数</label><input id="o-spec" value="${esc(opts.spec_pages||"")}"></div>
-      <div class="field"><label>附图总页数(sheets)</label><input id="o-draw" value="${esc(opts.drawing_sheets||"")}"></div>`;
-  const declBlock = `<div style="margin:10px 0 4px;font-size:11.5px;color:#64748b;">Inventor's Oath / Declaration</div>
-      <div class="checks"><label><input type="checkbox" id="o-has_declaration" ${ck("has_declaration")}>递交声明</label></div>
+  const specDraw = `<div class="field"><label>4 说明书总页数</label><input id="o-spec" value="${esc(opts.spec_pages||"")}"></div>
+      <div class="field"><label>5 附图总页数(sheets)</label><input id="o-draw" value="${esc(opts.drawing_sheets||"")}"></div>`;
+  const declBlock = `<div style="margin:10px 0 4px;font-size:11.5px;color:#64748b;">6 Inventor's Oath / Declaration</div>
+      <div class="checks"><label><input type="checkbox" id="o-has_declaration" ${ck("has_declaration")}>6 递交声明</label></div>
       <div class="grid">
-        <div class="field"><label>类型（按续案类型自动预选，可改）</label><select id="o-decl_kind">
+        <div class="field"><label>6 类型（按续案类型自动预选，可改）</label><select id="o-decl_kind">
           <option value="new" ${declKind==="copy"?"":"selected"}>a 新签署(original/copy)</option>
           <option value="copy" ${declKind==="copy"?"selected":""}>b 来自在先申请</option></select></div>
-        <div class="field"><label>Declaration 总页数</label><input id="o-decl" value="${esc(opts.declaration_pages||"")}"></div>
+        <div class="field"><label>6 Declaration 总页数</label><input id="o-decl" value="${esc(opts.declaration_pages||"")}"></div>
       </div>`;
 
   if (sm === "DES") {  // 外观 Design-Transmittal
-    return `<div class="section"><div class="section-head">Transmittal 递交清单（外观 Design-Transmittal；勾选本次实际递交的）</div><div class="section-body">
+    return `<div class="section"><div class="section-head">Transmittal 递交清单（编号对应外观 Design-Transmittal 表条目；勾选本次实际递交的）</div><div class="section-body">
       <div class="grid">${entitySel}${specDraw}</div>
       ${declBlock}
       <div class="checks" style="margin-top:8px;">
-        <label><input type="checkbox" id="o-has_ads" ${opts.has_ads!==false?"checked":""}>ADS</label>
-        <label><input type="checkbox" id="o-has_poa" ${ck("has_poa")}>Power of Attorney</label>
-        <label><input type="checkbox" id="o-has_assignment" ${ck("has_assignment")}>Assignment Papers</label>
-        <label><input type="checkbox" id="o-has_373_statement" ${ck("has_373_statement")}>37 CFR 3.73(c) 声明</label>
-        <label><input type="checkbox" id="o-has_preliminary_amendment" ${ck("has_preliminary_amendment")}>Preliminary Amendment</label>
+        <label><input type="checkbox" id="o-has_ads" ${opts.has_ads!==false?"checked":""}>7 ADS</label>
+        <label><input type="checkbox" id="o-has_assignment" ${ck("has_assignment")}>8 Assignment Papers</label>
+        <label><input type="checkbox" id="o-has_373_statement" ${ck("has_373_statement")}>9 37 CFR 3.73(c) 声明</label>
+        <label><input type="checkbox" id="o-has_poa" ${ck("has_poa")}>9 Power of Attorney</label>
       </div>
       <div class="checks" style="margin-top:8px;">
-        <label><input type="checkbox" id="o-has_ids" ${ck("has_ids")}>IDS</label>
-        <label><input type="checkbox" id="o-has_foreign_copies" ${ck("has_foreign_copies")}>Copies of foreign patent documents</label>
-        <label><input type="checkbox" id="o-has_english_translation" ${ck("has_english_translation")}>English Translation</label>
+        <label><input type="checkbox" id="o-has_english_translation" ${ck("has_english_translation")}>10 English Translation</label>
+        <label><input type="checkbox" id="o-has_ids" ${ck("has_ids")}>11 IDS</label>
+        <label><input type="checkbox" id="o-has_foreign_copies" ${ck("has_foreign_copies")}>11 Copies of foreign patent documents</label>
+        <label><input type="checkbox" id="o-has_preliminary_amendment" ${ck("has_preliminary_amendment")}>12 Preliminary Amendment</label>
       </div>
       <div class="checks" style="margin-top:8px;">
-        <label><input type="checkbox" id="o-has_priority_copy" ${ck("has_priority_copy")}>Certified Copy of Priority Document</label>
-        <label><input type="checkbox" id="o-has_expedited_design" ${ck("has_expedited_design")}>Request for Expedited Examination (Design)</label>
+        <label><input type="checkbox" id="o-has_priority_copy" ${ck("has_priority_copy")}>14 Certified Copy of Priority Document</label>
+        <label><input type="checkbox" id="o-has_expedited_design" ${ck("has_expedited_design")}>15 Request for Expedited Examination (Design)</label>
       </div>
       <div class="checks" style="margin-top:8px;">
-        <label><input type="checkbox" id="o-use_customer_number" ${opts.use_customer_number!==false?"checked":""}>通信地址用 Customer Number（号码取签字人 Customer No）</label>
+        <label><input type="checkbox" id="o-use_customer_number" ${opts.use_customer_number!==false?"checked":""}>17 通信地址用 Customer Number（号码取签字人 Customer No）</label>
       </div>
-      <div class="field" style="margin-top:10px;"><label>Other（备注，勾选并填文本）</label><input id="o-remark" value="${esc(opts.remark||"")}"></div>
+      <div class="field" style="margin-top:10px;"><label>16 Other（备注，勾选并填文本）</label><input id="o-remark" value="${esc(opts.remark||"")}"></div>
     </div></div>`;
   }
 
