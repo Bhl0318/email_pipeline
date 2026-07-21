@@ -80,9 +80,28 @@ def main(dry_run=False):
     print("[email_pipeline] 归档完成" + ("（dry-run，未实际归档）" if dry_run else ""), file=sys.stderr)
 
 
+def _run_forever(interval_min, dry_run):
+    """循环运行：每 interval_min 分钟跑一次；单轮异常只记录不中断循环。"""
+    import time
+    print(f"[email_pipeline] 循环模式：每 {interval_min} 分钟运行一次（Ctrl+C 退出）", file=sys.stderr)
+    while True:
+        try:
+            main(dry_run=dry_run)
+        except Exception as e:
+            print(f"[email_pipeline] 本轮运行异常，继续等待下一轮: {e}", file=sys.stderr)
+        print(f"[email_pipeline] 休眠 {interval_min} 分钟...", file=sys.stderr)
+        time.sleep(interval_min * 60)
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="email_pipeline 统一调度入口")
     parser.add_argument("--dry-run", action="store_true",
                         help="只读+分类+打印，不写库/不发邮件/不移邮件")
+    parser.add_argument("--interval", type=int, default=0, metavar="MIN",
+                        help="循环运行间隔（分钟）；不填或 0 则只跑一次。例：--interval 30")
     args = parser.parse_args()
-    main(dry_run=args.dry_run)
+
+    if args.interval and args.interval > 0:
+        _run_forever(args.interval, args.dry_run)
+    else:
+        main(dry_run=args.dry_run)
