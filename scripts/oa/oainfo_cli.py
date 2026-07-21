@@ -542,9 +542,14 @@ def create_oa_page(project, dry_run=False):
 # ============================================================
 OA_LIST_PAGE_TITLE = "测试页面-写入新增OA"
 
+# 跟进人轮转分配：按批内立项顺序循环 [苏雅, 苏雅, 姚涓涓]（苏雅2件、姚涓涓1件）。
+# 注：每次运行（每批）从头开始轮，不跨批累计。
+FOLLOWUP_ROTATION = ["苏雅", "苏雅", "姚涓涓"]
 
-def _build_table_row(item):
-    """根据筛选结果构建一行 HTML。"""
+
+def _build_table_row(item, followup=""):
+    """根据筛选结果构建一行 HTML。列序对应页面表头：
+    案号/备注/OA收到日/OA发文日/答复期限/OA类别/跟进人/其它备注事项/人员分配/是否正式立项。"""
     project = item.get("project", "")
     oa_remark = item.get("oa_remark", "")
     entrust_date = item.get("entrust_date", "")
@@ -554,16 +559,16 @@ def _build_table_row(item):
 
     return (
         f"<tr>"
-        f"<td>{project}</td>"
-        f"<td>{oa_remark}</td>"
-        f"<td>{entrust_date}</td>"
-        f"<td>{oa_doc_date}</td>"
-        f"<td>{project_deadline}</td>"
-        f"<td>{project_name}</td>"
-        f"<td></td>"
-        f"<td></td>"
-        f"<td></td>"
-        f"<td></td>"
+        f"<td>{project}</td>"              # 案号
+        f"<td>{oa_remark}</td>"            # 备注
+        f"<td>{entrust_date}</td>"         # OA收到日
+        f"<td>{oa_doc_date}</td>"          # OA发文日
+        f"<td>{project_deadline}</td>"     # 答复期限
+        f"<td>{project_name}</td>"         # OA类别
+        f"<td>{followup}</td>"             # 跟进人
+        f"<td></td>"                       # 其它备注事项
+        f"<td></td>"                       # 人员分配
+        f"<td></td>"                       # 是否正式立项
         f"</tr>"
     )
 
@@ -588,12 +593,15 @@ def append_oa_to_wiki(results):
 
     body = page["body"]
 
-    # 构建新行
+    # 构建新行（跟进人按 FOLLOWUP_ROTATION 轮转分配，只对有案号的行计数）
     new_rows = ""
+    idx = 0
     for item in results:
         if not item.get("project"):
             continue
-        new_rows += _build_table_row(item) + "\n"
+        followup = FOLLOWUP_ROTATION[idx % len(FOLLOWUP_ROTATION)]
+        new_rows += _build_table_row(item, followup) + "\n"
+        idx += 1
 
     if not new_rows:
         return {"code": 0, "msg": "无有效数据写入", "count": 0}
