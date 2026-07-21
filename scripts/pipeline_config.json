@@ -5,7 +5,7 @@
   ],
   "sinks": {
     "oa": true,
-    "report": true
+    "report": false
   },
   "oa_test_project_prefix": null
 }
