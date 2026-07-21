@@ -15,6 +15,7 @@ case_info 结构对齐三个生成器（ads_generator/poa_generator/transmittal_
 """
 import datetime
 import json
+import re
 from pathlib import Path
 
 from .common import clean_priority_no, infer_subject_matter
@@ -63,13 +64,21 @@ _COUNTRY_CODES = {
 }
 
 
+_PAREN_CODE_RE = re.compile(r"\(([A-Za-z]{2})\)")
+
+
 def _country_code(v):
-    """国家值规范成 ISO-2 代码（已是两位字母则大写；已知国名转代码；未知原样返回）。"""
+    """国家值规范成 ISO-2 代码（已是两位字母则大写；形如 "…China (CN)" 取括号内代码；
+    已知国名转代码；未知原样返回）。"""
     s = (v or "").strip()
     if not s:
         return ""
     if len(s) == 2 and s.isalpha():
         return s.upper()
+    # 提取器统一输出「全名 (XX)」，优先取括号内 2 字母代码（如 People's Republic of China (CN) → CN）
+    m = _PAREN_CODE_RE.search(s)
+    if m:
+        return m.group(1).upper()
     key = "".join(ch for ch in s.lower() if ch.isalnum())
     return _COUNTRY_CODES.get(key, s)
 
