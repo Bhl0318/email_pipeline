@@ -473,7 +473,8 @@ def _save_pdf_attachments_to_inbox(msg, msg_id, seq):
     返回保存的路径列表。写库时再移到 output/{案号}/source/。"""
     if not msg.is_multipart():
         return []
-    safe = re.sub(r'[\\/:*?"<>|@<>.]', '_', msg_id or '').strip('_')[:80] or f"seq_{seq}"
+    # 目录名 allowlist：只留字母数字和 ._-，其余（含空白/控制字符/@等）一律换 _，防非法路径
+    safe = re.sub(r'[^A-Za-z0-9._-]', '_', msg_id or '').strip('_')[:80] or f"seq_{seq}"
     target = os.path.join(OUTPUT_INBOX_DIR, safe)
     saved = []
     for part in msg.walk():
@@ -552,7 +553,8 @@ def parse_message(msg, attachment_dir=None):
         "to": parse_address_list(msg.get("To")),
         "cc": parse_address_list(msg.get("Cc")),
         "date": parse_email_date(msg),
-        "message_id": msg.get("Message-ID", ""),
+        # 去折行：Message-ID 头可能被折行含 \r\n\t，清掉内部空白，避免用作路径/IMAP搜索/键值时出错
+        "message_id": re.sub(r"\s+", "", msg.get("Message-ID", "") or ""),
         "body": body,
         "html_body": html_body,
         "attachments": get_attachments(msg),

@@ -353,7 +353,8 @@ def parse_message(msg, attachment_dir=None):
         "to": parse_address_list(msg.get("To")),
         "cc": parse_address_list(msg.get("Cc")),
         "date": parse_email_date(msg),
-        "message_id": msg.get("Message-ID", ""),
+        # 去折行：Message-ID 头可能被折行含 \r\n\t，清掉内部空白，避免用作路径/IMAP搜索/键值时出错
+        "message_id": re.sub(r"\s+", "", msg.get("Message-ID", "") or ""),
         "body": body,
         "html_body": html_body,
         "attachments": get_attachments(msg),
