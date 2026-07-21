@@ -870,6 +870,10 @@ DEFAULT_ACCOUNTS = [
     # {"account": "attorneys", "folder": "TEST"}
 ]
 
+# 无 checkpoint 时的回溯窗口（天）。设计为每天定时运行，首次/丢断点只读最近 1 天，
+# 不拉历史；有 checkpoint 时仍按断点增量读，漏跑一天下次会自动补上，不漏邮件。
+LOOKBACK_DAYS = 1
+
 
 def read_and_classify(accounts=None, config_path=None):
     """读邮件 + 分类。供单独运行和 email_pipeline 统一调度共用。
@@ -899,9 +903,9 @@ def read_and_classify(accounts=None, config_path=None):
                 since = datetime.fromisoformat(last_time) - timedelta(hours=1)
                 print(f"从断点继续: {since.isoformat()}", file=sys.stderr)
             except ValueError:
-                since = datetime.now() - timedelta(days=700)
+                since = datetime.now() - timedelta(days=LOOKBACK_DAYS)
         else:
-            since = datetime.now() - timedelta(days=700)
+            since = datetime.now() - timedelta(days=LOOKBACK_DAYS)
 
         # 读取邮件
         cfg = get_account_config(account_name)
