@@ -20,7 +20,10 @@ options（transmittal_options）schema（全部可选，缺省不勾/不填；�
     "has_ids": bool, "has_ids_copies": bool,     # item13 IDS(+copies attached)
     "has_preliminary_amendment": bool,           # item14
     "remark": "",                                # item18 Other
-    "use_customer_number": bool }                # item19 通信地址用 Customer Number
+    "use_customer_number": bool,                 # item19 通信地址用 Customer Number
+    # 以下为 Design-Transmittal(外观)专有条目（UTL 无对应字段，忽略）：
+    "has_assignment": bool, "has_373_statement": bool, "has_english_translation": bool,
+    "has_foreign_copies": bool, "has_priority_copy": bool, "has_expedited_design": bool }
 """
 import datetime
 from pathlib import Path
@@ -114,18 +117,33 @@ def _options_fields(ttype: str, opts: dict) -> dict:
             f["Specification"] = "Yes"; f["Total Pages"] = o["spec_pages"]
         if o.get("drawing_sheets"):
             f["Drawings"] = "Yes"; f["Total Sheets"] = o["drawing_sheets"]
+        # item6 Oath/Declaration（Newly executed 新签署 / Copy from prior application 来自在先申请）
+        if o.get("has_declaration"):
+            f["Copy from prior application" if o.get("declaration_kind") == "copy" else "Newly executed"] = "Yes"
         if o.get("declaration_pages"):
             f["Total Pages_2"] = o["declaration_pages"]
         if o.get("has_assignment"):
             f["Assignment Papers"] = "Yes"
+        if o.get("has_373_statement"):
+            f["37 CFR 3.73 (c) Statement"] = "Yes"
         if o.get("has_poa"):
             f["Power of Attorney"] = "Yes"
+        if o.get("has_english_translation"):
+            f["English Translation Document"] = "Yes"
         if o.get("has_ids"):
             f["Information Disclosure Statement (IDS)"] = "Yes"
+        if o.get("has_foreign_copies"):
+            f["Copies of foreign patent documents"] = "Yes"
         if o.get("has_preliminary_amendment"):
             f["Preliminary Amendment"] = "Yes"
+        if o.get("has_priority_copy"):
+            f["Certified Copy of Priority Document"] = "Yes"
+        if o.get("has_expedited_design"):
+            f["Request for Expedited Examination of a Design Application"] = "Yes"
         if o.get("has_ads"):
             f["Application Data Sheet"] = "Yes"
+        if o.get("use_customer_number"):
+            f["Customer Number"] = "Yes"
         if o.get("remark"):
             f["Other"] = "Yes"; f["Other 1"] = o["remark"]
 
