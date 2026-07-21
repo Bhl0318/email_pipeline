@@ -573,6 +573,62 @@ def _build_table_row(item, followup=""):
     )
 
 
+# 新建月份折叠块用的表格骨架（列宽/表头对齐现有页面的 10 列）
+_OA_LIST_COLGROUP = (
+    '<colgroup><col style="width: 135.0px;" /><col style="width: 107.0px;" />'
+    '<col style="width: 95.0px;" /><col style="width: 95.0px;" />'
+    '<col style="width: 111.0px;" /><col style="width: 248.0px;" />'
+    '<col style="width: 84.0px;" /><col style="width: 127.0px;" />'
+    '<col style="width: 373.0px;" /><col style="width: 246.0px;" /></colgroup>'
+)
+_OA_LIST_HEADER_ROW = (
+    '<tr><th>案号</th><th>备注</th><th>OA收到日</th><th>OA发文日</th><th>答复期限</th>'
+    '<th>OA类别</th><th>跟进人</th><th>其它备注事项</th><th>人员分配</th><th>是否正式立项</th></tr>'
+)
+
+
+def _month_title(dt):
+    """写入时间 → 折叠块标题，如 2026年7月（月份不补零，对齐现有页面）。"""
+    return f"{dt.year}年{dt.month}月"
+
+
+def _new_month_block(month_title, rows_html):
+    """构造一个新的月份折叠块（expand 宏 + 表头 + 数据行）。"""
+    return (
+        '<ac:structured-macro ac:name="expand" ac:schema-version="1">'
+        f'<ac:parameter ac:name="title">{month_title}</ac:parameter>'
+        '<ac:rich-text-body>'
+        f'<table class="fixed-table wrapped">{_OA_LIST_COLGROUP}<tbody>'
+        f'{_OA_LIST_HEADER_ROW}{rows_html}</tbody></table>'
+        '</ac:rich-text-body></ac:structured-macro>'
+    )
+
+
+def _insert_rows_by_month(body, rows_html, month_title):
+    """把 rows_html 插入 month_title 对应折叠块表格的顶部（表头行之后）。
+    该月折叠块不存在时，新建并插到所有折叠块最前面。
+    返回 (new_body, created)。"""
+    title_tag = f'<ac:parameter ac:name="title">{month_title}</ac:parameter>'
+    idx = body.find(title_tag)
+    if idx != -1:
+        # 该 title 之后第一个 <tbody...> → 其后第一个 </tr>（表头行结束）→ 插到其后（表格顶部）
+        tb = body.find('<tbody', idx)
+        if tb != -1:
+            tb_gt = body.find('>', tb)
+            hdr_end = body.find('</tr>', tb_gt)
+            if hdr_end != -1:
+                pos = hdr_end + len('</tr>')
+                return body[:pos] + rows_html + body[pos:], False
+        # 结构异常兜底：插到全页第一个 </tbody> 前
+        return body.replace('</tbody>', rows_html + '</tbody>', 1), False
+    # 该月折叠块不存在 → 新建，插到第一个 expand 宏之前（置顶）
+    block = _new_month_block(month_title, rows_html)
+    m = re.search(r'<ac:structured-macro ac:name="expand"', body)
+    if m:
+        return body[:m.start()] + block + body[m.start():], True
+    return body + block, True
+
+
 def append_oa_to_wiki(results):
     """
     将筛选结果批量追加到 Wiki 新增 OA 页面的表格中。
@@ -606,12 +662,12 @@ def append_oa_to_wiki(results):
     if not new_rows:
         return {"code": 0, "msg": "无有效数据写入", "count": 0}
 
-    # 在 </tbody> 前插入新行
-    if "</tbody>" in body:
-        body = body.replace("</tbody>", new_rows + "</tbody>", 1)
-    else:
-        logger.error("页面中未找到 </tbody> 标签")
-        return {"code": 1, "msg": "页面格式异常，未找到表格", "count": 0}
+    # 按写入时间的月份，插到对应折叠块表格顶部（表头之后）；该月不存在则新建并置顶
+    from datetime import datetime
+    month_title = _month_title(datetime.now())
+    body, created = _insert_rows_by_month(body, new_rows, month_title)
+    if created:
+        logger.info(f"新增月份折叠块: {month_title}")
 
     # 更新页面
     status = wiki.update_page(page["id"], OA_LIST_PAGE_TITLE, body, page["version"])

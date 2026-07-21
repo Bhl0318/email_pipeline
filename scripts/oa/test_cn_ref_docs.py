@@ -15,6 +15,7 @@ from oainfo_cli import (
     build_full_template, build_simple_template,
     _splice_ref_docs_into_body, _splice_oa_row, _ref_docs_cell_html,
     _build_table_row, FOLLOWUP_ROTATION,
+    _insert_rows_by_month,
 )
 
 # 拉取到的真实样本
@@ -142,6 +143,37 @@ def test_followup_rotation_order():
        f"7 条分配序列正确 (got {seq})")
 
 
+_OA_LIST_SAMPLE = (
+    '<p>note</p>'
+    '<ac:structured-macro ac:name="expand" ac:schema-version="1">'
+    '<ac:parameter ac:name="title">2026年7月</ac:parameter>'
+    '<ac:rich-text-body><p><br /></p>'
+    '<table class="fixed-table wrapped"><colgroup><col /></colgroup><tbody>'
+    '<tr><th>案号</th><th>备注</th><th>OA收到日</th><th>OA发文日</th><th>答复期限</th>'
+    '<th>OA类别</th><th>跟进人</th><th>其它备注事项</th><th>人员分配</th><th>是否正式立项</th></tr>'
+    '<tr><td>OLD-CASE</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>'
+    '</tbody></table></ac:rich-text-body></ac:structured-macro>'
+)
+
+
+def test_insert_top_of_current_month():
+    row = _build_table_row({"project": "NEW-CASE"}, "苏雅")
+    nb, created = _insert_rows_by_month(_OA_LIST_SAMPLE, row, "2026年7月")
+    ok(not created, "当月折叠块已存在，不新建")
+    ok(nb.index("NEW-CASE") < nb.index("OLD-CASE"), "新行在旧行之上（置顶）")
+    ok(nb.index("<th>案号</th>") < nb.index("NEW-CASE"), "新行在表头之后")
+
+
+def test_insert_new_month_block():
+    row = _build_table_row({"project": "AUG-CASE"}, "姚涓涓")
+    nb, created = _insert_rows_by_month(_OA_LIST_SAMPLE, row, "2026年8月")
+    ok(created, "当月折叠块不存在→新建")
+    ok(nb.index("2026年8月") < nb.index("2026年7月"), "新月份块置于旧月份块之前")
+    ok("AUG-CASE" in nb and "OLD-CASE" in nb, "新旧数据都在")
+    ok(nb.index("2026年8月") < nb.index("AUG-CASE") < nb.index("2026年7月"),
+       "新行落在新建的8月块内")
+
+
 def test_simple_template_skip():
     _p1, p2, _p3, p4 = build_simple_template("20664-0072CN00", "", "", "")
     cell = _ref_docs_cell_html(DOCS)
@@ -155,7 +187,8 @@ if __name__ == "__main__":
                test_fill_existing_row, test_idempotent,
                test_auto_add_row, test_fill_multi_columns,
                test_add_row_multi_columns, test_followup_row_placement,
-               test_followup_rotation_order, test_simple_template_skip]:
+               test_followup_rotation_order, test_insert_top_of_current_month,
+               test_insert_new_month_block, test_simple_template_skip]:
         print(f"[{fn.__name__}]")
         fn()
     print(f"\n全部通过：{_passed} 项断言")
