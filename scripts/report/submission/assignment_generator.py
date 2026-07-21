@@ -294,7 +294,7 @@ def generate_assignment(fields: dict, assignment: dict, output_dir, seq: int = 1
 
     warnings = []
     case_volume = fields.get("case_volume") or ""
-    title = (fields.get("case_info") or {}).get("case_name_en") or ""
+    title = ((fields.get("case_info") or {}).get("case_name_en") or "").upper()  # 申请名称全部大写
     # 受让人按本段 assignee 名字解析（匹配不到回退首位申请人并告警）
     seg_assignee_name = (assignment.get("assignee") or "").strip()
     assignee = resolve_assignee(fields, seg_assignee_name)

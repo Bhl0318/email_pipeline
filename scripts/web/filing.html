@@ -317,7 +317,7 @@ function renderForm(){
   $("formSections").innerHTML = `
     <div class="section"><div class="section-head">案件信息（来自 fields_json，只读）</div><div class="section-body grid">
       <div class="field"><label>代理所案号</label><input readonly value="${esc(fields.case_volume||"")}"></div>
-      <div class="field"><label>申请名称</label><input readonly value="${esc(ci.case_name_en||"")}"></div>
+      <div class="field"><label>申请名称</label><input readonly value="${esc((ci.case_name_en||"").toUpperCase())}"></div>
       <div class="field"><label>申请人</label><input readonly value="${esc(ap.applicant_name_en||"")}"></div>
       <div class="field"><label>发明人</label><input readonly value="${esc(invs)}"></div>
       <div class="field"><label>主题(Subject Matter)</label><input readonly value="${esc(fields.subject_matter||"")}"></div>

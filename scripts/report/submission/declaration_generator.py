@@ -79,7 +79,7 @@ def generate_declarations(fields: dict, output_dir) -> list:
     :return: [{"file_path", "file_name", "inventors": [...]}]（单元素列表，调用方按列表处理）
     """
     case_volume = fields.get("case_volume") or ""
-    title = (fields.get("case_info") or {}).get("case_name_en") or ""
+    title = ((fields.get("case_info") or {}).get("case_name_en") or "").upper()  # 申请名称全部大写
     advance = fields.get("case_advance_info") or {}
     pct_app_no = (advance.get("pct_app_no") or "").strip()
     pct_app_date = (advance.get("pct_app_date") or "").strip()

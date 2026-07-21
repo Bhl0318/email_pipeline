@@ -265,7 +265,8 @@ def fields_to_case_info(fields: dict, agent_info: dict = None) -> dict:
 
     case_info = {
         "Our Ref.": fields.get("case_volume", ""),
-        "Title": case_meta.get("case_name_en", ""),
+        # 申请名称（invention-title）US 递交要求全部大写（ADS/Transmittal 用此 Title）
+        "Title": (case_meta.get("case_name_en") or "").upper(),
         "Inventors": inventors,
         "Applicants": applicants,
         "Assignees": assignees,
