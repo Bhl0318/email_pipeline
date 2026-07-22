@@ -1,6 +1,7 @@
 {
   "accounts": [
     { "account": "docketing", "folder": "INBOX" },
+    { "account": "docketing", "folder": "Metis+Porus+Poseidon/Done", "no_archive": true },
     { "account": "attorneys", "folder": "INBOX" }
   ],
   "sinks": {

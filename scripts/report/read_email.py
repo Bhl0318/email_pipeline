@@ -1140,6 +1140,10 @@ def archive_emails(all_emails, all_results=None, dry_run=False):
         else:
             groups[key][2] += 1  # 未命中：不动
     for (account_name, folder), (acc, matched, skipped_n) in groups.items():
+        # no_archive 文件夹（如 Done 归档夹）：命中/未命中都不移动，只读，靠 checkpoint 去重
+        if acc.get("no_archive"):
+            print(f"  {account_name}/{folder} no_archive：命中 {len(matched)} + 未命中 {skipped_n} 封全部留原处", file=sys.stderr)
+            continue
         if skipped_n:
             print(f"  未命中 {skipped_n} 封保持不动（{account_name}/{folder}）", file=sys.stderr)
         if not matched:
