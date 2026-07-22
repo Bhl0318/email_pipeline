@@ -438,9 +438,10 @@ EP_TYPES = {
     "Summons to oral proceedings": ("Summons to attend oral proceedings pursuant to Rule 115(1)EPC（口头审理通知书）答复", True, True),
 }
 
-# EP 主题正则：【通信类型】... (EP号) ... Your Ref.: 案号; Our Ref: 代理号;
+# EP 主题正则：【通信类型】... (EP号) ... Your Ref.: 案号; Our Ref: 代理号
+# 注：Your Ref 值与分号间可能有空格（"EP01 ;"）；Our Ref 可能位于主题结尾、后无分隔符。
 EP_SUBJECT_RE = re.compile(
-    r'【(.+?)】.*?\((EP\d+\.\d)\).*?Your\s*Ref[.:_\s]+(\S+?)[;,].*?Our\s*Ref[.:_\s]+(\S+?)[;,\s]',
+    r'【(.+?)】.*?\((EP\d+\.\d)\).*?Your\s*Ref[.:_\s]+(\S+?)\s*[;,].*?Our\s*Ref[.:_\s]+(\S+?)\s*(?:[;,]|$)',
     re.IGNORECASE
 )
 
