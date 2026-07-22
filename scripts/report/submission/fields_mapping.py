@@ -205,8 +205,22 @@ def fields_to_case_info(fields: dict, agent_info: dict = None) -> dict:
 
     assignees = []
     _assignments = fields.get("assignments") or []
-    _app_by_name = {(ap.get("applicant_name_en") or "").strip().lower(): ap
-                    for ap in fields.get("applicants") or []}
+    _raw_apps = fields.get("applicants") or []
+
+    def _nkey(s):
+        return "".join(ch for ch in (s or "").lower() if ch.isalnum())
+    _app_by_name = {(ap.get("applicant_name_en") or "").strip().lower(): ap for ap in _raw_apps}
+    _app_by_nkey = {_nkey(ap.get("applicant_name_en")): ap for ap in _raw_apps}
+
+    def _app_for_assignee(nm):
+        """受让人取对应申请人地址：先精确名、再去标点/大小写归一名匹配；
+        仍不中（含中英译名差异，如 Cytoderm/Cell Wall）时——**单一申请人**→用其地址兜底
+        （个人转公司受让人通常即该唯一申请人）；多申请人则留空待人工。"""
+        ap = _app_by_name.get((nm or "").strip().lower()) or _app_by_nkey.get(_nkey(nm))
+        if ap:
+            return ap
+        return _raw_apps[0] if len(_raw_apps) == 1 else {}
+
     if _assignments:
         _seen = set()
         for asg in _assignments:
@@ -215,7 +229,7 @@ def fields_to_case_info(fields: dict, agent_info: dict = None) -> dict:
             if not nm or key in _seen:
                 continue
             _seen.add(key)
-            assignees.append(_assignee_entry(nm, _app_by_name.get(key, {}), asg.get("company_address", "")))
+            assignees.append(_assignee_entry(nm, _app_for_assignee(nm), asg.get("company_address", "")))
     else:
         for ap in fields.get("applicants") or []:
             assignees.append(_assignee_entry((ap.get("applicant_name_en") or "").strip(), ap))
@@ -235,7 +249,8 @@ def fields_to_case_info(fields: dict, agent_info: dict = None) -> dict:
     # 图纸页数复用递交清单的附图页数；Small Entity 由实体派生（small/micro→Yes）
     _opts = fields.get("transmittal_options") or {}
     _entity = (_opts.get("entity") or "").lower()
-    small_entity = "Yes" if _entity in ("small", "micro") else ""
+    # ADS chkSmallEntity 是 XFA 整数复选框（items 1/0/2，1=已声明小实体），须填整数 "1"/"0"，非 "Yes"
+    small_entity = "1" if _entity in ("small", "micro") else "0"
     drawing_sheets = _opts.get("drawing_sheets", "") or ""
 
     # Domestic Benefit / National Stage：parent_applications 的 Continuity Type 规范成代码；
