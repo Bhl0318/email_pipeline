@@ -420,13 +420,54 @@ function renderForm(){
     `<div class="field"><label>母案 ${esc(p["Application No"]||("#"+(i+1)))} 续案类型</label>
       <input id="fx-par-${i}-cont" value="${esc(p["Continuity Type"]||"")}" placeholder="如 Continuation of / Continuation in part of / Division of"></div>`
   ).join("") || '<div style="color:#94a3b8;font-size:12px;">无母案（新申请）</div>';
+  // 案件信息可编辑行（改完点上方预览重新生成；回写见 collectExtra）
+  const applicantRows = (fields.applicants||[]).map((a,i)=>`
+    <div style="border:1px solid #e2e8f0;border-radius:6px;padding:8px;margin-bottom:8px;">
+      <div class="grid">
+        <div class="field"><label>申请人英文名</label><input id="cf-app-${i}-name" value="${esc(a.applicant_name_en||"")}"></div>
+        <div class="field"><label>实体</label><select id="cf-app-${i}-entity">
+          <option value="" ${a.entity_en?"":"selected"}>—</option>
+          <option value="Large" ${a.entity_en==="Large"?"selected":""}>Large</option>
+          <option value="Small" ${a.entity_en==="Small"?"selected":""}>Small</option>
+          <option value="Micro" ${a.entity_en==="Micro"?"selected":""}>Micro</option></select></div>
+        <div class="field"><label>地址1</label><input id="cf-app-${i}-a1" value="${esc(a.address1||"")}"></div>
+        <div class="field"><label>地址2</label><input id="cf-app-${i}-a2" value="${esc(a.address2||"")}"></div>
+        <div class="field"><label>城市</label><input id="cf-app-${i}-city" value="${esc(a.city_en||"")}"></div>
+        <div class="field"><label>省/州</label><input id="cf-app-${i}-prov" value="${esc(a.province_city_en_us||"")}"></div>
+        <div class="field"><label>邮编</label><input id="cf-app-${i}-zip" value="${esc(a.postcode||"")}"></div>
+        <div class="field"><label>国家</label><input id="cf-app-${i}-ctry" value="${esc(a.country_en_us||"")}"></div>
+      </div></div>`).join("") || '<div style="color:#94a3b8;font-size:12px;">无申请人</div>';
+  const assigneeRows = (fields.assignments||[]).map((asg,i)=>`
+    <div class="field"><label>受让人 #${i+1}（${esc(asg.assignment_type||"")}；地址随对应申请人）</label>
+      <input id="cf-asg-${i}-name" value="${esc(asg.assignee||"")}"></div>`).join("")
+    || '<div style="color:#94a3b8;font-size:12px;">无转让/受让人</div>';
+  const priorityRows = (fields.priorities||[]).map((p,i)=>`
+    <div class="grid">
+      <div class="field"><label>优先权号</label><input id="cf-pri-${i}-no" value="${esc(p.priority_no||p.priority_num||"")}"></div>
+      <div class="field"><label>国别</label><input id="cf-pri-${i}-ctry" value="${esc(p.priority_country_id||"")}"></div>
+      <div class="field"><label>优先权日</label><input id="cf-pri-${i}-date" value="${esc(p.priority_date||"")}"></div>
+      <div class="field"><label>DAS 码</label><input id="cf-pri-${i}-das" value="${esc(p.access_code||"")}"></div>
+    </div>`).join("") || '<div style="color:#94a3b8;font-size:12px;">无优先权</div>';
+  const inventorNameRows = (fields.inventors||[]).map((inv,i)=>`
+    <div class="grid">
+      <div class="field"><label>发明人${i+1} 姓(Last)</label><input id="cf-inv-${i}-last" value="${esc(inv.last_name_en||"")}"></div>
+      <div class="field"><label>名(First)</label><input id="cf-inv-${i}-first" value="${esc(inv.first_name_en||"")}"></div>
+    </div>`).join("") || '<div style="color:#94a3b8;font-size:12px;">无发明人</div>';
   $("formSections").innerHTML = `
-    <div class="section"><div class="section-head">案件信息（来自 fields_json，只读）</div><div class="section-body grid">
-      <div class="field"><label>代理所案号</label><input readonly value="${esc(fields.case_volume||"")}"></div>
-      <div class="field"><label>申请名称</label><input readonly value="${esc((ci.case_name_en||"").toUpperCase())}"></div>
-      <div class="field"><label>申请人</label><input readonly value="${esc(ap.applicant_name_en||"")}"></div>
-      <div class="field"><label>发明人</label><input readonly value="${esc(invs)}"></div>
-      <div class="field"><label>主题(Subject Matter)</label><input readonly value="${esc(fields.subject_matter||"")}"></div>
+    <div class="section"><div class="section-head">案件信息（可编辑；改完点上方预览重新生成）</div><div class="section-body">
+      <div class="grid">
+        <div class="field"><label>代理所案号</label><input readonly value="${esc(fields.case_volume||"")}"></div>
+        <div class="field"><label>主题(Subject Matter)</label><input readonly value="${esc(fields.subject_matter||"")}"></div>
+        <div class="field"><label>申请名称（递交件自动大写）</label><input id="cf-title" value="${esc(ci.case_name_en||"")}"></div>
+      </div>
+      <div style="margin:10px 0 4px;font-size:11.5px;color:#64748b;">申请人</div>
+      ${applicantRows}
+      <div style="margin:10px 0 4px;font-size:11.5px;color:#64748b;">受让人（Assignment）</div>
+      ${assigneeRows}
+      <div style="margin:10px 0 4px;font-size:11.5px;color:#64748b;">优先权</div>
+      ${priorityRows}
+      <div style="margin:10px 0 4px;font-size:11.5px;color:#64748b;">发明人姓名（地址在下方"发明人居住地/通信地址"编辑）</div>
+      ${inventorNameRows}
     </div></div>
 
     <div class="section"><div class="section-head">签字代理人（选代理所/代理人「查库带出」，可手改；用于 POA/ADS/Transmittal 签字块）</div><div class="section-body">
@@ -533,6 +574,37 @@ function collectExtra(){
   (fields.parent_applications||[]).forEach((p,i)=>{
     const el = $(`fx-par-${i}-cont`);
     if (el) p["Continuity Type"] = el.value.trim();
+  });
+
+  // 案件信息可编辑字段回写（申请名称/申请人/受让人/优先权/发明人姓名）
+  if ($("cf-title")) {
+    fields.case_info = fields.case_info || {};
+    fields.case_info.case_name_en = $("cf-title").value.trim();
+  }
+  (fields.applicants||[]).forEach((a,i)=>{
+    const g=(k)=>{const e=$(`cf-app-${i}-${k}`);return e?e.value.trim():null;};
+    const m={name:"applicant_name_en",entity:"entity_en",a1:"address1",a2:"address2",
+             city:"city_en",prov:"province_city_en_us",zip:"postcode",ctry:"country_en_us"};
+    for (const [id,key] of Object.entries(m)){ const v=g(id); if (v!==null) a[key]=v; }
+  });
+  (fields.assignments||[]).forEach((asg,i)=>{
+    const e=$(`cf-asg-${i}-name`); if (e) asg.assignee=e.value.trim();
+  });
+  (fields.priorities||[]).forEach((p,i)=>{
+    const g=(k)=>{const e=$(`cf-pri-${i}-${k}`);return e?e.value.trim():null;};
+    const no=g("no"); if (no!==null){ p.priority_no=no; p.priority_num=no; }
+    const c=g("ctry"); if (c!==null) p.priority_country_id=c;
+    const d=g("date"); if (d!==null) p.priority_date=d;
+    const das=g("das"); if (das!==null) p.access_code=das;
+  });
+  (fields.inventors||[]).forEach((inv,i)=>{
+    const ln=$(`cf-inv-${i}-last`), fn=$(`cf-inv-${i}-first`);
+    if (ln) inv.last_name_en=ln.value.trim();
+    if (fn) inv.first_name_en=fn.value.trim();
+    if (ln||fn){
+      const L=inv.last_name_en||"", F=inv.first_name_en||"";
+      inv.full_name_en = L&&F ? `${L}, ${F}` : (L||F);   // 对齐著录项"姓, 名"
+    }
   });
 }
 
