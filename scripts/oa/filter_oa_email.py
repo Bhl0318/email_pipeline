@@ -649,6 +649,10 @@ def classify_us(email_data):
     if "noreply@uspto.gov" not in sender and "USPTO" not in subject:
         return None
 
+    # eGrant 授权通知：表格结构与 Correspondence 不同（多 Patent 列会错位），且本就不需要 OA 立项 → 整封跳过
+    if "egrant notification" in subject.lower():
+        return None
+
     body = email_data.get("body", "")
     html_body = email_data.get("html_body", "")
 
