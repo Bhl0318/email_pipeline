@@ -381,7 +381,7 @@ function invApplicantAddr(inv){
 function renderForm(){
   const ci = fields.case_info || {};
   const ap = (fields.applicants||[])[0] || {};
-  const invs = (fields.inventors||[]).map(i=>i.full_name_en||`${i.first_name_en||""} ${i.last_name_en||""}`).filter(Boolean).join("；");
+  const invs = (fields.inventors||[]).map(i=>(i.full_name_en||`${i.first_name_en||""} ${i.last_name_en||""}`).replace(/\s*,\s*/g, ", ").trim()).filter(Boolean).join("；");
   const docs = (data.final_docs||[]).map(d=>`<div class="docrow">📄 <a href="${esc(d.url)}" target="_blank">${esc(d.name)}</a><button class="del" onclick="delFinal('${esc(d.name)}')">删除</button></div>`).join("") || '<div style="color:#94a3b8;font-size:12px;">尚未上传定稿</div>';
   const scan = data.poa_scan;
   const scanRow = scan
@@ -402,7 +402,7 @@ function renderForm(){
     // 通信 City 放「城市, 省份」；州/省默认留空（美国州下拉，外国不填）
     const mailCity = esc(a.mail_city || [app.city_en, app.province_city_en_us].filter(Boolean).join(", "));
     const mailState = esc(a.mail_state || "");
-    const nm = inv.full_name_en||`${inv.first_name_en||""} ${inv.last_name_en||""}`.trim();
+    const nm = (inv.full_name_en||`${inv.first_name_en||""} ${inv.last_name_en||""}`).replace(/\s*,\s*/g, ", ").trim();
     return `<div style="border:1px solid #e2e8f0;border-radius:6px;padding:8px;margin-bottom:8px;">
       <div style="font-size:12px;font-weight:600;margin-bottom:6px;">${esc(nm)||("发明人"+(i+1))}</div>
       <div class="grid">
