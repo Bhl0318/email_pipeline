@@ -448,11 +448,13 @@ function renderForm(){
       <div class="field"><label>优先权日</label><input id="cf-pri-${i}-date" value="${esc(p.priority_date||"")}"></div>
       <div class="field"><label>DAS 码</label><input id="cf-pri-${i}-das" value="${esc(p.access_code||"")}"></div>
     </div>`).join("") || '<div style="color:#94a3b8;font-size:12px;">无优先权</div>';
-  const inventorNameRows = (fields.inventors||[]).map((inv,i)=>`
-    <div class="grid">
+  const inventorNameRows = (fields.inventors||[]).map((inv,i)=>{
+    const full=(inv.full_name_en||`${inv.first_name_en||""} ${inv.last_name_en||""}`).replace(/\s*,\s*/g, ", ").trim();
+    return `<div class="grid">
       <div class="field"><label>发明人${i+1} 姓(Last)</label><input id="cf-inv-${i}-last" value="${esc(inv.last_name_en||"")}"></div>
       <div class="field"><label>名(First)</label><input id="cf-inv-${i}-first" value="${esc(inv.first_name_en||"")}"></div>
-    </div>`).join("") || '<div style="color:#94a3b8;font-size:12px;">无发明人</div>';
+      <div class="field"><label>全名(姓, 名)</label><input readonly value="${esc(full)}"></div>
+    </div>`;}).join("") || '<div style="color:#94a3b8;font-size:12px;">无发明人</div>';
   $("formSections").innerHTML = `
     <div class="section"><div class="section-head">案件信息（可编辑；改完点上方预览重新生成）</div><div class="section-body">
       <div class="grid">
@@ -603,7 +605,8 @@ function collectExtra(){
     if (fn) inv.first_name_en=fn.value.trim();
     if (ln||fn){
       const L=inv.last_name_en||"", F=inv.first_name_en||"";
-      inv.full_name_en = L&&F ? `${L}, ${F}` : (L||F);   // 对齐著录项"姓, 名"
+      const combined = L&&F ? `${L}, ${F}` : (L||F);      // 对齐著录项"姓, 名"
+      if (combined) inv.full_name_en = combined;          // 姓名都空时不覆盖已有全名
     }
   });
 }
