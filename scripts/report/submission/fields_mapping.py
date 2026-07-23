@@ -227,17 +227,22 @@ def fields_to_case_info(fields: dict, agent_info: dict = None) -> dict:
             return True
         return len(_raw_apps) == 1
 
-    # ADS Non-Applicant Assignee(sfNonApplicantInfo)只放"确实不是申请人"的受让人；
-    # 受让人=申请人 → 不重复列（申请人已在 Applicant Information 以受让人身份出现，对齐确认函）。
+    # ADS「Assignee Information Including Non-Applicant Assignee Information」段(sfNonApplicantInfo)：
+    # 主要登【申请人作为受让人】——用**申请人自己的名字+地址**（不用 assignments 里可能异名的受让人名，
+    # 如 Cytoderm/Cell Wall）；若有**确实非申请人**的受让人再追加（多申请人场景）。
     _seen = set()
-    for asg in _assignments:
+    for ap in _raw_apps:                                    # 1) 申请人作为受让人（申请人名+地址）
+        nm = (ap.get("applicant_name_en") or "").strip()
+        if nm and nm.lower() not in _seen:
+            _seen.add(nm.lower())
+            assignees.append(_assignee_entry(nm, ap))
+    for asg in _assignments:                                # 2) 真·非申请人受让人才追加
         nm = (asg.get("assignee") or "").strip()
-        key = nm.lower()
-        if not nm or key in _seen:
+        if not nm or nm.lower() in _seen:
             continue
-        _seen.add(key)
-        if _assignee_is_applicant(nm):
+        if _assignee_is_applicant(nm):                      # 是申请人 → 已按申请人名登过，跳过其异名
             continue
+        _seen.add(nm.lower())
         assignees.append(_assignee_entry(nm, _app_for_assignee(nm), asg.get("company_address", "")))
 
     # ── 优先权 ──
