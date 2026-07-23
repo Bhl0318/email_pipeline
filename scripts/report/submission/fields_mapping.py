@@ -214,25 +214,31 @@ def fields_to_case_info(fields: dict, agent_info: dict = None) -> dict:
 
     def _app_for_assignee(nm):
         """受让人取对应申请人地址：先精确名、再去标点/大小写归一名匹配；
-        仍不中（含中英译名差异，如 Cytoderm/Cell Wall）时——**单一申请人**→用其地址兜底
-        （个人转公司受让人通常即该唯一申请人）；多申请人则留空待人工。"""
+        仍不中（含中英译名差异，如 Cytoderm/Cell Wall）时——**单一申请人**→用其地址兜底。"""
         ap = _app_by_name.get((nm or "").strip().lower()) or _app_by_nkey.get(_nkey(nm))
         if ap:
             return ap
         return _raw_apps[0] if len(_raw_apps) == 1 else {}
 
-    if _assignments:
-        _seen = set()
-        for asg in _assignments:
-            nm = (asg.get("assignee") or "").strip()
-            key = nm.lower()
-            if not nm or key in _seen:
-                continue
-            _seen.add(key)
-            assignees.append(_assignee_entry(nm, _app_for_assignee(nm), asg.get("company_address", "")))
-    else:
-        for ap in fields.get("applicants") or []:
-            assignees.append(_assignee_entry((ap.get("applicant_name_en") or "").strip(), ap))
+    def _assignee_is_applicant(nm):
+        """受让人是否即申请人：名字匹配任一申请人，或单一申请人（个人/公司转公司受让人即该申请人）。
+        与确认函(AIS 只列 Applicant、不单列受让人)一致——是申请人就不在 ADS Non-Applicant Assignee 重复列。"""
+        if _app_by_name.get((nm or "").strip().lower()) or _app_by_nkey.get(_nkey(nm)):
+            return True
+        return len(_raw_apps) == 1
+
+    # ADS Non-Applicant Assignee(sfNonApplicantInfo)只放"确实不是申请人"的受让人；
+    # 受让人=申请人 → 不重复列（申请人已在 Applicant Information 以受让人身份出现，对齐确认函）。
+    _seen = set()
+    for asg in _assignments:
+        nm = (asg.get("assignee") or "").strip()
+        key = nm.lower()
+        if not nm or key in _seen:
+            continue
+        _seen.add(key)
+        if _assignee_is_applicant(nm):
+            continue
+        assignees.append(_assignee_entry(nm, _app_for_assignee(nm), asg.get("company_address", "")))
 
     # ── 优先权 ──
     priorities = []
