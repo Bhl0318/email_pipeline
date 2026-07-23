@@ -542,8 +542,8 @@ def create_oa_page(project, dry_run=False):
 # ============================================================
 OA_LIST_PAGE_TITLE = "测试页面-写入新增OA"
 
-# 跟进人轮转分配：按批内立项顺序循环 [苏雅, 苏雅, 姚涓涓]（苏雅2件、姚涓涓1件）。
-# 注：每次运行（每批）从头开始轮，不跨批累计。
+# 跟进人轮转分配名单（当前未启用：append_oa_to_wiki 不分配、跟进人留空）。
+# 如需恢复轮转，在 append_oa_to_wiki 里按此列表给 _build_table_row 传 followup。
 FOLLOWUP_ROTATION = ["苏雅", "苏雅", "姚涓涓"]
 
 
@@ -649,15 +649,12 @@ def append_oa_to_wiki(results):
 
     body = page["body"]
 
-    # 构建新行（跟进人按 FOLLOWUP_ROTATION 轮转分配，只对有案号的行计数）
+    # 构建新行（跟进人当前不分配，留空；如需恢复轮转，用 FOLLOWUP_ROTATION 给 _build_table_row 传 followup）
     new_rows = ""
-    idx = 0
     for item in results:
         if not item.get("project"):
             continue
-        followup = FOLLOWUP_ROTATION[idx % len(FOLLOWUP_ROTATION)]
-        new_rows += _build_table_row(item, followup) + "\n"
-        idx += 1
+        new_rows += _build_table_row(item) + "\n"
 
     if not new_rows:
         return {"code": 0, "msg": "无有效数据写入", "count": 0}

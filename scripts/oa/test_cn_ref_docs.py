@@ -14,7 +14,7 @@ from parse_cn_pdf import extract_cn_ref_docs, _cn2int, parse_oa_seq
 from oainfo_cli import (
     build_full_template, build_simple_template,
     _splice_ref_docs_into_body, _splice_oa_row, _ref_docs_cell_html,
-    _build_table_row, FOLLOWUP_ROTATION,
+    _build_table_row,
     _insert_rows_by_month,
 )
 
@@ -125,22 +125,17 @@ def test_add_row_multi_columns():
        "补出的 OA4 行三列齐全")
 
 
-def test_followup_row_placement():
-    # 跟进人填在第 7 个 <td>，其后 3 列留空
+def test_followup_default_empty():
+    # 跟进人当前不分配：_build_table_row 默认第7列(跟进人)留空，第8-10列也空
     import re as _re
-    row = _build_table_row({"project": "20664-0072CN00"}, "苏雅")
+    row = _build_table_row({"project": "20664-0072CN00"})
     tds = _re.findall(r'<td>.*?</td>', row)
     ok(len(tds) == 10, f"一行 10 个单元格 (got {len(tds)})")
-    ok(tds[6] == "<td>苏雅</td>", f"第7列=跟进人 (got {tds[6]})")
-    ok(tds[7:] == ["<td></td>"] * 3, "第8-10列留空")
-
-
-def test_followup_rotation_order():
-    # 苏雅2件、姚涓涓1件，按此顺序循环
-    ok(FOLLOWUP_ROTATION == ["苏雅", "苏雅", "姚涓涓"], "轮转顺序 苏雅,苏雅,姚涓涓")
-    seq = [FOLLOWUP_ROTATION[i % len(FOLLOWUP_ROTATION)] for i in range(7)]
-    ok(seq == ["苏雅", "苏雅", "姚涓涓", "苏雅", "苏雅", "姚涓涓", "苏雅"],
-       f"7 条分配序列正确 (got {seq})")
+    ok(tds[6] == "<td></td>", f"第7列跟进人留空 (got {tds[6]})")
+    ok(tds[6:] == ["<td></td>"] * 4, "第7-10列均留空")
+    # 辅助能力仍在：显式传值仍可填(留待将来恢复分配)
+    ok("<td>苏雅</td>" in _build_table_row({"project": "X"}, "苏雅"),
+       "helper 仍支持显式跟进人")
 
 
 _OA_LIST_SAMPLE = (
@@ -186,8 +181,8 @@ if __name__ == "__main__":
     for fn in [test_cn2int, test_extract_real_pdf, test_cell_html,
                test_fill_existing_row, test_idempotent,
                test_auto_add_row, test_fill_multi_columns,
-               test_add_row_multi_columns, test_followup_row_placement,
-               test_followup_rotation_order, test_insert_top_of_current_month,
+               test_add_row_multi_columns, test_followup_default_empty,
+               test_insert_top_of_current_month,
                test_insert_new_month_block, test_simple_template_skip]:
         print(f"[{fn.__name__}]")
         fn()
