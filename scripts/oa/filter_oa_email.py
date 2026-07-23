@@ -557,6 +557,9 @@ US_TYPES_NEED_PROJECT = {
 # 不需要立项的 US Document Type
 US_TYPES_SKIP = {"ISSUE.NTF", "892", "1449", "COCX","ABN","APP.FILE.REC","NTC.PUB","NTC.PUB.DATE","OA.APPENDIX","WELCOME.LET"}
 
+# NOA（分案/续案评估）只对这几个客户立项，其它客户的 NOA 跳过（客户代码 = 案号第一段）
+NOA_PROJECT_CUSTOMERS = {"20608", "20618", "20849", "20633", "20609"}
+
 
 class _USTableParser(HTMLParser):
     """解析 USPTO 邮件正文中的 HTML 表格。"""
@@ -668,6 +671,12 @@ def classify_us(email_data):
 
         if doc_type in US_TYPES_SKIP:
             continue
+
+        # NOA（分案/续案评估）只对指定客户立项，其它客户跳过（客户代码 = 案号第一段）
+        if doc_type == "NOA":
+            cust = (case.get("project", "") or "").split("-")[0].strip()
+            if cust not in NOA_PROJECT_CUSTOMERS:
+                continue
 
         type_info = US_TYPES_NEED_PROJECT.get(doc_type)
         if type_info:
