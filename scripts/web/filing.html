@@ -513,6 +513,14 @@ function renderForm(){
       <div class="field"><label>正文</label><textarea id="m-body" rows="9" style="width:100%;box-sizing:border-box;font-family:inherit;" oninput="setMail({body:this.value});syncEmailPreview()">${esc(mailState.body)}</textarea></div>
       <div style="font-size:11px;color:#94a3b8;margin-top:6px;">附件：POA / Transmittal / ADS（确认发送时生成）+ 已上传定稿</div>
     </div></div>`;
+  // 发美代理后（status≠pending）文件已锁定：禁用整表单编辑，预览显示已发版（见 preview）
+  if (data && data.status && data.status !== "pending") lockForm();
+}
+
+// 锁定：禁用递交清单/案件信息/定稿上传等所有表单控件（预览 tab 在 formSections 之外，仍可点）
+function lockForm(){
+  document.querySelectorAll("#formSections input, #formSections select, #formSections textarea, #formSections button")
+    .forEach(el => { el.disabled = true; });
 }
 
 function collectOpts(){
@@ -671,6 +679,8 @@ async function delPoaScan(){
 }
 
 async function preview(target){
+  // 已锁定（发美代理后）：显示已发版(final/)，不按当前编辑重生成
+  if (data && data.status && data.status !== "pending") return previewSent(target);
   collectOpts();
   $("emailPreview").style.display = "none";
   // 高亮当前 tab + 显示 loading 遮罩（ADS 走 pdfRest 扁平化，较慢，文案区分）
@@ -695,6 +705,32 @@ async function preview(target){
     }
     if ((j.warnings||[]).length) toast(j.warnings[0]);
   } catch(e){ toast("预览失败: "+e.message); }
+  finally { $("previewLoading").classList.remove("show"); }
+}
+
+// 已发版预览：发美代理后文件锁定，显示 final/ 里【已发送】的那版，不重生成
+async function previewSent(target){
+  document.querySelectorAll(".preview-head .tab").forEach(b => b.classList.toggle("active", b.dataset.target === target));
+  $("emailPreview").style.display = "none";
+  $("previewLoadingText").textContent = "加载已发版…";
+  $("previewLoading").classList.add("show");
+  const fr = $("previewFrame"), bar = $("dlBar"), ph = $("previewPlaceholder");
+  try {
+    const j = await api("GET", `${API}/${taskId}/final-doc?target=${encodeURIComponent(target)}`);
+    if (!j.available) {
+      fr.style.display = "none"; bar.style.display = "none";
+      ph.style.display = "block"; ph.textContent = j.note || "无已发版";
+      return;
+    }
+    ph.style.display = "none";
+    if (j.inline) {
+      fr.style.display = "block"; fr.src = j.url; bar.style.display = "none";
+    } else {   // ADS 等 XFA 动态表单不内联，给下载
+      fr.style.display = "none"; bar.style.display = "block";
+      bar.innerHTML = `已发版 <b>${esc(j.name)}</b>（XFA/需 Adobe 打开）：` +
+        `<a href="${esc(j.url)}" target="_blank" style="color:#b45309;font-weight:600;">⬇ 打开/下载已发版</a>`;
+    }
+  } catch(e){ toast("加载已发版失败: " + e.message); }
   finally { $("previewLoading").classList.remove("show"); }
 }
 

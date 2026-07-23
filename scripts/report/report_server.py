@@ -775,6 +775,22 @@ def preview_submission_task(task_id: str, req: SubmissionPreviewReq):
     }
 
 
+@app.get("/api/submission/tasks/{task_id}/final-doc")
+def submission_final_doc(task_id: str, target: str):
+    """已发版预览：发美代理后文件已锁定，返回 final/(发送时生成) 中匹配 target 的【已发送】
+    文件 URL，不按当前编辑重生成。ADS 为动态 XFA 表单浏览器不内联 → inline=False（下载打开）。"""
+    _load_submission_task(task_id)
+    token = {"ads": "ADS", "poa": "POA", "transmittal": "Transmittal",
+             "assignment": "Assignment", "declaration": "Declaration"}.get(target, target)
+    hit = next((a for a in _submission_attachment_set(task_id)
+                if token.lower() in a["filename"].lower()), None)
+    if not hit:
+        return {"available": False, "note": f"final/ 无匹配「{token}」的已发文件"}
+    url = "/output/" + str(Path(hit["path"]).relative_to(_OUTPUT_DIR_FOR_MOUNT))
+    inline = Path(hit["filename"]).suffix.lower() == ".pdf" and token != "ADS"
+    return {"available": True, "name": hit["filename"], "url": url, "inline": inline}
+
+
 def _submission_final_dir(task_id: str) -> Path:
     return SUBMISSION_OUTPUT_DIR / task_id / "final"
 
