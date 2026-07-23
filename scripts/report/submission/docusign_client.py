@@ -183,7 +183,13 @@ if __name__ == "__main__":
     cmd = sys.argv[1] if len(sys.argv) > 1 else "help"
     if cmd == "help":
         print(__doc__)
-        print("用法: python docusign_client.py [consent|token|status <envId>|download <envId> <outdir>|demo]")
+        print("用法: python docusign_client.py <命令>\n"
+              "  consent                         打印一次性授权链接\n"
+              "  token                           验证 JWT Grant 换 token\n"
+              "  send <收件邮箱> <文件1> [文件2…]   建并发送信封（沙盒测试发件）\n"
+              "  status <envId>                  查信封状态\n"
+              "  download <envId> <输出目录>      取回签署版 PDF\n"
+              "  demo                            dry-run 打印信封结构（不连网）")
         sys.exit(0)
     if cmd == "consent":
         print("浏览器打开授权一次：\n" + consent_url(load_config()))
@@ -210,7 +216,18 @@ if __name__ == "__main__":
     cfg = load_config()
     auth = get_access_token(cfg)
     print(f"token OK; base_uri={auth['base_uri']} account={auth['account_id']}")
-    if cmd == "status" and len(sys.argv) > 2:
+    if cmd == "send" and len(sys.argv) > 3:
+        to_email = sys.argv[2]
+        files = sys.argv[3:]
+        for f in files:
+            if not Path(f).is_file():
+                raise SystemExit(f"文件不存在: {f}")
+        agent = cfg.get("agent") or {}
+        recip = {"name": agent.get("name") or "US Agent", "email": to_email}
+        env_id = send_envelope(cfg, auth, [{"path": f} for f in files], recip,
+                               anchor=cfg.get("anchor", "Signature"))
+        print(f"已发送信封 envelopeId={env_id} → {to_email}（沙盒收件箱查收，签完用 status/download）")
+    elif cmd == "status" and len(sys.argv) > 2:
         print("status:", get_status(cfg, auth, sys.argv[2]))
     elif cmd == "download" and len(sys.argv) > 3:
         print("saved:", download_signed(cfg, auth, sys.argv[2], sys.argv[3]))
