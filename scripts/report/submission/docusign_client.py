@@ -124,12 +124,13 @@ def build_envelope(documents, recipient, email_subject=None, anchor="Signature",
             "fileExtension": (p.suffix.lstrip(".").lower() or "pdf"),
             "documentBase64": _b64(p),
         })
-    tabs = {
-        "signHereTabs": [{"anchorString": anchor, "anchorUnits": "pixels",
-                          "anchorXOffset": "0", "anchorYOffset": "0"}],
-        "dateSignedTabs": [{"anchorString": date_anchor or anchor, "anchorUnits": "pixels",
-                            "anchorXOffset": "220", "anchorYOffset": "0"}],
-    }
+    # 签名位放在 anchor 文本处；日期位只有显式配了单独的 date_anchor 才放（避免从签名锚点
+    # 右移越界导致 INVALID_USER_OFFSET）。DocuSign 证书本身也会记录签署日期。
+    tabs = {"signHereTabs": [{"anchorString": anchor, "anchorUnits": "pixels",
+                              "anchorXOffset": "0", "anchorYOffset": "0"}]}
+    if date_anchor:
+        tabs["dateSignedTabs"] = [{"anchorString": date_anchor, "anchorUnits": "pixels",
+                                   "anchorXOffset": "0", "anchorYOffset": "0"}]
     signer = {"email": recipient["email"], "name": recipient["name"],
               "recipientId": "1", "routingOrder": "1", "tabs": tabs}
     return {
@@ -225,7 +226,8 @@ if __name__ == "__main__":
         agent = cfg.get("agent") or {}
         recip = {"name": agent.get("name") or "US Agent", "email": to_email}
         env_id = send_envelope(cfg, auth, [{"path": f} for f in files], recip,
-                               anchor=cfg.get("anchor", "Signature"))
+                               anchor=cfg.get("anchor", "Signature"),
+                               date_anchor=cfg.get("date_anchor"))
         print(f"已发送信封 envelopeId={env_id} → {to_email}（沙盒收件箱查收，签完用 status/download）")
     elif cmd == "status" and len(sys.argv) > 2:
         print("status:", get_status(cfg, auth, sys.argv[2]))
