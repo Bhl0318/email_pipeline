@@ -1,0 +1,24 @@
+{
+  "_README": [
+    "DocuSign JWT Grant 集成配置模板。复制为 docusign_config.json 填真实值（沙盒先用 demo 凭据）。",
+    "凭据来自 DocuSign 后台：Settings → Apps and Keys。",
+    "1) integration_key = 该 App 的 Integration Key(client_id)；",
+    "2) RSA 密钥对：在同页生成，私钥存本地 .pem，路径填 private_key_path；公钥留在 DocuSign；",
+    "3) user_id = 要模拟(impersonate)的 API 用户 GUID（Apps and Keys 页 'User ID'/'API Username'）；",
+    "4) account_id = API Account ID（留空则取默认账号）；",
+    "5) env = 'demo'(沙盒, 默认) 或 'production'；",
+    "首次运行需一次性授权：python docusign_client.py consent → 浏览器打开链接同意一次。"
+  ],
+  "env": "demo",
+  "integration_key": "<Integration Key (client_id) GUID>",
+  "user_id": "<Impersonated API 用户 GUID>",
+  "account_id": "",
+  "private_key_path": "<本地 RSA 私钥 .pem 路径，如 ./docusign_private.pem>",
+  "redirect_uri": "https://www.docusign.com",
+
+  "_signing": "签字位锚点：PDF 里出现该文本处放签名/日期框；按真实 POA/Transmittal/ADS 调，或改坐标定位。",
+  "anchor": "Signature",
+
+  "_recipient": "美代理签字人（运行时也可由代码传入覆盖）。",
+  "agent": { "name": "<US Agent Name>", "email": "<agent@firm.com>" }
+}
