@@ -342,6 +342,48 @@ def _load_email_config():
     return json.loads(EMAIL_CONFIG_PATH.read_text(encoding="utf-8"))
 
 
+# ─── 发送人身份（七星天 / 众慧）─────────────────────────────
+# 代码内置身份表；实际 SMTP 凭据从 email_config.json 的 senders.{key} 取（gitignore）。
+SENDER_PROFILES = {
+    "qxt":  {"label": "七星天", "from": "report@metis-ip.com"},
+    "zhyc": {"label": "众慧",   "from": "report_zhyc@zhycip.com"},
+}
+
+
+def _default_sender_key(project):
+    """代理所案号含 -H → 众慧(zhyc)，否则七星天(qxt)。"""
+    return "zhyc" if "-H" in (project or "").upper() else "qxt"
+
+
+def _sender_configured(scfg):
+    """senders.{key} 是否已填好可用凭据（以 smtp_host 是否填写为准）。"""
+    host = (scfg or {}).get("smtp_host", "")
+    return bool(host) and not str(host).startswith("请填写")
+
+
+def _resolve_sender(cfg, key):
+    """按 key 解析发送账号。返回 (send_cfg, from_addr)。
+    未配凭据时 send_cfg 为 None，调用方据此报错。"""
+    prof = SENDER_PROFILES.get(key) or SENDER_PROFILES["qxt"]
+    from_addr = prof["from"]
+    scfg = (cfg.get("senders") or {}).get(key) or {}
+    if not _sender_configured(scfg):
+        return None, from_addr
+    scfg = dict(scfg)
+    scfg.setdefault("user", from_addr)   # From 与登录账号一致
+    return scfg, from_addr
+
+
+def _sender_options(cfg):
+    """给前端下拉：每个发送人 key/label/from/configured。"""
+    senders = cfg.get("senders") or {}
+    return [
+        {"key": key, "label": prof["label"], "from": prof["from"],
+         "configured": _sender_configured(senders.get(key) or {})}
+        for key, prof in SENDER_PROFILES.items()
+    ]
+
+
 def _get_smtp_oauth2_token(account_cfg):
     """获取 SMTP 用的 OAuth2 token。"""
     oauth = account_cfg.get("oauth2", {})
@@ -407,6 +449,9 @@ class ConfirmReq(BaseModel):
     attach_pdf: bool | None = None   # 可选：审核人覆盖默认 attach_pdf
     html_body: str | None = None     # 邮件正文 HTML（前端渲染好的干净版）
     pdf_base64: str | None = None    # 浏览器生成的 PDF（base64），仅 attach_pdf=1 时有
+    mail_from: str | None = None     # 发送人 key（qxt/zhyc），空则按代理所案号 -H 规则
+    mail_to: list[str] | None = None # 收件人（客户邮箱），弹窗手填
+    mail_cc: list[str] | None = None # 抄送
 
 
 class PreviewSendReq(BaseModel):
@@ -429,20 +474,19 @@ def preview_send(task_id: str, req: PreviewSendReq):
         except Exception:
             pass
 
-    # 收发件配置
+    # 发送人：按代理所案号 -H 规则算默认，前端可在弹窗改
     try:
         cfg = _load_email_config()
-        send_cfg = cfg.get("accounts", {}).get("pa") or {}
-        notif = cfg.get("notification", {})
-        recipients = notif.get("recipients", [])
-        cc_addrs = notif.get("cc", [])
+        senders = _sender_options(cfg)
+        default_sender = _default_sender_key(req.fields.get("代理所案号", ""))
     except Exception as e:
         raise HTTPException(500, f"读 email_config.json 失败: {e}")
 
     return {
-        "from": send_cfg.get("user", ""),
-        "recipients": recipients,
-        "cc": cc_addrs,
+        "senders": senders,               # [{key,label,from,configured}]
+        "default_sender": default_sender, # 按 -H 预选
+        "recipients": [],                 # 收件人=客户邮箱，默认空，弹窗手填
+        "cc": [],                         # 抄送默认空，弹窗手填
         "subject": subject,
         "report_pdf_filename": (base + ".pdf") if req.attach_pdf else None,
         "source_attachments": [{"path": rel, "filename": rel.rsplit("/", 1)[-1]} for rel in source_attachments],
@@ -514,14 +558,22 @@ def confirm_task(task_id: str, req: ConfirmReq):
 
     try:
         cfg = _load_email_config()
-        send_cfg = cfg.get("accounts", {}).get("pa")
-        notif = cfg.get("notification", {})
-        recipients = notif.get("recipients", [])
-        cc_addrs = notif.get("cc", [])
-        if not send_cfg:
-            raise RuntimeError("email_config.json 缺 accounts.pa")
+
+        # 发送人：弹窗选的优先，否则按代理所案号 -H 规则
+        sender_key = req.mail_from or _default_sender_key(project)
+        send_cfg, from_addr = _resolve_sender(cfg, sender_key)
+
+        # 收件人/抄送：弹窗手填（去空白、去空项）
+        recipients = [a.strip() for a in (req.mail_to or []) if a and a.strip()]
+        cc_addrs = [a.strip() for a in (req.mail_cc or []) if a and a.strip()]
+
         if not recipients:
-            raise RuntimeError("email_config.json 缺 notification.recipients")
+            raise RuntimeError("请填写收件人")
+        if not send_cfg:
+            label = SENDER_PROFILES.get(sender_key, {}).get("label", sender_key)
+            raise RuntimeError(
+                f"发送人「{label} {from_addr}」未配置 SMTP 凭据"
+                f"（email_config.json → senders.{sender_key}），凭据到位后即可发送")
 
         _send_smtp(mime_msg, send_cfg, recipients, cc_addrs)
 
@@ -533,7 +585,7 @@ def confirm_task(task_id: str, req: ConfirmReq):
         out["ok"] = True
         out["status"] = "done"
         out["sent_to"] = recipients
-        out["sent_from"] = send_cfg["user"]
+        out["sent_from"] = from_addr
         print(f"[confirm] 已发送 task={task_id} → {recipients}", file=sys.stderr)
     except Exception as e:
         # 发送失败：status 保留 pending；PDF/.eml 已存在 output/ 作为备份，可重试
