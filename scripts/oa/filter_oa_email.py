@@ -344,6 +344,9 @@ CN_TYPES = {
     "复审通知书": lambda _: "复审意见答复",
 }
 
+# 办理登记手续通知书：只对这几个客户默认立项做分案评估，其余客户跳过（客户代码 = 案号第一段）
+CN_DENGJI_CUSTOMERS = {"20618", "20735"}
+
 # CN 主题正则：日期-通知类型-案号
 CN_SUBJECT_RE = re.compile(r'^(\d{4}-\d{2}-\d{2})-(.+?)-((\d{5}-\w+))$')
 
@@ -396,6 +399,12 @@ def classify_cn(email_data):
         docket_m = re.search(r'(\d{5}-\w{4}[A-Z]{2}\d{2})', subject)
         if docket_m:
             result["project"] = docket_m.group(1)
+
+    # 办理登记手续通知书：仅指定客户立项做分案评估，其余客户跳过（客户代码 = 案号第一段）
+    if matched_type == "办理登记手续通知书":
+        cust = (result.get("project", "") or "").split("-")[0].strip()
+        if cust not in CN_DENGJI_CUSTOMERS:
+            return None
 
     # 从正文提取答复期限
     body = email_data.get("body", "")
