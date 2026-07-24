@@ -1017,7 +1017,11 @@
       ).join('') + '</ul>';
     }
 
-    $('md-send-btn').disabled = !recipients.length;
+    // 收件人为空则禁用发送，随输入实时启用
+    const toInp = $('md-to-inp');
+    const syncSendBtn = () => { $('md-send-btn').disabled = !toInp.value.trim(); };
+    toInp.oninput = syncSendBtn;
+    syncSendBtn();
     $('sendModal').classList.add('show');
   }
 
