@@ -718,6 +718,12 @@ def classify_email(email_data):
     subject = email_data.get("subject", "").strip()
     sender = email_data.get("from", "").strip()
 
+    # 全局排除（先于区域判断）：这些邮件一律不立项
+    if "reminder" in subject.lower():
+        return None, "主题含 reminder，不立项"
+    if "向外国申请专利保密审查意见通知书" in subject:
+        return None, "向外国申请专利保密审查意见通知书，不立项"
+
     # 按优先级判断
     # 1. US
     if "noreply@uspto.gov" in sender or "USPTO" in subject:
