@@ -1754,7 +1754,8 @@ def confirm_filing_task(task_id: str, req: FilingConfirmReq):
     ds_paths, email_paths, ch_map = [], [], {}
     for p in attach_paths:
         key = _doc_channel_key(p, docs)
-        ch = (_fc.get(key) or ("docusign" if key in ("POA", "Transmittal", "ADS") else "email")).lower()
+        # ADS 是动态 XFA，DocuSign 不接受 → 默认走内部邮箱；POA/Transmittal 默认 DocuSign
+        ch = (_fc.get(key) or ("docusign" if key in ("POA", "Transmittal") else "email")).lower()
         ch_map[p.name] = ch
         (ds_paths if ch == "docusign" else email_paths).append(p)
 
