@@ -51,11 +51,17 @@ def consent_url(cfg: dict) -> str:
 
 def _private_key(cfg: dict) -> str:
     kp = cfg.get("private_key_path")
-    if kp and Path(kp).is_file():
-        return Path(kp).read_text(encoding="utf-8")
+    if kp:
+        p = Path(kp)
+        # 相对路径按本模块所在目录(submission/)解析，不依赖进程工作目录（report_server cwd 不同）；
+        # 再退回按 cwd 解析，兼容在 submission/ 里直接跑 CLI 的情况。
+        for cand in ([p] if p.is_absolute() else [Path(__file__).with_name(p.name), Path(__file__).parent / kp, p]):
+            if cand.is_file():
+                return cand.read_text(encoding="utf-8")
     if cfg.get("private_key"):
         return cfg["private_key"]
-    raise RuntimeError("缺 RSA 私钥：请在配置里给 private_key_path（指向 .pem）或 private_key")
+    raise RuntimeError(f"缺 RSA 私钥：private_key_path={kp!r} 未找到（相对路径按 submission/ 解析）；"
+                       "或在配置里给 private_key")
 
 
 def get_access_token(cfg: dict) -> dict:
