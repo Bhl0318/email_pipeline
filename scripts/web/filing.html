@@ -134,7 +134,8 @@
     <div class="field"><label>抄送</label><input id="mCc"></div>
     <div class="field"><label>主题</label><input id="mSubject"></div>
     <div class="field"><label>正文（与页面「给美代理邮件」同步，此处可最后微调）</label><textarea id="mBody" rows="6"></textarea></div>
-    <div class="field"><label>附件（确认发送时生成）</label><div class="attach-list" id="mAttach"></div></div>
+    <div class="field"><label>DocuSign 签字人姓名（留空则用收件人邮箱）</label><input id="mSigner" placeholder="如 Yu Rao"></div>
+    <div class="field"><label>附件通道（每个文件选 DocuSign 签字 / 内部邮箱；默认 POA/Transmittal/ADS 走 DocuSign）</label><div class="attach-list" id="mAttach"></div></div>
     <div id="mWarn"></div>
     <div class="actions">
       <button onclick="closeSendModal()">取消</button>
@@ -779,6 +780,24 @@ function attachSummaryHtml(){
   const finals = (data.final_docs||[]).map(d=>d.name);
   return "生成成品：" + gen.join("、") + "<br>定稿：" + (finals.length ? finals.map(esc).join("、") : "（未上传）");
 }
+// 发美代理 modal 的附件通道清单：生成三件(POA/Transmittal/ADS 默认 DocuSign) + 定稿(默认内部邮箱)
+function attachChannelFiles(){
+  const gen = [{key:"POA",label:"POA",def:"docusign"},
+               {key:"Transmittal",label:"Transmittal",def:"docusign"},
+               {key:"ADS",label:"ADS（XFA）",def:"docusign"}];
+  const finals = (data.final_docs||[]).map(d=>({key:d.name,label:d.name,def:"email"}));
+  return gen.concat(finals);
+}
+function attachChannelListHtml(){
+  return attachChannelFiles().map(f=>`
+    <div style="display:flex;align-items:center;gap:8px;padding:3px 0;">
+      <span style="flex:1;font-size:12px;">${esc(f.label)}</span>
+      <select class="ch-sel" data-key="${esc(f.key)}" style="font-size:12px;padding:2px 6px;">
+        <option value="docusign" ${f.def==="docusign"?"selected":""}>DocuSign 签字</option>
+        <option value="email" ${f.def==="email"?"selected":""}>内部邮箱</option>
+      </select>
+    </div>`).join("");
+}
 // 右侧预览美代理邮件（白纸卡片，宋体/Times 12pt，与环节2 确认邮件预览同款；渲染 mailState）
 function previewEmail(){
   if (!taskId) { toast("请先从左侧选择任务"); return; }
@@ -826,7 +845,8 @@ function openSendModal(){
   $("mBody").value = mailState.body;
   $("mSubject").oninput = () => { setMail({subject: $("mSubject").value}); syncEmailPreview(); };
   $("mBody").oninput = () => { setMail({body: $("mBody").value}); syncEmailPreview(); };
-  $("mAttach").innerHTML = attachSummaryHtml();
+  $("mSigner").value = "";
+  $("mAttach").innerHTML = attachChannelListHtml();
   $("sendModal").classList.add("show");
 }
 function closeSendModal(){ $("sendModal").classList.remove("show"); }
@@ -834,11 +854,15 @@ async function doConfirm(){
   const recipients = $("mTo").value.split(/[,，;；]/).map(s=>s.trim()).filter(Boolean);
   if (!recipients.length) { toast("收件人不能为空"); return; }
   const cc = $("mCc").value.split(/[,，;；]/).map(s=>s.trim()).filter(Boolean);
+  const file_channels = {};
+  document.querySelectorAll("#mAttach .ch-sel").forEach(s => { file_channels[s.dataset.key] = s.value; });
+  const signer_name = $("mSigner").value.trim();
   $("mConfirm").disabled = true;
   try {
     const j = await api("POST", `${API}/${taskId}/confirm`, {
       fields_json: fields, transmittal_options: opts, recipients, cc,
       recipient_name: "", subject: mailState.subject, body: mailState.body,
+      file_channels, signer_name,
     });
     toast("已发送，任务完成");
     closeSendModal(); await loadTaskList(); await openTask(taskId);

@@ -33,7 +33,7 @@ PROD_OAUTH_HOST = "account.docusign.com"     # 生产
 def load_config(path=None) -> dict:
     p = Path(path or CONFIG_PATH)
     if not p.is_file():
-        raise SystemExit(f"缺配置 {p}（参照同目录 docusign_config.example.json 建；沙盒填 demo 凭据）")
+        raise RuntimeError(f"缺配置 {p}（参照同目录 docusign_config.example.json 建；沙盒填 demo 凭据）")
     return json.loads(p.read_text(encoding="utf-8"))
 
 
@@ -55,7 +55,7 @@ def _private_key(cfg: dict) -> str:
         return Path(kp).read_text(encoding="utf-8")
     if cfg.get("private_key"):
         return cfg["private_key"]
-    raise SystemExit("缺 RSA 私钥：请在配置里给 private_key_path（指向 .pem）或 private_key")
+    raise RuntimeError("缺 RSA 私钥：请在配置里给 private_key_path（指向 .pem）或 private_key")
 
 
 def get_access_token(cfg: dict) -> dict:
@@ -63,7 +63,7 @@ def get_access_token(cfg: dict) -> dict:
     try:
         import jwt  # PyJWT
     except Exception:
-        raise SystemExit("需安装：pip install pyjwt cryptography")
+        raise RuntimeError("需安装：pip install pyjwt cryptography")
     host = _oauth_host(cfg)
     now = int(time.time())
     assertion = jwt.encode(
@@ -75,7 +75,7 @@ def get_access_token(cfg: dict) -> dict:
     r = requests.post(f"https://{host}/oauth/token", timeout=30, data={
         "grant_type": "urn:ietf:params:oauth:grant-type:jwt-bearer", "assertion": assertion})
     if r.status_code != 200:
-        raise SystemExit(f"JWT Grant 失败 {r.status_code}: {r.text}\n"
+        raise RuntimeError(f"JWT Grant 失败 {r.status_code}: {r.text}\n"
                          "（若 consent_required：先浏览器打开 consent_url 授权一次）")
     token = r.json()["access_token"]
     ui = requests.get(f"https://{host}/oauth/userinfo", timeout=30,
@@ -89,7 +89,7 @@ def get_access_token(cfg: dict) -> dict:
     if not acct and ui.get("accounts"):
         acct = ui["accounts"][0]
     if not acct:
-        raise SystemExit(f"userinfo 未返回账号：{ui}")
+        raise RuntimeError(f"userinfo 未返回账号：{ui}")
     return {"access_token": token, "base_uri": acct["base_uri"], "account_id": acct["account_id"]}
 
 
@@ -146,7 +146,7 @@ def send_envelope(cfg, auth, documents, recipient, **kw) -> str:
     body = build_envelope(documents, recipient, **kw)
     r = requests.post(_api(auth, "/envelopes"), headers=_hdr(auth), json=body, timeout=60)
     if r.status_code not in (200, 201):
-        raise SystemExit(f"建信封失败 {r.status_code}: {r.text}")
+        raise RuntimeError(f"建信封失败 {r.status_code}: {r.text}")
     return r.json()["envelopeId"]
 
 
@@ -222,7 +222,7 @@ if __name__ == "__main__":
         files = sys.argv[3:]
         for f in files:
             if not Path(f).is_file():
-                raise SystemExit(f"文件不存在: {f}")
+                raise RuntimeError(f"文件不存在: {f}")
         agent = cfg.get("agent") or {}
         recip = {"name": agent.get("name") or "US Agent", "email": to_email}
         env_id = send_envelope(cfg, auth, [{"path": f} for f in files], recip,

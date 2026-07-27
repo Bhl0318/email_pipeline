@@ -79,6 +79,7 @@ from submission.poa_generator import generate_poa  # noqa: E402
 from submission.transmittal_generator import generate_transmittal  # noqa: E402
 from submission.ads_generator import generate_ads, generate_ads_preview, generate_ads_flat  # noqa: E402
 from submission.agent_email import build_agent_email  # noqa: E402
+from submission import docusign_client as _docusign  # noqa: E402（仅 requests 依赖，安全 import）
 
 SUBMISSION_HTML = WEB_DIR / "submission.html"
 FILING_HTML = WEB_DIR / "filing.html"
@@ -1690,6 +1691,19 @@ class FilingConfirmReq(BaseModel):
     recipient_name: str = "X总/X律师"
     subject: str = ""
     body: str = ""
+    file_channels: dict = {}       # {文件key: "docusign"|"email"}；key=POA/Transmittal/ADS 或定稿文件名
+    signer_name: str = ""          # DocuSign 签字人姓名（缺省用收件人邮箱）
+
+
+def _doc_channel_key(path, docs):
+    """文件的通道 key：生成的三件用类型(POA/Transmittal/ADS)，定稿用文件名。"""
+    for d in docs:
+        if str(d["file_path"]) == str(path):
+            t = (d.get("type") or "")
+            if "Transmittal" in t:
+                return "Transmittal"
+            return t or Path(path).name           # "POA" / "ADS"
+    return Path(path).name                        # 定稿：文件名
 
 
 @app.post("/api/submission/filing/{task_id}/confirm")
@@ -1735,23 +1749,48 @@ def confirm_filing_task(task_id: str, req: FilingConfirmReq):
     if fdir.exists():
         attach_paths += [p for p in sorted(fdir.glob("*")) if p.is_file()]
 
-    # 3) 给美代理邮件（固定模板，可被 req 覆盖）+ 实发
+    # 2b) 按通道拆分：默认 POA/Transmittal/ADS 走 DocuSign，其余走内部邮箱；req.file_channels 覆盖
+    _fc = req.file_channels or {}
+    ds_paths, email_paths, ch_map = [], [], {}
+    for p in attach_paths:
+        key = _doc_channel_key(p, docs)
+        ch = (_fc.get(key) or ("docusign" if key in ("POA", "Transmittal", "ADS") else "email")).lower()
+        ch_map[p.name] = ch
+        (ds_paths if ch == "docusign" else email_paths).append(p)
+
     case_volume = row["case_volume"]
     mail = build_agent_email(case_volume, req.recipient_name or "X总/X律师")
     subject = req.subject or mail["subject"]
     body = req.body or mail["body"]
-    msg = MIMEMultipart()
-    msg["Subject"] = subject
-    msg.attach(MIMEText(body, "plain", "utf-8"))
-    for p in attach_paths:
-        part = MIMEApplication(p.read_bytes())
-        part.add_header("Content-Disposition", "attachment", filename=("utf-8", "", p.name))
-        msg.attach(part)
-    account_cfg, _cc = _submission_send_config()
-    try:
-        _send_smtp(msg, account_cfg, recipients, req.cc or None)
-    except Exception as exc:
-        raise HTTPException(502, f"邮件发送失败（任务保留 pending，成品已存 final/）：{exc}")
+
+    # 3a) DocuSign 组 → 建信封发签字人（沙盒/生产按 docusign_config）
+    envelope_id = None
+    if ds_paths:
+        try:
+            dcfg = _docusign.load_config()
+            dauth = _docusign.get_access_token(dcfg)
+            signer = {"name": (req.signer_name or "").strip() or recipients[0], "email": recipients[0]}
+            envelope_id = _docusign.send_envelope(
+                dcfg, dauth, [{"path": str(p)} for p in ds_paths], signer,
+                email_subject=subject, anchor=dcfg.get("anchor", "Signature"),
+                date_anchor=dcfg.get("date_anchor"))
+        except Exception as exc:
+            raise HTTPException(502, f"DocuSign 发送失败（任务保留 pending，成品已存 final/）：{exc}")
+
+    # 3b) 内部邮箱组 → SMTP 附件发美代理
+    if email_paths:
+        msg = MIMEMultipart()
+        msg["Subject"] = subject
+        msg.attach(MIMEText(body, "plain", "utf-8"))
+        for p in email_paths:
+            part = MIMEApplication(p.read_bytes())
+            part.add_header("Content-Disposition", "attachment", filename=("utf-8", "", p.name))
+            msg.attach(part)
+        account_cfg, _cc = _submission_send_config()
+        try:
+            _send_smtp(msg, account_cfg, recipients, req.cc or None)
+        except Exception as exc:
+            raise HTTPException(502, f"邮件发送失败（任务保留 pending，成品已存 final/）：{exc}")
 
     # 4) 落库 done + 存编辑后的 fields + 插 agent_followup（供环节6 跟进美代理回邮）
     execute_params(
@@ -1760,6 +1799,10 @@ def confirm_filing_task(task_id: str, req: FilingConfirmReq):
     followup_fields = json.dumps({
         "source_task_id": task_id, "files": [p.name for p in attach_paths],
         "sent_to": recipients, "sent_cc": req.cc, "sent_at": now,
+        "channels": ch_map,                          # {文件名: docusign|email}
+        "docusign_files": [p.name for p in ds_paths],
+        "email_files": [p.name for p in email_paths],
+        "envelope_id": envelope_id,                  # DocuSign 信封号（环节6 取签署版用）
     }, ensure_ascii=False)
     exist = execute_params(
         "SELECT id FROM submission_tasks WHERE task_type='agent_followup' AND case_volume=%s",
