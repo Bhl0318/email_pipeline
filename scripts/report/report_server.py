@@ -1776,7 +1776,9 @@ def confirm_filing_task(task_id: str, req: FilingConfirmReq):
                 date_anchor=dcfg.get("date_anchor"),
                 anchor_x=dcfg.get("anchor_x_offset", 0),
                 anchor_y=dcfg.get("anchor_y_offset", 0),
-                anchor_units=dcfg.get("anchor_units", "pixels"))
+                anchor_units=dcfg.get("anchor_units", "pixels"),
+                anchor_case_sensitive=dcfg.get("anchor_case_sensitive", True),
+                anchor_whole_word=dcfg.get("anchor_whole_word", True))
         except Exception as exc:
             raise HTTPException(502, f"DocuSign 发送失败（任务保留 pending，成品已存 final/）：{exc}")
 

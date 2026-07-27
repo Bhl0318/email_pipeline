@@ -21,6 +21,8 @@
   "anchor_x_offset": 0,
   "anchor_y_offset": 0,
   "anchor_units": "pixels",
+  "anchor_case_sensitive": true,
+  "anchor_whole_word": true,
 
   "_recipient": "美代理签字人（运行时也可由代码传入覆盖）。",
   "agent": { "name": "<US Agent Name>", "email": "<agent@firm.com>" }

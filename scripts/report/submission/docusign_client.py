@@ -116,7 +116,8 @@ def _b64(path) -> str:
 
 def build_envelope(documents, recipient, email_subject=None, anchor="Signature",
                    date_anchor=None, status="sent",
-                   anchor_x=0, anchor_y=0, anchor_units="pixels") -> dict:
+                   anchor_x=0, anchor_y=0, anchor_units="pixels",
+                   anchor_case_sensitive=True, anchor_whole_word=True) -> dict:
     """构造信封请求体（不发送，便于 dry-run 核对）。
     :param documents: [{"path", "name"(可选), "kind"(可选)}]，全放同一信封（一案一信封）
     :param recipient: {"name","email"}（美代理签字人）
@@ -135,11 +136,15 @@ def build_envelope(documents, recipient, email_subject=None, anchor="Signature",
         })
     # 签名位放在 anchor 文本处；日期位只有显式配了单独的 date_anchor 才放（避免从签名锚点
     # 右移越界导致 INVALID_USER_OFFSET）。DocuSign 证书本身也会记录签署日期。
-    tabs = {"signHereTabs": [{"anchorString": anchor, "anchorUnits": anchor_units,
-                              "anchorXOffset": str(anchor_x), "anchorYOffset": str(anchor_y)}]}
+    # anchorCaseSensitive/WholeWord 用于精确定位：POA 里 "SIGNATURE"(全大写标题)/"signature"(说明文)
+    # 都不是签字位，只有 "Signature"(首字母大写整词)才是 → 大小写敏感+整词 只中签字字段那一处。
+    _anch = {"anchorUnits": anchor_units, "anchorCaseSensitive": anchor_case_sensitive,
+             "anchorMatchWholeWord": anchor_whole_word}
+    tabs = {"signHereTabs": [dict(_anch, anchorString=anchor,
+                                  anchorXOffset=str(anchor_x), anchorYOffset=str(anchor_y))]}
     if date_anchor:
-        tabs["dateSignedTabs"] = [{"anchorString": date_anchor, "anchorUnits": anchor_units,
-                                   "anchorXOffset": "0", "anchorYOffset": "0"}]
+        tabs["dateSignedTabs"] = [dict(_anch, anchorString=date_anchor,
+                                       anchorXOffset="0", anchorYOffset="0")]
     signer = {"email": recipient["email"], "name": recipient["name"],
               "recipientId": "1", "routingOrder": "1", "tabs": tabs}
     return {
@@ -239,7 +244,9 @@ if __name__ == "__main__":
                                date_anchor=cfg.get("date_anchor"),
                                anchor_x=cfg.get("anchor_x_offset", 0),
                                anchor_y=cfg.get("anchor_y_offset", 0),
-                               anchor_units=cfg.get("anchor_units", "pixels"))
+                               anchor_units=cfg.get("anchor_units", "pixels"),
+                               anchor_case_sensitive=cfg.get("anchor_case_sensitive", True),
+                               anchor_whole_word=cfg.get("anchor_whole_word", True))
         print(f"已发送信封 envelopeId={env_id} → {to_email}（沙盒收件箱查收，签完用 status/download）")
     elif cmd == "status" and len(sys.argv) > 2:
         print("status:", get_status(cfg, auth, sys.argv[2]))
