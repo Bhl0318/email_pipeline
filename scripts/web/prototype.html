@@ -587,7 +587,10 @@
     </div>
     <div class="modal-body">
       <div class="modal-row"><div class="modal-label">发送人</div><div class="modal-value"><select class="modal-input" id="md-from-sel"></select></div></div>
-      <div class="modal-row"><div class="modal-label">收件人</div><div class="modal-value"><input class="modal-input" id="md-to-inp" placeholder="客户邮箱，多个用 ; 分隔" autocomplete="off"></div></div>
+      <div class="modal-row"><div class="modal-label">收件人</div><div class="modal-value">
+        <select class="modal-input" id="md-to-sel" style="margin-bottom:6px;"><option value="">— 从联系人选择添加 —</option></select>
+        <input class="modal-input" id="md-to-inp" placeholder="客户邮箱，多个用 ; 分隔" autocomplete="off">
+      </div></div>
       <div class="modal-row"><div class="modal-label">抄送</div><div class="modal-value"><input class="modal-input" id="md-cc-inp" placeholder="选填，多个用 ; 分隔" autocomplete="off"></div></div>
       <div class="modal-row"><div class="modal-label">主题</div><div class="modal-value" id="md-subject">—</div></div>
       <div class="modal-row"><div class="modal-label">附件</div><div class="modal-value modal-attachments" id="md-attachments">—</div></div>
@@ -990,16 +993,33 @@
   }
 
   function openSendModal(preview) {
-    // 发送人下拉（七星天/众慧），按 -H 规则预选；未配凭据的标注出来
+    // 发送人下拉（七星天/众慧），按 -H 规则预选
     const sel = $('md-from-sel');
     const senders = preview.senders || [];
     sel.innerHTML = senders.map(s =>
-      `<option value="${escapeHTML(s.key)}">${escapeHTML(s.label)}（${escapeHTML(s.from)}）${s.configured ? '' : ' [未配凭据]'}</option>`
+      `<option value="${escapeHTML(s.key)}">${escapeHTML(s.label)}（${escapeHTML(s.from)}）</option>`
     ).join('');
     if (preview.default_sender) sel.value = preview.default_sender;
 
-    // 收件人 / 抄送：可编辑输入框，预填后端给的默认（当前默认空）
-    $('md-to-inp').value = (preview.recipients || []).join('; ');
+    // 收件人：后台按案号查出的联系人做下拉，选中即追加；输入框默认预填全部，可手改
+    const contacts = preview.recipients || [];
+    const toSel = $('md-to-sel');
+    const toInp = $('md-to-inp');
+    toSel.innerHTML = '<option value="">— 从联系人选择添加 —</option>' +
+      contacts.map(r => `<option value="${escapeHTML(r)}">${escapeHTML(r)}</option>`).join('');
+    toInp.value = contacts.join('; ');
+    toSel.onchange = () => {
+      const v = toSel.value;
+      if (v) {
+        const cur = parseAddrs(toInp.value);
+        if (!cur.includes(v)) cur.push(v);
+        toInp.value = cur.join('; ');
+      }
+      toSel.value = '';
+      $('md-send-btn').disabled = !toInp.value.trim();
+    };
+
+    // 抄送：可编辑输入框，预填后端给的默认（当前默认空）
     $('md-cc-inp').value = (preview.cc || []).join('; ');
 
     $('md-subject').textContent = preview.subject || '';
@@ -1017,11 +1037,9 @@
       ).join('') + '</ul>';
     }
 
-    // 收件人为空则禁用发送，随输入实时启用
-    const toInp = $('md-to-inp');
-    const syncSendBtn = () => { $('md-send-btn').disabled = !toInp.value.trim(); };
-    toInp.oninput = syncSendBtn;
-    syncSendBtn();
+    // 收件人为空则禁用发送，随输入实时启用（toInp 上方已声明）
+    toInp.oninput = () => { $('md-send-btn').disabled = !toInp.value.trim(); };
+    toInp.oninput();
     $('sendModal').classList.add('show');
   }
 
