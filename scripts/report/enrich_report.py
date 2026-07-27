@@ -107,6 +107,50 @@ def query_customer_demands(project):
         return []
 
 
+def query_case_recipients(project):
+    """SQL Server IPEasy: 案号 → 客户联系人（汇报信收件人，全取）。
+    链路：p_case_info.case_volume = 案号 → customer_id
+          → c_contact.obj_id = customer_id，排除已离职、排除空邮箱，按 seq 升序。
+    返回**按邮箱去重、保持 seq 顺序**的 [{"name":.., "email":..}]；
+    查不到/未配库/出错返回 []。"""
+    if not project:
+        return []
+    cfg = _load_db_config().get("mssql_ipeasy", {})
+    host = cfg.get("host", "")
+    if not host or host.startswith("请填写"):
+        return []
+    try:
+        import pymssql
+        conn = pymssql.connect(
+            cfg["host"], cfg["user"], cfg["password"], cfg["database"],
+            charset=cfg.get("charset", "utf8"),
+        )
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT c.contact_name, c.email FROM p_case_info ci "
+            "JOIN c_contact c ON c.obj_id = ci.customer_id "
+            "WHERE ci.case_volume = %s "
+            "AND c.remark <> %s "
+            "AND c.email IS NOT NULL AND LTRIM(RTRIM(c.email)) <> '' "
+            "ORDER BY c.seq",
+            (project, "已离职"),
+        )
+        rows = cur.fetchall()
+        cur.close()
+        conn.close()
+        seen, out = set(), []
+        for name, email in rows:
+            e = (email or "").strip()
+            key = e.lower()
+            if e and key not in seen:
+                seen.add(key)
+                out.append({"name": (name or "").strip(), "email": e})
+        return out
+    except Exception as e:
+        print(f"[enrich] 查案件收件人失败 {project}: {e}", file=sys.stderr)
+        return []
+
+
 def enrich_cn_fields(project):
     """返回要合并进 fields_json 的字段（查到才返回该键，覆盖"请提供"）"""
     out = {}
@@ -135,5 +179,6 @@ if __name__ == "__main__":
         print(json.dumps(enrich_cn_fields(project), ensure_ascii=False, indent=2))
         demands = query_customer_demands(project)
         print(json.dumps(demands, ensure_ascii=False, indent=2))
+        print("收件人:", json.dumps(query_case_recipients(project), ensure_ascii=False, indent=2))
     else:
         print("用法: python3 enrich_report.py <代理所案号>", file=sys.stderr)

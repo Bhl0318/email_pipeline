@@ -49,6 +49,7 @@ from pathlib import Path
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.application import MIMEApplication
+from email.utils import getaddresses
 
 import requests
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form
@@ -431,10 +432,11 @@ def _send_smtp(msg, account_cfg, recipients, cc_addrs=None):
         if msg["To"]:   del msg["To"]
         if msg["Cc"]:   del msg["Cc"]
         msg["From"] = account_cfg["user"]
-        msg["To"] = ", ".join(recipients)
+        msg["To"] = ", ".join(recipients)            # 可含「姓名 <邮箱>」
         if cc_addrs:
             msg["Cc"] = ", ".join(cc_addrs)
-        all_rcpts = recipients + (cc_addrs or [])
+        # 信封收件人只要纯邮箱：从「姓名 <邮箱>」解析出地址
+        all_rcpts = [addr for _, addr in getaddresses(recipients + (cc_addrs or [])) if addr]
         smtp.sendmail(account_cfg["user"], all_rcpts, msg.as_string())
     finally:
         try:
@@ -475,17 +477,29 @@ def preview_send(task_id: str, req: PreviewSendReq):
             pass
 
     # 发送人：按代理所案号 -H 规则算默认，前端可在弹窗改
+    project = req.fields.get("代理所案号", "")
     try:
         cfg = _load_email_config()
         senders = _sender_options(cfg)
-        default_sender = _default_sender_key(req.fields.get("代理所案号", ""))
+        default_sender = _default_sender_key(project)
     except Exception as e:
         raise HTTPException(500, f"读 email_config.json 失败: {e}")
+
+    # 收件人：按案号从 IPEasy 查客户联系人（在职、有邮箱，全取），格式化为「姓名 <邮箱>」
+    recipients = []
+    try:
+        from enrich_report import query_case_recipients
+        recipients = [
+            (f'{c["name"]} <{c["email"]}>' if c.get("name") else c["email"])
+            for c in query_case_recipients(project)
+        ]
+    except Exception as e:
+        print(f"[preview-send] 查收件人失败 {project}: {e}", file=sys.stderr)
 
     return {
         "senders": senders,               # [{key,label,from,configured}]
         "default_sender": default_sender, # 按 -H 预选
-        "recipients": [],                 # 收件人=客户邮箱，默认空，弹窗手填
+        "recipients": recipients,         # 按案号自动带出，弹窗可改
         "cc": [],                         # 抄送默认空，弹窗手填
         "subject": subject,
         "report_pdf_filename": (base + ".pdf") if req.attach_pdf else None,
