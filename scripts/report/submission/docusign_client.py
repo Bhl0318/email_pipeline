@@ -115,11 +115,14 @@ def _b64(path) -> str:
 
 
 def build_envelope(documents, recipient, email_subject=None, anchor="Signature",
-                   date_anchor=None, status="sent") -> dict:
+                   date_anchor=None, status="sent",
+                   anchor_x=0, anchor_y=0, anchor_units="pixels") -> dict:
     """构造信封请求体（不发送，便于 dry-run 核对）。
     :param documents: [{"path", "name"(可选), "kind"(可选)}]，全放同一信封（一案一信封）
     :param recipient: {"name","email"}（美代理签字人）
-    :param anchor: 签名位锚点文本（PDF 里该文本出现处放签名框；按真实文档调，也可改用坐标）
+    :param anchor: 签名位锚点文本（每个文档里该文本出现处都放一个签名框；跨全部文档生效）
+    :param anchor_x/anchor_y: 相对锚点文本起点的偏移（校正签名框落点；X 右+、Y 下+）
+    :param anchor_units: 偏移单位 pixels（72=1英寸）/ inches / mms
     """
     docs = []
     for i, d in enumerate(documents, start=1):
@@ -132,10 +135,10 @@ def build_envelope(documents, recipient, email_subject=None, anchor="Signature",
         })
     # 签名位放在 anchor 文本处；日期位只有显式配了单独的 date_anchor 才放（避免从签名锚点
     # 右移越界导致 INVALID_USER_OFFSET）。DocuSign 证书本身也会记录签署日期。
-    tabs = {"signHereTabs": [{"anchorString": anchor, "anchorUnits": "pixels",
-                              "anchorXOffset": "0", "anchorYOffset": "0"}]}
+    tabs = {"signHereTabs": [{"anchorString": anchor, "anchorUnits": anchor_units,
+                              "anchorXOffset": str(anchor_x), "anchorYOffset": str(anchor_y)}]}
     if date_anchor:
-        tabs["dateSignedTabs"] = [{"anchorString": date_anchor, "anchorUnits": "pixels",
+        tabs["dateSignedTabs"] = [{"anchorString": date_anchor, "anchorUnits": anchor_units,
                                    "anchorXOffset": "0", "anchorYOffset": "0"}]
     signer = {"email": recipient["email"], "name": recipient["name"],
               "recipientId": "1", "routingOrder": "1", "tabs": tabs}
@@ -233,7 +236,10 @@ if __name__ == "__main__":
         recip = {"name": agent.get("name") or "US Agent", "email": to_email}
         env_id = send_envelope(cfg, auth, [{"path": f} for f in files], recip,
                                anchor=cfg.get("anchor", "Signature"),
-                               date_anchor=cfg.get("date_anchor"))
+                               date_anchor=cfg.get("date_anchor"),
+                               anchor_x=cfg.get("anchor_x_offset", 0),
+                               anchor_y=cfg.get("anchor_y_offset", 0),
+                               anchor_units=cfg.get("anchor_units", "pixels"))
         print(f"已发送信封 envelopeId={env_id} → {to_email}（沙盒收件箱查收，签完用 status/download）")
     elif cmd == "status" and len(sys.argv) > 2:
         print("status:", get_status(cfg, auth, sys.argv[2]))

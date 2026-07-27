@@ -1773,7 +1773,10 @@ def confirm_filing_task(task_id: str, req: FilingConfirmReq):
             envelope_id = _docusign.send_envelope(
                 dcfg, dauth, [{"path": str(p)} for p in ds_paths], signer,
                 email_subject=subject, anchor=dcfg.get("anchor", "Signature"),
-                date_anchor=dcfg.get("date_anchor"))
+                date_anchor=dcfg.get("date_anchor"),
+                anchor_x=dcfg.get("anchor_x_offset", 0),
+                anchor_y=dcfg.get("anchor_y_offset", 0),
+                anchor_units=dcfg.get("anchor_units", "pixels"))
         except Exception as exc:
             raise HTTPException(502, f"DocuSign 发送失败（任务保留 pending，成品已存 final/）：{exc}")
 

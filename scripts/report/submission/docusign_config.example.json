@@ -16,8 +16,11 @@
   "private_key_path": "<本地 RSA 私钥 .pem 路径，如 ./docusign_private.pem>",
   "redirect_uri": "https://www.docusign.com",
 
-  "_signing": "签字位锚点：PDF 里出现该文本处放签名/日期框；按真实 POA/Transmittal/ADS 调，或改坐标定位。",
+  "_signing": "签字位锚点：每个文档里出现该文本处都放签名框。偏移校正：X 右+、Y 下+，单位 pixels(72=1英寸)/inches/mms。",
   "anchor": "Signature",
+  "anchor_x_offset": 0,
+  "anchor_y_offset": 0,
+  "anchor_units": "pixels",
 
   "_recipient": "美代理签字人（运行时也可由代码传入覆盖）。",
   "agent": { "name": "<US Agent Name>", "email": "<agent@firm.com>" }
