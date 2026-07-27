@@ -100,9 +100,25 @@ REPORT_TYPE_TO_TEMPLATE = {
 }
 REVIEW_BASE_URL = "http://10.10.70.88:8501"
 
-# 汇报信审核任务通知邮件收件人
+# 汇报信审核任务通知邮件收件人（兜底：未命中准备人规则时用）
 REVIEW_NOTIFY_TO  = ["weihong.yuan@metis-ip.com"]
 REVIEW_NOTIFY_CC  = ["hailing.bi@metis-ip.com"]
+
+# 汇报信准备人（收审核链接的人）路由：按国别 + 客户码（案号前5位）
+# 目前规则（仅 OA 场景）：CN 客户码 20615→胡梅，其他 CN→任惠；US/EP→王晶。
+REPORT_PREPARER_HU   = "mei.hu@metis-ip.com"    # 胡梅
+REPORT_PREPARER_REN  = "hui.ren@metis-ip.com"   # 任惠
+REPORT_PREPARER_WANG = "jing.wang@metis-ip.com" # 王晶
+
+
+def _report_preparer_email(region, project):
+    """按国别+客户码返回汇报信准备人邮箱；未命中规则回退默认审核人。"""
+    code = (project or "")[:5]
+    if region == "CN":
+        return REPORT_PREPARER_HU if code == "20615" else REPORT_PREPARER_REN
+    if region in ("US", "EP"):
+        return REPORT_PREPARER_WANG
+    return (REVIEW_NOTIFY_TO or ["hailing.bi@metis-ip.com"])[0]
 
 # USPTO Document Type 代码 → 英文全名（用于汇报信"官文英文名称"字段）
 US_DOC_TYPE_FULLNAME = {
@@ -665,36 +681,14 @@ def _build_review_links_html(links):
 </body></html>"""
 
 
-def send_review_links_email(links):
-    """把刚生成的审核链接清单发邮件给审核人。"""
-    if not links:
-        print("[审核通知] 无待审核任务，跳过发送", file=sys.stderr)
-        return
-
-    cfg = load_config()
-    pa_cfg = cfg.get("accounts", {}).get("pa")
-    if not pa_cfg:
-        print("[审核通知] 未配置 PA 账号，跳过发送", file=sys.stderr)
-        return
-
-    # 汇报信收件人/抄送与 OA 立项独立：优先 notification.report，回退写死的常量
-    report_notif = cfg.get("notification", {}).get("report", {})
-    to_list = report_notif.get("recipients") or REVIEW_NOTIFY_TO
-    cc_list = report_notif.get("cc") if report_notif.get("cc") is not None else REVIEW_NOTIFY_CC
-
+def _send_one_review_email(pa_cfg, to_list, links):
+    """给一个准备人发一封审核链接通知邮件（links 为其名下的任务）。"""
     today = datetime.now().strftime("%Y-%m-%d")
     msg = MIMEMultipart("alternative")
     msg["From"] = pa_cfg["user"]
     msg["To"] = ", ".join(to_list)
-    if cc_list:
-        msg["Cc"] = ", ".join(cc_list)
     msg["Subject"] = f"汇报信审核任务通知 - {today} ({len(links)}条)"
-
-    html_body = _build_review_links_html(links)
-    msg.attach(MIMEText(html_body, "html", "utf-8"))
-
-    # 实际收件人 = To + Cc（SMTP sendmail 要显式给全）
-    recipients = to_list + cc_list
+    msg.attach(MIMEText(_build_review_links_html(links), "html", "utf-8"))
 
     try:
         smtp = smtplib.SMTP(pa_cfg["smtp_host"], pa_cfg["smtp_port"], timeout=30)
@@ -714,12 +708,34 @@ def send_review_links_email(links):
         else:
             smtp.login(pa_cfg["user"], pa_cfg["password"])
 
-        smtp.sendmail(pa_cfg["user"], recipients, msg.as_string())
+        smtp.sendmail(pa_cfg["user"], to_list, msg.as_string())
         smtp.quit()
-        print(f"[审核通知] 发送成功: {len(links)} 条 → {', '.join(to_list)}"
-              + (f" (CC: {', '.join(cc_list)})" if cc_list else ""), file=sys.stderr)
+        print(f"[审核通知] 发送成功: {len(links)} 条 → {', '.join(to_list)}", file=sys.stderr)
     except Exception as e:
-        print(f"[审核通知] 发送失败: {e}", file=sys.stderr)
+        print(f"[审核通知] 发送失败 → {', '.join(to_list)}: {e}", file=sys.stderr)
+
+
+def send_review_links_email(links):
+    """按准备人分组，把各自名下的审核链接分别发给对应准备人。"""
+    if not links:
+        print("[审核通知] 无待审核任务，跳过发送", file=sys.stderr)
+        return
+
+    cfg = load_config()
+    pa_cfg = cfg.get("accounts", {}).get("pa")
+    if not pa_cfg:
+        print("[审核通知] 未配置 PA 账号，跳过发送", file=sys.stderr)
+        return
+
+    # 按准备人邮箱分组（缺失则回退默认审核人）
+    fallback = (REVIEW_NOTIFY_TO or ["hailing.bi@metis-ip.com"])[0]
+    groups = {}
+    for it in links:
+        to_email = it.get("preparer") or fallback
+        groups.setdefault(to_email, []).append(it)
+
+    for to_email, group_links in groups.items():
+        _send_one_review_email(pa_cfg, [to_email], group_links)
 
 
 # ─── 主功能 ──────────────────────────────────────────────
@@ -1084,6 +1100,7 @@ def dispatch_report(all_results, all_emails, dry_run=False):
                         "project":    project,
                         "ntype":      ntype,
                         "issue_date": item.get("issue_date", "") or item.get("oa_doc_date", ""),
+                        "preparer":   _report_preparer_email(region, project),
                     })
                 else:
                     try:
