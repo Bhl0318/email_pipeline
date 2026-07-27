@@ -114,16 +114,41 @@ def _b64(path) -> str:
     return base64.b64encode(Path(path).read_bytes()).decode()
 
 
+def _locate_anchor(pdf_path, anchor, case_sensitive=True, whole_word=True):
+    """用 fitz 在 PDF 里定位 anchor 文本，返回首个匹配 (page_1based, x0, y0)（points，左上角，
+    坐标系与 DocuSign 绝对定位一致：原点左上、Y 向下、72pt=1英寸）。找不到/无 fitz → None。"""
+    try:
+        import fitz
+    except Exception:
+        return None
+    try:
+        doc = fitz.open(str(pdf_path))
+    except Exception:
+        return None
+    try:
+        tgt = anchor if case_sensitive else anchor.lower()
+        for pno in range(len(doc)):
+            for w in doc[pno].get_text("words"):   # (x0,y0,x1,y1,word,block,line,wno)
+                word = w[4] if case_sensitive else w[4].lower()
+                if (word == tgt) if whole_word else (tgt in word):
+                    return pno + 1, w[0], w[1]
+        return None
+    finally:
+        doc.close()
+
+
 def build_envelope(documents, recipient, email_subject=None, anchor="Signature",
                    date_anchor=None, status="sent",
                    anchor_x=0, anchor_y=0, anchor_units="pixels",
-                   anchor_case_sensitive=True, anchor_whole_word=True) -> dict:
+                   anchor_case_sensitive=True, anchor_whole_word=True,
+                   anchor_offsets=None) -> dict:
     """构造信封请求体（不发送，便于 dry-run 核对）。
     :param documents: [{"path", "name"(可选), "kind"(可选)}]，全放同一信封（一案一信封）
     :param recipient: {"name","email"}（美代理签字人）
-    :param anchor: 签名位锚点文本（每个文档里该文本出现处都放一个签名框；跨全部文档生效）
-    :param anchor_x/anchor_y: 相对锚点文本起点的偏移（校正签名框落点；X 右+、Y 下+）
-    :param anchor_units: 偏移单位 pixels（72=1英寸）/ inches / mms
+    :param anchor: 签名位锚点文本（在每份文档里定位该文本处放签名框）
+    :param anchor_offsets: 按文档类型的偏移 {kind: {"x":,"y":}, "_default": {...}}；无则用 anchor_x/anchor_y。
+        每份文档用 fitz 找 anchor 坐标 + 该类型偏移 → 放**绝对坐标**签名框（一个信封、各文档各自落点）。
+        fitz 不可用/全都定位不到 → 退回单锚点（全局偏移，老行为）。
     """
     docs = []
     for i, d in enumerate(documents, start=1):
@@ -134,17 +159,34 @@ def build_envelope(documents, recipient, email_subject=None, anchor="Signature",
             "fileExtension": (p.suffix.lstrip(".").lower() or "pdf"),
             "documentBase64": _b64(p),
         })
-    # 签名位放在 anchor 文本处；日期位只有显式配了单独的 date_anchor 才放（避免从签名锚点
-    # 右移越界导致 INVALID_USER_OFFSET）。DocuSign 证书本身也会记录签署日期。
-    # anchorCaseSensitive/WholeWord 用于精确定位：POA 里 "SIGNATURE"(全大写标题)/"signature"(说明文)
-    # 都不是签字位，只有 "Signature"(首字母大写整词)才是 → 大小写敏感+整词 只中签字字段那一处。
-    _anch = {"anchorUnits": anchor_units, "anchorCaseSensitive": anchor_case_sensitive,
-             "anchorMatchWholeWord": anchor_whole_word}
-    tabs = {"signHereTabs": [dict(_anch, anchorString=anchor,
-                                  anchorXOffset=str(anchor_x), anchorYOffset=str(anchor_y))]}
-    if date_anchor:
-        tabs["dateSignedTabs"] = [dict(_anch, anchorString=date_anchor,
-                                       anchorXOffset="0", anchorYOffset="0")]
+
+    def _off(kind):
+        ao = anchor_offsets or {}
+        o = ao.get(kind) or ao.get("_default") or {"x": anchor_x, "y": anchor_y}
+        return int(round(float(o.get("x", 0)))), int(round(float(o.get("y", 0))))
+
+    # 逐文档 fitz 定位 → 绝对坐标签名框（一个信封、各文档各自偏移）
+    sign_tabs = []
+    for i, d in enumerate(documents, start=1):
+        ox, oy = _off(d.get("kind"))
+        loc = _locate_anchor(d["path"], anchor, anchor_case_sensitive, anchor_whole_word)
+        if loc:
+            pg, x0, y0 = loc
+            sign_tabs.append({"documentId": str(i), "pageNumber": str(pg), "recipientId": "1",
+                              "xPosition": str(int(round(x0)) + ox), "yPosition": str(int(round(y0)) + oy)})
+    if not sign_tabs:
+        # fitz 不可用 / 全都没定位到 → 退回单锚点（全局偏移）
+        ox, oy = _off(None)
+        sign_tabs = [{"anchorString": anchor, "anchorUnits": anchor_units,
+                      "anchorCaseSensitive": anchor_case_sensitive,
+                      "anchorMatchWholeWord": anchor_whole_word,
+                      "anchorXOffset": str(ox), "anchorYOffset": str(oy)}]
+    tabs = {"signHereTabs": sign_tabs}
+    if date_anchor:   # 需要单独日期框才配（仍用锚点，跨文档）
+        tabs["dateSignedTabs"] = [{"anchorString": date_anchor, "anchorUnits": anchor_units,
+                                   "anchorCaseSensitive": anchor_case_sensitive,
+                                   "anchorMatchWholeWord": anchor_whole_word,
+                                   "anchorXOffset": "0", "anchorYOffset": "0"}]
     signer = {"email": recipient["email"], "name": recipient["name"],
               "recipientId": "1", "routingOrder": "1", "tabs": tabs}
     return {
@@ -239,14 +281,21 @@ if __name__ == "__main__":
                 raise RuntimeError(f"文件不存在: {f}")
         agent = cfg.get("agent") or {}
         recip = {"name": agent.get("name") or "US Agent", "email": to_email}
-        env_id = send_envelope(cfg, auth, [{"path": f} for f in files], recip,
+        def _kind(fn):   # CLI 按文件名推类型，好套用 anchor_offsets 里的按文档偏移
+            n = Path(fn).name.upper()
+            for k in ("POA", "TRANSMITTAL", "ADS", "DECLARATION"):
+                if k in n:
+                    return "Transmittal" if k == "TRANSMITTAL" else k.title() if k == "DECLARATION" else k
+            return None
+        env_id = send_envelope(cfg, auth, [{"path": f, "kind": _kind(f)} for f in files], recip,
                                anchor=cfg.get("anchor", "Signature"),
                                date_anchor=cfg.get("date_anchor"),
                                anchor_x=cfg.get("anchor_x_offset", 0),
                                anchor_y=cfg.get("anchor_y_offset", 0),
                                anchor_units=cfg.get("anchor_units", "pixels"),
                                anchor_case_sensitive=cfg.get("anchor_case_sensitive", True),
-                               anchor_whole_word=cfg.get("anchor_whole_word", True))
+                               anchor_whole_word=cfg.get("anchor_whole_word", True),
+                               anchor_offsets=cfg.get("anchor_offsets"))
         print(f"已发送信封 envelopeId={env_id} → {to_email}（沙盒收件箱查收，签完用 status/download）")
     elif cmd == "status" and len(sys.argv) > 2:
         print("status:", get_status(cfg, auth, sys.argv[2]))

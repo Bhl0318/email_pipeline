@@ -23,6 +23,11 @@
   "anchor_units": "pixels",
   "anchor_case_sensitive": true,
   "anchor_whole_word": true,
+  "anchor_offsets": {
+    "POA": { "x": 90, "y": 5 },
+    "Transmittal": { "x": 50, "y": 5 },
+    "_default": { "x": 90, "y": 5 }
+  },
 
   "_recipient": "美代理签字人（运行时也可由代码传入覆盖）。",
   "agent": { "name": "<US Agent Name>", "email": "<agent@firm.com>" }
