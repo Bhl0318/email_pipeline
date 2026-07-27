@@ -1125,6 +1125,7 @@ def dispatch_report(all_results, all_emails, dry_run=False):
                             "project":    project,
                             "ntype":      ntype,
                             "issue_date": item.get("issue_date", "") or item.get("oa_doc_date", ""),
+                            "preparer":   _report_preparer_email(region, project),
                         })
                     except Exception as e:
                         print(f"  [report_tasks 写库失败] {e}", file=sys.stderr)
