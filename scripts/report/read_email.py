@@ -102,7 +102,8 @@ REVIEW_BASE_URL = "http://10.10.70.88:8501"
 
 # 汇报信审核任务通知邮件收件人（兜底：未命中准备人规则时用）
 REVIEW_NOTIFY_TO  = ["weihong.yuan@metis-ip.com"]
-REVIEW_NOTIFY_CC  = ["hailing.bi@metis-ip.com"]
+# 每封审核链接通知固定抄送
+REVIEW_NOTIFY_CC  = ["hailing.bi@metis-ip.com", "dandan.cheng@metis-ip.com"]
 
 # 汇报信准备人（收审核链接的人）路由：按国别 + 客户码（案号前5位）
 # 目前规则（仅 OA 场景）：CN 客户码 20615→胡梅，其他 CN→任惠；US/EP→王晶。
@@ -681,12 +682,15 @@ def _build_review_links_html(links):
 </body></html>"""
 
 
-def _send_one_review_email(pa_cfg, to_list, links):
+def _send_one_review_email(pa_cfg, to_list, links, cc_list=None):
     """给一个准备人发一封审核链接通知邮件（links 为其名下的任务）。"""
+    cc_list = [c for c in (cc_list or []) if c and c not in to_list]
     today = datetime.now().strftime("%Y-%m-%d")
     msg = MIMEMultipart("alternative")
     msg["From"] = pa_cfg["user"]
     msg["To"] = ", ".join(to_list)
+    if cc_list:
+        msg["Cc"] = ", ".join(cc_list)
     msg["Subject"] = f"汇报信审核任务通知 - {today} ({len(links)}条)"
     msg.attach(MIMEText(_build_review_links_html(links), "html", "utf-8"))
 
@@ -708,9 +712,10 @@ def _send_one_review_email(pa_cfg, to_list, links):
         else:
             smtp.login(pa_cfg["user"], pa_cfg["password"])
 
-        smtp.sendmail(pa_cfg["user"], to_list, msg.as_string())
+        smtp.sendmail(pa_cfg["user"], to_list + cc_list, msg.as_string())
         smtp.quit()
-        print(f"[审核通知] 发送成功: {len(links)} 条 → {', '.join(to_list)}", file=sys.stderr)
+        print(f"[审核通知] 发送成功: {len(links)} 条 → {', '.join(to_list)}"
+              + (f" (CC: {', '.join(cc_list)})" if cc_list else ""), file=sys.stderr)
     except Exception as e:
         print(f"[审核通知] 发送失败 → {', '.join(to_list)}: {e}", file=sys.stderr)
 
@@ -735,7 +740,7 @@ def send_review_links_email(links):
         groups.setdefault(to_email, []).append(it)
 
     for to_email, group_links in groups.items():
-        _send_one_review_email(pa_cfg, [to_email], group_links)
+        _send_one_review_email(pa_cfg, [to_email], group_links, cc_list=REVIEW_NOTIFY_CC)
 
 
 # ─── 主功能 ──────────────────────────────────────────────
