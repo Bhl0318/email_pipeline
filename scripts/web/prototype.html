@@ -147,8 +147,13 @@
   .modal-recipients .pill { display: inline-block; background: #eff6ff; color: #1d4ed8; padding: 2px 10px; border-radius: 12px; font-size: 12px; margin-right: 6px; margin-bottom: 4px; }
   .modal-input { width: 100%; box-sizing: border-box; font-size: 13px; color: #1e293b; padding: 5px 8px; border: 1px solid #e2e8f0; border-radius: 6px; background: #fff; }
   .modal-input:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,.15); }
-  .checklist { border: 1px solid #e2e8f0; border-radius: 6px; max-height: 168px; overflow-y: auto; padding: 4px 0; background: #fff; }
-  .checkitem { display: flex; align-items: center; gap: 8px; padding: 5px 10px; font-size: 13px; color: #1e293b; cursor: pointer; word-break: break-all; }
+  .combo { position: relative; }
+  .combo .modal-input { padding-right: 30px; }
+  .combo-btn { position: absolute; top: 0; right: 0; height: 100%; width: 28px; border: none; background: transparent; color: #64748b; font-size: 12px; cursor: pointer; border-left: 1px solid #e2e8f0; }
+  .combo-btn:hover { color: #3b82f6; }
+  .combo-panel { display: none; position: absolute; top: calc(100% + 2px); left: 0; right: 0; z-index: 10; border: 1px solid #e2e8f0; border-radius: 6px; background: #fff; box-shadow: 0 6px 20px rgba(0,0,0,.12); max-height: 200px; overflow-y: auto; padding: 4px 0; }
+  .combo-panel.show { display: block; }
+  .checkitem { display: flex; align-items: center; gap: 8px; padding: 6px 10px; font-size: 13px; color: #1e293b; cursor: pointer; word-break: break-all; }
   .checkitem:hover { background: #f8fafc; }
   .checkitem input { flex: none; }
   .checklist-empty { padding: 8px 10px; font-size: 12px; color: #cbd5e1; }
@@ -593,8 +598,12 @@
     <div class="modal-body">
       <div class="modal-row"><div class="modal-label">发送人</div><div class="modal-value"><select class="modal-input" id="md-from-sel"></select></div></div>
       <div class="modal-row"><div class="modal-label">收件人</div><div class="modal-value">
-        <div class="checklist" id="md-to-list"></div>
-        <div style="font-size:11px;color:#94a3b8;margin-top:4px;">默认全选，可勾选/取消</div>
+        <div class="combo">
+          <input class="modal-input" id="md-to-inp" placeholder="收件人邮箱，多个用 ; 分隔" autocomplete="off">
+          <button type="button" class="combo-btn" id="md-to-toggle" title="从联系人选择">&#9662;</button>
+          <div class="combo-panel" id="md-to-panel"></div>
+        </div>
+        <div style="font-size:11px;color:#94a3b8;margin-top:4px;">默认已带出全部联系人，点 ▾ 勾选，或直接编辑</div>
       </div></div>
       <div class="modal-row"><div class="modal-label">抄送</div><div class="modal-value"><input class="modal-input" id="md-cc-inp" placeholder="选填，多个用 ; 分隔" autocomplete="off"></div></div>
       <div class="modal-row"><div class="modal-label">主题</div><div class="modal-value" id="md-subject">—</div></div>
@@ -1006,14 +1015,18 @@
     ).join('');
     if (preview.default_sender) sel.value = preview.default_sender;
 
-    // 收件人：后台按案号查出的联系人做勾选列表，默认全选，可勾选/取消
+    // 收件人：输入框默认带出全部联系人(可手编辑)，▾ 展开勾选面板
     const contacts = preview.recipients || [];
-    const toList = $('md-to-list');
-    toList.innerHTML = contacts.length
-      ? contacts.map(r =>
-          `<label class="checkitem"><input type="checkbox" value="${escapeHTML(r)}" checked onchange="syncRecipBtn()"> ${escapeHTML(r)}</label>`
-        ).join('')
-      : '<div class="checklist-empty">未查到该案客户联系人，请确认案号或另行处理</div>';
+    const toInp = $('md-to-inp');
+    toInp.value = contacts.join('; ');
+    toInp.oninput = syncRecipBtn;
+    buildRecipPanel(contacts);
+    $('md-to-toggle').onclick = (e) => {
+      e.stopPropagation();
+      const panel = $('md-to-panel');
+      if (!panel.classList.contains('show')) syncRecipChecks();
+      panel.classList.toggle('show');
+    };
 
     // 抄送：可编辑输入框，预填后端给的默认（当前默认空）
     $('md-cc-inp').value = (preview.cc || []).join('; ');
@@ -1048,13 +1061,57 @@
     return (s || '').split(/[,;\n]+/).map(x => x.trim()).filter(Boolean);
   }
 
+  // 收件人：输入框为准（可手编辑），▾ 面板勾选同步到输入框
+  function bareEmail(s) {
+    const m = String(s).match(/<([^>]+)>/);
+    return (m ? m[1] : s).trim().toLowerCase();
+  }
+
   function getSelectedRecipients() {
-    return Array.from(document.querySelectorAll('#md-to-list input:checked')).map(c => c.value);
+    return parseAddrs($('md-to-inp').value);
   }
 
   function syncRecipBtn() {
     $('md-send-btn').disabled = !getSelectedRecipients().length;
   }
+
+  function buildRecipPanel(contacts) {
+    const panel = $('md-to-panel');
+    panel.classList.remove('show');
+    panel.innerHTML = contacts.length
+      ? contacts.map(r =>
+          `<label class="checkitem"><input type="checkbox" value="${escapeHTML(r)}" onchange="toggleRecip(this)"> ${escapeHTML(r)}</label>`
+        ).join('')
+      : '<div class="checklist-empty">未查到该案客户联系人，请手动输入</div>';
+  }
+
+  // 打开面板前：按输入框内容回填各复选框勾选态
+  function syncRecipChecks() {
+    const emails = getSelectedRecipients().map(bareEmail);
+    $('md-to-panel').querySelectorAll('input[type=checkbox]').forEach(cb => {
+      cb.checked = emails.includes(bareEmail(cb.value));
+    });
+  }
+
+  // 勾选/取消 → 增删输入框里对应地址（按邮箱去重）
+  function toggleRecip(cb) {
+    const inp = $('md-to-inp');
+    const em = bareEmail(cb.value);
+    let list = parseAddrs(inp.value);
+    if (cb.checked) {
+      if (!list.some(x => bareEmail(x) === em)) list.push(cb.value);
+    } else {
+      list = list.filter(x => bareEmail(x) !== em);
+    }
+    inp.value = list.join('; ');
+    syncRecipBtn();
+  }
+
+  // 点面板外收起
+  document.addEventListener('click', (e) => {
+    const panel = $('md-to-panel');
+    if (panel && !e.target.closest('.combo')) panel.classList.remove('show');
+  });
 
   async function doSend() {
     if (!pendingSendCtx) return;
