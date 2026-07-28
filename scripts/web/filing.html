@@ -148,13 +148,12 @@
 <div class="modal-mask" id="reviewerModal">
   <div class="modal">
     <h3>发送给审核人</h3>
-    <div class="field"><label>快速添加</label>
-      <select id="rvPick" onchange="rvAdd()" style="width:100%;padding:6px;font-size:13px;">
-        <option value="">— 选择审核人 —</option>
-        <option value="liuyun.shen@metis-ip.com">liuyun.shen@metis-ip.com</option>
-        <option value="ling.ding@metis-ip.com">ling.ding@metis-ip.com</option>
-      </select></div>
-    <div class="field"><label>收件人（可手动编辑，多个用逗号分隔）<span style="color:#dc2626">*</span></label><input id="rvTo" placeholder="reviewer@metis-ip.com"></div>
+    <div class="field"><label>收件人（点击可下拉选择，也可手动输入/修改；多个用逗号分隔）<span style="color:#dc2626">*</span></label>
+      <input id="rvTo" list="rvOptions" placeholder="reviewer@metis-ip.com" autocomplete="off">
+      <datalist id="rvOptions">
+        <option value="liuyun.shen@metis-ip.com"></option>
+        <option value="ling.ding@metis-ip.com"></option>
+      </datalist></div>
     <div class="field"><label>抄送</label><input id="rvCc"></div>
     <p style="font-size:12px;color:#64748b;margin:2px 0 8px;">将把本递交页链接发给审核人，供其在线核对 POA/Transmittal/ADS 等文件。不改变任务状态，与「发美代理」互不影响。</p>
     <div class="actions">
@@ -892,22 +891,13 @@ async function doConfirm(){
 }
 
 // 发送审核人：把当前递交页链接发给审核人（下拉两个预设 + 可手动编辑），不改任务状态
-const REVIEWER_PRESETS = ["liuyun.shen@metis-ip.com", "ling.ding@metis-ip.com"];
 function openReviewerModal(){
   if (!taskId) return;
-  $("rvPick").value = "";
-  $("rvTo").value = REVIEWER_PRESETS.join(", ");
+  $("rvTo").value = "";
   $("rvCc").value = "";
   $("reviewerModal").classList.add("show");
 }
 function closeReviewerModal(){ $("reviewerModal").classList.remove("show"); }
-function rvAdd(){
-  const v = $("rvPick").value; if (!v) return;
-  const cur = $("rvTo").value.split(/[,，;；]/).map(s=>s.trim()).filter(Boolean);
-  if (!cur.includes(v)) cur.push(v);
-  $("rvTo").value = cur.join(", ");
-  $("rvPick").value = "";
-}
 async function doSendReviewer(){
   const recipients = $("rvTo").value.split(/[,，;；]/).map(s=>s.trim()).filter(Boolean);
   if (!recipients.length) { toast("收件人不能为空"); return; }
