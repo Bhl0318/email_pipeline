@@ -30,7 +30,7 @@
 | Communication R.70(2) | **不单独立项**,期限合并到同案号 EESR | — |
 
 ### US（发件人含 `noreply@uspto.gov` 或主题含 USPTO;按正文表格 Document Type）
-**需立项的 12 种 Document Type（`US_TYPES_NEED_PROJECT`）**
+**需立项的 11 种 Document Type（`US_TYPES_NEED_PROJECT`）**
 | 代码 | 立项名称 | 要 OA 序号 |
 |---|---|---|
 | CTNF | Non-Final Rejection答复 | 是 |
@@ -42,11 +42,10 @@
 | CTEQ | Ex Parte Quayle Action答复 | 否 |
 | PPH.DECISION | PPH Decision dismissed补正答复 | 否 |
 | NT.CR.APP.PA | Notice to file corrected application papers补正答复 | 否 |
-| M327 | 同上（Notice to file corrected…） | 否 |
 | NTC.MISS.PRT | NOTICE TO FILE MISSING PARTS…补正答复 | 否 |
 | PETDEC | Petition Decision Dismissed补正答复 | 否 |
 
-**跳过不立项（`US_TYPES_SKIP`）**:`ISSUE.NTF、892、1449、COCX、ABN、APP.FILE.REC、NTC.PUB、NTC.PUB.DATE、OA.APPENDIX、WELCOME.LET`
+**跳过不立项（`US_TYPES_SKIP`）**:`ISSUE.NTF、892、1449、COCX、ABN、APP.FILE.REC、NTC.PUB、NTC.PUB.DATE、OA.APPENDIX、WELCOME.LET、M327、PREDOCK.NTF`
 
 **其它 US 规则**
 - **eGrant Notification**(主题命中）整封跳过（其表格为 5 列会错位,且本就不需立项）。

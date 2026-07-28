@@ -557,14 +557,13 @@ US_TYPES_NEED_PROJECT = {
     "EXIN": ("Examiner Interview Summary Record答复", False),
     "PPH.DECISION": ("PPH Decision dismissed补正答复", False),
     "NT.CR.APP.PA": ("Notice to file corrected application papers补正答复", False),
-    "M327": ("Notice to file corrected application papers补正答复", False),
     "NTC.MISS.PRT": ("NOTICE TO FILE MISSING PARTS OF NONPROVISIONAL APPLICATION补正答复", False),
     "PETDEC": ("Petition Decision Dismissed补正答复", False),
     "CTEQ": ("Ex Parte Quayle Action答复", False),
 }
 
 # 不需要立项的 US Document Type
-US_TYPES_SKIP = {"ISSUE.NTF", "892", "1449", "COCX","ABN","APP.FILE.REC","NTC.PUB","NTC.PUB.DATE","OA.APPENDIX","WELCOME.LET"}
+US_TYPES_SKIP = {"ISSUE.NTF", "892", "1449", "COCX","ABN","APP.FILE.REC","NTC.PUB","NTC.PUB.DATE","OA.APPENDIX","WELCOME.LET","M327","PREDOCK.NTF"}
 
 # NOA（分案/续案评估）只对这几个客户立项，其它客户的 NOA 跳过（客户代码 = 案号第一段）
 NOA_PROJECT_CUSTOMERS = {"20608", "20618", "20849", "20633", "20609"}
