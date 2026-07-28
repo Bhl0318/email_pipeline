@@ -1037,6 +1037,10 @@ def dispatch_report(all_results, all_emails, dry_run=False):
             region = item.get("region", "")
             ntype = item.get("notification_type", "")
             tpl_info = REPORT_TYPE_TO_TEMPLATE.get(region, {}).get(ntype)
+            # 客户码 5 开头的案子：CN 阶段所有官文都不分配汇报信
+            if tpl_info and region == "CN" and project.startswith("5"):
+                print(f"  [跳过汇报信] CN 5开头客户 {project}（{ntype}）不分配汇报信", file=sys.stderr)
+                tpl_info = None
             if tpl_info:
                 template, attach_pdf = tpl_info
                 report_fields = build_report_fields(region, item)
