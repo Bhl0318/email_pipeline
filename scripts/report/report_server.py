@@ -1700,6 +1700,11 @@ class FilingConfirmReq(BaseModel):
     signer_name: str = ""          # DocuSign 签字人姓名（缺省用收件人邮箱）
 
 
+class SendReviewerReq(BaseModel):
+    recipients: list = []          # 审核人邮箱（必填，下拉/手填）
+    cc: list = []
+
+
 def _doc_channel_key(path, docs):
     """文件的通道 key：生成的三件用类型(POA/Transmittal/ADS)，定稿用文件名。"""
     for d in docs:
@@ -1834,6 +1839,30 @@ def confirm_filing_task(task_id: str, req: FilingConfirmReq):
 
     return {"ok": True, "task_id": task_id, "status": "done", "sent_to": recipients,
             "files": [p.name for p in attach_paths], "followup_task_id": followup_id, "warnings": warnings}
+
+
+@app.post("/api/submission/filing/{task_id}/send-reviewer")
+def send_reviewer_link(task_id: str, req: SendReviewerReq):
+    """把当前递交页链接发给审核人（下拉/手填收件人）。与「发美代理」并列，不改任务状态。"""
+    row = _load_submission_task(task_id)
+    recipients = [r.strip() for r in req.recipients if r and r.strip()]
+    if not recipients:
+        raise HTTPException(400, "审核人收件人不能为空")
+    cc = [c.strip() for c in (req.cc or []) if c and c.strip()]
+    case_volume = row["case_volume"]
+    link = f"{_filing_review_base()}/submission/filing/{task_id}"
+    account_cfg, _cc = _submission_send_config()
+    msg = MIMEMultipart()
+    msg["Subject"] = f"【US递交-待审核】{case_volume} 递交文件"
+    msg.attach(MIMEText(
+        f"<p>案号 <b>{case_volume}</b> 的递交文件已生成，请在线审核 POA/Transmittal/ADS 等：</p>"
+        f"<p><a href='{link}'>{link}</a></p><p>本邮件由系统自动发送。</p>",
+        "html", "utf-8"))
+    try:
+        _send_smtp(msg, account_cfg, recipients, cc or None)
+    except Exception as exc:
+        raise HTTPException(502, f"审核链接发送失败：{exc}")
+    return {"ok": True, "sent_to": recipients, "cc": cc, "link": link}
 
 
 @app.post("/api/submission/filing/{task_id}/skip")
