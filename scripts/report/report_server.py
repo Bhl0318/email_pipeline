@@ -631,7 +631,7 @@ def skip_task(task_id: str):
 def _load_submission_task(task_id: str) -> dict:
     rows = execute_params(
         "SELECT id, task_type, case_volume, fields_json, missing_json, source_mail, "
-        "contact_email, status, created_at, updated_at, confirmed_at "
+        "contact_email, filer_email, status, created_at, updated_at, confirmed_at "
         "FROM submission_tasks WHERE id = %s",
         (task_id,),
     )
@@ -692,6 +692,7 @@ def get_submission_task(task_id: str):
         "missing_json": missing,
         "source_mail": row["source_mail"],
         "contact_email": row["contact_email"],
+        "filer_email": row.get("filer_email") or "",   # 递交人邮箱（环节5/6 用；确认页可手填）
         "status": row["status"],
         "created_at": str(row["created_at"]) if row["created_at"] else None,
         "updated_at": str(row["updated_at"]) if row["updated_at"] else None,
@@ -767,6 +768,7 @@ def get_submission_source_docs(task_id: str):
 class SubmissionSaveReq(BaseModel):
     fields_json: dict
     contact_email: str = ""
+    filer_email: str = None       # 递交人邮箱；None=不改，""=清空，值=更新
 
 
 @app.post("/api/submission/tasks/{task_id}/save")
@@ -776,9 +778,12 @@ def save_submission_task(task_id: str, req: SubmissionSaveReq):
         raise HTTPException(status_code=400, detail=f"任务状态为 {row['status']}，不可编辑")
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     contact_email = req.contact_email.strip() or row["contact_email"]
+    # filer_email：None=保留原值，否则更新（含清空）
+    filer_email = row.get("filer_email") if req.filer_email is None else req.filer_email.strip()
     execute_params(
-        "UPDATE submission_tasks SET fields_json = %s, contact_email = %s, updated_at = %s WHERE id = %s",
-        (json.dumps(req.fields_json, ensure_ascii=False), contact_email, now, task_id),
+        "UPDATE submission_tasks SET fields_json = %s, contact_email = %s, filer_email = %s, "
+        "updated_at = %s WHERE id = %s",
+        (json.dumps(req.fields_json, ensure_ascii=False), contact_email, filer_email, now, task_id),
     )
     return {"ok": True, "task_id": task_id, "updated_at": now}
 

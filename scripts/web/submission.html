@@ -580,6 +580,8 @@ function renderForm() {
         </select></div>
       <div class="field"><label>接口人邮箱（审核链接/成品收件人）</label>
         <input id="contactEmail" value="${esc(task.contact_email || "")}"></div>
+      <div class="field"><label>递交人邮箱（客户回签后递交页链接收件人；正文未抽到时手填）</label>
+        <input id="filerEmail" value="${esc(task.filer_email || "")}" placeholder="如 hailing.bi@metis-ip.com"></div>
     </div></div></div>
 
     <div class="section">${head("申请人", "applicants", "申请人")}<div class="section-body" id="sec-applicants">
@@ -651,7 +653,7 @@ function onAssignTypeChange(i, val) { fields.assignments[i].assignment_type = va
 async function saveTask() {
   if (!taskId) return;
   try {
-    await api("POST", `${API}/tasks/${taskId}/save`, { fields_json: fields, contact_email: $("contactEmail") ? $("contactEmail").value.trim() : "" });
+    await api("POST", `${API}/tasks/${taskId}/save`, { fields_json: fields, contact_email: $("contactEmail") ? $("contactEmail").value.trim() : "", filer_email: $("filerEmail") ? $("filerEmail").value.trim() : null });
     toast("已保存 ✅");
   } catch (e) { toast("保存失败：" + problemsOf(e).join("；"), 4000); }
 }
@@ -923,6 +925,12 @@ async function doConfirm() {
   if (!chosen.length) { toast("至少要勾选一个附件"); return; }
   const btn = $("mConfirmBtn"); btn.disabled = true; btn.textContent = "发送中…";
   try {
+    // 先落库 fields + 接口人/递交人邮箱，确保确认发送/后续环节用的是最新值（避免未点「保存」丢失）
+    await api("POST", `${API}/tasks/${taskId}/save`, {
+      fields_json: fields,
+      contact_email: $("contactEmail") ? $("contactEmail").value.trim() : "",
+      filer_email: $("filerEmail") ? $("filerEmail").value.trim() : null,
+    });
     const d = await api("POST", `${API}/tasks/${taskId}/confirm`, {
       fields_json: fields, recipients,
       cc: $("mCc").value.split(/[,，;；]/).map(s => s.trim()).filter(Boolean),
