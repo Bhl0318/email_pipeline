@@ -8,8 +8,8 @@
 ⚠️ 现状与前置（patent_center_ui.py 尚在联调，未开 --live 前只 dry-run 规划）：
   1. patent_center_ui.run() 结尾的 input() 需去掉（否则卡住）、并返回成功/失败；选择器需按真实页面稳定；
   2. Okta 登录要 OTP（可走钉钉机器人回复，仍需人递一次码）——非纯无人；
-  3. 上传包需完整：uspto_upload/{案号}/ 目前只有美代理签回件，说明书/权要/附图**定稿**（环节5 上传）
-     需并入才齐（下方 _build_upload_data 已留 TODO）。
+  3. 上传包完整性：环节5 递交人上传全套 USPTO 文档，不签字的（说明书/权要/附图定稿等）选「仅存档」
+     即在环节5 就复制进 uspto_upload/{案号}/；签字件的签署版由环节6 落入同目录 → 上传包 = 二者之和。
   默认 **dry-run**（只规划、不驱动浏览器、不置 done）；补齐上述后加 --live 才真正上传。
   ⚠️ 环节7 严禁 AI，纯确定性代码；本脚本连真实 DB/USPTO，按项目规矩只提交、由人工在受控环境发起。
 
@@ -78,8 +78,8 @@ def _submission_type(case_volume):
 
 def _build_upload_data(case):
     """组 Patent Center 上传载荷 {submission_type, practitioner, ads_path, other_paths}。
-    文件取 archived_dir 里现有件：名字含 ADS 的作 ads_path，其余 other_paths。
-    TODO：说明书/权要/附图**定稿**（环节5 上传，不在 archived_dir）需并入才是完整上传包。"""
+    文件取 archived_dir 里现有件（= 环节5 归档的「仅存档」定稿 + 环节6 回收的签署版）：
+    名字含 ADS 的作 ads_path，其余 other_paths。"""
     d = case["archived_dir"]
     files = []
     if os.path.isdir(d):

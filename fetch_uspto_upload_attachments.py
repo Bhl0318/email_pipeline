@@ -308,6 +308,9 @@ def _settle_agent_followup(case_no, case_dir, filenames):
     for f in (filenames or []):
         if f not in present:
             present.append(f)
+    # 排除环节5 就地归档的「仅存档」件（说明书/权要/附图定稿等）：它们是上传包的一部分、
+    # 但不是美代理回件，不参与"发出 vs 回收"比对，否则会被当成 extra 卡住 done。
+    present = [n for n in present if n not in _archived]
     saved_stems = [(s, _name_stem(s)) for s in present]
 
     def _has_match(sent_stem):

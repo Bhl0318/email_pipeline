@@ -1846,6 +1846,19 @@ def confirm_filing_task(task_id: str, req: FilingConfirmReq):
         except Exception as exc:
             raise HTTPException(502, f"邮件发送失败（任务保留 pending，成品已存 final/）：{exc}")
 
+    # 3c) 先归档：把「仅存档」件（不需签字、不发美代理，如说明书/权要/附图定稿）复制进案号上传目录，
+    #     环节7 上传包 = 这些归档件 + 环节6 回收的签署版。签字件不在此复制（其签署版由环节6 落入同目录）。
+    staged = []
+    if archive_paths:
+        up_dir = Path(__file__).resolve().parents[2] / "uspto_upload" / case_volume
+        try:
+            up_dir.mkdir(parents=True, exist_ok=True)
+            for p in archive_paths:
+                shutil.copy2(str(p), str(up_dir / p.name))
+                staged.append(p.name)
+        except Exception as exc:
+            warnings.append(f"仅存档件归档到上传目录失败：{exc}")
+
     # 4) 落库 done + 存编辑后的 fields + 插 agent_followup（供环节6 跟进美代理回邮）
     execute_params(
         "UPDATE submission_tasks SET status='done', fields_json=%s, confirmed_at=%s, updated_at=%s WHERE id=%s",
