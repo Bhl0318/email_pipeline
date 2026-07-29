@@ -139,7 +139,8 @@
     <div class="field"><label>附件通道（每个文件选 DocuSign 签字 / 内部邮箱 / 仅存档；默认 POA/Transmittal 走 DocuSign，ADS 走内部邮箱；「仅存档」不发送、只留档）</label><div class="attach-list" id="mAttach"></div></div>
     <div id="mWarn"></div>
     <div class="actions">
-      <button onclick="closeSendModal()">取消</button>
+      <span id="mLoading" style="display:none;align-items:center;gap:8px;margin-right:auto;font-size:12px;color:#2563eb;"><span class="spinner" style="width:16px;height:16px;border-width:2px;"></span>正在发送，请稍候…（DocuSign/邮件可能需数秒）</span>
+      <button id="mCancel" onclick="closeSendModal()">取消</button>
       <button class="success" id="mConfirm" onclick="doConfirm()">确认并发送</button>
     </div>
   </div>
@@ -882,7 +883,8 @@ async function doConfirm(){
   const needSend = Object.values(file_channels).some(v => v === "docusign" || v === "email");
   if (needSend && !recipients.length) { toast("有文件需发送美代理，收件人不能为空"); return; }
   const signer_name = $("mSigner").value.trim();
-  $("mConfirm").disabled = true;
+  $("mConfirm").disabled = true; $("mCancel").disabled = true;
+  $("mConfirm").textContent = "发送中…"; $("mLoading").style.display = "inline-flex";
   try {
     const j = await api("POST", `${API}/${taskId}/confirm`, {
       fields_json: fields, transmittal_options: opts, recipients, cc,
@@ -892,7 +894,10 @@ async function doConfirm(){
     toast("已发送，任务完成");
     closeSendModal(); await loadTaskList(); await openTask(taskId);
   } catch(e){ toast("发送失败: "+e.message); }
-  finally { $("mConfirm").disabled = false; }
+  finally {
+    $("mConfirm").disabled = false; $("mCancel").disabled = false;
+    $("mConfirm").textContent = "确认并发送"; $("mLoading").style.display = "none";
+  }
 }
 
 // 发送审核人：把当前递交页链接发给审核人（下拉两个预设 + 可手动编辑），不改任务状态
