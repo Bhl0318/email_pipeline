@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """DocuSign eSignature 集成（沙盒脚手架）——把需签字件发美代理电子签、API 回收签署版。
 
-用于 US 递交环节5/6：只把需签字子集(POA/Transmittal/ADS)放同一信封发 DocuSign 给美代理签，
-签完经 API 取回签署版 PDF（替代邮箱抓件/改名匹配）。纯确定性调用，无 AI。
+用于 US 递交环节5/6：把需签字子集(POA/Transmittal/Petition/Transmittal-submitting-Declarations 等)
+放同一信封发 DocuSign 给美代理签，签完经 API 取回签署版 PDF（替代邮箱抓件/改名匹配）。纯确定性调用，无 AI。
+签字位按文档类型定锚点（POA/Transmittal→"Signature"、Petition/Declarations→"By:"）+ 偏移；.docx 先转 PDF。
 
 鉴权：JWT Grant（服务端对服务端、无人值守）。前置（DocuSign 后台一次性配置）：
   1. 建 integration key（= client_id），生成/上传 RSA 密钥对（私钥存本地 .pem）；
@@ -19,6 +20,7 @@
 import base64
 import json
 import sys
+import tempfile
 import time
 from pathlib import Path
 
@@ -137,6 +139,39 @@ def _locate_anchor(pdf_path, anchor, case_sensitive=True, whole_word=True):
         doc.close()
 
 
+def infer_kind(name):
+    """按文件名推 DocuSign 文档类型（套用 anchor_offsets 里的按文档锚点/偏移）。
+    注意顺序：'Transmittal_submitting_Declarations' 同时含 Transmittal/Declaration，
+    需先判 Petition/Declaration，避免误归为普通 Transmittal。"""
+    n = Path(name).name.upper()
+    if "PETITION" in n:
+        return "Petition"
+    if "DECLARATION" in n:          # 如 Transmittal_submitting_Declarations（签字在 "By:"）
+        return "Declarations"
+    if "POA" in n:
+        return "POA"
+    if "TRANSMITTAL" in n:
+        return "Transmittal"
+    if "ADS" in n:
+        return "ADS"
+    return None
+
+
+def _ensure_pdf(path):
+    """DocuSign 走 fitz 绝对定位 + PDF 上传：.docx/.doc 先用 LibreOffice 转 PDF（转到临时目录），
+    已是 PDF 原样返回。转换能力缺失（无 soffice）时抛错，让调用方明确失败而非静默丢签名框。"""
+    p = Path(path)
+    if p.suffix.lower() in (".pdf",):
+        return p
+    if p.suffix.lower() in (".docx", ".doc"):
+        try:
+            from .preview import docx_to_pdf
+        except ImportError:
+            from preview import docx_to_pdf     # 作为脚本直跑时
+        return Path(docx_to_pdf(str(p), out_dir=tempfile.mkdtemp(prefix="ds_pdf_")))
+    return p
+
+
 def build_envelope(documents, recipient, email_subject=None, anchor="Signature",
                    date_anchor=None, status="sent",
                    anchor_x=0, anchor_y=0, anchor_units="pixels",
@@ -145,38 +180,44 @@ def build_envelope(documents, recipient, email_subject=None, anchor="Signature",
     """构造信封请求体（不发送，便于 dry-run 核对）。
     :param documents: [{"path", "name"(可选), "kind"(可选)}]，全放同一信封（一案一信封）
     :param recipient: {"name","email"}（美代理签字人）
-    :param anchor: 签名位锚点文本（在每份文档里定位该文本处放签名框）
-    :param anchor_offsets: 按文档类型的偏移 {kind: {"x":,"y":}, "_default": {...}}；无则用 anchor_x/anchor_y。
-        每份文档用 fitz 找 anchor 坐标 + 该类型偏移 → 放**绝对坐标**签名框（一个信封、各文档各自落点）。
-        fitz 不可用/全都定位不到 → 退回单锚点（全局偏移，老行为）。
+    :param anchor: 全局默认签名位锚点文本；某文档类型可在 anchor_offsets[kind].anchor 覆盖
+        （如 Petition/Declarations 用 "By:"，POA/Transmittal 用 "Signature"）。
+    :param anchor_offsets: 按文档类型 {kind: {"anchor"(可选), "x", "y"}, "_default": {...}}；缺省用全局 anchor + anchor_x/anchor_y。
+        每份文档用 fitz 找该类型 anchor 坐标 + 偏移 → 放**绝对坐标**签名框（一个信封、各文档各自落点）。
+        .docx/.doc 文档先转 PDF 再定位与上传。fitz 不可用/全都定位不到 → 退回单锚点（全局偏移，老行为）。
     """
+    # 逐文档解析成 PDF（.docx→PDF），供 fitz 定位与 DocuSign 上传共用
+    pdf_paths = [_ensure_pdf(d["path"]) for d in documents]
+
     docs = []
-    for i, d in enumerate(documents, start=1):
-        p = Path(d["path"])
+    for i, (d, pdf) in enumerate(zip(documents, pdf_paths), start=1):
+        src = Path(d["path"])
         docs.append({
             "documentId": str(i),
-            "name": d.get("name") or p.name,
-            "fileExtension": (p.suffix.lstrip(".").lower() or "pdf"),
-            "documentBase64": _b64(p),
+            "name": d.get("name") or (src.stem + ".pdf" if src.suffix.lower() != ".pdf" else src.name),
+            "fileExtension": "pdf",
+            "documentBase64": _b64(pdf),
         })
 
-    def _off(kind):
+    def _anchor_off(kind):
+        """返回该文档类型的 (锚点文本, x偏移, y偏移)；anchor 缺省回退全局 anchor。"""
         ao = anchor_offsets or {}
         o = ao.get(kind) or ao.get("_default") or {"x": anchor_x, "y": anchor_y}
-        return int(round(float(o.get("x", 0)))), int(round(float(o.get("y", 0))))
+        a = o.get("anchor") or anchor
+        return a, int(round(float(o.get("x", 0)))), int(round(float(o.get("y", 0))))
 
-    # 逐文档 fitz 定位 → 绝对坐标签名框（一个信封、各文档各自偏移）
+    # 逐文档 fitz 定位（按各自锚点）→ 绝对坐标签名框（一个信封、各文档各自落点）
     sign_tabs = []
-    for i, d in enumerate(documents, start=1):
-        ox, oy = _off(d.get("kind"))
-        loc = _locate_anchor(d["path"], anchor, anchor_case_sensitive, anchor_whole_word)
+    for i, (d, pdf) in enumerate(zip(documents, pdf_paths), start=1):
+        a, ox, oy = _anchor_off(d.get("kind"))
+        loc = _locate_anchor(pdf, a, anchor_case_sensitive, anchor_whole_word)
         if loc:
             pg, x0, y0 = loc
             sign_tabs.append({"documentId": str(i), "pageNumber": str(pg), "recipientId": "1",
                               "xPosition": str(int(round(x0)) + ox), "yPosition": str(int(round(y0)) + oy)})
     if not sign_tabs:
         # fitz 不可用 / 全都没定位到 → 退回单锚点（全局偏移）
-        ox, oy = _off(None)
+        _a, ox, oy = _anchor_off(None)
         sign_tabs = [{"anchorString": anchor, "anchorUnits": anchor_units,
                       "anchorCaseSensitive": anchor_case_sensitive,
                       "anchorMatchWholeWord": anchor_whole_word,
@@ -281,13 +322,7 @@ if __name__ == "__main__":
                 raise RuntimeError(f"文件不存在: {f}")
         agent = cfg.get("agent") or {}
         recip = {"name": agent.get("name") or "US Agent", "email": to_email}
-        def _kind(fn):   # CLI 按文件名推类型，好套用 anchor_offsets 里的按文档偏移
-            n = Path(fn).name.upper()
-            for k in ("POA", "TRANSMITTAL", "ADS", "DECLARATION"):
-                if k in n:
-                    return "Transmittal" if k == "TRANSMITTAL" else k.title() if k == "DECLARATION" else k
-            return None
-        env_id = send_envelope(cfg, auth, [{"path": f, "kind": _kind(f)} for f in files], recip,
+        env_id = send_envelope(cfg, auth, [{"path": f, "kind": infer_kind(f)} for f in files], recip,
                                anchor=cfg.get("anchor", "Signature"),
                                date_anchor=cfg.get("date_anchor"),
                                anchor_x=cfg.get("anchor_x_offset", 0),

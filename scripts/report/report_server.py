@@ -1725,6 +1725,15 @@ def _doc_channel_key(path, docs):
     return Path(path).name                        # 定稿：文件名
 
 
+def _docusign_kind(path, docs):
+    """DocuSign 锚点用的文档类型（不同于通道路由 key）：生成三件用 POA/Transmittal/ADS；
+    定稿按文件名认 Petition/Declarations（套 anchor_offsets 里的 'By:' 锚点），否则回退文件名。"""
+    k = _doc_channel_key(path, docs)
+    if k in ("POA", "Transmittal", "ADS"):
+        return k
+    return _docusign.infer_kind(Path(path).name) or k
+
+
 @app.post("/api/submission/filing/{task_id}/confirm")
 def confirm_filing_task(task_id: str, req: FilingConfirmReq):
     """生成 POA/Transmittal/ADS 三件成品 + 给美代理邮件 → 发美代理（附定稿）→ done。"""
@@ -1790,7 +1799,7 @@ def confirm_filing_task(task_id: str, req: FilingConfirmReq):
             dcfg = _docusign.load_config()
             dauth = _docusign.get_access_token(dcfg)
             signer = {"name": (req.signer_name or "").strip() or recipients[0], "email": recipients[0]}
-            ds_docs = [{"path": str(p), "kind": _doc_channel_key(p, docs)} for p in ds_paths]
+            ds_docs = [{"path": str(p), "kind": _docusign_kind(p, docs)} for p in ds_paths]
             envelope_id = _docusign.send_envelope(
                 dcfg, dauth, ds_docs, signer,
                 email_subject=subject, anchor=dcfg.get("anchor", "Signature"),

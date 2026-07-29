@@ -26,6 +26,8 @@
   "anchor_offsets": {
     "POA": { "x": 90, "y": 5 },
     "Transmittal": { "x": 50, "y": 5 },
+    "Petition": { "anchor": "By:", "x": 20, "y": 5 },
+    "Declarations": { "anchor": "By:", "x": 20, "y": 5 },
     "_default": { "x": 90, "y": 5 }
   },
 
