@@ -803,12 +803,15 @@ function attachSummaryHtml(){
   const finals = (data.final_docs||[]).map(d=>d.name);
   return "生成成品：" + gen.join("、") + "<br>定稿：" + (finals.length ? finals.map(esc).join("、") : "（未上传）");
 }
-// 发美代理 modal 的附件通道清单：生成三件(POA/Transmittal/ADS 默认 DocuSign) + 定稿(默认内部邮箱)
+// 定稿默认通道：文件名含 ADS/POA/Transmittal/Declarations/Petition → 默认 DocuSign，否则内部邮箱
+const DS_NAME_RE = /ADS|POA|Transmittal|Declarations|Petition/i;
+function defChannelForName(name){ return DS_NAME_RE.test(name || "") ? "docusign" : "email"; }
+// 发美代理 modal 的附件通道清单：生成三件(POA/Transmittal 默认 DocuSign、ADS 走内部邮箱) + 定稿(按文件名默认)
 function attachChannelFiles(){
   const gen = [{key:"POA",label:"POA",def:"docusign"},
                {key:"Transmittal",label:"Transmittal",def:"docusign"},
-               {key:"ADS",label:"ADS（XFA，走内部邮箱）",def:"email"}];  // ADS 是动态 XFA，DocuSign 不接受
-  const finals = (data.final_docs||[]).map(d=>({key:d.name,label:d.name,def:"email"}));
+               {key:"ADS",label:"ADS（XFA，走内部邮箱）",def:"email"}];  // 生成的 ADS 是动态 XFA，DocuSign 不接受
+  const finals = (data.final_docs||[]).map(d=>({key:d.name,label:d.name,def:defChannelForName(d.name)}));
   return gen.concat(finals);
 }
 function attachChannelListHtml(){

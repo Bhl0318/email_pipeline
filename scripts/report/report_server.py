@@ -1725,6 +1725,20 @@ def _doc_channel_key(path, docs):
     return Path(path).name                        # 定稿：文件名
 
 
+_DS_DEFAULT_NAME_RE = re.compile(r"ADS|POA|Transmittal|Declarations|Petition", re.I)
+
+
+def _default_doc_channel(key):
+    """前端未显式指定 file_channels 时的默认通道兜底（与前端 defChannelForName 一致）：
+    生成的 POA/Transmittal→DocuSign；生成的 ADS(动态 XFA，DocuSign 不接受)→内部邮箱；
+    定稿按文件名含 ADS/POA/Transmittal/Declarations/Petition→DocuSign，否则内部邮箱。"""
+    if key in ("POA", "Transmittal"):
+        return "docusign"
+    if key == "ADS":
+        return "email"
+    return "docusign" if _DS_DEFAULT_NAME_RE.search(key or "") else "email"
+
+
 def _docusign_kind(path, docs):
     """DocuSign 锚点用的文档类型（不同于通道路由 key）：生成三件用 POA/Transmittal/ADS；
     定稿按文件名认 Petition/Declarations（套 anchor_offsets 里的 'By:' 锚点），否则回退文件名。"""
@@ -1782,8 +1796,8 @@ def confirm_filing_task(task_id: str, req: FilingConfirmReq):
     ds_paths, email_paths, archive_paths, ch_map = [], [], [], {}
     for p in attach_paths:
         key = _doc_channel_key(p, docs)
-        # ADS 是动态 XFA，DocuSign 不接受 → 默认走内部邮箱；POA/Transmittal 默认 DocuSign
-        ch = (_fc.get(key) or ("docusign" if key in ("POA", "Transmittal") else "email")).lower()
+        # 默认通道见 _default_doc_channel（生成 ADS=XFA 走内部邮箱；定稿按文件名关键字）；req.file_channels 覆盖
+        ch = (_fc.get(key) or _default_doc_channel(key)).lower()
         ch_map[p.name] = ch
         (archive_paths if ch == "archive" else ds_paths if ch == "docusign" else email_paths).append(p)
 
