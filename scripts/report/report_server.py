@@ -1666,12 +1666,21 @@ def preview_filing_task(task_id: str, req: FilingPreviewReq):
     return {"target": req.target, "files": files, "warnings": warnings}
 
 
+class FilingAdsXfaReq(BaseModel):
+    fields_json: dict = None       # 页面当前编辑值（未保存也生效）；缺省用库中值
+    transmittal_options: dict = None
+
+
 @app.post("/api/submission/filing/{task_id}/ads-xfa")
-def filing_ads_xfa(task_id: str, online: int = 0):
+def filing_ads_xfa(task_id: str, online: int = 0, req: FilingAdsXfaReq = None):
     """按需生成 ADS XFA 版：默认本地 XFA 供下载（Adobe 打开，不上云）；
-    online=1 时额外走 pdfRest 扁平化，产出可在线看的真实排版 PDF。"""
+    online=1 时额外走 pdfRest 扁平化，产出可在线看的真实排版 PDF。
+    与预览一致，优先用页面当前编辑值 req.fields_json（未点保存也能带出签字/通信），缺省回退库中值。"""
     row = _load_submission_task(task_id)
-    fields = json.loads(row["fields_json"]) if row["fields_json"] else {}
+    fields = (req.fields_json if (req and req.fields_json is not None)
+              else (json.loads(row["fields_json"]) if row["fields_json"] else {}))
+    if req and req.transmittal_options is not None:
+        fields["transmittal_options"] = req.transmittal_options
     fields["subject_matter"] = infer_subject_matter(fields)
     normalize_parents(fields)
     ci, _ai = _filing_case_info(row, fields)
