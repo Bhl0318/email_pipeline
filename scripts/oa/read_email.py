@@ -764,6 +764,23 @@ def query_customer_shortname(customer_code):
     return name
 
 
+def _drop_closed_cases(all_results, is_closed):
+    """剔除已结案案件（不立项）。is_closed(project)->bool 由调用方注入，便于测试。
+    按 project 缓存，避免同案号重复查 IPEasy；无案号的条目保留（不查）。返回保留的 results。"""
+    cache = {}
+    kept = []
+    for item in all_results:
+        proj = item.get("project", "") or ""
+        if proj:
+            if proj not in cache:
+                cache[proj] = is_closed(proj)
+            if cache[proj]:
+                print(f"[结案] {proj} 已结案（终止/维持/结案），跳过立项", file=sys.stderr)
+                continue
+        kept.append(item)
+    return kept
+
+
 def dispatch_oa(all_results, all_emails=None, dry_run=False, test_project_prefix=None):
     """OA 立项下游 sink：建OA信息表页 → US期限 → 上传官文附件 → 新增OA → projects → 立项通知。
     all_emails 用于按 message_id 取邮件官文 PDF（CN/EP）；US 官文来自下载。
@@ -771,6 +788,10 @@ def dispatch_oa(all_results, all_emails=None, dry_run=False, test_project_prefix
     90009-0895CN00），用于测试时避免撞已存在的 Wiki 页面。
     注：email_pipeline 模式下本函数不再 move 邮件，归档统一交 archive_emails。
     dry_run=True 时：不下载USPTO官文、不建/写Wiki、不上传附件、不发立项通知邮件。"""
+    # 已结案案件不立项：查 IPEasy 状态（终止/维持/结案）→ 剔除。用真实案号,故先于测试前缀替换。
+    from oainfo_cli import is_case_closed
+    all_results = _drop_closed_cases(all_results, is_case_closed)
+
     # 测试用案号前缀替换：20618-0895CN00 → 90009-0895CN00（防 Wiki 页面已存在）
     # ⚠️ 直接改写 item['project']，OA 先于 report 跑且共用 all_results，开启时建议关 report sink
     if test_project_prefix:
