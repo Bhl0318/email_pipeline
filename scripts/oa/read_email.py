@@ -583,8 +583,12 @@ def send_forward_oa(all_results, all_emails=None, dry_run=False):
 
     if dry_run:
         for p in plans:
-            print(f"  [dry-run][转OA] {p['item'].get('project')} | To={p['to']} | "
-                  f"Cc={len(p['cc'])}人 | 附件{len(p['atts'])} | 主题={p['subject']}", file=sys.stderr)
+            atts = [os.path.basename(a) for a in p["atts"]]
+            print(f"  [dry-run][转OA] {p['item'].get('project')}", file=sys.stderr)
+            print(f"      主题: {p['subject']}", file=sys.stderr)
+            print(f"      收件人({len(p['to'])}): {', '.join(p['to'])}", file=sys.stderr)
+            print(f"      抄送({len(p['cc'])}): {', '.join(p['cc'])}", file=sys.stderr)
+            print(f"      附件({len(atts)}): {', '.join(atts) if atts else '(无)'}", file=sys.stderr)
         print(f"  [dry-run][转OA] 共 {len(plans)} 封待发（未实际发送）", file=sys.stderr)
         return
 
