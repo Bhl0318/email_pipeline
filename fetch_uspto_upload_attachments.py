@@ -266,9 +266,11 @@ def _settle_agent_followup(case_no, case_dir, filenames):
     except Exception:
         fj = {}
 
-    # 比对：环节5 发出的附件名(fields_json.files) vs 本次回邮存下的附件名。
+    # 比对：环节5 发出的附件名 vs 本次回邮存下的附件名。
     # 规则：发送件名主体作为**子串**出现在某回邮件名主体里即算对应（%原名%，兼容加前/后缀改名）。
-    sent = fj.get("files") or []
+    # 排除「仅存档」件(archive_files)：未发给美代理、不会回邮，参与比对会永远缺件销不掉账。
+    _archived = set(fj.get("archive_files") or [])
+    sent = [f for f in (fj.get("files") or []) if f not in _archived]
     saved_stems = [(s, _name_stem(s)) for s in (filenames or [])]
 
     def _has_match(sent_stem):
@@ -299,7 +301,8 @@ def _settle_agent_followup(case_no, case_dir, filenames):
         "UPDATE submission_tasks SET status='received', fields_json=%s, updated_at=%s WHERE id=%s",
         (json.dumps(fj, ensure_ascii=False), now, row["id"]))
     if not sent:
-        return "agent_followup.files 为空（环节5 未记发送件），无法比对；已置 received 待人工"
+        return ("无发给美代理的待回件（环节5 未记发送件，或全部选了「仅存档」），"
+                "无需等回邮；已置 received 待人工确认")
     return f"比对不一致（缺{len(missing)}:{missing} 多{len(extra)}:{extra}），未 done，置 received 待人工"
 
 
