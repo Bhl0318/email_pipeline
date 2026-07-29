@@ -1910,6 +1910,45 @@ def skip_filing_task(task_id: str):
     return {"ok": True, "task_id": task_id, "status": "skipped"}
 
 
+# ── 环节7「待上传 USPTO」pull 消费：环节6 全部签署件回齐(agent_followup done)时，
+#    销账函数建 task_type='uspto_upload'(pending)；环节7 扫 pending 拉起上传、传完 mark-uploaded。
+@app.get("/api/submission/uspto-uploads")
+def list_uspto_uploads(status: str = "pending"):
+    """列「待上传 USPTO」任务（默认 pending）。供环节7 pull 拉取；每条含案号 + 归档目录 + 文件清单。"""
+    statuses = [s.strip() for s in status.split(",") if s.strip()] or ["pending"]
+    placeholders = ",".join(["%s"] * len(statuses))
+    rows = execute_params(
+        f"SELECT id, case_volume, fields_json, status, created_at, updated_at "
+        f"FROM submission_tasks WHERE task_type='uspto_upload' AND status IN ({placeholders}) "
+        f"ORDER BY created_at ASC", tuple(statuses))
+    out = []
+    for r in rows:
+        for k in ("created_at", "updated_at"):
+            if r.get(k) is not None:
+                r[k] = str(r[k])
+        try:
+            fj = json.loads(r.get("fields_json") or "{}")
+        except Exception:
+            fj = {}
+        r.pop("fields_json", None)
+        out.append({**r, "archived_dir": fj.get("archived_dir"),
+                    "files": fj.get("files") or [], "ready_at": fj.get("ready_at")})
+    return {"tasks": out}
+
+
+@app.post("/api/submission/uspto-uploads/{task_id}/mark-uploaded")
+def mark_uspto_uploaded(task_id: str):
+    """环节7 上传 Patent Center 成功后置 uspto_upload=done（避免重复上传；环节8 复审接续）。"""
+    row = _load_submission_task(task_id)
+    if row["task_type"] != "uspto_upload":
+        raise HTTPException(400, f"任务 {task_id} 不是 uspto_upload（实际 {row['task_type']}）")
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    execute_params(
+        "UPDATE submission_tasks SET status='done', confirmed_at=%s, updated_at=%s WHERE id=%s",
+        (now, now, task_id))
+    return {"ok": True, "task_id": task_id, "status": "done"}
+
+
 if __name__ == "__main__":
     print(f"启动汇报信审核服务: http://localhost:8501", file=sys.stderr)
     print(f"  - 模板目录: {TEMPLATES_DIR}", file=sys.stderr)

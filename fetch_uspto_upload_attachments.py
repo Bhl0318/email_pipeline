@@ -245,6 +245,32 @@ def _name_stem(n):
     return os.path.splitext(os.path.basename((n or "").replace("\\", "/")))[0].strip().lower()
 
 
+def _ensure_uspto_upload_task(case_no, case_dir, files, now):
+    """agent_followup 全部回齐(done)时，建/刷新一条 uspto_upload 任务(pending)——
+    作为环节7「上传 USPTO」的待办信号（pull：环节7 定时扫 pending 拉起上传，传完置 done）。
+    幂等：已存在则只刷新 fields_json（不动其 status，避免把已上传的 done 打回）。best-effort。"""
+    import uuid
+    payload = json.dumps({
+        "source": "agent_followup", "archived_dir": case_dir,
+        "files": files, "ready_at": now,   # 全部签署件回齐、可上传的时间
+    }, ensure_ascii=False)
+    try:
+        exist = _db_exec(
+            "SELECT id FROM submission_tasks WHERE task_type='uspto_upload' AND case_volume=%s",
+            (case_no,))
+        if exist:
+            _db_exec("UPDATE submission_tasks SET fields_json=%s, updated_at=%s WHERE id=%s",
+                     (payload, now, exist[0]["id"]))
+            return f"uspto_upload 已存在，刷新待办（id={exist[0]['id']}）"
+        _db_exec(
+            "INSERT INTO submission_tasks (id, task_type, case_volume, fields_json, status, created_at) "
+            "VALUES (%s, 'uspto_upload', %s, %s, 'pending', %s)",
+            (str(uuid.uuid4()), case_no, payload, now))
+        return "已建 uspto_upload 待上传任务（pending）"
+    except Exception as exc:   # noqa: BLE001
+        return f"建 uspto_upload 任务失败（忽略）：{exc}"
+
+
 def _settle_agent_followup(case_no, case_dir, filenames):
     """回邮附件已归档 → 命中该案 agent_followup（环节6），先**比对发出/回收附件**再决定：
     - 发多少回多少、逐件对应（允许加 signed 前缀）→ 置 done；
@@ -306,7 +332,9 @@ def _settle_agent_followup(case_no, case_dir, filenames):
         _db_exec(
             "UPDATE submission_tasks SET status='done', fields_json=%s, confirmed_at=%s, updated_at=%s WHERE id=%s",
             (json.dumps(fj, ensure_ascii=False), now, now, row["id"]))
-        return f"比对一致（{len(matched)} 件），agent_followup 置 done（原 {row.get('status')}）"
+        # 全部签署件回齐 → 建/刷新 uspto_upload 待办，触发环节7 上传（pull 扫描消费）
+        up_note = _ensure_uspto_upload_task(case_no, case_dir, present, now)
+        return f"比对一致（{len(matched)} 件），agent_followup 置 done（原 {row.get('status')}）；{up_note}"
     # 不一致：置 received（不 done），留差异待人工
     _db_exec(
         "UPDATE submission_tasks SET status='received', fields_json=%s, updated_at=%s WHERE id=%s",
