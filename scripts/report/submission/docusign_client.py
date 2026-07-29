@@ -116,9 +116,10 @@ def _b64(path) -> str:
     return base64.b64encode(Path(path).read_bytes()).decode()
 
 
-def _locate_anchor(pdf_path, anchor, case_sensitive=True, whole_word=True):
-    """用 fitz 在 PDF 里定位 anchor 文本，返回首个匹配 (page_1based, x0, y0)（points，左上角，
-    坐标系与 DocuSign 绝对定位一致：原点左上、Y 向下、72pt=1英寸）。找不到/无 fitz → None。"""
+def _locate_anchor(pdf_path, anchor, case_sensitive=True, whole_word=True, which="first"):
+    """用 fitz 在 PDF 里定位 anchor 文本，返回匹配 (page_1based, x0, y0)（points，左上角，
+    坐标系与 DocuSign 绝对定位一致：原点左上、Y 向下、72pt=1英寸）。找不到/无 fitz → None。
+    which='first'（默认）取首个匹配；'last' 取全文最后一个匹配（如 "By:" 多处时取末尾签字块）。"""
     try:
         import fitz
     except Exception:
@@ -129,12 +130,15 @@ def _locate_anchor(pdf_path, anchor, case_sensitive=True, whole_word=True):
         return None
     try:
         tgt = anchor if case_sensitive else anchor.lower()
+        found = None
         for pno in range(len(doc)):
             for w in doc[pno].get_text("words"):   # (x0,y0,x1,y1,word,block,line,wno)
                 word = w[4] if case_sensitive else w[4].lower()
                 if (word == tgt) if whole_word else (tgt in word):
-                    return pno + 1, w[0], w[1]
-        return None
+                    found = (pno + 1, w[0], w[1])
+                    if which != "last":
+                        return found
+        return found
     finally:
         doc.close()
 
@@ -200,24 +204,26 @@ def build_envelope(documents, recipient, email_subject=None, anchor="Signature",
         })
 
     def _anchor_off(kind):
-        """返回该文档类型的 (锚点文本, x偏移, y偏移)；anchor 缺省回退全局 anchor。"""
+        """返回该文档类型的 (锚点文本, x偏移, y偏移, 匹配位置)；anchor 缺省回退全局 anchor，
+        match 缺省 'first'（'last' 则取该锚点在文档中的最后一处，如 "By:" 多处取末尾）。"""
         ao = anchor_offsets or {}
         o = ao.get(kind) or ao.get("_default") or {"x": anchor_x, "y": anchor_y}
         a = o.get("anchor") or anchor
-        return a, int(round(float(o.get("x", 0)))), int(round(float(o.get("y", 0))))
+        which = (o.get("match") or "first").lower()
+        return a, int(round(float(o.get("x", 0)))), int(round(float(o.get("y", 0)))), which
 
     # 逐文档 fitz 定位（按各自锚点）→ 绝对坐标签名框（一个信封、各文档各自落点）
     sign_tabs = []
     for i, (d, pdf) in enumerate(zip(documents, pdf_paths), start=1):
-        a, ox, oy = _anchor_off(d.get("kind"))
-        loc = _locate_anchor(pdf, a, anchor_case_sensitive, anchor_whole_word)
+        a, ox, oy, which = _anchor_off(d.get("kind"))
+        loc = _locate_anchor(pdf, a, anchor_case_sensitive, anchor_whole_word, which)
         if loc:
             pg, x0, y0 = loc
             sign_tabs.append({"documentId": str(i), "pageNumber": str(pg), "recipientId": "1",
                               "xPosition": str(int(round(x0)) + ox), "yPosition": str(int(round(y0)) + oy)})
     if not sign_tabs:
         # fitz 不可用 / 全都没定位到 → 退回单锚点（全局偏移）
-        _a, ox, oy = _anchor_off(None)
+        _a, ox, oy, _w = _anchor_off(None)
         sign_tabs = [{"anchorString": anchor, "anchorUnits": anchor_units,
                       "anchorCaseSensitive": anchor_case_sensitive,
                       "anchorMatchWholeWord": anchor_whole_word,
