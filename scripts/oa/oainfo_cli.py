@@ -125,6 +125,41 @@ def find_project_info(project):
         conn.close()
 
 
+# IPEasy 案件状态中文名属于这几种 → 视为已结案（无需转 OA）
+CLOSED_CASE_STATUSES = {"终止", "维持", "结案"}
+
+
+def get_case_status(case_volume):
+    """从 IPEasy 查询案件状态中文名：
+    p_case_info JOIN i_case_status ON case_status_id，按 case_volume(案号) 过滤。
+    查不到返回空串。"""
+    import pymssql
+    conn = pymssql.connect(MSSQL_HOST, MSSQL_USER, MSSQL_PWD, MSSQL_DB, charset='utf8')
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT s.case_status_zh_cn "
+            "FROM p_case_info p "
+            "JOIN i_case_status s ON p.case_status_id = s.case_status_id "
+            "WHERE p.case_volume = %s",
+            (case_volume,),
+        )
+        row = cur.fetchone()
+        return (row[0] or "") if row else ""
+    finally:
+        conn.close()
+
+
+def is_case_closed(case_volume):
+    """案件是否已结案（IPEasy 状态中文名 ∈ {终止, 维持, 结案}）。
+    查不到 / 连接异常 → 按未结案(False)处理（对齐 OP02：状态查不到按未结案继续）。"""
+    try:
+        return get_case_status(case_volume).strip() in CLOSED_CASE_STATUSES
+    except Exception as e:
+        logger.warning(f"[结案查询] {case_volume} 查询失败，按未结案处理: {e}")
+        return False
+
+
 def query_project_write_info(zu_code, project):
     """查询撰写案的 QC/负责人/参与人"""
     conn = get_mysql_connection()
