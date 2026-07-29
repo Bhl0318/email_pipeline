@@ -266,12 +266,23 @@ def _settle_agent_followup(case_no, case_dir, filenames):
     except Exception:
         fj = {}
 
-    # 比对：环节5 发出的附件名 vs 本次回邮存下的附件名。
-    # 规则：发送件名主体作为**子串**出现在某回邮件名主体里即算对应（%原名%，兼容加前/后缀改名）。
-    # 排除「仅存档」件(archive_files)：未发给美代理、不会回邮，参与比对会永远缺件销不掉账。
+    # 比对：环节5 发出的附件名 vs 案号目录里现有的全部文件名。
+    # 规则：发送件名主体作为**子串**出现在某回件名主体里即算对应（%原名%，兼容加前/后缀改名）。
+    # 排除「仅存档」件(archive_files)：未发给美代理、不会回件，参与比对会永远缺件销不掉账。
     _archived = set(fj.get("archive_files") or [])
     sent = [f for f in (fj.get("files") or []) if f not in _archived]
-    saved_stems = [(s, _name_stem(s)) for s in (filenames or [])]
+    # present = 案号目录下现有全部文件（源不限：邮箱附件 / DocuSign 下载的签署版），
+    # 使 Outlook 抓件与 DocuSign 取回两条回收线在同一 agent_followup 上会合（谁补齐谁置 done）。
+    present = []
+    try:
+        if case_dir and os.path.isdir(case_dir):
+            present = [n for n in os.listdir(case_dir) if os.path.isfile(os.path.join(case_dir, n))]
+    except Exception:
+        present = []
+    for f in (filenames or []):
+        if f not in present:
+            present.append(f)
+    saved_stems = [(s, _name_stem(s)) for s in present]
 
     def _has_match(sent_stem):
         return bool(sent_stem) and any(sent_stem in rst for _o, rst in saved_stems)
@@ -286,7 +297,7 @@ def _settle_agent_followup(case_no, case_dir, filenames):
 
     fj["reply"] = {
         "archived_dir": case_dir,
-        "attachments": filenames,
+        "attachments": present,
         "received_at": now,
         "by": "fetch_uspto_upload_attachments",
         "match": ok, "matched": matched, "missing": missing, "extra": extra,
