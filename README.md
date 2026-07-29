@@ -3,6 +3,25 @@
 邮件统一调度：一封邮件**只读一次、只分类一次**，扇出给「OA 立项」和「汇报信」两条下游流程。
 设计细节见 [DESIGN.md](DESIGN.md)。
 
+## OA 立项现状（2026-07 已上线）
+
+`main.py` 每 30 分钟一轮（Windows `scripts/run_pipeline.bat` → 激活 venv → `python main.py --interval 30`）。
+当前 `sinks.oa=true`、`sinks.report=false`（只跑 OA 立项）。
+
+**链路**：读 INBOX + docketing 的 `Metis+Porus+Poseidon/Done`（Done 标 `no_archive` 只读不移）
+→ 分类 → **已结案案件跳过立项**（查 IPEasy `p_case_info JOIN i_case_status`，状态 ∈ {终止,维持,结案}）
+→ 立项（建 Wiki OA 信息表页 / US 官文下载算期限 / CN 解析对比文件写回 / 写 `projects` / 写新增OA登记页）
+→ **转OA**：逐案发给 OA 团队（收件人 = 杨姣+薄佳璐+客户公共邮箱；抄送 = 固定8人(含张琴)+客户接口人；正文 OP02 模板落款“系统”；附官文 PDF；pa 账号发）。
+
+**关键规则**（`oa/filter_oa_email.py` 顶部常量 + `oa/forward_oa.py`）：
+- US NOA 仅 `{20608,20618,20849,20633,20609}` 立项；`M327`/`PREDOCK.NTF`/eGrant 不立项
+- CN 办理登记手续通知书 仅 `{20618,20735}` 立项
+- 全局排除：主题含 `reminder` / `向外国申请专利保密审查意见通知书` → 不立项
+- 无 checkpoint 时回溯窗口 1 天；checkpoint 已开，按 message_id 去重
+- 类型/期限详表见 [oa/OA类型与期限规则.md](scripts/oa/OA类型与期限规则.md)；转OA SOP 见 [oa/OP02-转达OA人员.md](scripts/oa/OP02-转达OA人员.md)
+
+**先验证**：`python main.py --dry-run`（不写库/不发信/不移邮件，逐封打印转OA的收件人/抄送/附件）。
+
 ## 目录
 
 ```
@@ -53,16 +72,17 @@ cd scripts/report && python3 report_server.py                    # 监听 :8501
 
 ```json
 { "accounts": [
-    { "account": "docketing", "folder": "TEST" },
-    { "account": "attorneys", "folder": "TEST" }
+    { "account": "docketing", "folder": "INBOX" },
+    { "account": "docketing", "folder": "Metis+Porus+Poseidon/Done", "no_archive": true },
+    { "account": "attorneys", "folder": "INBOX" }
   ],
-  "sinks": { "oa": true, "report": true },
-  "oa_test_project_prefix": "90009" }
+  "sinks": { "oa": true, "report": false },
+  "oa_test_project_prefix": null }
 ```
 
-- `sinks.report` / `sinks.oa`：两个 sink 独立开关。灰度已完成，**当前两条都开**（曾以 `oa:false, report:true` 先验证调度框架，OA 跑通后置 true）。
-- `accounts`：当前读 `docketing`（CN+US）与 `attorneys`（EP）两个账号。
-- `oa_test_project_prefix`：OA sink 测试期只对该案号前缀的案件落库，限定灰度范围。
+- `sinks.report` / `sinks.oa`：两个 sink 独立开关。**当前 `oa:true, report:false`**（只跑 OA 立项；汇报信线待启用）。
+- `accounts`：读 `docketing` 的 `INBOX`（CN）+ `Metis+Porus+Poseidon/Done`（US，`no_archive` 只读不移）、`attorneys` 的 `INBOX`（EP）。
+- `oa_test_project_prefix`：测试期案号前缀替换开关，**当前 `null`（已停用）**。
 
 ## 副本来源 commit
 
