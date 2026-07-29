@@ -10,7 +10,8 @@ sys.path.insert(0, SCRIPT_DIR)
 
 from forward_oa import (
     customer_public_email, forward_recipients, PUBLIC_EMAIL_FALLBACK,
-    _split_names, get_customer_contacts,
+    _split_names, get_customer_contacts, forward_cc, FORWARD_FIXED_CC,
+    build_forward_body,
 )
 
 _passed = 0
@@ -85,10 +86,42 @@ def test_contacts_no_customer():
     ok(get_customer_contacts("", execute=ex) == [], "空案号→空")
 
 
+def test_cc_fixed_plus_contacts():
+    ex = _fake_execute("钱祎,孙竹青", {"钱祎": "qian.yi@metis-ip.com", "孙竹青": "sun.zq@metis-ip.com"})
+    cc = forward_cc("20618-1200CN00", execute=ex)
+    ok(cc[:7] == FORWARD_FIXED_CC, "抄送前7位=固定7人")
+    ok(cc[7:] == ["qian.yi@metis-ip.com", "sun.zq@metis-ip.com"], "固定人员之后接客户接口人")
+    ok(len(FORWARD_FIXED_CC) == 7, "固定抄送为7人")
+
+
+def test_cc_dedup():
+    # 接口人邮箱恰好是固定人员之一 → 不重复
+    ex = _fake_execute("苏雅", {"苏雅": "ya.su@metis-ip.com"})
+    cc = forward_cc("20618-1200CN00", execute=ex)
+    ok(cc == FORWARD_FIXED_CC, "接口人与固定人员重复时去重")
+
+
+def test_forward_body():
+    item = {"project": "20633-0128CN00", "notification_type": "第一次审查意见通知书",
+            "oa_doc_date": "2026-07-22", "project_deadline": "2026-11-22"}
+    body = build_forward_body(item)
+    ok("题述申请收到了第一次审查意见通知书" in body, "官文类型填入")
+    ok("案号：20633-0128CN00" in body, "案号")
+    ok("发文日：2026-07-22" in body, "发文日")
+    ok("截止日期：2026-11-22" in body, "截止日期")
+    ok("发送人：系统" in body, "落款=系统")
+
+
+def test_forward_body_no_deadline():
+    body = build_forward_body({"project": "X", "notification_type": "补正通知书"})
+    ok("待确认" in body, "无期限→待确认")
+
+
 if __name__ == "__main__":
     for fn in [test_public_email_mapping, test_public_email_fallback, test_recipients,
                test_split_names, test_contacts_multi, test_contacts_missing_user_skipped,
-               test_contacts_no_customer]:
+               test_contacts_no_customer, test_cc_fixed_plus_contacts, test_cc_dedup,
+               test_forward_body, test_forward_body_no_deadline]:
         print(f"[{fn.__name__}]")
         fn()
     print(f"\n全部通过：{_passed} 项断言")
