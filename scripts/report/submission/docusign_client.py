@@ -219,8 +219,15 @@ def build_envelope(documents, recipient, email_subject=None, anchor="Signature",
         loc = _locate_anchor(pdf, a, anchor_case_sensitive, anchor_whole_word, which)
         if loc:
             pg, x0, y0 = loc
+            fx, fy = int(round(x0)) + ox, int(round(y0)) + oy
+            print(f"[docusign] doc{i} kind={d.get('kind')} anchor={a!r}({which}) "
+                  f"定位=(p{pg}, x0={x0:.1f}, y0={y0:.1f}) 偏移=({ox},{oy}) → 落点=(p{pg}, x={fx}, y={fy})",
+                  file=sys.stderr)
             sign_tabs.append({"documentId": str(i), "pageNumber": str(pg), "recipientId": "1",
-                              "xPosition": str(int(round(x0)) + ox), "yPosition": str(int(round(y0)) + oy)})
+                              "xPosition": str(fx), "yPosition": str(fy)})
+        else:
+            print(f"[docusign] doc{i} kind={d.get('kind')} anchor={a!r}({which}) 未定位到 "
+                  f"（{Path(pdf).name}）→ 该文档无绝对签名框", file=sys.stderr)
     if not sign_tabs:
         # fitz 不可用 / 全都没定位到 → 退回单锚点（全局偏移）
         _a, ox, oy, _w = _anchor_off(None)
