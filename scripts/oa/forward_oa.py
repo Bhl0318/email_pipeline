@@ -36,3 +36,38 @@ def forward_recipients(project):
     if pub not in to:
         to.append(pub)
     return to
+
+
+import re as _re
+
+
+def _split_names(bspeople):
+    """把 customer.bspeople 拆成人名列表（支持中英文逗号/顿号/分号分隔，去空白空项）。"""
+    return [n.strip() for n in _re.split(r'[,，、;；]', bspeople or '') if n.strip()]
+
+
+def get_customer_contacts(project, execute=None):
+    """客户接口人邮箱列表（转OA 抄送用）:
+    atw customer.bspeople(customer_code = 案号前5位) → 拆多个中文名 → 各查 users.usermail。
+    查不到 / 异常 → 返回 []（不阻塞抄送）。execute 可注入（测试用），默认用 db_query.execute。"""
+    code = (project or "")[:5]
+    if not code:
+        return []
+    if execute is None:
+        from db_query import execute as execute
+    try:
+        safe = code.replace("'", "\\'")
+        rows = execute(f"SELECT bspeople FROM customer WHERE customer_code = '{safe}'")
+        bspeople = rows[0].get("bspeople") if rows else ""
+        mails = []
+        for name in _split_names(bspeople):
+            sn = name.replace("'", "\\'")
+            r2 = execute(f"SELECT usermail FROM users WHERE username_zn = '{sn}'")
+            mail = (r2[0].get("usermail") if r2 else "") or ""
+            if mail and mail not in mails:
+                mails.append(mail)
+        return mails
+    except Exception as e:
+        import sys
+        print(f"[转OA] 查客户接口人失败 {code}: {e}", file=sys.stderr)
+        return []
