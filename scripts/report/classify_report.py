@@ -344,6 +344,9 @@ CN_TYPES = {
     "复审通知书": lambda _: "复审意见答复",
 }
 
+# 办理登记手续通知书：只对这几个客户默认立项做分案评估，其余客户跳过（客户代码 = 案号第一段）
+CN_DENGJI_CUSTOMERS = {"20618", "20735"}
+
 # CN 主题正则：日期-通知类型-案号
 CN_SUBJECT_RE = re.compile(r'^(\d{4}-\d{2}-\d{2})-(.+?)-((\d{5}-\w+))$')
 
@@ -397,6 +400,12 @@ def classify_cn(email_data):
         if docket_m:
             result["project"] = docket_m.group(1)
 
+    # 办理登记手续通知书：仅指定客户立项做分案评估，其余客户跳过（客户代码 = 案号第一段）
+    if matched_type == "办理登记手续通知书":
+        cust = (result.get("project", "") or "").split("-")[0].strip()
+        if cust not in CN_DENGJI_CUSTOMERS:
+            return None
+
     # 从正文提取答复期限
     body = email_data.get("body", "")
     deadline_m = CN_DEADLINE_RE.search(body)
@@ -438,9 +447,10 @@ EP_TYPES = {
     "Summons to oral proceedings": ("Summons to attend oral proceedings pursuant to Rule 115(1)EPC（口头审理通知书）答复", True, True),
 }
 
-# EP 主题正则：【通信类型】... (EP号) ... Your Ref.: 案号; Our Ref: 代理号;
+# EP 主题正则：【通信类型】... (EP号) ... Your Ref.: 案号; Our Ref: 代理号
+# 注：Your Ref 值与分号间可能有空格（"EP01 ;"）；Our Ref 可能位于主题结尾、后无分隔符。
 EP_SUBJECT_RE = re.compile(
-    r'【(.+?)】.*?\((EP\d+\.\d)\).*?Your\s*Ref[.:_\s]+(\S+?)[;,].*?Our\s*Ref[.:_\s]+(\S+?)[;,\s]',
+    r'【(.+?)】.*?\((EP\d+\.\d)\).*?Your\s*Ref[.:_\s]+(\S+?)\s*[;,].*?Our\s*Ref[.:_\s]+(\S+?)\s*(?:[;,]|$)',
     re.IGNORECASE
 )
 
@@ -547,14 +557,16 @@ US_TYPES_NEED_PROJECT = {
     "EXIN": ("Examiner Interview Summary Record答复", False),
     "PPH.DECISION": ("PPH Decision dismissed补正答复", False),
     "NT.CR.APP.PA": ("Notice to file corrected application papers补正答复", False),
-    "M327": ("Notice to file corrected application papers补正答复", False),
     "NTC.MISS.PRT": ("NOTICE TO FILE MISSING PARTS OF NONPROVISIONAL APPLICATION补正答复", False),
     "PETDEC": ("Petition Decision Dismissed补正答复", False),
     "CTEQ": ("Ex Parte Quayle Action答复", False),
 }
 
 # 不需要立项的 US Document Type
-US_TYPES_SKIP = {"ISSUE.NTF", "892", "1449", "COCX","ABN","APP.FILE.REC","NTC.PUB","NTC.PUB.DATE","OA.APPENDIX","WELCOME.LET"}
+US_TYPES_SKIP = {"ISSUE.NTF", "892", "1449", "COCX","ABN","APP.FILE.REC","NTC.PUB","NTC.PUB.DATE","OA.APPENDIX","WELCOME.LET","M327","PREDOCK.NTF"}
+
+# NOA（分案/续案评估）只对这几个客户立项，其它客户的 NOA 跳过（客户代码 = 案号第一段）
+NOA_PROJECT_CUSTOMERS = {"20608", "20618", "20849", "20633", "20609"}
 
 
 class _USTableParser(HTMLParser):
@@ -648,6 +660,10 @@ def classify_us(email_data):
     if "noreply@uspto.gov" not in sender and "USPTO" not in subject:
         return None
 
+    # eGrant 授权通知：表格结构与 Correspondence 不同（多 Patent 列会错位），且本就不需要 OA 立项 → 整封跳过
+    if "egrant notification" in subject.lower():
+        return None
+
     body = email_data.get("body", "")
     html_body = email_data.get("html_body", "")
 
@@ -663,6 +679,12 @@ def classify_us(email_data):
 
         if doc_type in US_TYPES_SKIP:
             continue
+
+        # NOA（分案/续案评估）只对指定客户立项，其它客户跳过（客户代码 = 案号第一段）
+        if doc_type == "NOA":
+            cust = (case.get("project", "") or "").split("-")[0].strip()
+            if cust not in NOA_PROJECT_CUSTOMERS:
+                continue
 
         type_info = US_TYPES_NEED_PROJECT.get(doc_type)
         if type_info:
@@ -703,6 +725,12 @@ def classify_email(email_data):
     """
     subject = email_data.get("subject", "").strip()
     sender = email_data.get("from", "").strip()
+
+    # 全局排除（先于区域判断）：这些邮件一律不立项
+    if "reminder" in subject.lower():
+        return None, "主题含 reminder，不立项"
+    if "向外国申请专利保密审查意见通知书" in subject:
+        return None, "向外国申请专利保密审查意见通知书，不立项"
 
     # 按优先级判断
     # 1. US
