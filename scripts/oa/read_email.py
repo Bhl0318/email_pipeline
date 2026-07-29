@@ -538,6 +538,104 @@ def send_notification(results):
         print(f"[通知邮件] 发送失败: {e}", file=sys.stderr)
 
 
+def send_forward_oa(all_results, all_emails=None, dry_run=False):
+    """转OA：把每条立项逐案转给 OA 处理团队（替换原 send_notification 总表→qin.zhang）。
+    收件人=杨姣/薄佳璐/客户公共邮箱；抄送=固定7人+客户接口人；主题保留原邮件；
+    正文 OP02 模板；附官文 PDF。用 pa 账号发。dry_run 只打印不发。"""
+    from email.mime.base import MIMEBase
+    from email import encoders
+    from forward_oa import (forward_recipients, forward_cc,
+                            build_forward_body, forward_attachments)
+
+    if not all_results:
+        print("[转OA] 无立项结果，跳过", file=sys.stderr)
+        return
+
+    pa_cfg = load_config().get("accounts", {}).get("pa")
+    if not pa_cfg:
+        print("[转OA] 未配置 PA 账号，跳过", file=sys.stderr)
+        return
+
+    # msgid -> _inbox 官文 PDF（CN/EP 附件来源）
+    msgid_to_pdfs = {}
+    for _acc, _em in (all_emails or []):
+        mid = _em.get("message_id", "")
+        if mid and _em.get("saved_pdfs"):
+            msgid_to_pdfs[mid] = _em.get("saved_pdfs", [])
+
+    # 逐案预构建
+    plans = []
+    for item in all_results:
+        project = item.get("project", "")
+        if not project:
+            continue
+        plans.append({
+            "item": item,
+            "to": forward_recipients(project),
+            "cc": forward_cc(project),
+            "subject": item.get("email_subject", "") or f"OA转达 - {project}",
+            "body": build_forward_body(item),
+            "atts": forward_attachments(item, msgid_to_pdfs),
+        })
+    if not plans:
+        print("[转OA] 无有效案件（缺案号），跳过", file=sys.stderr)
+        return
+
+    if dry_run:
+        for p in plans:
+            print(f"  [dry-run][转OA] {p['item'].get('project')} | To={p['to']} | "
+                  f"Cc={len(p['cc'])}人 | 附件{len(p['atts'])} | 主题={p['subject']}", file=sys.stderr)
+        print(f"  [dry-run][转OA] 共 {len(plans)} 封待发（未实际发送）", file=sys.stderr)
+        return
+
+    # 打开一次 SMTP，逐案发送
+    try:
+        smtp = smtplib.SMTP(pa_cfg["smtp_host"], pa_cfg["smtp_port"])
+        smtp.ehlo(); smtp.starttls(); smtp.ehlo()
+        token = _get_smtp_oauth2_token(pa_cfg)
+        if token:
+            auth_string = f"user={pa_cfg['user']}\x01auth=Bearer {token}\x01\x01"
+            try:
+                smtp.docmd("AUTH", "XOAUTH2 " + __import__("base64").b64encode(auth_string.encode()).decode())
+            except smtplib.SMTPAuthenticationError:
+                print("[转OA] OAuth2 认证失败，降级密码认证", file=sys.stderr)
+                smtp.login(pa_cfg["user"], pa_cfg["password"])
+        else:
+            smtp.login(pa_cfg["user"], pa_cfg["password"])
+    except Exception as e:
+        print(f"[转OA] SMTP 连接/认证失败，全部跳过: {e}", file=sys.stderr)
+        return
+
+    sent = 0
+    for p in plans:
+        try:
+            msg = MIMEMultipart()
+            msg["From"] = pa_cfg["user"]
+            msg["To"] = ", ".join(p["to"])
+            if p["cc"]:
+                msg["Cc"] = ", ".join(p["cc"])
+            msg["Subject"] = p["subject"]
+            msg.attach(MIMEText(p["body"], "plain", "utf-8"))
+            for fp in p["atts"]:
+                with open(fp, "rb") as fh:
+                    part = MIMEBase("application", "octet-stream")
+                    part.set_payload(fh.read())
+                encoders.encode_base64(part)
+                part.add_header("Content-Disposition", "attachment",
+                                filename=("utf-8", "", os.path.basename(fp)))
+                msg.attach(part)
+            smtp.sendmail(pa_cfg["user"], p["to"] + p["cc"], msg.as_string())
+            sent += 1
+            print(f"[转OA] {p['item'].get('project')} 已发 → {', '.join(p['to'])}", file=sys.stderr)
+        except Exception as e:
+            print(f"[转OA] {p['item'].get('project')} 发送失败: {e}", file=sys.stderr)
+    try:
+        smtp.quit()
+    except Exception:
+        pass
+    print(f"[转OA] 完成：{sent}/{len(plans)} 封", file=sys.stderr)
+
+
 # ─── 主功能 ──────────────────────────────────────────────
 
 def list_folders(account_cfg):
@@ -1002,11 +1100,8 @@ def dispatch_oa(all_results, all_emails=None, dry_run=False, test_project_prefix
 
         print(f"TIP 写入完成: {inserted} 条", file=sys.stderr)
 
-    # 发送立项结果通知邮件
-    if all_results and dry_run:
-        print(f"  [dry-run] 跳过发送立项通知邮件（{len(all_results)} 条）", file=sys.stderr)
-    elif all_results:
-        send_notification(all_results)
+    # 转OA：逐案转发给 OA 处理团队（替换原 send_notification 总表→qin.zhang；dry_run 内部处理）
+    send_forward_oa(all_results, all_emails, dry_run=dry_run)
 
 
 def archive_emails(all_emails, all_results=None, dry_run=False):

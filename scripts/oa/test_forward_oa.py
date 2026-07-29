@@ -11,7 +11,7 @@ sys.path.insert(0, SCRIPT_DIR)
 from forward_oa import (
     customer_public_email, forward_recipients, PUBLIC_EMAIL_FALLBACK,
     _split_names, get_customer_contacts, forward_cc, FORWARD_FIXED_CC,
-    build_forward_body,
+    build_forward_body, forward_attachments,
 )
 
 _passed = 0
@@ -89,9 +89,10 @@ def test_contacts_no_customer():
 def test_cc_fixed_plus_contacts():
     ex = _fake_execute("钱祎,孙竹青", {"钱祎": "qian.yi@metis-ip.com", "孙竹青": "sun.zq@metis-ip.com"})
     cc = forward_cc("20618-1200CN00", execute=ex)
-    ok(cc[:7] == FORWARD_FIXED_CC, "抄送前7位=固定7人")
-    ok(cc[7:] == ["qian.yi@metis-ip.com", "sun.zq@metis-ip.com"], "固定人员之后接客户接口人")
-    ok(len(FORWARD_FIXED_CC) == 7, "固定抄送为7人")
+    n = len(FORWARD_FIXED_CC)
+    ok(cc[:n] == FORWARD_FIXED_CC, "抄送前段=固定人员")
+    ok(cc[n:] == ["qian.yi@metis-ip.com", "sun.zq@metis-ip.com"], "固定人员之后接客户接口人")
+    ok("qin.zhang@metis-ip.com" in FORWARD_FIXED_CC, "固定抄送含张琴")
 
 
 def test_cc_dedup():
@@ -117,11 +118,24 @@ def test_forward_body_no_deadline():
     ok("待确认" in body, "无期限→待确认")
 
 
+def test_attachments_gather():
+    # CN/EP：按 message_id 取 _inbox PDF；US：取 us_pdf_path。check_exists=False 只验收集
+    msgid_to_pdfs = {"<m1>": ["/x/a.pdf", "/x/b.pdf"]}
+    cn = {"message_id": "<m1>"}
+    ok(forward_attachments(cn, msgid_to_pdfs, check_exists=False) == ["/x/a.pdf", "/x/b.pdf"],
+       "CN/EP 取邮件附件")
+    us = {"message_id": "<m2>", "us_pdf_path": "/y/us.pdf"}
+    ok(forward_attachments(us, msgid_to_pdfs, check_exists=False) == ["/y/us.pdf"],
+       "US 取下载官文")
+    ok(forward_attachments({"message_id": "<none>"}, msgid_to_pdfs, check_exists=False) == [],
+       "无匹配→空")
+
+
 if __name__ == "__main__":
     for fn in [test_public_email_mapping, test_public_email_fallback, test_recipients,
                test_split_names, test_contacts_multi, test_contacts_missing_user_skipped,
                test_contacts_no_customer, test_cc_fixed_plus_contacts, test_cc_dedup,
-               test_forward_body, test_forward_body_no_deadline]:
+               test_forward_body, test_forward_body_no_deadline, test_attachments_gather]:
         print(f"[{fn.__name__}]")
         fn()
     print(f"\n全部通过：{_passed} 项断言")

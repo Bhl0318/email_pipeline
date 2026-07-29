@@ -31,6 +31,7 @@ FORWARD_FIXED_CC = [
     "oa@metis-ip.com",           # OA立项
     "ya.su@metis-ip.com",        # 苏雅
     "juanjuan.yao@metis-ip.com", # 姚涓涓
+    "qin.zhang@metis-ip.com",    # 张琴
 ]
 
 
@@ -118,3 +119,24 @@ def build_forward_body(item):
         oa_type=oa_type, period_sentence=period_sentence,
         project=project, issue_date=issue_date, deadline=deadline,
     )
+
+
+def forward_attachments(item, msgid_to_pdfs=None, check_exists=True):
+    """收集该立项项要附的官文 PDF 路径:
+    CN/EP 取邮件附件(按 message_id 从 _inbox),US 取下载的官文(us_pdf_path)。
+    去重;check_exists=True 时过滤掉不存在的文件。"""
+    import os
+    paths = []
+    if msgid_to_pdfs:
+        paths.extend(msgid_to_pdfs.get(item.get("message_id", ""), []) or [])
+    if item.get("us_pdf_path"):
+        paths.append(item["us_pdf_path"])
+    seen, out = set(), []
+    for p in paths:
+        if not p or p in seen:
+            continue
+        if check_exists and not os.path.exists(p):
+            continue
+        seen.add(p)
+        out.append(p)
+    return out
