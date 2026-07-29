@@ -136,7 +136,7 @@
     <div class="field"><label>主题</label><input id="mSubject"></div>
     <div class="field"><label>正文（与页面「给美代理邮件」同步，此处可最后微调）</label><textarea id="mBody" rows="6"></textarea></div>
     <div class="field"><label>DocuSign 签字人姓名（留空则用收件人邮箱）</label><input id="mSigner" placeholder="如 Yu Rao"></div>
-    <div class="field"><label>附件通道（每个文件选 DocuSign 签字 / 内部邮箱；默认 POA/Transmittal/ADS 走 DocuSign）</label><div class="attach-list" id="mAttach"></div></div>
+    <div class="field"><label>附件通道（每个文件选 DocuSign 签字 / 内部邮箱 / 仅存档；默认 POA/Transmittal 走 DocuSign，ADS 走内部邮箱；「仅存档」不发送、只留档）</label><div class="attach-list" id="mAttach"></div></div>
     <div id="mWarn"></div>
     <div class="actions">
       <button onclick="closeSendModal()">取消</button>
@@ -817,6 +817,7 @@ function attachChannelListHtml(){
       <select class="ch-sel" data-key="${esc(f.key)}" style="font-size:12px;padding:2px 6px;">
         <option value="docusign" ${f.def==="docusign"?"selected":""}>DocuSign 签字</option>
         <option value="email" ${f.def==="email"?"selected":""}>内部邮箱</option>
+        <option value="archive" ${f.def==="archive"?"selected":""}>仅存档(不发送)</option>
       </select>
     </div>`).join("");
 }
@@ -874,10 +875,12 @@ function openSendModal(){
 function closeSendModal(){ $("sendModal").classList.remove("show"); }
 async function doConfirm(){
   const recipients = $("mTo").value.split(/[,，;；]/).map(s=>s.trim()).filter(Boolean);
-  if (!recipients.length) { toast("收件人不能为空"); return; }
   const cc = $("mCc").value.split(/[,，;；]/).map(s=>s.trim()).filter(Boolean);
   const file_channels = {};
   document.querySelectorAll("#mAttach .ch-sel").forEach(s => { file_channels[s.dataset.key] = s.value; });
+  // 收件人仅在有文件走 DocuSign/内部邮箱时必填；全「仅存档」可空
+  const needSend = Object.values(file_channels).some(v => v === "docusign" || v === "email");
+  if (needSend && !recipients.length) { toast("有文件需发送美代理，收件人不能为空"); return; }
   const signer_name = $("mSigner").value.trim();
   $("mConfirm").disabled = true;
   try {

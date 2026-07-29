@@ -1741,8 +1741,7 @@ def confirm_filing_task(task_id: str, req: FilingConfirmReq):
     if row["status"] != "pending":
         raise HTTPException(400, f"任务状态为 {row['status']}，不可确认")
     recipients = [r.strip() for r in req.recipients if r and r.strip()]
-    if not recipients:
-        raise HTTPException(400, "美代理收件人不能为空")
+    # 收件人校验延后到通道拆分后：仅当确有文件走 DocuSign/内部邮箱时才必填（全「仅存档」可空）
 
     fields = req.fields_json if req.fields_json is not None else (
         json.loads(row["fields_json"]) if row["fields_json"] else {})
@@ -1777,15 +1776,20 @@ def confirm_filing_task(task_id: str, req: FilingConfirmReq):
     if fdir.exists():
         attach_paths += [p for p in sorted(fdir.glob("*")) if p.is_file()]
 
-    # 2b) 按通道拆分：默认 POA/Transmittal/ADS 走 DocuSign，其余走内部邮箱；req.file_channels 覆盖
+    # 2b) 按通道拆分：默认 POA/Transmittal/ADS 走 DocuSign，其余走内部邮箱；req.file_channels 覆盖。
+    #     archive=仅存档（不发 DocuSign、不发邮件，只留在 final/ 供存档、并计入 agent_followup 清单）
     _fc = req.file_channels or {}
-    ds_paths, email_paths, ch_map = [], [], {}
+    ds_paths, email_paths, archive_paths, ch_map = [], [], [], {}
     for p in attach_paths:
         key = _doc_channel_key(p, docs)
         # ADS 是动态 XFA，DocuSign 不接受 → 默认走内部邮箱；POA/Transmittal 默认 DocuSign
         ch = (_fc.get(key) or ("docusign" if key in ("POA", "Transmittal") else "email")).lower()
         ch_map[p.name] = ch
-        (ds_paths if ch == "docusign" else email_paths).append(p)
+        (archive_paths if ch == "archive" else ds_paths if ch == "docusign" else email_paths).append(p)
+
+    # 收件人校验：仅当确有文件要发（DocuSign/内部邮箱）时才必填
+    if (ds_paths or email_paths) and not recipients:
+        raise HTTPException(400, "有文件需发送美代理，收件人不能为空")
 
     case_volume = row["case_volume"]
     mail = build_agent_email(case_volume, req.recipient_name or "X总/X律师")
@@ -1835,9 +1839,10 @@ def confirm_filing_task(task_id: str, req: FilingConfirmReq):
     followup_fields = json.dumps({
         "source_task_id": task_id, "files": [p.name for p in attach_paths],
         "sent_to": recipients, "sent_cc": req.cc, "sent_at": now,
-        "channels": ch_map,                          # {文件名: docusign|email}
+        "channels": ch_map,                          # {文件名: docusign|email|archive}
         "docusign_files": [p.name for p in ds_paths],
         "email_files": [p.name for p in email_paths],
+        "archive_files": [p.name for p in archive_paths],   # 仅存档、未发送
         "envelope_id": envelope_id,                  # DocuSign 信封号（环节6 取签署版用）
     }, ensure_ascii=False)
     exist = execute_params(
