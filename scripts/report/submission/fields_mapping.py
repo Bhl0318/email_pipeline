@@ -282,12 +282,15 @@ def fields_to_case_info(fields: dict, agent_info: dict = None) -> dict:
     _pct = fields.get("case_advance_info") or {}
     _pct_no = (_pct.get("pct_app_no") or "").strip()
     if _pct_no and not parents:
+        # 有 PCT 号且无美国母案 ⇒ 经 PCT 入美（371 / bypass），PCT 即在先申请，本栏必有一行。
+        # 关系标签：含 371→371 国际阶段；否则按 filing_route 里的续案关系词规范
+        # （CIP/DIV/CON 原样、bypass→Continuation of），空则兜底 Continuation of。
+        # 旧逻辑只认字面 "bypass"/"371"，filing_route 存续案关系词（如 "Continuation in part of"）时漏填。
         _pct_date = (_pct.get("pct_app_date") or "").strip()
-        _ct = "Continuation of" if "bypass" in _route else ("a 371 of international" if "371" in _route else "")
-        if _ct:
-            parents.append({"Application No": "", "Prior Application Number": _pct_no,
-                            "Filing Date": _pct_date, "Continuity Type": _ct,
-                            "Prior Application Status": "Pending"})
+        _ct = "a 371 of international" if "371" in _route else (_continuity_display(_route) or "Continuation of")
+        parents.append({"Application No": "", "Prior Application Number": _pct_no,
+                        "Filing Date": _pct_date, "Continuity Type": _ct,
+                        "Prior Application Status": "Pending"})
 
     case_info = {
         "Our Ref.": fields.get("case_volume", ""),
