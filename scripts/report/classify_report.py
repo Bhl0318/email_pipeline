@@ -400,6 +400,12 @@ def classify_cn(email_data):
         if docket_m:
             result["project"] = docket_m.group(1)
 
+    # 发文日兜底：主题若是 日期-案号-类型 顺序（CN_SUBJECT_RE 不匹配），抓开头 YYYY-MM-DD 作发文日
+    if not result.get("issue_date"):
+        _dm = re.match(r'\s*(\d{4}-\d{2}-\d{2})', subject)
+        if _dm:
+            result["issue_date"] = _dm.group(1)
+
     # 办理登记手续通知书：仅指定客户立项做分案评估，其余客户跳过（客户代码 = 案号第一段）
     if matched_type == "办理登记手续通知书":
         cust = (result.get("project", "") or "").split("-")[0].strip()
