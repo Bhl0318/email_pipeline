@@ -42,6 +42,25 @@ def test_reminder_skipped():
     ok(res is None, f"含 reminder 不立项 (reason={reason})")
 
 
+def test_re_reply_skipped():
+    # RE: 内部回复邮件 → 不立项（即使主题含办登/审查意见等关键词）
+    ed = {
+        "subject": "RE: 【DSTRBTFILING】20886-0007CN00 - 答复 - 办理登记手续通知书",
+        "from": "juanjuan.yao@metis-ip.com", "body": "", "html_body": "",
+    }
+    res, reason = classify_email(ed)
+    ok(res is None, f"RE: 回复不立项 (reason={reason})")
+
+
+def test_chinese_reply_skipped():
+    ed = {
+        "subject": "回复：2026-07-09-第一次审查意见通知书-20618-0001CN00",
+        "from": "x@metis-ip.com", "body": "", "html_body": "",
+    }
+    res, _ = classify_email(ed)
+    ok(res is None, "回复：开头不立项")
+
+
 def test_normal_cn_still_classifies():
     # 正常第一次审查意见通知书仍立项
     ed = {
@@ -57,6 +76,7 @@ def test_normal_cn_still_classifies():
 
 if __name__ == "__main__":
     for fn in [test_baomi_shencha_skipped, test_reminder_skipped,
+               test_re_reply_skipped, test_chinese_reply_skipped,
                test_normal_cn_still_classifies]:
         print(f"[{fn.__name__}]")
         fn()

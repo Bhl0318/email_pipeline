@@ -733,6 +733,8 @@ def classify_email(email_data):
     sender = email_data.get("from", "").strip()
 
     # 全局排除（先于区域判断）：这些邮件一律不立项
+    if re.match(r'^\s*(re|回复)\s*[:：]', subject, re.IGNORECASE):
+        return None, "回复邮件（RE:/回复:），不立项"
     if "reminder" in subject.lower():
         return None, "主题含 reminder，不立项"
     if "向外国申请专利保密审查意见通知书" in subject:
