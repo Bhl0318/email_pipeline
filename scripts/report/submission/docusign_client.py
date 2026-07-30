@@ -341,19 +341,33 @@ def download_signed(cfg, auth, envelope_id, out_dir, which="combined") -> list:
 
 
 if __name__ == "__main__":
-    cmd = sys.argv[1] if len(sys.argv) > 1 else "help"
+    # 可选开关：--config <路径>（用指定配置文件，不动默认）、--firm <代理所>（多账号按所解析）
+    _argv, cfg_path, firm, rest, _i = sys.argv[1:], None, None, [], 0
+    while _i < len(_argv):
+        if _argv[_i] == "--config" and _i + 1 < len(_argv):
+            cfg_path = _argv[_i + 1]; _i += 2
+        elif _argv[_i] == "--firm" and _i + 1 < len(_argv):
+            firm = _argv[_i + 1]; _i += 2
+        else:
+            rest.append(_argv[_i]); _i += 1
+    cmd = rest[0] if rest else "help"
+
+    def _cfg():
+        c = load_config(cfg_path)
+        return resolve_account(c, firm) if firm else c
+
     if cmd == "help":
         print(__doc__)
-        print("用法: python docusign_client.py <命令>\n"
+        print("用法: python docusign_client.py [--config 路径] [--firm 代理所] <命令>\n"
               "  consent                         打印一次性授权链接\n"
               "  token                           验证 JWT Grant 换 token\n"
-              "  send <收件邮箱> <文件1> [文件2…]   建并发送信封（沙盒测试发件）\n"
+              "  send <收件邮箱> <文件1> [文件2…]   建并发送信封\n"
               "  status <envId>                  查信封状态\n"
               "  download <envId> <输出目录>      取回签署版 PDF\n"
               "  demo                            dry-run 打印信封结构（不连网）")
         sys.exit(0)
     if cmd == "consent":
-        print("浏览器打开授权一次：\n" + consent_url(load_config()))
+        print("浏览器打开授权一次：\n" + consent_url(_cfg()))
         sys.exit(0)
     if cmd == "demo":
         # dry-run：打印将发送的信封体（不连网、不发送），核对结构/锚点
@@ -373,13 +387,13 @@ if __name__ == "__main__":
         }
         print(json.dumps(preview, ensure_ascii=False, indent=2))
         sys.exit(0)
-    # 以下真连 DocuSign（需配置好凭据 + 沙盒 consent）
-    cfg = load_config()
+    # 以下真连 DocuSign（需配置好凭据 + consent）
+    cfg = _cfg()
     auth = get_access_token(cfg)
     print(f"token OK; base_uri={auth['base_uri']} account={auth['account_id']}")
-    if cmd == "send" and len(sys.argv) > 3:
-        to_email = sys.argv[2]
-        files = sys.argv[3:]
+    if cmd == "send" and len(rest) > 2:
+        to_email = rest[1]
+        files = rest[2:]
         for f in files:
             if not Path(f).is_file():
                 raise RuntimeError(f"文件不存在: {f}")
@@ -394,8 +408,8 @@ if __name__ == "__main__":
                                anchor_case_sensitive=cfg.get("anchor_case_sensitive", True),
                                anchor_whole_word=cfg.get("anchor_whole_word", True),
                                anchor_offsets=cfg.get("anchor_offsets"))
-        print(f"已发送信封 envelopeId={env_id} → {to_email}（沙盒收件箱查收，签完用 status/download）")
-    elif cmd == "status" and len(sys.argv) > 2:
-        print("status:", get_status(cfg, auth, sys.argv[2]))
-    elif cmd == "download" and len(sys.argv) > 3:
-        print("saved:", download_signed(cfg, auth, sys.argv[2], sys.argv[3]))
+        print(f"已发送信封 envelopeId={env_id} → {to_email}（收件箱查收，签完用 status/download）")
+    elif cmd == "status" and len(rest) > 1:
+        print("status:", get_status(cfg, auth, rest[1]))
+    elif cmd == "download" and len(rest) > 2:
+        print("saved:", download_signed(cfg, auth, rest[1], rest[2]))
