@@ -39,6 +39,47 @@ def load_config(path=None) -> dict:
     return json.loads(p.read_text(encoding="utf-8"))
 
 
+def _firm_key(cfg: dict, firm) -> str:
+    """把案件的代理所名（如 'Porus IP LLC'）归一到 firm_accounts 的 key（如 'Porus'）。
+    先查 firm_map 精确/大小写不敏感，再按 key 子串包含兜底（'...porus...'→Porus）。找不到返回 ''。"""
+    fa = cfg.get("firm_accounts") or {}
+    if not fa or not firm:
+        return ""
+    f = str(firm).strip()
+    fmap = cfg.get("firm_map") or {}
+    if f in fmap:
+        return fmap[f]
+    low = f.lower()
+    for k, v in fmap.items():          # firm_map 大小写不敏感
+        if k.lower() == low:
+            return v
+    for k in fa:                       # 按账号 key 子串兜底（Metis/Poseidon/Porus）
+        if k.lower() in low:
+            return k
+    return ""
+
+
+def resolve_account(cfg: dict, firm=None) -> dict:
+    """按代理所选 DocuSign 发送账号：返回"共享默认 + 该所账号覆盖"合并后的有效 cfg。
+    无 firm_accounts（沙盒单账号）→ 原样返回（老行为不变）。匹配不到 firm → 用 default_firm。
+    账号缺 user_id/account_id → 抛错（避免误用别的账号发生产件）。"""
+    fa = cfg.get("firm_accounts") or {}
+    if not fa:
+        return cfg                                     # 单账号（沙盒）老行为
+    key = _firm_key(cfg, firm) or cfg.get("default_firm") or ""
+    acct = fa.get(key)
+    if acct is None:
+        raise RuntimeError(f"代理所「{firm}」未匹配到 DocuSign 账号（firm_accounts 无 '{key}'）；"
+                           "请在 docusign_config.json 的 firm_map/firm_accounts 补齐")
+    merged = {**cfg, **acct}
+    merged.pop("firm_accounts", None)
+    merged.pop("firm_map", None)
+    if not merged.get("user_id") or not merged.get("account_id"):
+        raise RuntimeError(f"代理所「{firm}」→账号 '{key}' 的 DocuSign 凭据未配全（缺 user_id/account_id）")
+    merged["_firm_key"] = key
+    return merged
+
+
 def _oauth_host(cfg: dict) -> str:
     return PROD_OAUTH_HOST if cfg.get("env") == "production" else DEMO_OAUTH_HOST
 

@@ -39,11 +39,13 @@ except Exception as exc:  # noqa: BLE001
     _DS_OK = False
 
 
-def _envelope_id_of(fields_json):
+def _followup_of(fields_json):
+    """从 agent_followup.fields_json 取 (envelope_id, docusign_firm)。"""
     try:
-        return (json.loads(fields_json or "{}") or {}).get("envelope_id")
+        fj = json.loads(fields_json or "{}") or {}
     except Exception:
-        return None
+        fj = {}
+    return fj.get("envelope_id"), fj.get("docusign_firm")
 
 
 def fetch():
@@ -57,17 +59,26 @@ def fetch():
     rows = _db_exec(
         "SELECT id, case_volume, fields_json, status FROM submission_tasks "
         "WHERE task_type='agent_followup' AND status <> 'done'") or []
-    targets = [(r, _envelope_id_of(r.get("fields_json"))) for r in rows]
-    targets = [(r, eid) for r, eid in targets if eid]
+    targets = [(r, *_followup_of(r.get("fields_json"))) for r in rows]
+    targets = [(r, eid, firm) for r, eid, firm in targets if eid]
     print(f"待取回签署版的 agent_followup：{len(targets)} 个（未 done 且有 envelope_id）")
     if not targets:
         return
 
-    cfg = _ds.load_config()
-    auth = _ds.get_access_token(cfg)
+    base_cfg = _ds.load_config()
+    auth_cache = {}   # firm_key -> (cfg, auth)，同一代理所账号复用 token，不同所各自鉴权
 
-    for row, eid in targets:
+    for row, eid, firm in targets:
         case = row["case_volume"]
+        try:                                          # 按代理所解析 DocuSign 账号（与 env5 发送同一账号）
+            cfg = _ds.resolve_account(base_cfg, firm)
+            fk = cfg.get("_firm_key") or "_default"
+            if fk not in auth_cache:
+                auth_cache[fk] = (cfg, _ds.get_access_token(cfg))
+            cfg, auth = auth_cache[fk]
+        except Exception as exc:  # noqa: BLE001
+            print(f"  {case}: DocuSign 账号解析/鉴权失败（代理所={firm}）：{exc}")
+            continue
         try:
             status = _ds.get_status(cfg, auth, eid)
         except Exception as exc:  # noqa: BLE001

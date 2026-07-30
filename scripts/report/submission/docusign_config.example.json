@@ -32,5 +32,24 @@
   },
 
   "_recipient": "美代理签字人（运行时也可由代码传入覆盖）。",
-  "agent": { "name": "<US Agent Name>", "email": "<agent@firm.com>" }
+  "agent": { "name": "<US Agent Name>", "email": "<agent@firm.com>" },
+
+  "_multi_account": [
+    "多账号（按代理所选 DocuSign 发送账号）。填了 firm_accounts 即启用；不填=用上面单账号(沙盒)。",
+    "顶层 integration_key/private_key_path/env/anchor* 为共享默认；各所账号只需覆盖 user_id/account_id，",
+    "若各所是不同 DocuSign App/密钥，则在该所条目里再覆盖 integration_key/private_key_path。",
+    "firm_map：案件代理所名(filing_extra.agent_firm，如 'Porus IP LLC') → firm_accounts 的 key。",
+    "解析：firm_map 精确/大小写不敏感 → 再按 key 子串包含兜底（'...porus...'→Porus）→ 不中用 default_firm。"
+  ],
+  "default_firm": "Metis",
+  "firm_map": {
+    "Metis IP LLC": "Metis", "Metis": "Metis",
+    "Poseidon": "Poseidon", "Poseidon Advanced": "Poseidon", "Poseidon Advanced LLC": "Poseidon",
+    "Porus": "Porus", "Porus IP LLC": "Porus"
+  },
+  "firm_accounts": {
+    "Metis":    { "login_email": "patent_filling@metis-ip.com",        "user_id": "<Metis API 用户 GUID>",    "account_id": "<Metis Account ID>" },
+    "Poseidon": { "login_email": "patent_filling@poseidonadvanced.com", "user_id": "<Poseidon API 用户 GUID>", "account_id": "<Poseidon Account ID>" },
+    "Porus":    { "login_email": "patent_filling@porusip.com",          "user_id": "<Porus API 用户 GUID>",    "account_id": "<Porus Account ID>" }
+  }
 }

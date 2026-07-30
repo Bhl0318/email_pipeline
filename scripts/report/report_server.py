@@ -1809,12 +1809,14 @@ def confirm_filing_task(task_id: str, req: FilingConfirmReq):
     mail = build_agent_email(case_volume, req.recipient_name or "X总/X律师")
     subject = req.subject or mail["subject"]
     body = req.body or mail["body"]
+    # 代理所（决定用哪个 DocuSign 账号发；env6 取回签署版须用同一账号）
+    agent_firm = (fields.get("filing_extra") or {}).get("agent_firm") or ""
 
-    # 3a) DocuSign 组 → 建信封发签字人（沙盒/生产按 docusign_config）
+    # 3a) DocuSign 组 → 建信封发签字人（按代理所选账号：Metis/Poseidon/Porus）
     envelope_id = None
     if ds_paths:
         try:
-            dcfg = _docusign.load_config()
+            dcfg = _docusign.resolve_account(_docusign.load_config(), agent_firm)
             dauth = _docusign.get_access_token(dcfg)
             signer = {"name": (req.signer_name or "").strip() or recipients[0], "email": recipients[0]}
             ds_docs = [{"path": str(p), "kind": _docusign_kind(p, docs)} for p in ds_paths]
@@ -1871,6 +1873,7 @@ def confirm_filing_task(task_id: str, req: FilingConfirmReq):
         "email_files": [p.name for p in email_paths],
         "archive_files": [p.name for p in archive_paths],   # 仅存档、未发送
         "envelope_id": envelope_id,                  # DocuSign 信封号（环节6 取签署版用）
+        "docusign_firm": agent_firm,                 # 代理所（env6 取回须用同一 DocuSign 账号）
     }, ensure_ascii=False)
     exist = execute_params(
         "SELECT id FROM submission_tasks WHERE task_type='agent_followup' AND case_volume=%s",
