@@ -1801,27 +1801,32 @@ def confirm_filing_task(task_id: str, req: FilingConfirmReq):
         ch_map[p.name] = ch
         (archive_paths if ch == "archive" else ds_paths if ch == "docusign" else email_paths).append(p)
 
-    # 收件人校验：仅当确有文件要发（DocuSign/内部邮箱）时才必填
-    if (ds_paths or email_paths) and not recipients:
-        raise HTTPException(400, "有文件需发送美代理，收件人不能为空")
+    # DocuSign 通道当前【只登记不发送】：生产账号无 API 权限(IAM Standard 套餐不含)，改由人工手动发签字件；
+    # 系统只登记这些件(记入 docusign_files)，供环节6 轮询邮箱时与回邮比对。
+    # 将来账号买了 API：把 email_config.submission.docusign_api_send 设 true 即恢复自动建信封发送。
+    _ds_api = bool((_load_email_config().get("submission") or {}).get("docusign_api_send", False))
+
+    # 收件人校验：内部邮箱由系统发→必填；DocuSign 走人工手动发(未开 API)、仅存档不发→不强制。
+    if (email_paths or (ds_paths and _ds_api)) and not recipients:
+        raise HTTPException(400, "有文件需由系统发送美代理，收件人不能为空")
 
     case_volume = row["case_volume"]
     mail = build_agent_email(case_volume, req.recipient_name or "X总/X律师")
     subject = req.subject or mail["subject"]
     body = req.body or mail["body"]
-    # 代理所（决定用哪个 DocuSign 账号发；env6 取回签署版须用同一账号）
+    # 代理所（开 API 自动发时决定用哪个 DocuSign 账号；env6 取回须用同一账号）
     agent_firm = (fields.get("filing_extra") or {}).get("agent_firm") or ""
 
-    # 拦截：代理所不走 DocuSign（未配 DocuSign 账号，如 Lai Runzhi）却把文件设成 DocuSign 通道 → 拒绝，
-    # 让审阅人改走内部邮箱/仅存档，避免误用别所账号发出。
-    _dcfg_all = _docusign.load_config() if ds_paths else None
-    if ds_paths and not _docusign.firm_uses_docusign(_dcfg_all, agent_firm):
-        raise HTTPException(400, f"代理所「{agent_firm or '未指定'}」不走 DocuSign（未配 DocuSign 账号）；"
-                                 f"请把以下文件改为内部邮箱或仅存档后重发：{', '.join(p.name for p in ds_paths)}")
-
-    # 3a) DocuSign 组 → 建信封发签字人（按代理所选账号：Metis/Poseidon/Porus）
+    # 3a) DocuSign 组：
+    #   未开 API(默认，当前) → 只登记 ds_paths、不发（人工手动发 DocuSign），envelope_id=None；
+    #   开了 API → 按代理所选账号(Metis/Poseidon/Porus)建信封自动发。
     envelope_id = None
-    if ds_paths:
+    if ds_paths and _ds_api:
+        _dcfg_all = _docusign.load_config()
+        # 拦截：代理所未配 DocuSign 账号（如 Lai Runzhi）却设成 DocuSign 通道 → 拒绝，避免误用别所账号
+        if not _docusign.firm_uses_docusign(_dcfg_all, agent_firm):
+            raise HTTPException(400, f"代理所「{agent_firm or '未指定'}」不走 DocuSign（未配 DocuSign 账号）；"
+                                     f"请把以下文件改为内部邮箱或仅存档后重发：{', '.join(p.name for p in ds_paths)}")
         try:
             dcfg = _docusign.resolve_account(_dcfg_all, agent_firm)
             dauth = _docusign.get_access_token(dcfg)
