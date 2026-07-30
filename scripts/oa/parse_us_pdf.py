@@ -171,6 +171,60 @@ def _ai_extract_months_from_images(pdf_path, max_pages=3):
     return None
 
 
+def _ai_pph_decision_from_images(pdf_path, max_pages=3):
+    """扫描件降级：渲染前 N 页发 qwen-vl-max 判断 PPH 决定是 dismissed 还是 granted。"""
+    try:
+        import fitz
+    except ImportError:
+        return ""
+    doc = fitz.open(pdf_path)
+    images_b64 = []
+    for i in range(min(max_pages, len(doc))):
+        pix = doc[i].get_pixmap(dpi=200)
+        images_b64.append(base64.b64encode(pix.tobytes("png")).decode("utf-8"))
+    doc.close()
+    if not images_b64:
+        return ""
+    client = OpenAI(api_key=QWEN_API_KEY, base_url=QWEN_BASE_URL)
+    content = [{
+        "type": "text",
+        "text": ('These are pages of a USPTO PPH (Patent Prosecution Highway) decision. '
+                 'Is the PPH request/petition DISMISSED or GRANTED? '
+                 'Return ONLY JSON: {"decision": "dismissed"} or {"decision": "granted"}.')
+    }]
+    for b64 in images_b64:
+        content.append({"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b64}"}})
+    try:
+        resp = client.chat.completions.create(
+            model=QWEN_VL_MODEL, max_tokens=30,
+            messages=[{"role": "user", "content": content}])
+        m = re.search(r'\{.*?\}', resp.choices[0].message.content.strip(), re.DOTALL)
+        if m:
+            d = (json.loads(m.group()).get("decision") or "").lower()
+            if "dismiss" in d:
+                return "dismissed"
+            if "grant" in d:
+                return "granted"
+    except Exception as e:
+        print(f"qwen-vl-max PPH 判断失败: {e}", file=sys.stderr)
+    return ""
+
+
+def parse_pph_decision(pdf_path):
+    """判断 PPH 决定：返回 'dismissed' / 'granted' / ''（无法判断）。
+    先读文字层（封面或文字版官文，命中 dismiss/grant 即返回）；读不到再 OCR 前几页。"""
+    if not pdf_path or not os.path.exists(pdf_path):
+        return ""
+    text, _is_scanned = _pdf_to_text(pdf_path, max_pages=5)
+    low = (text or "").lower()
+    # 官文正文关键句 "the request and petition are dismissed/granted"；封面 "PPH Dismissed/Granted"
+    if "dismiss" in low:
+        return "dismissed"
+    if "grant" in low:
+        return "granted"
+    return _ai_pph_decision_from_images(pdf_path, max_pages=3)
+
+
 def extract_us_deadline(pdf_path, mailing_date=None):
     """
     从 US 官文 PDF 提取答复期限。

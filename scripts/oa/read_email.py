@@ -959,6 +959,19 @@ def dispatch_oa(all_results, all_emails=None, dry_run=False, test_project_prefix
             except Exception as e:
                 print(f"[US] {item['project']} 异常: {e}", file=sys.stderr)
 
+    # PPH Decision：读下载的官文判 dismissed/granted —— granted 不立项（只发汇报信），dismissed 保留
+    pph_items = [r for r in all_results if r.get("notification_type") == "PPH.DECISION"]
+    if pph_items and not dry_run:
+        from parse_us_pdf import parse_pph_decision
+        for it in pph_items:
+            decision = parse_pph_decision(it.get("us_pdf_path", ""))
+            if decision == "granted":
+                it["_pph_drop"] = True
+                print(f"[PPH] {it.get('project')} granted → 不立项（只发汇报信）", file=sys.stderr)
+            else:
+                print(f"[PPH] {it.get('project')} 判定={decision or '未判定，保留'} → 立项", file=sys.stderr)
+        all_results = [r for r in all_results if not r.get("_pph_drop")]
+
     # 上传官文附件到 OA 信息记录表页：CN/EP 取邮件附件 PDF，US 取下载的官文
     if all_results and dry_run:
         print(f"  [dry-run] 跳过上传官文附件到 OA 信息表页", file=sys.stderr)
