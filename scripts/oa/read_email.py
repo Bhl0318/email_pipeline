@@ -573,7 +573,7 @@ def send_forward_oa(all_results, all_emails=None, dry_run=False):
             "item": item,
             "to": forward_recipients(project),
             "cc": forward_cc(project),
-            "subject": item.get("email_subject", "") or f"OA转达 - {project}",
+            "subject": "【OA自动立项通知】" + (item.get("email_subject", "") or f"OA转达 - {project}"),
             "body": build_forward_body(item),
             "atts": forward_attachments(item, msgid_to_pdfs),
         })
