@@ -469,18 +469,13 @@ function missingFieldSet() {
 }
 
 function applicantNames() { return [...new Set((fields.applicants || []).map(a => (a.applicant_name_en || "").trim()).filter(Boolean))]; }
-// 申请人名改动后，原地刷新发明人「归属公司」下拉的选项（保留各 select 当前值；不在列表的值保留并标记）
+// 申请人名改动后，原地刷新发明人「归属公司」datalist 的建议项（不动输入框已填的值，含非申请人公司名）
 function refreshEmployerSelects() {
-  const opts = applicantNames();
-  document.querySelectorAll('#formSections select[data-path]').forEach(sel => {
-    const p = JSON.parse(sel.getAttribute("data-path"));
+  const dlHtml = applicantNames().map(o => `<option value="${esc(o)}"></option>`).join("");
+  document.querySelectorAll('#formSections input[data-path]').forEach(inp => {
+    const p = JSON.parse(inp.getAttribute("data-path"));
     if (!(p[0] === "inventors" && p[2] === "employer")) return;
-    const cur = sel.value;
-    const known = opts.includes(cur);
-    sel.innerHTML =
-      `<option value=""${cur === "" ? " selected" : ""}>（未指定）</option>` +
-      opts.map(o => `<option value="${esc(o)}"${o === cur ? " selected" : ""}>${esc(o)}</option>`).join("") +
-      ((!known && cur !== "") ? `<option value="${esc(cur)}" selected>${esc(cur)}（不在申请人列表，请核对）</option>` : "");
+    if (inp.list) inp.list.innerHTML = dlHtml;   // 只刷新建议项，保留手输值
   });
 }
 function fieldInput(def) {
@@ -496,7 +491,12 @@ function fieldInput(def) {
     hint = `<div class="hint">${esc(def.hintText)}</div>`;
   }
   let control;
-  if (def.options) {
+  if (def.datalist) {
+    // 可下拉可手输：从建议(如申请人名)里选，也可直接输入不在列表的值（如非申请人的归属公司）
+    const dlId = "dl_" + def.path.join("_").replace(/[^a-zA-Z0-9]/g, "");
+    control = `<input data-path='${dp}' value="${esc(val ?? "")}" list="${dlId}" ${def.readonly ? "readonly" : ""} autocomplete="off">
+      <datalist id="${dlId}">${def.datalist.map(o => `<option value="${esc(o)}"></option>`).join("")}</datalist>`;
+  } else if (def.options) {
     const cur = (val ?? "").toString();
     const known = def.options.includes(cur);
     control = `<select data-path='${dp}' ${def.readonly ? "disabled" : ""}>
@@ -521,8 +521,8 @@ function arrayBlock(key, title, defs, extraHTML) {
         <button onclick="removeItem('${key}',${i})">删除</button></div>
       <div class="grid">${defs.map(([k, label, req, opt]) =>
         fieldInput({ path: [key, i, k], label, req,
-          options: opt === "applicantNames" ? applicantNames() : undefined,
-          hintText: opt === "applicantNames" ? "从申请人英文名中选择；地址按所选公司取。改了申请人名请回来重选" : undefined,
+          datalist: opt === "applicantNames" ? applicantNames() : undefined,
+          hintText: opt === "applicantNames" ? "可从申请人里选，也可直接输入非申请人的公司名（发明人的雇主/前雇主）。地址来源：申请人→取其地址；非申请人→需在下方「转让安排」加一段“公司转公司”(转让方=该公司)并填公司地址" : undefined,
         })).join("")}</div>
       ${extraHTML ? extraHTML(item, i) : ""}
     </div>`).join("");
