@@ -1812,11 +1812,18 @@ def confirm_filing_task(task_id: str, req: FilingConfirmReq):
     # 代理所（决定用哪个 DocuSign 账号发；env6 取回签署版须用同一账号）
     agent_firm = (fields.get("filing_extra") or {}).get("agent_firm") or ""
 
+    # 拦截：代理所不走 DocuSign（未配 DocuSign 账号，如 Lai Runzhi）却把文件设成 DocuSign 通道 → 拒绝，
+    # 让审阅人改走内部邮箱/仅存档，避免误用别所账号发出。
+    _dcfg_all = _docusign.load_config() if ds_paths else None
+    if ds_paths and not _docusign.firm_uses_docusign(_dcfg_all, agent_firm):
+        raise HTTPException(400, f"代理所「{agent_firm or '未指定'}」不走 DocuSign（未配 DocuSign 账号）；"
+                                 f"请把以下文件改为内部邮箱或仅存档后重发：{', '.join(p.name for p in ds_paths)}")
+
     # 3a) DocuSign 组 → 建信封发签字人（按代理所选账号：Metis/Poseidon/Porus）
     envelope_id = None
     if ds_paths:
         try:
-            dcfg = _docusign.resolve_account(_docusign.load_config(), agent_firm)
+            dcfg = _docusign.resolve_account(_dcfg_all, agent_firm)
             dauth = _docusign.get_access_token(dcfg)
             signer = {"name": (req.signer_name or "").strip() or recipients[0], "email": recipients[0]}
             ds_docs = [{"path": str(p), "kind": _docusign_kind(p, docs)} for p in ds_paths]

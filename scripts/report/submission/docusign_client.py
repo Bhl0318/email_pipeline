@@ -59,6 +59,15 @@ def _firm_key(cfg: dict, firm) -> str:
     return ""
 
 
+def firm_uses_docusign(cfg: dict, firm=None) -> bool:
+    """该代理所是否走 DocuSign：无 firm_accounts（沙盒单账号）→ True；
+    否则要求 firm **严格命中**某账号（不走 default_firm 兜底），未配账号的所（如 Lai Runzhi）→ False，
+    其文件不得走 DocuSign（只能内部邮箱/仅存档），避免误用别所账号发出。"""
+    if not (cfg.get("firm_accounts")):
+        return True
+    return bool(_firm_key(cfg, firm))
+
+
 def resolve_account(cfg: dict, firm=None) -> dict:
     """按代理所选 DocuSign 发送账号：返回"共享默认 + 该所账号覆盖"合并后的有效 cfg。
     无 firm_accounts（沙盒单账号）→ 原样返回（老行为不变）。匹配不到 firm → 用 default_firm。
