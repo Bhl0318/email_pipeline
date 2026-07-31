@@ -121,6 +121,38 @@ def build_forward_body(item):
     )
 
 
+# 转OA 主题前缀
+FORWARD_SUBJECT_PREFIX = "【OA自动立项通知】"
+
+# US Document Type 代码 → 官文可读名（无官文文件名时的兜底用）
+US_DOC_NAME = {
+    "CTNF": "Non-Final Rejection", "CTFR": "Final Rejection", "CTAV": "Advisory Action",
+    "NOA": "Notice of Allowance", "CTRS": "Requirement for Restriction Election",
+    "EXIN": "Examiner Interview Summary Record", "CTEQ": "Ex Parte Quayle Action",
+    "PPH.DECISION": "PPH Decision", "NT.CR.APP.PA": "Notice to file corrected application papers",
+    "NTC.MISS.PRT": "Notice to file missing parts", "PETDEC": "Petition Decision Dismissed",
+}
+
+
+def official_doc_name(item):
+    """官文可读名：US 代码转可读名（查不到用原代码）；CN/EP 用 notification_type。"""
+    ntype = item.get("notification_type", "") or ""
+    return US_DOC_NAME.get(ntype, ntype) if item.get("region") == "US" else ntype
+
+
+def build_forward_subject(item, attachments=None):
+    """转OA 主题 = 【OA自动立项通知】+ 官文文件名(去扩展名，本身即 发文日-官文名-案号)。
+    无官文附件时兜底用 发文日-官文名-案号；再不行用原邮件主题。"""
+    import os
+    if attachments:
+        base = os.path.splitext(os.path.basename(attachments[0]))[0].strip()
+        if base:
+            return FORWARD_SUBJECT_PREFIX + base
+    date = item.get("oa_doc_date", "") or item.get("issue_date", "") or ""
+    core = "-".join(p for p in (date, official_doc_name(item), item.get("project", "")) if p)
+    return FORWARD_SUBJECT_PREFIX + (core or item.get("email_subject", "") or "OA转达")
+
+
 def forward_attachments(item, msgid_to_pdfs=None, check_exists=True):
     """收集该立项项要附的官文 PDF 路径:
     CN/EP 取邮件附件(按 message_id 从 _inbox),US 取下载的官文(us_pdf_path)。

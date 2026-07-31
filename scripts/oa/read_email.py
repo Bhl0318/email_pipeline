@@ -544,7 +544,7 @@ def send_forward_oa(all_results, all_emails=None, dry_run=False):
     正文 OP02 模板；附官文 PDF。用 pa 账号发。dry_run 只打印不发。"""
     from email.mime.base import MIMEBase
     from email import encoders
-    from forward_oa import (forward_recipients, forward_cc,
+    from forward_oa import (forward_recipients, forward_cc, build_forward_subject,
                             build_forward_body, forward_attachments)
 
     if not all_results:
@@ -569,13 +569,14 @@ def send_forward_oa(all_results, all_emails=None, dry_run=False):
         project = item.get("project", "")
         if not project:
             continue
+        atts = forward_attachments(item, msgid_to_pdfs)
         plans.append({
             "item": item,
             "to": forward_recipients(project),
             "cc": forward_cc(project),
-            "subject": "【OA自动立项通知】" + (item.get("email_subject", "") or f"OA转达 - {project}"),
+            "subject": build_forward_subject(item, atts),  # 【OA自动立项通知】+ 官文文件名(发文日-官文名-案号)
             "body": build_forward_body(item),
-            "atts": forward_attachments(item, msgid_to_pdfs),
+            "atts": atts,
         })
     if not plans:
         print("[转OA] 无有效案件（缺案号），跳过", file=sys.stderr)

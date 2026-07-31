@@ -11,7 +11,7 @@ sys.path.insert(0, SCRIPT_DIR)
 from forward_oa import (
     customer_public_email, forward_recipients, PUBLIC_EMAIL_FALLBACK,
     _split_names, get_customer_contacts, forward_cc, FORWARD_FIXED_CC,
-    build_forward_body, forward_attachments,
+    build_forward_body, forward_attachments, build_forward_subject,
 )
 
 _passed = 0
@@ -118,6 +118,20 @@ def test_forward_body_no_deadline():
     ok("待确认" in body, "无期限→待确认")
 
 
+def test_forward_subject():
+    us = {"region": "US", "notification_type": "CTNF", "project": "20608-0289US00",
+          "oa_doc_date": "2026-07-29"}
+    ok(build_forward_subject(us, ["/x/2026-07-29-Non-Final Rejection-20608-0289US00.pdf"]) ==
+       "【OA自动立项通知】2026-07-29-Non-Final Rejection-20608-0289US00", "US 主题=前缀+官文文件名")
+    ok(build_forward_subject(us, []) ==
+       "【OA自动立项通知】2026-07-29-Non-Final Rejection-20608-0289US00", "无附件兜底=发文日-官文名-案号")
+    cn = {"region": "CN", "notification_type": "审查意见通知书", "project": "20664-0072CN00",
+          "oa_doc_date": "2026-07-09"}
+    ok("第二次审查意见通知书" in
+       build_forward_subject(cn, ["/x/2026-07-09-第二次审查意见通知书-20664-0072CN00.pdf"]),
+       "CN 用附件文件名(含第N次)")
+
+
 def test_attachments_gather():
     # CN/EP：按 message_id 取 _inbox PDF；US：取 us_pdf_path。check_exists=False 只验收集
     msgid_to_pdfs = {"<m1>": ["/x/a.pdf", "/x/b.pdf"]}
@@ -135,7 +149,8 @@ if __name__ == "__main__":
     for fn in [test_public_email_mapping, test_public_email_fallback, test_recipients,
                test_split_names, test_contacts_multi, test_contacts_missing_user_skipped,
                test_contacts_no_customer, test_cc_fixed_plus_contacts, test_cc_dedup,
-               test_forward_body, test_forward_body_no_deadline, test_attachments_gather]:
+               test_forward_body, test_forward_body_no_deadline,
+               test_forward_subject, test_attachments_gather]:
         print(f"[{fn.__name__}]")
         fn()
     print(f"\n全部通过：{_passed} 项断言")
