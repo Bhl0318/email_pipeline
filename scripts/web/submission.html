@@ -314,7 +314,7 @@ async function openTask(id) {
   const _ems = fields.email_module_state || {};
   emailModules = [];
   moduleChecked = { ...(_ems.checked || {}) };
-  moduleParams = { ...(_ems.params || {}) };
+  moduleParams = persistParams(_ems.params);   // 恢复参数但去掉称呼（不带出旧称呼）
   customSlots = nonEmptySlots(_ems.slots);   // 只恢复有内容的自定义槽（空槽不恢复，避免自动展开）
   openModules = {};
   $("caseTitle").textContent = task.case_volume || id;
@@ -347,6 +347,11 @@ function collectModuleParams() {   // 只收集输入框到 moduleParams，不�
   moduleParams.caf_tier = ($("modCafTier") || {}).value || "";
 }
 function regenerateModules() { collectModuleParams(); loadEmailModules(); }
+// 持久化参数时排除「称呼」——称呼每封现填、不留默认（否则会带出上次填的旧称呼，如"李老师"）
+function persistParams(p) {
+  const { salutation, ...rest } = p || {};
+  return rest;
+}
 // 只留有内容（标题或正文非空）的自定义槽——空槽不持久化，避免刷新后自动展开成空文本框
 function nonEmptySlots(obj) {
   const out = {};
@@ -357,7 +362,7 @@ function nonEmptySlots(obj) {
 // 把邮件模块的勾选/参数/自定义槽快照进 fields，随「保存」/「确认发送」落库，刷新后可恢复
 function snapshotModules() {
   collectModuleParams();
-  fields.email_module_state = { checked: moduleChecked, params: moduleParams, slots: nonEmptySlots(customSlots) };
+  fields.email_module_state = { checked: moduleChecked, params: persistParams(moduleParams), slots: nonEmptySlots(customSlots) };
 }
 function renderEmailModules() {
   const el = $("sec-email-modules");
