@@ -316,14 +316,18 @@ def generate_assignment(fields: dict, assignment: dict, output_dir, seq: int = 1
             if "案号" in paragraph.text:
                 paragraph.text = paragraph.text.replace("案号", case_volume)
 
-    # 2. 让与人：个人转公司 → I/WE；公司转公司 → 转让方公司名
+    # 2. 让与人 + am/is/are（仅这两处按人数/法人动态；其余斜杠形式保持不动，按用户要求）：
+    #    个人转公司 → 1 名 I/am、多名 WE/are；公司转公司 → 公司名 / is（单数法人）
     if assignment_type == "个人转公司":
-        _replace_everywhere(doc, "让与人", "I/WE")
+        _single = len(names) == 1
+        _replace_everywhere(doc, "让与人", "I" if _single else "WE")
+        _replace_everywhere(doc, "am/is/are", "am" if _single else "are")
     else:
         assigning_company = assignment.get("assigning_company") or ""
         if not assigning_company:
             warnings.append("公司转公司缺少转让方公司名称（assigning_company）")
         _replace_everywhere(doc, "让与人", assigning_company)
+        _replace_everywhere(doc, "am/is/are", "is")
 
     # 3. 发明名称（标题样式）
     for paragraph in doc.paragraphs:
