@@ -310,13 +310,11 @@ async function openTask(id) {
   try { task = await api("GET", `${API}/tasks/${id}`); }
   catch (e) { $("formSections").innerHTML = `<div class="banner error">任务加载失败：${esc(problemsOf(e).join("；"))}</div>`; return; }
   fields = task.fields_json || {};
-  // 恢复上次保存的邮件模块状态（勾选/参数/自定义槽）；无则空，loadEmailModules 再填后端默认勾选
+  // 只恢复「勾选」状态（用户诉求）；参数/称呼/自定义槽不持久化——每次现填，避免带出旧值/空槽自动展开。
   const _ems = fields.email_module_state || {};
   emailModules = [];
   moduleChecked = { ...(_ems.checked || {}) };
-  moduleParams = persistParams(_ems.params);   // 恢复参数但去掉称呼（不带出旧称呼）
-  customSlots = nonEmptySlots(_ems.slots);   // 只恢复有内容的自定义槽（空槽不恢复，避免自动展开）
-  openModules = {};
+  moduleParams = {}; customSlots = {}; openModules = {};
   $("caseTitle").textContent = task.case_volume || id;
   const b = $("statusBadge"); b.textContent = task.status; b.className = "badge " + task.status;
   renderMissing(); renderForm(); renderSidebar(); resetPreview();
@@ -347,22 +345,10 @@ function collectModuleParams() {   // 只收集输入框到 moduleParams，不�
   moduleParams.caf_tier = ($("modCafTier") || {}).value || "";
 }
 function regenerateModules() { collectModuleParams(); loadEmailModules(); }
-// 持久化参数时排除「称呼」——称呼每封现填、不留默认（否则会带出上次填的旧称呼，如"李老师"）
-function persistParams(p) {
-  const { salutation, ...rest } = p || {};
-  return rest;
-}
-// 只留有内容（标题或正文非空）的自定义槽——空槽不持久化，避免刷新后自动展开成空文本框
-function nonEmptySlots(obj) {
-  const out = {};
-  for (const [id, s] of Object.entries(obj || {}))
-    if (s && ((s.title || "").trim() || (s.body || "").trim())) out[id] = s;
-  return out;
-}
-// 把邮件模块的勾选/参数/自定义槽快照进 fields，随「保存」/「确认发送」落库，刷新后可恢复
+// 只把模块「勾选」状态快照进 fields，随「保存」/「确认发送」落库，刷新后恢复勾选。
+// 参数/称呼/自定义槽有意不持久化：每封现填，避免带出旧称呼、空自定义槽自动展开等问题。
 function snapshotModules() {
-  collectModuleParams();
-  fields.email_module_state = { checked: moduleChecked, params: persistParams(moduleParams), slots: nonEmptySlots(customSlots) };
+  fields.email_module_state = { checked: moduleChecked };
 }
 function renderEmailModules() {
   const el = $("sec-email-modules");
@@ -679,7 +665,7 @@ function onAssignTypeChange(i, val) { fields.assignments[i].assignment_type = va
 /* ───────── 保存 / 跳过 ───────── */
 async function saveTask() {
   if (!taskId) return;
-  snapshotModules();   // 把邮件模块勾选/参数/自定义槽写进 fields，随下面 save 落库
+  snapshotModules();   // 把邮件模块「勾选」状态写进 fields，随下面 save 落库
   try {
     await api("POST", `${API}/tasks/${taskId}/save`, { fields_json: fields, contact_email: $("contactEmail") ? $("contactEmail").value.trim() : "", filer_email: $("filerEmail") ? $("filerEmail").value.trim() : null });
     toast("已保存 ✅");
