@@ -174,13 +174,7 @@ class PatentApplicationFormGenerator:
                     'description': '必填字段：申请人城市（英文）不能为空'
                 })
 
-            if not first_applicant.get('province_city_en_us'):
-                missing_fields.append({
-                    'field': 'applicants[0].province_city_en_us',
-                    'field_name': '申请人州/省（英文）',
-                    'path': 'case_info["applicants"][0]["province_city_en_us"]',
-                    'description': '必填字段：申请人州/省（英文）不能为空'
-                })
+            # 州/省（英文）不作为必填：直辖市（天津/北京/上海/重庆）无独立省份，允许为空
 
             if not first_applicant.get('postcode'):
                 missing_fields.append({
