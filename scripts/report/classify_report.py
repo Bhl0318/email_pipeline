@@ -765,6 +765,22 @@ def classify_email(email_data):
     return None, "发件人不属于已知来源（非 USPTO/Panovision/Metis）"
 
 
+def type_oa_remark(notification):
+    """按官文类型定「备注」（oa_remark）。其他OA返回 ''，交 dispatch 阶段查 atw 填 同族首案/非同族首案。
+      - US NOA / CN 办理登记手续通知书(notification_type='分案评估') → 分案评估
+      - 驳回决定 → 驳回复审评估
+      - US 补正(NT.CR.APP.PA/NTC.MISS.PRT) / CN 补正通知书·复审请求补正通知书 → 补正
+    """
+    notification = notification or ""
+    if notification in ("NOA", "分案评估"):
+        return "分案评估"
+    if notification == "驳回决定":
+        return "驳回复审评估"
+    if notification in ("NT.CR.APP.PA", "NTC.MISS.PRT") or "补正答复" in notification:
+        return "补正"
+    return ""
+
+
 def process_emails(emails):
     """批量处理邮件列表，返回筛选结果。"""
     results = []
@@ -813,14 +829,8 @@ def process_emails(emails):
             # 计划送审日
             item["dueDate"] = calc_dueDate(item)
 
-            # oa_remark: 只处理能确定的
-            notification = item.get("notification_type", "")
-            if notification == "NOA":
-                item["oa_remark"] = "分案评估"
-            elif notification == "驳回决定":
-                item["oa_remark"] = "驳回复审评估"
-            else:
-                item["oa_remark"] = ""
+            # oa_remark（备注）：能按类型确定的先定；其他OA留空，dispatch 阶段查 atw 填 同族首案/非同族首案
+            item["oa_remark"] = type_oa_remark(item.get("notification_type", ""))
 
             # standalone_project=False 的 EP 记录（如 R.70(2)）不进最终结果
             # 先暂存，等全部处理完后再合并期限

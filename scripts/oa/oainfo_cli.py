@@ -209,6 +209,38 @@ def query_first_case_info(zu_code):
         conn.close()
 
 
+def family_first_case_remark(project, project_name="", execute=None):
+    """其他OA 的「同族首案/非同族首案」备注判定。
+    查 atw projects 中同族(project 前10位 = 组内号)的所有 (project, project_name)，
+    排除当前案自身这行后，只要有任一 project_name 含 'OA' → '非同族首案'，否则 → '同族首案'。
+    （当前案的 OA 立项此时尚未写入 projects；防御性排除自身行以防调用次序变化。）
+    查不到/异常 → 返回 ''（留空，人工补）。execute 可注入（测试用，返回 dict 行）。"""
+    prefix = (project or "")[:10]
+    if not prefix:
+        return ""
+    try:
+        if execute is not None:
+            rows = execute(f"SELECT project, project_name FROM projects WHERE project LIKE '{prefix}%'")
+            recs = [(r.get("project", ""), r.get("project_name", "") or "") for r in rows]
+        else:
+            conn = get_mysql_connection()
+            try:
+                cur = conn.cursor()
+                cur.execute("SELECT project, project_name FROM projects WHERE project LIKE %s", (f"{prefix}%",))
+                recs = [(row[0], row[1] or "") for row in cur.fetchall()]
+            finally:
+                conn.close()
+        for pj, name in recs:
+            if pj == project and name == project_name:
+                continue  # 排除当前案自身这行
+            if "OA" in name:
+                return "非同族首案"
+        return "同族首案"
+    except Exception as e:
+        logger.warning(f"同族首案判定失败 {project}: {e}")
+        return ""
+
+
 # ============================================================
 # Wiki API 操作
 # ============================================================

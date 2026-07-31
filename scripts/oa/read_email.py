@@ -1072,6 +1072,18 @@ def dispatch_oa(all_results, all_emails=None, dry_run=False, test_project_prefix
     print(f"汇总: {len(all_results)} 条立项结果", file=sys.stderr)
     print("results:", all_results)
 
+    # 其他OA 备注：查 atw projects 判 同族首案/非同族首案（分案评估/补正/驳回复审评估 已由分类器定，不覆盖）
+    # 必须在写 projects(INSERT) 之前，避免把当前案自身算进去
+    if all_results and not dry_run:
+        from oainfo_cli import family_first_case_remark
+        for item in all_results:
+            if item.get("oa_remark"):     # 已有类型化备注 → 保留
+                continue
+            item["oa_remark"] = family_first_case_remark(
+                item.get("project", ""), item.get("project_name", ""))
+            if item["oa_remark"]:
+                print(f"[备注] {item.get('project')} → {item['oa_remark']}", file=sys.stderr)
+
     # 写入 Wiki 新增 OA 页面
     if all_results and dry_run:
         print(f"  [dry-run] 跳过写 Wiki 新增OA（{len(all_results)} 条）", file=sys.stderr)
