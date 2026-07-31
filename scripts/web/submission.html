@@ -338,6 +338,7 @@ async function loadEmailModules() {
 }
 function collectModuleParams() {   // 只收集输入框到 moduleParams，不触发重载（供 regenerate 与保存快照复用）
   moduleParams.salutation = ($("modSalutation") || {}).value || "";
+  moduleParams.opening = ($("modOpening") || {}).value || "";
   moduleParams.route_phrase = ($("modRoutePhrase") || {}).value || "";
   moduleParams.repeat_entity = ($("modRepeatEntity") || {}).value || "";
   moduleParams.claims_total = ($("modClaims") || {}).value || "";
@@ -358,8 +359,11 @@ function renderEmailModules() {
     const on = !!moduleChecked[m.id];
     let inputs = "";       // 标题行的短输入（窄）
     let rowInput = "";     // 标题行下方独占一行的宽输入
-    if (m.id === "greeting")
+    if (m.id === "greeting") {
       inputs = `<input class="mod-num" id="modSalutation" style="width:150px" placeholder="客户称呼（如：张总）" value="${esc(moduleParams.salutation || "")}" onclick="event.stopPropagation()" onchange="regenerateModules()">`;
+      rowInput = `<div class="mod-rowinput"><label>开场白</label>
+        <input id="modOpening" placeholder="开场白（含 本案已定稿 等，可整体改写）" value="${esc(moduleParams.opening || m.input_value || "")}" onchange="regenerateModules()"></div>`;
+    }
     if (m.id === "app_info")
       rowInput = `<div class="mod-rowinput"><label>落地方式话术</label>
         <input id="modRoutePhrase" placeholder="落地方式话术" value="${esc(moduleParams.route_phrase || m.input_value || "")}" onchange="regenerateModules()"></div>`;

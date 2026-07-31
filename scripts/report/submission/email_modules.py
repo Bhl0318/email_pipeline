@@ -44,16 +44,19 @@ def build_email_modules(fields: dict, params: dict = None) -> list:
 
     modules = []
 
-    # 1. 机密声明 + 称呼
+    # 1. 机密声明 + 称呼 + 开场白（开场白含"本案已定稿"，审阅人可在下方整体改写）
     salutation = (params.get("salutation") or "").strip() or "XXX"
+    default_opening = "很高兴与您对接本案的递交事宜。本案已定稿，烦请贵司确认以下信息："
+    opening = (params.get("opening") or "").strip() or default_opening
     modules.append({
         "id": "greeting", "title": "机密声明 + 称呼开场", "checked": True,
         # 机密声明两行加粗斜体（与汇报信模板 ***...*** 一致）
         "html": _p("<b><i>机密并受律师客户通讯特权保护</i></b>") +
                 _p("<b><i>Privileged and Confidential; Attorney-Client Communication</i></b>") +
                 _p(f"{salutation}，您好！") +
-                _p("很高兴与您对接本案的递交事宜。本案已定稿，烦请贵司确认以下信息："),
-        "note": "在右侧输入客户称呼",
+                _p(opening),
+        "note": "在右侧输入客户称呼；下方可改开场白（含\"本案已定稿\"）",
+        "input": "opening", "input_value": opening, "input_default": default_opening,
     })
 
     # 2. 确认申请信息
