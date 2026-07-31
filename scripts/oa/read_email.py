@@ -967,6 +967,19 @@ def dispatch_oa(all_results, all_emails=None, dry_run=False, test_project_prefix
                 # 记下下载的官文 PDF 路径，供上传到 OA 信息表页
                 if dl and dl.get("pdf_path"):
                     item["us_pdf_path"] = dl["pdf_path"]
+                    # 盖 DOCKETED 邮戳（仅主OA答复类+补正类）：生成盖章副本，保留原文件名（_stamped 子目录）
+                    try:
+                        from stamp_us_pdf import stamp_us_pdf
+                        _sd = os.path.join(os.path.dirname(dl["pdf_path"]), "_stamped")
+                        os.makedirs(_sd, exist_ok=True)
+                        _out = os.path.join(_sd, os.path.basename(dl["pdf_path"]))
+                        _stamped = stamp_us_pdf(dl["pdf_path"], item.get("notification_type", ""),
+                                                item.get("oa_doc_date", ""), out_path=_out)
+                        if _stamped:
+                            item["us_stamped_pdf_path"] = _stamped
+                            print(f"[US] {item['project']} 已盖DOCKETED邮戳", file=sys.stderr)
+                    except Exception as e:
+                        print(f"[US] {item['project']} 盖章失败(用原官文): {e}", file=sys.stderr)
             except Exception as e:
                 print(f"[US] {item['project']} 异常: {e}", file=sys.stderr)
 

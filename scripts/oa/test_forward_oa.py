@@ -141,6 +141,10 @@ def test_attachments_gather():
     us = {"message_id": "<m2>", "us_pdf_path": "/y/us.pdf"}
     ok(forward_attachments(us, msgid_to_pdfs, check_exists=False) == ["/y/us.pdf"],
        "US 取下载官文")
+    us_stamped = {"message_id": "<m2>", "us_pdf_path": "/y/us.pdf",
+                  "us_stamped_pdf_path": "/y/_stamped/us.pdf"}
+    ok(forward_attachments(us_stamped, msgid_to_pdfs, check_exists=False) == ["/y/_stamped/us.pdf"],
+       "US 有盖章副本时优先附盖章版")
     ok(forward_attachments({"message_id": "<none>"}, msgid_to_pdfs, check_exists=False) == [],
        "无匹配→空")
 

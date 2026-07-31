@@ -155,13 +155,16 @@ def build_forward_subject(item, attachments=None):
 
 def forward_attachments(item, msgid_to_pdfs=None, check_exists=True):
     """收集该立项项要附的官文 PDF 路径:
-    CN/EP 取邮件附件(按 message_id 从 _inbox),US 取下载的官文(us_pdf_path)。
-    去重;check_exists=True 时过滤掉不存在的文件。"""
+    CN/EP 取邮件附件(按 message_id 从 _inbox),US 优先取盖章副本(us_stamped_pdf_path),
+    无盖章版则取原下载官文(us_pdf_path)。去重;check_exists=True 时过滤掉不存在的文件。"""
     import os
     paths = []
     if msgid_to_pdfs:
         paths.extend(msgid_to_pdfs.get(item.get("message_id", ""), []) or [])
-    if item.get("us_pdf_path"):
+    # US：优先附盖章副本（DOCKETED 邮戳），无盖章版则附原官文
+    if item.get("us_stamped_pdf_path"):
+        paths.append(item["us_stamped_pdf_path"])
+    elif item.get("us_pdf_path"):
         paths.append(item["us_pdf_path"])
     seen, out = set(), []
     for p in paths:
