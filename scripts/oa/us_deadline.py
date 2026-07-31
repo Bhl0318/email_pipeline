@@ -75,6 +75,28 @@ def get_us_deadline(application_no, document_code, oa_doc_date, project):
     return result
 
 
+def download_us_ref_doc(application_no, document_code, official_date, project):
+    """下载同案号的文献(892/1449)PDF，返回本地文件路径列表；失败/无匹配返回 []。
+    与官文走同一 USPTO documents API，按 documentCode + officialDate 精确匹配。"""
+    from downloadByAPI import USPTOApplication
+
+    mailing_date = official_date or ""
+    if "/" in mailing_date:
+        parts = mailing_date.split("/")
+        if len(parts) == 3:
+            mailing_date = f"{parts[2]}-{parts[0].zfill(2)}-{parts[1].zfill(2)}"
+    if not application_no or not document_code:
+        return []
+    print(f"[US-ref] 下载文献: app={application_no} doc={document_code} date={mailing_date} project={project}", file=sys.stderr)
+    try:
+        uspto = USPTOApplication(download_dir=DOWNLOAD_DIR, project=project)
+        doc_list = uspto.downLoad_Documents_ByAPI(application_no, document_code, mailing_date, project, "")
+        return [f for f in doc_list.get(project, []) if f and os.path.exists(f)]
+    except Exception as e:
+        print(f"[US-ref] {project} {document_code} 下载失败: {e}", file=sys.stderr)
+        return []
+
+
 if __name__ == "__main__":
     if len(sys.argv) < 5:
         print("用法: python3 us_deadline.py <application_no> <document_code> <oa_doc_date> <project>")

@@ -718,6 +718,20 @@ def classify_us(email_data):
                 "needs_confirmation": True,
             })
 
+    # 同案号下的 892(引用文献通知)/1449(IDS) 行：本身不立项，但挂到该案 OA 立项项，供 dispatch 从 USPTO 下载
+    ref_by_project = {}
+    for case in cases:
+        if case["document_type"] in ("892", "1449"):
+            ref_by_project.setdefault(case["project"], []).append({
+                "document_code": case["document_type"],
+                "application_no": case["application_no"],
+                "oa_doc_date": case["oa_doc_date"],
+            })
+    for item in results:
+        refs = ref_by_project.get(item["project"])
+        if refs:
+            item["us_ref_docs"] = refs
+
     return results if results else None
 
 
@@ -906,7 +920,7 @@ def process_emails(emails):
         "project", "project_name", "oa_doc_date", "entrust_date",
         "oaNum", "applytype", "project_deadline", "dueDate",
         "now_status", "project_phase", "submitby", "oa_remark",
-        "wikiurl",
+        "wikiurl", "us_ref_docs",
         # 汇报信侧需要：关联 _inbox 里的官文 PDF
         "message_id", "email_subject", "email_from",
     ]

@@ -980,6 +980,21 @@ def dispatch_oa(all_results, all_emails=None, dry_run=False, test_project_prefix
                             print(f"[US] {item['project']} 已盖DOCKETED邮戳", file=sys.stderr)
                     except Exception as e:
                         print(f"[US] {item['project']} 盖章失败(用原官文): {e}", file=sys.stderr)
+                # 同案号 892/1449 文献：从 USPTO 下载（供转OA附件 + Wiki 上传；不盖章）
+                ref_docs = item.get("us_ref_docs") or []
+                if ref_docs:
+                    from us_deadline import download_us_ref_doc
+                    ref_paths = []
+                    for rd in ref_docs:
+                        ref_paths.extend(download_us_ref_doc(
+                            rd.get("application_no", "") or item.get("application_no", ""),
+                            rd.get("document_code", ""),
+                            rd.get("oa_doc_date", "") or item.get("oa_doc_date", ""),
+                            item.get("project", "")))
+                    if ref_paths:
+                        item["us_ref_pdf_paths"] = ref_paths
+                        print(f"[US-ref] {item['project']} 文献 {len(ref_paths)} 份: "
+                              f"{[os.path.basename(p) for p in ref_paths]}", file=sys.stderr)
             except Exception as e:
                 print(f"[US] {item['project']} 异常: {e}", file=sys.stderr)
 
@@ -1016,6 +1031,7 @@ def dispatch_oa(all_results, all_emails=None, dry_run=False, test_project_prefix
             files = list(msgid_to_pdfs.get(item.get("message_id", ""), []))
             if item.get("us_pdf_path"):
                 files.append(item["us_pdf_path"])
+            files.extend(item.get("us_ref_pdf_paths") or [])   # 同案号 892/1449 文献
             for fp in files:
                 try:
                     if wiki.upload_attachment(page_id, fp):
