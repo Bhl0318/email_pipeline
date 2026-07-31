@@ -937,6 +937,9 @@ def dispatch_oa(all_results, all_emails=None, dry_run=False, test_project_prefix
         print(f"  [dry-run] 跳过 {len(us_items)} 条 US 官文下载/期限解析", file=sys.stderr)
     elif us_items:
         from us_deadline import get_us_deadline
+        from filter_oa_email import _parse_date, _add_months, calc_dueDate
+        # 兜底标准期限（P1-综合期限速查表）：官文解析失败时，用 发文日(邮戳)+标准月数
+        US_STANDARD_MONTHS = {"CTNF": 3, "CTFR": 3, "CTRS": 2, "NOA": 3}
         print(f"\n{len(us_items)} 条 US 记录需要获取答复期限...", file=sys.stderr)
         for item in us_items:
             try:
@@ -949,11 +952,18 @@ def dispatch_oa(all_results, all_emails=None, dry_run=False, test_project_prefix
                 if dl and dl.get("deadline"):
                     item["project_deadline"] = dl["deadline"]
                     # 用新的 deadline 重算 dueDate
-                    from filter_oa_email import calc_dueDate
                     item["dueDate"] = calc_dueDate(item)
                     print(f"[US] {item['project']} 答复期限: {dl['deadline']}", file=sys.stderr)
                 else:
-                    print(f"[US] {item['project']} 答复期限获取失败，留空", file=sys.stderr)
+                    # 兜底：发文日 + 标准月数
+                    _m = US_STANDARD_MONTHS.get(item.get("notification_type", ""))
+                    _d = _parse_date(item.get("oa_doc_date", "")) if _m else None
+                    if _m and _d:
+                        item["project_deadline"] = _add_months(_d, _m).strftime("%Y-%m-%d")
+                        item["dueDate"] = calc_dueDate(item)
+                        print(f"[US] {item['project']} 官文解析失败，按标准表兜底 {_m}月 → {item['project_deadline']}", file=sys.stderr)
+                    else:
+                        print(f"[US] {item['project']} 答复期限获取失败，留空", file=sys.stderr)
                 # 记下下载的官文 PDF 路径，供上传到 OA 信息表页
                 if dl and dl.get("pdf_path"):
                     item["us_pdf_path"] = dl["pdf_path"]
