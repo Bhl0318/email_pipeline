@@ -20,11 +20,14 @@ BLACK = (0.0, 0.0, 0.0)
 #   ssp        : 缩短法定期限(月)，即主答复绝限
 #   extendable : 是否可按月延期到 6 个月法定绝限（画 EOT 行）
 #   check_ids  : 是否画 "Check IDS when filing response" 行
+# 仅 US 的主OA答复类 + 补正类需要盖章（NOA/CTAV/CTEQ/PPH/PETDEC 及 CN/EP 一律不盖）。
+# 补正类按 2 月可延期结构（同 Restriction）；补正不涉 IDS，故不画 Check IDS 行。
 US_STAMP_CONFIG = {
-    "CTNF": {"label": "Non Final-OA",           "ssp": 3, "extendable": True,  "check_ids": True},
-    "CTFR": {"label": "Final-OA",               "ssp": 3, "extendable": True,  "check_ids": True},
-    "CTRS": {"label": "Restriction Requirement", "ssp": 2, "extendable": True,  "check_ids": True},
-    "NOA":  {"label": "Notice of Allowance",    "ssp": 3, "extendable": False, "check_ids": False},
+    "CTNF": {"label": "Non Final-OA",              "ssp": 3, "extendable": True, "check_ids": True},
+    "CTFR": {"label": "Final-OA",                  "ssp": 3, "extendable": True, "check_ids": True},
+    "CTRS": {"label": "Restriction Requirement",   "ssp": 2, "extendable": True, "check_ids": True},
+    "NT.CR.APP.PA": {"label": "Corrected Application Papers", "ssp": 2, "extendable": True, "check_ids": False},
+    "NTC.MISS.PRT": {"label": "Missing Parts",     "ssp": 2, "extendable": True, "check_ids": False},
 }
 
 
@@ -169,7 +172,7 @@ if __name__ == "__main__":
                        out_path="_sample_stamped_CTNF.pdf", clear_existing=True)
     print("已生成样张:", out)
     # 各类型文字预览（无实样的类型只看文字）
-    for nt in ("CTNF", "CTFR", "CTRS", "NOA"):
+    for nt in ("CTNF", "CTFR", "CTRS", "NT.CR.APP.PA", "NTC.MISS.PRT"):
         rows, _ = build_stamp_lines(nt, __import__("datetime").datetime(2026, 7, 29))
         print(f"\n=== {nt} ===")
         for label, date, is_red in rows:
