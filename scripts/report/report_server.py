@@ -1873,6 +1873,18 @@ def confirm_filing_task(task_id: str, req: FilingConfirmReq):
         except Exception as exc:
             warnings.append(f"仅存档件归档到上传目录失败：{exc}")
 
+    # 3d) 固定版额外归档到网络盘：{base}\{码}\{组内号}\{案号}\（全部固定件：生成三件 + 上传定稿）。
+    #     码=案号前5位、组内号=案号前10位（同 OA 目录约定）。base 可配，缺省 Z:\upload_USPTO。best-effort。
+    _arch_base = (_load_email_config().get("submission") or {}).get("uspto_upload_archive_base", r"Z:\upload_USPTO")
+    if _arch_base and len(case_volume) >= 10:
+        try:
+            arch_dir = Path(_arch_base) / case_volume[:5] / case_volume[:10] / case_volume
+            arch_dir.mkdir(parents=True, exist_ok=True)
+            for p in attach_paths:
+                shutil.copy2(str(p), str(arch_dir / p.name))
+        except Exception as exc:
+            warnings.append(f"固定版归档到 {_arch_base} 失败：{exc}")
+
     # 4) 落库 done + 存编辑后的 fields + 插 agent_followup（供环节6 跟进美代理回邮）
     execute_params(
         "UPDATE submission_tasks SET status='done', fields_json=%s, confirmed_at=%s, updated_at=%s WHERE id=%s",
