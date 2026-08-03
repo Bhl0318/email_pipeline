@@ -18,7 +18,7 @@ import json
 import re
 from pathlib import Path
 
-from .common import clean_priority_no, infer_subject_matter
+from .common import clean_priority_no, infer_subject_matter, blank_none
 
 # 签字代理人/Customer Number/Deposit 全局配置（gitignore，本地维护；模板见 agent_config.example.json）
 AGENT_CONFIG_PATH = Path(__file__).resolve().parent / "agent_config.json"
@@ -326,7 +326,7 @@ def fields_to_case_info(fields: dict, agent_info: dict = None) -> dict:
         "Representative Information": {"Customer Number": ai.get("Customer Number", "")},
         "Deposit Account No": ai.get("Deposit Account No", ""),
     }
-    return case_info
+    return blank_none(case_info)   # 深度 None→''，ADS/POA/Transmittal 不出现字面 'None'
 
 
 if __name__ == "__main__":

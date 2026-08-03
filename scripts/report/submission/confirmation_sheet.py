@@ -10,6 +10,7 @@ import datetime
 from pathlib import Path
 
 from .confirmation_sheet_generator import PatentApplicationFormGenerator
+from .common import blank_none
 
 # 生成器对第一申请人有硬取键访问，页面编辑/新增的申请人可能缺键 → 统一补默认空值
 _APPLICANT_KEYS = (
@@ -20,6 +21,7 @@ _APPLICANT_KEYS = (
 
 
 def _normalize_fields(fields: dict) -> dict:
+    fields = blank_none(fields or {})   # 先深度 None→''，任何 null 字段不渲染成 'None'
     normalized = dict(fields)
     normalized["applicants"] = [
         {**{k: "" for k in _APPLICANT_KEYS}, **(a or {})}

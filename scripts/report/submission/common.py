@@ -100,6 +100,18 @@ def is_special_client(case_volume: str) -> bool:
     return bool(case_volume) and case_volume.startswith(SPECIAL_CLIENT_PREFIXES)
 
 
+def blank_none(obj):
+    """深度把 None 转成 ''（dict/list 递归），避免生成文档里出现字面 'None'
+    （某字段值为 null 被 f-string/替换/cell.text 渲染成 'None'）。非 None 标量原样返回。"""
+    if obj is None:
+        return ""
+    if isinstance(obj, dict):
+        return {k: blank_none(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [blank_none(v) for v in obj]
+    return obj
+
+
 def format_inventor_name(inventor: dict) -> str:
     """库著录项发明人 → Assignment/Declaration 用的 "姓大写, 名" 格式。
 

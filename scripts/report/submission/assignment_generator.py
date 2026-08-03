@@ -20,6 +20,7 @@ from docx.table import _Cell, _Row
 
 from .common import (
     ASSIGNMENT_TEMPLATE,
+    blank_none,
     application_type_words,
     build_priority_rows,
     effective_assignments,
@@ -286,6 +287,8 @@ def generate_assignment(fields: dict, assignment: dict, output_dir, seq: int = 1
     :param seq/total: 当前序号 / 总段数（total>1 时文件名带序号和类型）
     :return: {"file_path", "file_name", "warnings": [...]}
     """
+    fields = blank_none(fields or {})          # 深度 None→''，Assignment 不出现字面 'None'
+    assignment = blank_none(assignment or {})
     assignment_type = assignment.get("assignment_type") or ""
     if assignment_type not in ("个人转公司", "公司转公司"):
         raise ValueError(f"assignment_type 非法：{assignment_type!r}")
