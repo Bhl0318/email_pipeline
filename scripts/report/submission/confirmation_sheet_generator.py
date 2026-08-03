@@ -444,7 +444,10 @@ class PatentApplicationFormGenerator:
         LaborInfo = applicants_list[0] if applicants_list else _EMPTY_APP
 
         def _norm(s):
-            return (s or "").strip().lower()
+            # 公司名宽松匹配：去掉所有非字母数字（空格/逗号/点/半角与全角括号等），使
+            # "BMC(TIANJIN)MEDICAL CO., LTD." 与 "BMC（TIANJIN）MEDICAL CO., LTD." 视为同名，
+            # 否则归属公司(半角括号) 匹配不到 assignments 转让方(全角括号) → 该组发明人地址取不到。
+            return re.sub(r"[^0-9a-z]+", "", (s or "").lower())
 
         # 申请人按英文名索引，供按 employer 取地址
         _app_by_name = {_norm(a.get("applicant_name_en")): a for a in applicants_list}
