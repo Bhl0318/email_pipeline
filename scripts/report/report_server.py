@@ -1873,15 +1873,22 @@ def confirm_filing_task(task_id: str, req: FilingConfirmReq):
         except Exception as exc:
             warnings.append(f"仅存档件归档到上传目录失败：{exc}")
 
-    # 3d) 固定版额外归档到网络盘：{base}\{码}\{组内号}\{案号}\（全部固定件：生成三件 + 上传定稿）。
+    # 3d) 固定版额外归档到网络盘：{base}\{码}\{组内号}\{案号}\，并按用途分子文件夹便于后期核销：
+    #     发美代理\ = 发给美代理需回签的件（DocuSign + 内部邮箱通道）；仅存档\ = 不发、直接进上传包的件。
     #     码=案号前5位、组内号=案号前10位（同 OA 目录约定）。base 可配，缺省 Z:\upload_USPTO。best-effort。
     _arch_base = (_load_email_config().get("submission") or {}).get("uspto_upload_archive_base", r"Z:\upload_USPTO")
     if _arch_base and len(case_volume) >= 10:
         try:
-            arch_dir = Path(_arch_base) / case_volume[:5] / case_volume[:10] / case_volume
-            arch_dir.mkdir(parents=True, exist_ok=True)
-            for p in attach_paths:
-                shutil.copy2(str(p), str(arch_dir / p.name))
+            arch_root = Path(_arch_base) / case_volume[:5] / case_volume[:10] / case_volume
+            sent_dir = arch_root / "发美代理"      # 需回签，后期核销比对
+            sent_dir.mkdir(parents=True, exist_ok=True)
+            for p in (ds_paths + email_paths):
+                shutil.copy2(str(p), str(sent_dir / p.name))
+            if archive_paths:
+                only_dir = arch_root / "仅存档"
+                only_dir.mkdir(parents=True, exist_ok=True)
+                for p in archive_paths:
+                    shutil.copy2(str(p), str(only_dir / p.name))
         except Exception as exc:
             warnings.append(f"固定版归档到 {_arch_base} 失败：{exc}")
 
