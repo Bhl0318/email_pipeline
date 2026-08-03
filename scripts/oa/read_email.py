@@ -1032,7 +1032,10 @@ def dispatch_oa(all_results, all_emails=None, dry_run=False, test_project_prefix
             if item.get("us_pdf_path"):
                 files.append(item["us_pdf_path"])
             files.extend(item.get("us_ref_pdf_paths") or [])   # 同案号 892/1449 文献
-            pub = find_publication_file(item.get("project", ""), item.get("region", ""))  # 公布/公告文件
+            # 公布/公告文件：客户目录名用 atw 客户简称拼；查不到简称/文件则跳过
+            pub = find_publication_file(
+                item.get("project", ""), item.get("region", ""),
+                shortname=query_customer_shortname((item.get("project", "") or "")[:5]))
             if pub:
                 files.append(pub)
                 print(f"[公布文件] {item.get('project')} → {os.path.basename(pub)}", file=sys.stderr)

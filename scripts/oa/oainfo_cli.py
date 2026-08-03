@@ -247,22 +247,25 @@ PUBLICATION_BASE_DIR = "Z:\\"
 PUBLICATION_TOPLEVEL_CUSTOMERS = {"20608", "20615", "20618", "20633", "20735", "20849"}
 
 
-def find_publication_file(project, region="", base_dir=None):
+def find_publication_file(project, region="", shortname="", base_dir=None):
     """按案号定位公布/公告文件 PDF：
-      列出客户： {base}\\{码}-*\\{组内号}\\{案号}\\*官方文件*\\
-      其他客户： {base}\\其他客户\\{码}-*\\{组内号}\\{案号}\\*官方文件*\\
+      列出客户： {base}\\{码}-{客户简称}\\{组内号}\\{案号}\\*官方文件*\\
+      其他客户： {base}\\其他客户\\{码}-{客户简称}\\{组内号}\\{案号}\\*官方文件*\\
+    客户目录名 = 案号前5位 + '-' + atw customer.customer_shortname（由调用方查好传入 shortname）；
+    shortname 为空（查不到简称）直接返回 None，不猜路径。列出客户在根下，其余在「其他客户」子目录下。
     官方文件目录名不固定（2.官方文件 / 2官方文件 / 官方文件），只要含「官方文件」即可。
     文件名关键词：US/EP=publication（大小写不限），CN=公告文件。
-    找不到/异常返回 None；多份取字典序第一。"""
+    找不到简称/文件不存在/异常均返回 None；多份取字典序第一。"""
     import glob
-    if not project or len(project) < 10:
+    if not project or len(project) < 10 or not shortname:
         return None
     base = base_dir or PUBLICATION_BASE_DIR
     code, zu = project[:5], project[:10]
+    cust_dir = f"{code}-{shortname}"
     if code in PUBLICATION_TOPLEVEL_CUSTOMERS:
-        cust_glob = os.path.join(base, f"{code}-*")
+        cust_glob = os.path.join(base, cust_dir)
     else:
-        cust_glob = os.path.join(base, "其他客户", f"{code}-*")
+        cust_glob = os.path.join(base, "其他客户", cust_dir)
     keyword = "公告文件" if region == "CN" else "publication"
     try:
         pattern = os.path.join(cust_glob, zu, project, "*官方文件*", "*")
