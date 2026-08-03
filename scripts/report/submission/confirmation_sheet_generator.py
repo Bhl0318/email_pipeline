@@ -561,10 +561,19 @@ class PatentApplicationFormGenerator:
                 data_rows4.append(['Priority No./优先权号', prioritie.get('priority_no') or prioritie.get('priority_num') or ''])
                 data_rows4.append(['Priority Date/优先权日:', prioritie.get('priority_date', '')])
                 data_rows4.append(['DAS code/DAS码', prioritie.get('access_code', '')])
+        # 加速方式单元格：值为 None/none（无加速）→ 显示空白，不显示字面 "None"；
+        # 有具体加速方式 → 显示该值；未选 → 列出可选项供客户勾选。
+        _ae = (case_info.get('ae_methods') or '').strip()
+        if _ae.lower() == 'none':
+            _ae_cell = ''
+        elif _ae:
+            _ae_cell = _ae
+        else:
+            _ae_cell = "None \nTrack One prioritized examination(Track One) \nPatent Prosecution Highway (PPH)"
         data_rows5 = [
             ['Filing Route/落地方式'],
             ['Filing Route/落地方式', case_info.get('filing_route', '')] if case_info.get('filing_route') else ['Filing Route/落地方式', "371 Route (PCT national stage) \nBy pass continuation \nNew \nContinuation of \nContinuation in part of \nDivision of /nParis"],
-            ['Expedited Examination Route/加速方式', case_info.get('ae_methods', '')] if case_info.get('ae_methods') else ['Expedited Examination Route/加速方式', "None \nTrack One prioritized examination(Track One) \nPatent Prosecution Highway (PPH)"],
+            ['Expedited Examination Route/加速方式', _ae_cell],
         ]
 
         data_rows = data_rows1 + data_rows6 + data_rows7 + data_rows2 + data_rows3 + data_rows4 + data_rows5
