@@ -1015,7 +1015,7 @@ def dispatch_oa(all_results, all_emails=None, dry_run=False, test_project_prefix
     if all_results and dry_run:
         print(f"  [dry-run] 跳过上传官文附件到 OA 信息表页", file=sys.stderr)
     elif all_results:
-        from oainfo_cli import WikiClient
+        from oainfo_cli import WikiClient, find_publication_file
         # msgid -> 邮件保存的官文 PDF（report 读取层存到 _inbox 的）
         msgid_to_pdfs = {}
         for _acc, _em in (all_emails or []):
@@ -1032,6 +1032,10 @@ def dispatch_oa(all_results, all_emails=None, dry_run=False, test_project_prefix
             if item.get("us_pdf_path"):
                 files.append(item["us_pdf_path"])
             files.extend(item.get("us_ref_pdf_paths") or [])   # 同案号 892/1449 文献
+            pub = find_publication_file(item.get("project", ""), item.get("region", ""))  # 公布/公告文件
+            if pub:
+                files.append(pub)
+                print(f"[公布文件] {item.get('project')} → {os.path.basename(pub)}", file=sys.stderr)
             for fp in files:
                 try:
                     if wiki.upload_attachment(page_id, fp):

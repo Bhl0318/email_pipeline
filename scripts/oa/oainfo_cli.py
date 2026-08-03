@@ -241,6 +241,42 @@ def family_first_case_remark(project, project_name="", execute=None):
         return ""
 
 
+# 公布/公告文件根目录；下列客户的案件目录直接在根下，其余客户在「其他客户」子目录下。
+# 客户名部分统一用 {客户码}-* 通配匹配（名称不写死）。
+PUBLICATION_BASE_DIR = "Z:\\"
+PUBLICATION_TOPLEVEL_CUSTOMERS = {"20608", "20615", "20618", "20633", "20735", "20849"}
+
+
+def find_publication_file(project, region="", base_dir=None):
+    """按案号定位公布/公告文件 PDF：
+      列出客户： {base}\\{码}-*\\{组内号}\\{案号}\\*官方文件*\\
+      其他客户： {base}\\其他客户\\{码}-*\\{组内号}\\{案号}\\*官方文件*\\
+    官方文件目录名不固定（2.官方文件 / 2官方文件 / 官方文件），只要含「官方文件」即可。
+    文件名关键词：US/EP=publication（大小写不限），CN=公告文件。
+    找不到/异常返回 None；多份取字典序第一。"""
+    import glob
+    if not project or len(project) < 10:
+        return None
+    base = base_dir or PUBLICATION_BASE_DIR
+    code, zu = project[:5], project[:10]
+    if code in PUBLICATION_TOPLEVEL_CUSTOMERS:
+        cust_glob = os.path.join(base, f"{code}-*")
+    else:
+        cust_glob = os.path.join(base, "其他客户", f"{code}-*")
+    keyword = "公告文件" if region == "CN" else "publication"
+    try:
+        pattern = os.path.join(cust_glob, zu, project, "*官方文件*", "*")
+        hits = [f for f in sorted(glob.glob(pattern))
+                if keyword.lower() in os.path.basename(f).lower()
+                and f.lower().endswith(".pdf")]
+        if len(hits) > 1:
+            logger.warning(f"公布文件多份 {project}，取第一份: {[os.path.basename(h) for h in hits]}")
+        return hits[0] if hits else None
+    except Exception as e:
+        logger.warning(f"查公布文件失败 {project}: {e}")
+        return None
+
+
 # ============================================================
 # Wiki API 操作
 # ============================================================
