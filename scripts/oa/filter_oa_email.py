@@ -348,7 +348,7 @@ CN_TYPES = {
 CN_DENGJI_CUSTOMERS = {"20618", "20735"}
 
 # CN 主题正则：日期-通知类型-案号
-CN_SUBJECT_RE = re.compile(r'^(\d{4}-\d{2}-\d{2})-(.+?)-((\d{5}-\w+))$')
+CN_SUBJECT_RE = re.compile(r'^(\d{4}-\d{2}-\d{2})-(.+?)-(([0-9A-Z]{5}-\w+))$')
 
 # 答复期限正则
 CN_DEADLINE_RE = re.compile(r'答复期限[：:]\s*(.+?)[。\s]')
@@ -396,7 +396,7 @@ def classify_cn(email_data):
         result["project"] = m.group(3)
     else:
         # 尝试从主题中提取案号
-        docket_m = re.search(r'(\d{5}-\w{4}[A-Z]{2}\d{2})', subject)
+        docket_m = re.search(r'([0-9A-Z]{5}-\w{4}[A-Z]{2}\d{2})', subject)
         if docket_m:
             result["project"] = docket_m.group(1)
 
