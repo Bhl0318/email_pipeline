@@ -110,12 +110,59 @@ REPORT_PREPARER_WANG = "jing.wang@metis-ip.com" # 王晶
 
 
 def _report_preparer_email(region, project):
-    """按国别返回汇报信准备人邮箱：CN→任惠，US/EP→王晶；未命中返回 None（不分配、不发）。"""
+    """按国别返回汇报信准备人邮箱：CN→任惠，US/EP→王晶；未命中返回 None（不分配、不发）。
+    注：仅作 OA 规则表未命中时的兜底，OA 官文优先走 oa_report_rules.json。"""
     if region == "CN":
         return REPORT_PREPARER_REN
     if region in ("US", "EP"):
         return REPORT_PREPARER_WANG
     return None
+
+
+# ─── OA 官文规则表（客户 × 官文类型 × 次数 → assign/skip/ignore）─────────
+# 源: oa_report_rules.json（由 汇报信规则矩阵-2026-07-30 的 CN/US/EP-OA 三表结构化）
+_OA_RULES_CACHE = None
+_OA_ORDINAL_RE = re.compile(r'第([一二三四五六七八九十百]+)次')
+
+
+def _load_oa_rules():
+    global _OA_RULES_CACHE
+    if _OA_RULES_CACHE is None:
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "oa_report_rules.json")
+        try:
+            with open(path, encoding="utf-8") as f:
+                _OA_RULES_CACHE = json.load(f)
+        except Exception as e:
+            print(f"[OA规则] 加载 oa_report_rules.json 失败: {e}", file=sys.stderr)
+            _OA_RULES_CACHE = {}
+    return _OA_RULES_CACHE
+
+
+def _oa_ordinal_is_first(item):
+    """CN 审查意见是否第一次：从立项名称/主题的"第X次"判，抽不到默认第一次。"""
+    m = _OA_ORDINAL_RE.search(item.get("project_name", "") or "")
+    return (m.group(1) == "一") if m else True
+
+
+def _resolve_oa_action(region, ntype, project, item):
+    """按 (国别, 官文类型, 客户码, 次数) 查 OA 规则表。
+    返回 {"action": "assign"/"skip"/"ignore", ...} 或 None（不在规则表 → 调用方回退旧逻辑）。"""
+    region_rules = _load_oa_rules().get(region, {})
+    rule_type = ntype
+    if region == "CN" and ntype == "审查意见通知书":
+        rule_type = "审查意见通知书@1" if _oa_ordinal_is_first(item) else "审查意见通知书@2+"
+    type_rules = region_rules.get(rule_type)
+    if not type_rules:
+        return None
+    if "*" in type_rules:                       # 所有客户同规则
+        return type_rules["*"]
+    code = (project or "")[:5]
+    rule = type_rules.get(code)                 # 精确客户码优先
+    if rule is None and code.startswith("5"):   # 再 5 开头
+        rule = type_rules.get("5开头")
+    if rule is None:                            # 最后兜底"其他"
+        rule = type_rules.get("其他")
+    return rule
 
 # USPTO Document Type 代码 → 英文全名（用于汇报信"官文英文名称"字段）
 US_DOC_TYPE_FULLNAME = {
@@ -1035,10 +1082,25 @@ def dispatch_report(all_results, all_emails, dry_run=False):
             region = item.get("region", "")
             ntype = item.get("notification_type", "")
             tpl_info = REPORT_TYPE_TO_TEMPLATE.get(region, {}).get(ntype)
-            # 客户码 5 开头的案子：CN 阶段所有官文都不分配汇报信
-            if tpl_info and region == "CN" and project.startswith("5"):
-                print(f"  [跳过汇报信] CN 5开头客户 {project}（{ntype}）不分配汇报信", file=sys.stderr)
-                tpl_info = None
+            # OA 规则表决策（客户×类型×次数）：assign 分配 / skip 不分配(记转发) / ignore 不处理
+            preparer_override = None
+            if tpl_info:
+                action = _resolve_oa_action(region, ntype, project, item)
+                if action is None:
+                    # 不在 OA 规则表 → 回退旧逻辑：CN 5 开头跳过
+                    if region == "CN" and project.startswith("5"):
+                        print(f"  [跳过汇报信] CN 5开头客户 {project}（{ntype}）不分配汇报信", file=sys.stderr)
+                        tpl_info = None
+                else:
+                    act = action.get("action")
+                    if act == "ignore":
+                        tpl_info = None
+                    elif act == "skip":
+                        fwd = action.get("forward") or {}
+                        print(f"  [规则-skip] {project} {ntype} 不分配汇报信，应转发 to={fwd.get('to')} cc={fwd.get('cc')}（转发二期实现）", file=sys.stderr)
+                        tpl_info = None
+                    elif act == "assign":
+                        preparer_override = action.get("preparer")
             if tpl_info:
                 template, attach_pdf = tpl_info
                 report_fields = build_report_fields(region, item)
@@ -1107,7 +1169,7 @@ def dispatch_report(all_results, all_emails, dry_run=False):
                         "project":    project,
                         "ntype":      ntype,
                         "issue_date": item.get("issue_date", "") or item.get("oa_doc_date", ""),
-                        "preparer":   _report_preparer_email(region, project),
+                        "preparer":   preparer_override or _report_preparer_email(region, project),
                     })
                 else:
                     try:
@@ -1127,7 +1189,7 @@ def dispatch_report(all_results, all_emails, dry_run=False):
                             "project":    project,
                             "ntype":      ntype,
                             "issue_date": item.get("issue_date", "") or item.get("oa_doc_date", ""),
-                            "preparer":   _report_preparer_email(region, project),
+                            "preparer":   preparer_override or _report_preparer_email(region, project),
                         })
                     except Exception as e:
                         print(f"  [report_tasks 写库失败] {e}", file=sys.stderr)
