@@ -231,6 +231,36 @@ def _assignee_from_company_address(name: str, company_address: str) -> dict:
     return {"name": (name or "").strip(), "address1": bal1, "address2": bal2, "address_lines": lines}
 
 
+# 转让方公司地址结构化字段（前端 company_* 键）→ 申请人式 dict 的键映射
+_COMPANY_ADDR_MAP = {
+    "company_address1": "address1", "company_address2": "address2",
+    "company_address_cn": "contact_address_cn",
+    "company_city_en": "city_en", "company_city_cn": "city_cn",
+    "company_province_en": "province_city_en_us", "company_province_cn": "province_city_zh_cn",
+    "company_postcode": "postcode",
+    "company_country_en": "country_en_us", "company_country_cn": "country_zh_cn",
+}
+
+
+def company_addr_dict(a: dict) -> dict:
+    """转让方公司地址 → 申请人式 dict（供 _assignee_from_applicant / 确认函 _app_for_employer 直接复用）。
+    结构化 company_* 字段优先（中英+邮编+国家）；缺省回退旧单串 company_address（逗号拆到 address1/2）。
+    名称放 applicant_name_en。"""
+    a = a or {}
+    name = (a.get("assigning_company") or "").strip()
+    if any((a.get(k) or "").strip() for k in _COMPANY_ADDR_MAP):
+        d = {dst: (a.get(src) or "").strip() for src, dst in _COMPANY_ADDR_MAP.items()}
+        d["applicant_name_en"] = name
+        return d
+    # 回退：旧单串
+    full = (a.get("company_address") or "").strip()
+    a1, a2 = split_address(full)
+    return {"applicant_name_en": name, "address1": a1, "address2": a2,
+            "contact_address_en": full, "contact_address_cn": "", "city_en": "", "city_cn": "",
+            "province_city_en_us": "", "province_city_zh_cn": "", "postcode": "",
+            "country_en_us": "", "country_zh_cn": ""}
+
+
 def get_assignee(fields: dict) -> dict:
     """受让人（申请人第一位）——兼容旧调用。"""
     applicants = fields.get("applicants") or []
@@ -259,12 +289,14 @@ def resolve_assignee(fields: dict, name: str) -> dict:
                 res = _assignee_from_applicant(a)
                 res["matched"] = True
                 return res
-        # 转让链中间公司：地址在 公司转公司 段的 company_address
+        # 转让链中间公司：地址在 公司转公司 段（结构化 company_* 或旧单串 company_address）
         for asg in fields.get("assignments") or []:
-            if (asg.get("assignment_type") == "公司转公司"
-                    and _norm_company(asg.get("assigning_company")) == key
-                    and (asg.get("company_address") or "").strip()):
-                res = _assignee_from_company_address(name, asg["company_address"])
+            if asg.get("assignment_type") != "公司转公司" or _norm_company(asg.get("assigning_company")) != key:
+                continue
+            cd = company_addr_dict(asg)
+            if any(cd.get(k) for k in ("address1", "city_en", "postcode", "country_en_us", "contact_address_en")):
+                res = _assignee_from_applicant(cd)   # 结构化→六字段拼全址拆行；旧串→逗号拆
+                res["name"] = name
                 res["matched"] = True
                 return res
     res = _assignee_from_applicant(applicants[0] if applicants else {})

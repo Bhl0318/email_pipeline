@@ -276,9 +276,15 @@ const APPLICANT_FIELDS = [
 const INVENTOR_FIELDS = [["last_name_en", "姓（大写）", true], ["first_name_en", "名", true], ["full_name_en", "全名", false], ["employer", "归属公司", false, "applicantNames"]];
 const PRIORITY_FIELDS = [["priority_no", "优先权号", false], ["priority_num", "国别+号", false], ["priority_country_id", "国别", false], ["priority_date", "优先权日", false], ["access_code", "DAS 码", false]];
 const PARENT_FIELDS = [["Application No", "申请号", false], ["Filing Date", "申请日", false]];
+// 公司转公司字段（[key, label, req, maxlength]）。转让方公司地址仿申请人：中英+城市/省/邮编/国家，地址1/2各≤50
 const ASSIGN_QUAD = [
-  ["assigning_company", "转让方公司名称"], ["company_representative", "签字代表姓名"],
-  ["representative_title", "代表职位"], ["company_address", "公司地址"],
+  ["assigning_company", "转让方公司名称", true], ["company_representative", "签字代表姓名", true],
+  ["representative_title", "代表职位", true],
+  ["company_address1", "地址1（英文，≤50）", true, 50], ["company_address2", "地址2（英文，≤50）", false, 50],
+  ["company_address_cn", "地址（中文）", false],
+  ["company_city_en", "城市（英文）", true], ["company_city_cn", "城市（中文）", false],
+  ["company_province_en", "省/州（英文）", false], ["company_province_cn", "省/州（中文）", false],
+  ["company_postcode", "邮编", true], ["company_country_en", "国家（英文）", true], ["company_country_cn", "国家（中文）", false],
 ];
 
 /* ───────── sidebar ───────── */
@@ -518,7 +524,7 @@ function fieldInput(def) {
       ${(!known && cur !== "") ? `<option value="${esc(cur)}" selected>${esc(cur)}（不在申请人列表，请核对）</option>` : ""}
     </select>`;
   } else {
-    control = `<input data-path='${dp}' value="${esc(val ?? "")}" ${def.readonly ? "readonly" : ""}>`;
+    control = `<input data-path='${dp}' value="${esc(val ?? "")}" ${def.maxlength ? `maxlength="${def.maxlength}"` : ""} ${def.readonly ? "readonly" : ""}>`;
   }
   return `<div class="field" style="${def.wide ? "grid-column: span 2;" : ""}">
     <label>${esc(def.label)}${def.req ? ' <span class="req">*</span>' : ""}</label>
@@ -557,8 +563,8 @@ function assignmentBlock() {
           <option value="公司转公司" ${isCompany ? "selected" : ""}>公司转公司</option>
         </select></div>
       <div class="quad" style="display:${isCompany ? "block" : "none"};">
-        <div class="grid">${ASSIGN_QUAD.map(([k, label]) =>
-          fieldInput({ path: ["assignments", i, k], label, req: true })).join("")}</div>
+        <div class="grid">${ASSIGN_QUAD.map(([k, label, req, maxlength]) =>
+          fieldInput({ path: ["assignments", i, k], label, req: !!req, maxlength })).join("")}</div>
       </div>
     </div>`;
   }).join("");

@@ -20,6 +20,33 @@ from docx.oxml.ns import qn
 from docx.enum.table import WD_ROW_HEIGHT_RULE
 
 
+# 转让方公司地址结构化字段(前端 company_*) → 申请人式键映射（本文件自包含，不依赖 common）
+_COMPANY_ADDR_MAP = {
+    "company_address1": "address1", "company_address2": "address2",
+    "company_address_cn": "contact_address_cn",
+    "company_city_en": "city_en", "company_city_cn": "city_cn",
+    "company_province_en": "province_city_en_us", "company_province_cn": "province_city_zh_cn",
+    "company_postcode": "postcode",
+    "company_country_en": "country_en_us", "company_country_cn": "country_zh_cn",
+}
+
+
+def company_addr_dict(a):
+    """转让方公司地址 → 申请人式 dict（结构化 company_* 优先，缺省回退旧 company_address 逗号拆到 address1/2）。"""
+    a = a or {}
+    name = (a.get("assigning_company") or "").strip()
+    if any((a.get(k) or "").strip() for k in _COMPANY_ADDR_MAP):
+        d = {dst: (a.get(src) or "").strip() for src, dst in _COMPANY_ADDR_MAP.items()}
+        d["applicant_name_en"] = name
+        return d
+    full = (a.get("company_address") or "").strip()
+    parts = [p.strip() for p in re.split(r"[，,]", full) if p.strip()]
+    return {"applicant_name_en": name,
+            "address1": parts[0] if parts else full,
+            "address2": ", ".join(parts[1:]) if len(parts) > 1 else "",
+            "contact_address_en": full}
+
+
 class PatentApplicationFormGenerator:
     def __init__(self, case_info, output_path):
         self.case_info = case_info
@@ -453,19 +480,17 @@ class PatentApplicationFormGenerator:
         _app_by_name = {_norm(a.get("applicant_name_en")): a for a in applicants_list}
 
         def _app_for_employer(key, emp):
-            """employer 命中申请人则取该申请人；否则（如前雇主，不在申请人列表）
-            从 assignments.assigning_company 兜底取其地址（company_address 按逗号拆 address1/2）。"""
+            """employer 命中申请人则取该申请人；否则（如前雇主，不在申请人列表）从 assignments
+            公司转公司段取其地址：结构化 company_* 字段（中英+城市/省/邮编/国家）优先，
+            缺省回退旧单串 company_address。"""
             app = _app_by_name.get(key)
             if app:
                 return app
             for a in (case_info.get("assignments") or []):
-                if _norm(a.get("assigning_company")) == key and (a.get("company_address") or "").strip():
-                    ca = a["company_address"].strip()
-                    parts = [p.strip() for p in re.split(r"[，,]", ca) if p.strip()]
-                    return {**_EMPTY_APP, "applicant_name_en": emp,
-                            "address1": parts[0] if parts else ca,
-                            "address2": ", ".join(parts[1:]) if len(parts) > 1 else "",
-                            "contact_address_en": ca}
+                if a.get("assignment_type") == "公司转公司" and _norm(a.get("assigning_company")) == key:
+                    cd = company_addr_dict(a)
+                    if any(cd.get(k) for k in ("address1", "city_en", "postcode", "country_en_us", "contact_address_en")):
+                        return {**_EMPTY_APP, **cd}
             return _EMPTY_APP
 
         def _residence(app):

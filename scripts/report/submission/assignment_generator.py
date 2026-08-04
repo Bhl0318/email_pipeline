@@ -21,6 +21,8 @@ from docx.table import _Cell, _Row
 from .common import (
     ASSIGNMENT_TEMPLATE,
     blank_none,
+    company_addr_dict,
+    _assignee_from_applicant,
     application_type_words,
     build_priority_rows,
     effective_assignments,
@@ -357,12 +359,13 @@ def generate_assignment(fields: dict, assignment: dict, output_dir, seq: int = 1
         if filled < len(names):
             warnings.append(f"发明人 {len(names)} 名超出模板签字表容量且扩容失败，仅填入 {filled} 名")
     else:
-        company_addr = split_address(assignment.get("company_address") or "")
+        # 公司地址：结构化 company_* 六字段拼全址拆 2 行（同申请人）；缺省回退旧单串
+        company_addr = _assignee_from_applicant(company_addr_dict(assignment))
         _replace_everywhere(doc, "转让公司名称", assignment.get("assigning_company") or "")
         _replace_everywhere(doc, "转让公司代表打印版名字", assignment.get("company_representative") or "")
         _replace_everywhere(doc, "转让公司代表职位", assignment.get("representative_title") or "")
-        _replace_everywhere(doc, "转让公司地址1", company_addr[0])
-        _replace_everywhere(doc, "转让公司地址2", company_addr[1])
+        _replace_everywhere(doc, "转让公司地址1", company_addr["address1"])
+        _replace_everywhere(doc, "转让公司地址2", company_addr["address2"])
         _replace_everywhere(doc, "转让公司代表签字日期", today_dot)
         if special:
             # 特例客户保留受让人签字页；代表姓名/职位留空待人工补签（不填占位符）
