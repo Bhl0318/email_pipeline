@@ -130,8 +130,9 @@ def inventor_names(fields: dict) -> list:
 
 
 def clean_priority_no(priority_no: str) -> str:
-    """优先权号只留数字和点（对齐旧流程规则：去掉国别字母等）。"""
-    return re.sub(r"[^0-9.]", "", priority_no or "")
+    """优先权号只留数字、点和校验位 X（去掉国别字母/空格等）。
+    CN 申请号末位校验位可能是 X（如 202511948961.X），不能当国别字母删掉。"""
+    return re.sub(r"[^0-9.Xx]", "", priority_no or "")
 
 
 def split_address(raw: str) -> list:
