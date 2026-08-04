@@ -27,7 +27,6 @@ FORWARD_FIXED_CC = [
     "meixin.wu@metis-ip.com",    # 伍美欣
     "min.zhao@metis-ip.com",     # 赵敏
     "jingjing.li@metis-ip.com",  # 李晶晶
-    "qiqi.yang@metis-ip.com",    # 杨琪琪
     "oa@metis-ip.com",           # OA立项
     "ya.su@metis-ip.com",        # 苏雅
     "juanjuan.yao@metis-ip.com", # 姚涓涓
