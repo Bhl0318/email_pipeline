@@ -104,15 +104,15 @@ REVIEW_BASE_URL = "http://10.10.70.88:8501"
 REVIEW_NOTIFY_CC  = ["hailing.bi@metis-ip.com", "dandan.cheng@metis-ip.com"]
 
 # 汇报信准备人（收审核链接的人）路由：按国别
-# 规则：CN 全部→胡梅；US/EP→王晶；未命中→不分配（None，不发）。
-REPORT_PREPARER_HU   = "mei.hu@metis-ip.com"    # 胡梅
+# 规则：CN 全部→任惠；US/EP→王晶；未命中→不分配（None，不发）。
+REPORT_PREPARER_REN  = "hui.ren@metis-ip.com"   # 任惠
 REPORT_PREPARER_WANG = "jing.wang@metis-ip.com" # 王晶
 
 
 def _report_preparer_email(region, project):
-    """按国别返回汇报信准备人邮箱：CN→胡梅，US/EP→王晶；未命中返回 None（不分配、不发）。"""
+    """按国别返回汇报信准备人邮箱：CN→任惠，US/EP→王晶；未命中返回 None（不分配、不发）。"""
     if region == "CN":
-        return REPORT_PREPARER_HU
+        return REPORT_PREPARER_REN
     if region in ("US", "EP"):
         return REPORT_PREPARER_WANG
     return None
