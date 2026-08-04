@@ -9,7 +9,8 @@
   1. patent_center_ui.run() 结尾的 input() 需去掉（否则卡住）、并返回成功/失败；选择器需按真实页面稳定；
   2. Okta 登录要 OTP（可走钉钉机器人回复，仍需人递一次码）——非纯无人；
   3. 上传包完整性：环节5 递交人上传全套 USPTO 文档，不签字的（说明书/权要/附图定稿等）选「仅存档」
-     即在环节5 就复制进 uspto_upload/{案号}/；签字件的签署版由环节6 落入同目录 → 上传包 = 二者之和。
+     环节5 归档到 Z:\\upload_USPTO\\{码}\\{组内号}\\{案号}\\仅存档\\，签署版由环节6 落 签署版\\ →
+     上传包 = 仅存档\\ + 签署版\\（发美代理\\ 是未签发出版，不上传）。
   默认 **dry-run**（只规划、不驱动浏览器、不置 done）；补齐上述后加 --live 才真正上传。
   ⚠️ 环节7 严禁 AI，纯确定性代码；本脚本连真实 DB/USPTO，按项目规矩只提交、由人工在受控环境发起。
 
@@ -38,6 +39,20 @@ except Exception as exc:  # noqa: BLE001
 # subject_matter → Patent Center 申请类型
 _SUBMISSION_TYPE = {"UTL": "Utility Nonprovisional", "371": "Utility Nonprovisional",
                     "DES": "Design"}
+
+
+def _archive_base():
+    """Z 盘归档基路径：email_config.json 的 submission.uspto_upload_archive_base，缺省 Z:\\upload_USPTO。"""
+    try:
+        with open(os.path.join(SCRIPT_DIR, "scripts", "report", "email_config.json"), encoding="utf-8") as f:
+            return ((json.load(f).get("submission") or {}).get("uspto_upload_archive_base")) or r"Z:\upload_USPTO"
+    except Exception:
+        return r"Z:\upload_USPTO"
+
+
+def _zcase_root(case_volume):
+    """该案在 Z 盘的归档根：{base}\\{码}\\{组内号}\\{案号}（码=前5位、组内号=前10位，同 OA 约定）。"""
+    return os.path.join(_archive_base(), case_volume[:5], case_volume[:10], case_volume)
 
 
 def _ready_cases():
@@ -77,13 +92,15 @@ def _submission_type(case_volume):
 
 
 def _build_upload_data(case):
-    """组 Patent Center 上传载荷 {submission_type, practitioner, ads_path, other_paths}。
-    文件取 archived_dir 里现有件（= 环节5 归档的「仅存档」定稿 + 环节6 回收的签署版）：
-    名字含 ADS 的作 ads_path，其余 other_paths。"""
-    d = case["archived_dir"]
+    """从 Z 盘归档目录取上传件：{base}\\{码}\\{组内号}\\{案号}\\ 下的
+    「仅存档」(不签的定稿：说明书/权要/附图等) + 「签署版」(环节6 回收的签署版)。
+    「发美代理」是未签发出版，不上传。名字含 ADS 的作 ads_path，其余 other_paths。"""
+    root = _zcase_root(case["case_volume"])
     files = []
-    if os.path.isdir(d):
-        files = sorted(os.path.join(d, n) for n in os.listdir(d) if os.path.isfile(os.path.join(d, n)))
+    for sub in ("仅存档", "签署版"):
+        d = os.path.join(root, sub)
+        if os.path.isdir(d):
+            files += sorted(os.path.join(d, n) for n in os.listdir(d) if os.path.isfile(os.path.join(d, n)))
     ads = [f for f in files if "ADS" in os.path.basename(f).upper()]
     others = [f for f in files if f not in ads]
     return {
@@ -122,9 +139,9 @@ def run(live=False):
         data, files = _build_upload_data(c)
         print(f"\n案 {c['case_volume']}：类型={data['submission_type']} "
               f"ADS={os.path.basename(data['ads_path']) if data['ads_path'] else '（缺）'} "
-              f"其余 {len(data['other_paths'])} 件；归档目录 {c['archived_dir']}")
+              f"其余 {len(data['other_paths'])} 件；Z 盘目录 {_zcase_root(c['case_volume'])}")
         if not files:
-            print("  ⚠️ 归档目录无文件，跳过。")
+            print("  ⚠️ Z 盘归档目录(仅存档/签署版)无文件，跳过。")
             continue
         if not data["ads_path"]:
             print("  ⚠️ 未找到 ADS 件，跳过（上传需 ADS）。")
