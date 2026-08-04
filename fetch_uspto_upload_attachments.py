@@ -348,11 +348,21 @@ def _settle_agent_followup(case_no, case_dir, filenames):
     return f"比对不一致（缺{len(missing)}:{missing} 多{len(extra)}:{extra}），未 done，置 received 待人工"
 
 
+def _archive_base():
+    """Z 盘归档基路径：email_config.json 的 submission.uspto_upload_archive_base，缺省 Z:\\upload_USPTO。"""
+    try:
+        with open(CONFIG_PATH, encoding="utf-8") as f:
+            return ((json.load(f).get("submission") or {}).get("uspto_upload_archive_base")) or r"Z:\upload_USPTO"
+    except Exception:
+        return r"Z:\upload_USPTO"
+
+
 def fetch(folder, account_key="agent", output_root="uspto_upload", move=True, settle=True):
     """读 folder 抓附件归档；move=True 把成功邮件移 {folder}-done、未落附件移 {folder}-skipped；
     settle=True 把已归档案号的 agent_followup（环节6）置 done 并回填归档信息（best-effort）。"""
     cfg = load_account(account_key)
     out_root = output_root if os.path.isabs(output_root) else os.path.join(SCRIPT_DIR, output_root)
+    zbase = _archive_base()   # Z 盘归档基路径（签署版额外存一份，供核销/存档）
     done_folder = f"{folder}-done"
     skipped_folder = f"{folder}-skipped"
 
@@ -391,6 +401,15 @@ def fetch(folder, account_key="agent", output_root="uspto_upload", move=True, se
                 dest = _unique_path(case_dir, fname)
                 with open(dest, "wb") as f:
                     f.write(payload)
+                # 额外存一份到 Z 盘：{base}\{码}\{组内号}\{案号}\签署版\（best-effort，供核销/存档；Z 盘不可写只提示）
+                if len(case_no) >= 10:
+                    try:
+                        zdir = os.path.join(zbase, case_no[:5], case_no[:10], case_no, "签署版")
+                        os.makedirs(zdir, exist_ok=True)
+                        with open(os.path.join(zdir, os.path.basename(dest)), "wb") as zf:
+                            zf.write(payload)
+                    except Exception as _zexc:
+                        print(f"  [Z盘归档跳过] {case_no}/{os.path.basename(dest)}: {_zexc}", file=sys.stderr)
                 saved_by_case[case_no] = saved_by_case.get(case_no, 0) + 1
                 saved_files_by_case.setdefault(case_no, []).append(os.path.basename(dest))
                 saved_this_email += 1
