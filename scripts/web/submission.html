@@ -316,11 +316,14 @@ async function openTask(id) {
   try { task = await api("GET", `${API}/tasks/${id}`); }
   catch (e) { $("formSections").innerHTML = `<div class="banner error">任务加载失败：${esc(problemsOf(e).join("；"))}</div>`; return; }
   fields = task.fields_json || {};
-  // 只恢复「勾选」状态（用户诉求）；参数/称呼/自定义槽不持久化——每次现填，避免带出旧值/空槽自动展开。
+  // 恢复「勾选」状态 + 非空自定义槽（自定义内容需持久化）；参数/称呼仍不持久化，每次现填避免带出旧值。
   const _ems = fields.email_module_state || {};
   emailModules = [];
   moduleChecked = { ...(_ems.checked || {}) };
-  moduleParams = {}; customSlots = {}; openModules = {};
+  moduleParams = {}; openModules = {};
+  customSlots = {};
+  for (const [sid, sv] of Object.entries(_ems.slots || {}))
+    customSlots[sid] = { title: (sv || {}).title || "", body: (sv || {}).body || "" };
   $("caseTitle").textContent = task.case_volume || id;
   const b = $("statusBadge"); b.textContent = task.status; b.className = "badge " + task.status;
   renderMissing(); renderForm(); renderSidebar(); resetPreview();
@@ -351,10 +354,15 @@ function collectModuleParams() {   // 只收集输入框到 moduleParams，不�
   moduleParams.caf_tier = ($("modCafTier") || {}).value || "";
 }
 function regenerateModules() { collectModuleParams(); loadEmailModules(); }
-// 只把模块「勾选」状态快照进 fields，随「保存」/「确认发送」落库，刷新后恢复勾选。
-// 参数/称呼/自定义槽有意不持久化：每封现填，避免带出旧称呼、空自定义槽自动展开等问题。
+// 把模块「勾选」状态 + 非空自定义槽快照进 fields，随「保存」/「确认发送」落库，刷新后恢复。
+// 参数/称呼仍不持久化：每封现填，避免带出旧称呼；空自定义槽不存，避免刷新后自动展开空槽。
 function snapshotModules() {
-  fields.email_module_state = { checked: moduleChecked };
+  const slots = {};
+  for (const [sid, sv] of Object.entries(customSlots)) {
+    const t = ((sv || {}).title || "").trim(), b = ((sv || {}).body || "").trim();
+    if (t || b) slots[sid] = { title: (sv || {}).title || "", body: (sv || {}).body || "" };
+  }
+  fields.email_module_state = { checked: moduleChecked, slots };
 }
 function renderEmailModules() {
   const el = $("sec-email-modules");
