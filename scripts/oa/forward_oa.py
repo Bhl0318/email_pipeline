@@ -101,6 +101,7 @@ FORWARD_BODY_TEMPLATE = (
     "发文日：{issue_date}\n"
     "截止日期：{deadline}\n\n"
     "@OA 分析师值班人，请重启项目，生产管理安排人员处理。\n\n"
+    "{prescreen_line}"
     "--\n"
     "发送人：系统\n"
 )
@@ -114,9 +115,12 @@ def build_forward_body(item):
     deadline = item.get("project_deadline", "") or ""
     period_sentence = (f"该官文的答复期限为 {deadline}。" if deadline
                        else "该官文的答复期限待确认。")
+    # 预审案件加注一行（第一/二次审查意见 + 邮件含预审案件时由分类器置 prescreen_note）
+    prescreen_line = "注：该案件为预审案件\n\n" if item.get("prescreen_note") else ""
     return FORWARD_BODY_TEMPLATE.format(
         oa_type=oa_type, period_sentence=period_sentence,
         project=project, issue_date=issue_date, deadline=deadline,
+        prescreen_line=prescreen_line,
     )
 
 

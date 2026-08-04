@@ -1107,6 +1107,13 @@ def dispatch_oa(all_results, all_emails=None, dry_run=False, test_project_prefix
             if item["oa_remark"]:
                 print(f"[备注] {item.get('project')} → {item['oa_remark']}", file=sys.stderr)
 
+    # 预审案件：备注一格追加「预审案件」（第一/二次审查意见 + 邮件含预审案件；无需查库，dry_run 也生效）
+    for item in (all_results or []):
+        note = item.get("prescreen_note")
+        if note and note not in (item.get("oa_remark", "") or ""):
+            item["oa_remark"] = f"{item.get('oa_remark', '')} {note}".strip()
+            print(f"[预审] {item.get('project')} 备注加注：{note}", file=sys.stderr)
+
     # 写入 Wiki 新增 OA 页面
     if all_results and dry_run:
         print(f"  [dry-run] 跳过写 Wiki 新增OA（{len(all_results)} 条）", file=sys.stderr)

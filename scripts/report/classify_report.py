@@ -434,8 +434,13 @@ def classify_cn(email_data):
                 result["project_deadline"] = raw_deadline
 
     # 特殊标记
-    result["is_pre_exam"] = "预审案件" in body
+    _full = f"{subject}\n{body}\n{email_data.get('html_body', '')}"
+    result["is_pre_exam"] = "预审案件" in _full
     result["is_priority_exam"] = "优先审查" in body
+    # 预审案件 + 第一/二次审查意见通知书 → 转OA正文与Wiki备注加注「预审案件」
+    if result["is_pre_exam"] and matched_type == "审查意见通知书" \
+            and result.get("project_name") in ("第一次审查意见答复", "第二次审查意见答复"):
+        result["prescreen_note"] = "预审案件"
 
     return result
 
@@ -920,7 +925,7 @@ def process_emails(emails):
         "project", "project_name", "oa_doc_date", "entrust_date",
         "oaNum", "applytype", "project_deadline", "dueDate",
         "now_status", "project_phase", "submitby", "oa_remark",
-        "wikiurl", "us_ref_docs",
+        "wikiurl", "us_ref_docs", "prescreen_note",
         # 汇报信侧需要：关联 _inbox 里的官文 PDF
         "message_id", "email_subject", "email_from",
     ]
