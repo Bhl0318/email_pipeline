@@ -10,7 +10,7 @@ import tempfile
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, SCRIPT_DIR)
 
-from submission.common import company_addr_dict, _assignee_from_applicant
+from submission.common import company_addr_dict, _assignee_from_applicant, parse_address_en
 from submission.confirmation_sheet import generate_confirmation_sheet
 from docx import Document
 
@@ -64,8 +64,18 @@ def test_confirmation_shows_structured():
     ok("Tianjin" in txt and "301799" in txt, "确认函归属公司组显示城市/邮编（结构化生效）")
 
 
+def test_parse_address():
+    r = parse_address_en("3/F, Building No.4, No.1 Xinxing Road, Wuqing District, Tianjin, 301799, China")
+    ok(r["city_en"] == "Tianjin" and r["postcode"] == "301799" and r["country_en_us"] == "China",
+       "粘贴地址识别：城市/邮编/国家（邮编独立成段）")
+    r2 = parse_address_en("Room 110, Fengyu Tower, Haidian District, Beijing 100142, China")
+    ok(r2["city_en"] == "Beijing" and r2["postcode"] == "100142",
+       "粘贴地址识别：城市与邮编同段 'Beijing 100142'")
+
+
 if __name__ == "__main__":
     test_structured_dict()
     test_fallback_old_string()
     test_confirmation_shows_structured()
+    test_parse_address()
     print(f"\nAll {_passed} checks passed.")

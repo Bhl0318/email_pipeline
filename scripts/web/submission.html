@@ -563,6 +563,11 @@ function assignmentBlock() {
           <option value="公司转公司" ${isCompany ? "selected" : ""}>公司转公司</option>
         </select></div>
       <div class="quad" style="display:${isCompany ? "block" : "none"};">
+        <div class="field" style="grid-column:1/-1;margin-bottom:6px;">
+          <label>粘贴完整地址自动识别（拆到下方 地址/城市/邮编/国家，需人工复核）</label>
+          <textarea id="asgAddrPaste-${i}" rows="2" style="width:100%;box-sizing:border-box;" placeholder="如：3/F, Xinxing Road, Wuqing District, Tianjin, 301799, China"></textarea>
+          <button class="primary" style="margin-top:4px;padding:4px 12px;" onclick="parseAsgAddress(${i})">识别填充</button>
+        </div>
         <div class="grid">${ASSIGN_QUAD.map(([k, label, req, maxlength]) =>
           fieldInput({ path: ["assignments", i, k], label, req: !!req, maxlength })).join("")}</div>
       </div>
@@ -667,6 +672,21 @@ function addItem(key) { (fields[key] = fields[key] || []).push(EMPTY_ITEM[key]()
 function removeItem(key, i) { fields[key].splice(i, 1); renderForm(); }
 function moveItem(key, i, dir) { const a = fields[key]; const j = i + dir; [a[i], a[j]] = [a[j], a[i]]; renderForm(); }
 function onAssignTypeChange(i, val) { fields.assignments[i].assignment_type = val; renderForm(); } // 切换不清值：四件套留在 state
+// 粘贴完整地址 → 后端启发式拆分 → 填该段转让方公司地址结构化字段（人工复核）
+async function parseAsgAddress(i) {
+  const ta = document.getElementById("asgAddrPaste-" + i);
+  const raw = (ta && ta.value || "").trim();
+  if (!raw) { toast("请先粘贴完整地址"); return; }
+  try {
+    const d = await api("POST", `${API}/parse-address`, { raw });
+    const a = fields.assignments[i];
+    a.company_address1 = d.address1 || ""; a.company_address2 = d.address2 || "";
+    a.company_city_en = d.city_en || ""; a.company_province_en = d.province_city_en_us || "";
+    a.company_postcode = d.postcode || ""; a.company_country_en = d.country_en_us || "";
+    renderForm();
+    toast("已识别填充，请核对（省/州、中文等按需补）");
+  } catch (e) { toast("识别失败：" + problemsOf(e).join("；"), 4000); }
+}
 
 /* ───────── 保存 / 跳过 ───────── */
 async function saveTask() {

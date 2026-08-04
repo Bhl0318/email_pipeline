@@ -142,6 +142,34 @@ def split_address(raw: str) -> list:
     return ["", ""]
 
 
+def parse_address_en(raw: str) -> dict:
+    """把一整串英文地址启发式拆成结构化字段（供前端「粘贴完整地址→识别填充」，结果需人工复核）。
+    规则：逗号拆段 → 末段=国家；剩余末段含 5-6 位数字则拆出邮编（与城市同段如 'Beijing 100142'
+    则城市取余下，否则邮编独立成段、城市取前一段）；其余前段拼成地址按 50 拆 address1/address2。
+    省/州与中文字段留空（歧义大，交人工）。返回 {address1,address2,city_en,province_city_en_us,postcode,country_en_us}。"""
+    res = {"address1": "", "address2": "", "city_en": "", "province_city_en_us": "",
+           "postcode": "", "country_en_us": ""}
+    parts = [p.strip() for p in re.split(r"[，,]", raw or "") if p.strip()]
+    if not parts:
+        return res
+    res["country_en_us"] = parts.pop()
+    if parts:
+        m = re.search(r"\d{5,6}", parts[-1])
+        if m:
+            res["postcode"] = m.group(0)
+            rest = (parts[-1][:m.start()] + parts[-1][m.end():]).strip(" ,")
+            parts.pop()
+            if rest:                     # 城市与邮编同段，如 "Beijing 100142"
+                res["city_en"] = rest
+            elif parts:                  # 邮编独立成段，城市取前一段
+                res["city_en"] = parts.pop()
+        else:                            # 无邮编：末段当城市
+            res["city_en"] = parts.pop()
+    a1, a2 = rebalance_address(", ".join(parts), "")
+    res["address1"], res["address2"] = a1, a2
+    return res
+
+
 # 地址1单行不折行的估算字符上限（地址格宽约3.05英寸/12pt）。
 # 纯估算（比例字体无法精确），偏长折行就调小此值。
 ADDRESS_LINE1_MAX = 50

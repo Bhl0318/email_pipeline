@@ -67,7 +67,7 @@ EMAIL_CONFIG_PATH = SCRIPT_DIR / "email_config.json"
 
 sys.path.insert(0, str(SCRIPT_DIR))
 from db_query import execute_params  # noqa: E402
-from submission.common import infer_subject_matter, normalize_parents, validate_for_confirm  # noqa: E402
+from submission.common import infer_subject_matter, normalize_parents, validate_for_confirm, parse_address_en  # noqa: E402
 from submission.email_modules import build_email_modules  # noqa: E402
 from submission.confirmation_sheet import generate_confirmation_sheet  # noqa: E402
 from submission.assignment_generator import generate_assignments  # noqa: E402
@@ -786,6 +786,16 @@ def save_submission_task(task_id: str, req: SubmissionSaveReq):
         (json.dumps(req.fields_json, ensure_ascii=False), contact_email, filer_email, now, task_id),
     )
     return {"ok": True, "task_id": task_id, "updated_at": now}
+
+
+class ParseAddressReq(BaseModel):
+    raw: str = ""
+
+
+@app.post("/api/submission/parse-address")
+def parse_address(req: ParseAddressReq):
+    """把一整串英文地址启发式拆成结构化字段（供转让方公司地址「粘贴完整地址→识别填充」；结果需人工复核）。"""
+    return parse_address_en(req.raw or "")
 
 
 class SubmissionPreviewReq(BaseModel):
