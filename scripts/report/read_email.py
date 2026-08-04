@@ -100,26 +100,22 @@ REPORT_TYPE_TO_TEMPLATE = {
 }
 REVIEW_BASE_URL = "http://10.10.70.88:8501"
 
-# 汇报信审核任务通知邮件收件人（兜底：未命中准备人规则时用）
-REVIEW_NOTIFY_TO  = ["weihong.yuan@metis-ip.com"]
 # 每封审核链接通知固定抄送
 REVIEW_NOTIFY_CC  = ["hailing.bi@metis-ip.com", "dandan.cheng@metis-ip.com"]
 
-# 汇报信准备人（收审核链接的人）路由：按国别 + 客户码（案号前5位）
-# 目前规则（仅 OA 场景）：CN 客户码 20615→胡梅，其他 CN→任惠；US/EP→王晶。
+# 汇报信准备人（收审核链接的人）路由：按国别
+# 规则：CN 全部→胡梅；US/EP→王晶；未命中→不分配（None，不发）。
 REPORT_PREPARER_HU   = "mei.hu@metis-ip.com"    # 胡梅
-REPORT_PREPARER_REN  = "hui.ren@metis-ip.com"   # 任惠
 REPORT_PREPARER_WANG = "jing.wang@metis-ip.com" # 王晶
 
 
 def _report_preparer_email(region, project):
-    """按国别+客户码返回汇报信准备人邮箱；未命中规则回退默认审核人。"""
-    code = (project or "")[:5]
+    """按国别返回汇报信准备人邮箱：CN→胡梅，US/EP→王晶；未命中返回 None（不分配、不发）。"""
     if region == "CN":
-        return REPORT_PREPARER_HU if code == "20615" else REPORT_PREPARER_REN
+        return REPORT_PREPARER_HU
     if region in ("US", "EP"):
         return REPORT_PREPARER_WANG
-    return (REVIEW_NOTIFY_TO or ["hailing.bi@metis-ip.com"])[0]
+    return None
 
 # USPTO Document Type 代码 → 英文全名（用于汇报信"官文英文名称"字段）
 US_DOC_TYPE_FULLNAME = {
@@ -732,11 +728,13 @@ def send_review_links_email(links):
         print("[审核通知] 未配置 PA 账号，跳过发送", file=sys.stderr)
         return
 
-    # 按准备人邮箱分组（缺失则回退默认审核人）
-    fallback = (REVIEW_NOTIFY_TO or ["hailing.bi@metis-ip.com"])[0]
+    # 按准备人邮箱分组；未命中准备人规则（preparer 为空）直接跳过不发
     groups = {}
     for it in links:
-        to_email = it.get("preparer") or fallback
+        to_email = it.get("preparer")
+        if not to_email:
+            print(f"  [跳过审核通知] {it.get('project','')} 未命中准备人规则，不发", file=sys.stderr)
+            continue
         groups.setdefault(to_email, []).append(it)
 
     for to_email, group_links in groups.items():
