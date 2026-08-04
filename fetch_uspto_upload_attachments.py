@@ -45,11 +45,13 @@ CASE_RE = re.compile(r"[0-9A-Z]{5}-[0-9A-Z]{4}[A-Z]{2}[0-9A-Z]{2}")
 # 销账用 DB：复用 report 端 db_query（atw.submission_tasks）。best-effort——
 # 导入失败（无 pymysql / 在无 DB 环境跑）只跳过销账，不影响抓文件归档。
 _SETTLE_OK = True
+_SETTLE_ERR = ""
 try:
     sys.path.insert(0, os.path.join(SCRIPT_DIR, "scripts", "report"))
     from db_query import execute_params as _db_exec
-except Exception:
+except Exception as _e:
     _SETTLE_OK = False
+    _SETTLE_ERR = f"{type(_e).__name__}: {_e}"   # 如 No module named 'pymysql' / 'db_query'
 
 # 内置账号：美代理回邮所在邮箱（agent@metis-ip.com）。metis-ip.com 在世纪互联
 # partner.outlook.cn，IMAP 基本认证已被停用，必须走 OAuth2 的 ROPC（密码）授权：
@@ -429,7 +431,8 @@ def fetch(folder, account_key="agent", output_root="uspto_upload", move=True, se
         settle_notes = {}
         if settle and saved_by_case:
             if not _SETTLE_OK:
-                settle_notes["_"] = "未装 pymysql / 无法导入 db_query，跳过销账（文件已归档）"
+                settle_notes["_"] = (f"跳过销账（文件已归档）——导入 db_query 失败：{_SETTLE_ERR}。"
+                                     f"（脚本目录={SCRIPT_DIR}，找 db_query 于 {os.path.join(SCRIPT_DIR, 'scripts', 'report')}）")
             else:
                 for case_no in sorted(saved_by_case):
                     try:
