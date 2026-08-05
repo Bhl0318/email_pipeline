@@ -402,7 +402,9 @@ def get_oauth2_token(account_cfg):
 
 
 def login_imap(account_cfg):
-    imap = imaplib.IMAP4_SSL(account_cfg["imap_host"], account_cfg["imap_port"])
+    # 加 timeout：无超时时服务器无响应会一直挂到 TCP 重传超时(数分钟)才抛 WinError 10060
+    imap = imaplib.IMAP4_SSL(account_cfg["imap_host"], account_cfg["imap_port"],
+                             timeout=account_cfg.get("imap_timeout", 30))
 
     token = get_oauth2_token(account_cfg)
     if token:
