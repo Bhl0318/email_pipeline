@@ -209,10 +209,21 @@ def query_first_case_info(zu_code):
         conn.close()
 
 
+# 同族里出现这些立项名关键词，即视为该族已有 OA 类立项 → 当前案为「非同族首案」
+FAMILY_OA_KEYWORDS = (
+    "OA",
+    "审查意见",
+    "Requirement for Restriction",
+    "Partial Supplementary European Search Report",
+)
+
+
 def family_first_case_remark(project, project_name="", execute=None):
     """其他OA 的「同族首案/非同族首案」备注判定。
     查 atw projects 中同族(project 前10位 = 组内号)的所有 (project, project_name)，
-    排除当前案自身这行后，只要有任一 project_name 含 'OA' → '非同族首案'，否则 → '同族首案'。
+    排除当前案自身这行后，只要有任一 project_name 含 FAMILY_OA_KEYWORDS 任一关键词
+    （OA / 审查意见 / Requirement for Restriction / Partial Supplementary European Search Report）
+    → '非同族首案'，否则 → '同族首案'。
     （当前案的 OA 立项此时尚未写入 projects；防御性排除自身行以防调用次序变化。）
     查不到/异常 → 返回 ''（留空，人工补）。execute 可注入（测试用，返回 dict 行）。"""
     prefix = (project or "")[:10]
@@ -233,7 +244,7 @@ def family_first_case_remark(project, project_name="", execute=None):
         for pj, name in recs:
             if pj == project and name == project_name:
                 continue  # 排除当前案自身这行
-            if "OA" in name:
+            if any(k in name for k in FAMILY_OA_KEYWORDS):
                 return "非同族首案"
         return "同族首案"
     except Exception as e:

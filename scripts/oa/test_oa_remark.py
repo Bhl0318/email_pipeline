@@ -67,6 +67,27 @@ def test_first_case_no_oa():
        == "同族首案", "同族无OA立项 → 同族首案")
 
 
+def test_first_case_keyword_shencha():
+    rows = [{"project": "20618-1061CN00", "project_name": "第一次审查意见答复"},
+            {"project": "20618-1061US00", "project_name": "US撰写"}]
+    ok(family_first_case_remark("20618-1061US00", "OA1-Non-Final Rejection答复", execute=_ex(rows))
+       == "非同族首案", "同族有『审查意见』立项 → 非同族首案")
+
+
+def test_first_case_keyword_restriction():
+    rows = [{"project": "20618-1061EP00", "project_name": "Requirement for Restriction Election答复"},
+            {"project": "20618-1061US00", "project_name": "US撰写"}]
+    ok(family_first_case_remark("20618-1061US00", "x", execute=_ex(rows))
+       == "非同族首案", "同族有『Requirement for Restriction』立项 → 非同族首案")
+
+
+def test_first_case_keyword_esr():
+    rows = [{"project": "20618-1061EP00", "project_name": "Partial Supplementary European Search Report"},
+            {"project": "20618-1061US00", "project_name": "US撰写"}]
+    ok(family_first_case_remark("20618-1061US00", "x", execute=_ex(rows))
+       == "非同族首案", "同族有『Partial Supplementary European Search Report』→ 非同族首案")
+
+
 def test_first_case_excludes_self():
     # 只有当前案自身的 OA 行（若已抢先写入）→ 排除后应判同族首案
     rows = [{"project": "20618-1061US00", "project_name": "OA1-Non-Final Rejection答复"}]
@@ -102,7 +123,9 @@ def test_first_case_db_error():
 if __name__ == "__main__":
     for fn in [test_type_fenan, test_type_bohui, test_type_buzheng_us, test_type_buzheng_cn,
                test_type_other_oa_empty,
-               test_first_case_sibling_has_oa, test_first_case_no_oa, test_first_case_excludes_self,
+               test_first_case_sibling_has_oa, test_first_case_no_oa,
+               test_first_case_keyword_shencha, test_first_case_keyword_restriction,
+               test_first_case_keyword_esr, test_first_case_excludes_self,
                test_first_case_self_plus_sibling_oa, test_first_case_empty_family,
                test_first_case_no_project, test_first_case_db_error]:
         print(f"[{fn.__name__}]")
