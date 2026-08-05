@@ -794,6 +794,100 @@ def append_oa_to_wiki(results):
 
 
 # ============================================================
+# 邮件动作记录页（按日折叠，每案一行，不漏每封邮件）
+# ============================================================
+EMAIL_ACTION_PAGE_TITLE = "邮件动作"
+_EMAIL_ACTION_COLGROUP = (
+    '<colgroup><col style="width: 160.0px;" /><col style="width: 340.0px;" />'
+    '<col style="width: 140.0px;" /><col style="width: 160.0px;" />'
+    '<col style="width: 90.0px;" /></colgroup>'
+)
+_EMAIL_ACTION_HEADER_ROW = (
+    '<tr><th>案号</th><th>邮件主题</th><th>收件时间</th><th>动作</th><th>是否移动</th></tr>'
+)
+
+
+def _day_title(dt):
+    """写入时间 → 日折叠块标题，如 2026年8月5日（不补零）。"""
+    return f"{dt.year}年{dt.month}月{dt.day}日"
+
+
+def _new_day_block(day_title, rows_html):
+    """构造一个新的按日折叠块（expand 宏 + 表头 + 数据行）。"""
+    return (
+        '<ac:structured-macro ac:name="expand" ac:schema-version="1">'
+        f'<ac:parameter ac:name="title">{day_title}</ac:parameter>'
+        '<ac:rich-text-body>'
+        f'<table class="fixed-table wrapped">{_EMAIL_ACTION_COLGROUP}<tbody>'
+        f'{_EMAIL_ACTION_HEADER_ROW}{rows_html}</tbody></table>'
+        '</ac:rich-text-body></ac:structured-macro>'
+    )
+
+
+def _insert_rows_by_day(body, rows_html, day_title):
+    """把 rows_html 插入 day_title 对应折叠块表格的顶部（表头行之后）。
+    该日折叠块不存在时，新建并插到所有折叠块最前面。返回 (new_body, created)。"""
+    title_tag = f'<ac:parameter ac:name="title">{day_title}</ac:parameter>'
+    idx = body.find(title_tag)
+    if idx != -1:
+        tb = body.find('<tbody', idx)
+        if tb != -1:
+            tb_gt = body.find('>', tb)
+            hdr_end = body.find('</tr>', tb_gt)
+            if hdr_end != -1:
+                pos = hdr_end + len('</tr>')
+                return body[:pos] + rows_html + body[pos:], False
+        return body.replace('</tbody>', rows_html + '</tbody>', 1), False
+    block = _new_day_block(day_title, rows_html)
+    m = re.search(r'<ac:structured-macro ac:name="expand"', body)
+    if m:
+        return body[:m.start()] + block + body[m.start():], True
+    return body + block, True
+
+
+def _esc_html(s):
+    """单元格文本转义，避免主题里的 <>& 破坏表格结构。"""
+    return (str(s or "")).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
+def _build_email_action_row(rec):
+    """一条动作记录 → 一个 <tr>。rec: {project, subject, received_time, action, moved(bool)}。"""
+    cells = [
+        rec.get("project", "") or "",
+        rec.get("subject", "") or "",
+        rec.get("received_time", "") or "",
+        rec.get("action", "") or "",
+        "是" if rec.get("moved") else "否",
+    ]
+    return "<tr>" + "".join(f"<td>{_esc_html(c)}</td>" for c in cells) + "</tr>"
+
+
+def append_email_actions_to_wiki(records):
+    """把邮件处理动作按日折叠写入「邮件动作」页（每案一行，未命中邮件也记一行）。
+    records: [{project, subject, received_time, action, moved}]。返回 {code, msg, count}。"""
+    if not records:
+        return {"code": 0, "msg": "无动作记录需要写入", "count": 0}
+    wiki = WikiClient()
+    page = wiki.get_page(EMAIL_ACTION_PAGE_TITLE)
+    if not page:
+        return {"code": 1, "msg": f"未找到页面: {EMAIL_ACTION_PAGE_TITLE}", "count": 0}
+    body = page["body"]
+    new_rows = "".join(_build_email_action_row(r) for r in records)
+
+    from datetime import datetime
+    day_title = _day_title(datetime.now())
+    body, created = _insert_rows_by_day(body, new_rows, day_title)
+    if created:
+        logger.info(f"新增日折叠块: {day_title}")
+
+    status = wiki.update_page(page["id"], EMAIL_ACTION_PAGE_TITLE, body, page["version"])
+    if status == 200:
+        logger.info(f"邮件动作页写入成功: {len(records)} 条")
+        return {"code": 0, "msg": f"写入成功 {len(records)} 条", "count": len(records)}
+    return {"code": 1, "msg": f"页面更新失败 (HTTP {status})", "count": 0}
+
+
+# ============================================================
 # 对比文件写回 OA信息记录表页（填「OA过程」表 OA{N} 行的「对比文件链接」列）
 # ============================================================
 def _strip_tags(s):
