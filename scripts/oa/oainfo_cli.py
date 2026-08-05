@@ -798,12 +798,13 @@ def append_oa_to_wiki(results):
 # ============================================================
 EMAIL_ACTION_PAGE_TITLE = "邮件动作"
 _EMAIL_ACTION_COLGROUP = (
-    '<colgroup><col style="width: 160.0px;" /><col style="width: 340.0px;" />'
-    '<col style="width: 140.0px;" /><col style="width: 160.0px;" />'
-    '<col style="width: 90.0px;" /></colgroup>'
+    '<colgroup><col style="width: 150.0px;" /><col style="width: 300.0px;" />'
+    '<col style="width: 130.0px;" /><col style="width: 140.0px;" />'
+    '<col style="width: 220.0px;" /><col style="width: 80.0px;" /></colgroup>'
 )
 _EMAIL_ACTION_HEADER_ROW = (
-    '<tr><th>案号</th><th>邮件主题</th><th>收件时间</th><th>动作</th><th>是否移动</th></tr>'
+    '<tr><th>案号</th><th>邮件主题</th><th>收件时间</th><th>动作</th>'
+    '<th>判断依据</th><th>是否移动</th></tr>'
 )
 
 
@@ -851,15 +852,67 @@ def _esc_html(s):
 
 
 def _build_email_action_row(rec):
-    """一条动作记录 → 一个 <tr>。rec: {project, subject, received_time, action, moved(bool)}。"""
+    """一条动作记录 → 一个 <tr>。rec: {project, subject, received_time, action, reason, moved(bool)}。"""
     cells = [
         rec.get("project", "") or "",
         rec.get("subject", "") or "",
         rec.get("received_time", "") or "",
         rec.get("action", "") or "",
+        rec.get("reason", "") or "",
         "是" if rec.get("moved") else "否",
     ]
     return "<tr>" + "".join(f"<td>{_esc_html(c)}</td>" for c in cells) + "</tr>"
+
+
+def build_email_action_records(all_results, all_emails, oa_actions, report_actions):
+    """汇总两个 sink 的动作 → 邮件动作记录（每案一行，不漏每封邮件）。纯函数，便于测试。
+    all_results: 分类结果(每条一个案，含 message_id/project/email_subject)。
+    all_emails: [(acc, email_dict)]，email_dict 含 message_id/subject/date。
+    oa_actions/report_actions: [{message_id, project, action, reason}]。
+    返回 [{project, subject, received_time, action, reason, moved}]：
+      命中邮件 → 每案一行(moved=True，动作/依据按 message_id+project 合并；无则「无动作」)；
+      未命中邮件 → 一行(案号空，动作「无动作」，依据「未命中分类」，moved=False)。"""
+    act_map = {}
+    for a in list(oa_actions or []) + list(report_actions or []):
+        key = (a.get("message_id", ""), a.get("project", ""))
+        e = act_map.setdefault(key, {"actions": [], "reasons": []})
+        act = a.get("action")
+        if act and act not in e["actions"]:
+            e["actions"].append(act)
+        rsn = a.get("reason")
+        if rsn and rsn not in e["reasons"]:
+            e["reasons"].append(rsn)
+
+    email_meta = {}
+    for _acc, em in (all_emails or []):
+        mid = em.get("message_id", "")
+        if mid and mid not in email_meta:
+            email_meta[mid] = (em.get("subject", "") or "", str(em.get("date", "") or ""))
+
+    matched_mids = {it.get("message_id", "") for it in (all_results or []) if it.get("message_id")}
+
+    records = []
+    # 命中：每案一行
+    for it in (all_results or []):
+        mid = it.get("message_id", "")
+        proj = it.get("project", "") or ""
+        subject, rtime = email_meta.get(mid, (it.get("email_subject", "") or "", ""))
+        e = act_map.get((mid, proj))
+        action = "；".join(e["actions"]) if (e and e["actions"]) else "无动作"
+        reason = "；".join(e["reasons"]) if (e and e["reasons"]) else ""
+        records.append({"project": proj, "subject": subject, "received_time": rtime,
+                        "action": action, "reason": reason, "moved": True})
+    # 未命中：每封一行（去重 message_id）
+    seen = set()
+    for _acc, em in (all_emails or []):
+        mid = em.get("message_id", "")
+        if mid in matched_mids or mid in seen:
+            continue
+        seen.add(mid)
+        records.append({"project": "", "subject": em.get("subject", "") or "",
+                        "received_time": str(em.get("date", "") or ""),
+                        "action": "无动作", "reason": "未命中OA/汇报信分类", "moved": False})
+    return records
 
 
 def append_email_actions_to_wiki(records):

@@ -56,11 +56,12 @@ def main(dry_run=False):
     print(f"[email_pipeline] sink 开关：oa={oa_on}  report={report_on}", file=sys.stderr)
 
     # ② 扇出。OA 在前（其 US 期限补全会就地改写 result，report 随后能用到）。
+    oa_acts, rep_acts = [], []   # 各 sink 回报的动作，供邮件动作记录页
     if oa_on:
         print("[email_pipeline] → OA 立项 sink", file=sys.stderr)
         with oa as OA:
             OA.set_config_path(SHARED_EMAIL_CONFIG)
-            OA.dispatch_oa(all_results, all_emails, dry_run=dry_run, test_project_prefix=oa_test_prefix)
+            oa_acts = OA.dispatch_oa(all_results, all_emails, dry_run=dry_run, test_project_prefix=oa_test_prefix) or []
     else:
         print("[email_pipeline] OA 立项 sink 关闭（sinks.oa=false）", file=sys.stderr)
 
@@ -68,7 +69,7 @@ def main(dry_run=False):
         print("[email_pipeline] → 汇报信 sink", file=sys.stderr)
         with rpt as RPT:
             RPT.set_config_path(SHARED_EMAIL_CONFIG)
-            RPT.dispatch_report(all_results, all_emails, dry_run=dry_run)
+            rep_acts = RPT.dispatch_report(all_results, all_emails, dry_run=dry_run) or []
     else:
         print("[email_pipeline] 汇报信 sink 关闭（sinks.report=false）", file=sys.stderr)
 
@@ -78,6 +79,11 @@ def main(dry_run=False):
         RPT.set_config_path(SHARED_EMAIL_CONFIG)
         RPT.archive_emails(all_emails, all_results, dry_run=dry_run)
     print("[email_pipeline] 归档完成" + ("（dry-run，未实际归档）" if dry_run else ""), file=sys.stderr)
+
+    # ④ 邮件动作记录页（按日折叠写入「邮件动作」；用 oa 副本的写入函数）。
+    with oa as OA:
+        OA.set_config_path(SHARED_EMAIL_CONFIG)
+        OA.record_email_actions(all_results, all_emails, oa_acts, rep_acts, dry_run=dry_run)
 
 
 def _run_forever(interval_min, dry_run):

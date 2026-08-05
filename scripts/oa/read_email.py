@@ -549,12 +549,12 @@ def send_forward_oa(all_results, all_emails=None, dry_run=False):
 
     if not all_results:
         print("[转OA] 无立项结果，跳过", file=sys.stderr)
-        return
+        return []
 
     pa_cfg = load_config().get("accounts", {}).get("pa")
     if not pa_cfg:
         print("[转OA] 未配置 PA 账号，跳过", file=sys.stderr)
-        return
+        return []
 
     # msgid -> _inbox 官文 PDF（CN/EP 附件来源）
     msgid_to_pdfs = {}
@@ -580,7 +580,14 @@ def send_forward_oa(all_results, all_emails=None, dry_run=False):
         })
     if not plans:
         print("[转OA] 无有效案件（缺案号），跳过", file=sys.stderr)
-        return
+        return []
+
+    # 本次转OA立项动作（每案一条，供邮件动作记录页）；依据=官文类型
+    fwd_actions = [{"message_id": p["item"].get("message_id", ""),
+                    "project": p["item"].get("project", ""),
+                    "action": "转OA立项",
+                    "reason": f"OA立项官文类型:{p['item'].get('notification_type', '') or p['item'].get('project_name', '')}"}
+                   for p in plans]
 
     if dry_run:
         for p in plans:
@@ -591,7 +598,7 @@ def send_forward_oa(all_results, all_emails=None, dry_run=False):
             print(f"      抄送({len(p['cc'])}): {', '.join(p['cc'])}", file=sys.stderr)
             print(f"      附件({len(atts)}): {', '.join(atts) if atts else '(无)'}", file=sys.stderr)
         print(f"  [dry-run][转OA] 共 {len(plans)} 封待发（未实际发送）", file=sys.stderr)
-        return
+        return fwd_actions
 
     # 打开一次 SMTP，逐案发送
     try:
@@ -609,7 +616,7 @@ def send_forward_oa(all_results, all_emails=None, dry_run=False):
             smtp.login(pa_cfg["user"], pa_cfg["password"])
     except Exception as e:
         print(f"[转OA] SMTP 连接/认证失败，全部跳过: {e}", file=sys.stderr)
-        return
+        return []
 
     sent = 0
     for p in plans:
@@ -639,6 +646,7 @@ def send_forward_oa(all_results, all_emails=None, dry_run=False):
     except Exception:
         pass
     print(f"[转OA] 完成：{sent}/{len(plans)} 封", file=sys.stderr)
+    return fwd_actions
 
 
 # ─── 主功能 ──────────────────────────────────────────────
@@ -1196,7 +1204,24 @@ def dispatch_oa(all_results, all_emails=None, dry_run=False, test_project_prefix
         print(f"TIP 写入完成: {inserted} 条", file=sys.stderr)
 
     # 转OA：逐案转发给 OA 处理团队（替换原 send_notification 总表→qin.zhang；dry_run 内部处理）
-    send_forward_oa(all_results, all_emails, dry_run=dry_run)
+    # 返回本次转OA立项动作 [{message_id, project, action, reason}]，供 main.py 汇总写邮件动作页
+    return send_forward_oa(all_results, all_emails, dry_run=dry_run) or []
+
+
+def record_email_actions(all_results, all_emails, oa_actions=None, report_actions=None, dry_run=False):
+    """汇总两个 sink 的动作，按日折叠写入「邮件动作」Wiki 页（每案一行，不漏每封邮件）。
+    dry_run 时只构建不写页。返回构建的 records。"""
+    from oainfo_cli import build_email_action_records, append_email_actions_to_wiki
+    records = build_email_action_records(all_results, all_emails, oa_actions or [], report_actions or [])
+    if dry_run:
+        print(f"[邮件动作] dry-run：{len(records)} 条待写（未写 Wiki）", file=sys.stderr)
+        return records
+    try:
+        res = append_email_actions_to_wiki(records)
+        print(f"[邮件动作] {res.get('msg', '')}", file=sys.stderr)
+    except Exception as e:
+        print(f"[邮件动作] 写入失败: {e}", file=sys.stderr)
+    return records
 
 
 def archive_emails(all_emails, all_results=None, dry_run=False):

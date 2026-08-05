@@ -1105,6 +1105,7 @@ def dispatch_report(all_results, all_emails, dry_run=False):
     _fwd_pa_cfg = load_config().get("accounts", {}).get("pa")   # 转发从 pa 账号发
 
     all_review_links = []  # 收集所有审核链接，最后统一发一封通知邮件
+    report_actions = []    # 本次汇报信动作 [{message_id, project, action}]，供 main.py 汇总写邮件动作页
 
     # 写入 TIP 系统（projects 表）
     if all_results:
@@ -1177,6 +1178,10 @@ def dispatch_report(all_results, all_emails, dry_run=False):
                         fwd_to = _resolve_forward_targets(fwd.get("to"), project)
                         fwd_cc = _resolve_forward_targets(fwd.get("cc"), project)
                         print(f"  [规则-skip] {project} {ntype} 不分配汇报信，转发 to={fwd_to} cc={fwd_cc}", file=sys.stderr)
+                        if fwd_to:   # 解析到转发地址才算「转发原始」动作
+                            report_actions.append({"message_id": item.get("message_id", ""),
+                                                   "project": project, "action": "转发原始",
+                                                   "reason": f"OA规则表skip不分配汇报信→转发接口人({ntype})"})
                         if not dry_run and fwd_to and _fwd_pa_cfg:
                             em = msgid_to_email.get(item.get("message_id", ""))
                             _forward_official_email(
@@ -1190,6 +1195,9 @@ def dispatch_report(all_results, all_emails, dry_run=False):
                     elif act == "assign":
                         preparer_override = action.get("preparer")
             if tpl_info:
+                report_actions.append({"message_id": item.get("message_id", ""),
+                                       "project": project, "action": "分配汇报信",
+                                       "reason": f"命中汇报信模板:{region}/{ntype}"})
                 template, attach_pdf = tpl_info
                 report_fields = build_report_fields(region, item)
                 # 注：客户名/申请号/申请名/申请日/客户案号 等案件主数据不在这里填，
@@ -1289,6 +1297,8 @@ def dispatch_report(all_results, all_emails, dry_run=False):
         print(f"[dry-run] 跳过发送审核链接邮件（本应汇总 {len(all_review_links)} 条）", file=sys.stderr)
     else:
         send_review_links_email(all_review_links)
+
+    return report_actions
 
 
 def archive_emails(all_emails, all_results=None, dry_run=False):
