@@ -763,6 +763,79 @@ def _send_one_review_email(pa_cfg, to_list, links, cc_list=None):
         print(f"[审核通知] 发送失败 → {', '.join(to_list)}: {e}", file=sys.stderr)
 
 
+def _smtp_send(pa_cfg, msg, all_rcpts):
+    """底层 SMTP 发送（OAuth2 XOAUTH2 优先，认证失败降级密码）。失败抛异常。"""
+    smtp = smtplib.SMTP(pa_cfg["smtp_host"], pa_cfg["smtp_port"], timeout=30)
+    try:
+        smtp.ehlo(); smtp.starttls(); smtp.ehlo()
+        token = _get_smtp_oauth2_token(pa_cfg)
+        authed = False
+        if token:
+            import base64 as _b64
+            auth_string = f"user={pa_cfg['user']}\x01auth=Bearer {token}\x01\x01"
+            code, _ = smtp.docmd("AUTH", "XOAUTH2 " + _b64.b64encode(auth_string.encode()).decode())
+            if code == 334:                     # 有 challenge，回空行取最终码
+                code, _ = smtp.docmd("")
+            authed = (code == 235)
+        if not authed:
+            smtp.login(pa_cfg["user"], pa_cfg["password"])
+        smtp.sendmail(pa_cfg["user"], all_rcpts, msg.as_string())
+    finally:
+        try: smtp.quit()
+        except Exception: pass
+
+
+def _resolve_forward_targets(addrs, project):
+    """把转发目标里的占位「对应案件接口」替换成查库接口人邮箱；其余固定邮箱原样。去重。"""
+    out, seen = [], set()
+    def _add(m):
+        m = (m or "").strip()
+        if m and m.lower() not in seen:
+            seen.add(m.lower()); out.append(m)
+    for a in (addrs or []):
+        if a == "对应案件接口":
+            try:
+                from enrich_report import query_case_interface
+                for m in query_case_interface(project):
+                    _add(m)
+            except Exception as e:
+                print(f"  [转发] 查接口人失败 {project}: {e}", file=sys.stderr)
+        else:
+            _add(a)
+    return out
+
+
+def _forward_official_email(pa_cfg, raw_bytes, orig_subject, to_list, cc_list):
+    """把原始官文邮件作为 .eml 附件，从 pa 账号 Fwd 给接口人。best-effort。"""
+    if not raw_bytes or not to_list:
+        if not raw_bytes:
+            print(f"  [转发跳过] {orig_subject} 无原始邮件，无法原样转发", file=sys.stderr)
+        return
+    from email.mime.message import MIMEMessage
+    import email as _email
+    cc_list = [c for c in (cc_list or []) if c and c not in to_list]
+    msg = MIMEMultipart()
+    msg["From"] = pa_cfg["user"]
+    msg["To"] = ", ".join(to_list)
+    if cc_list:
+        msg["Cc"] = ", ".join(cc_list)
+    msg["Subject"] = f"Fwd: {orig_subject}"
+    msg.attach(MIMEText("系统自动转发官文邮件，原件见附件。", "plain", "utf-8"))
+    try:
+        rfc = MIMEMessage(_email.message_from_bytes(raw_bytes))
+    except Exception as e:
+        print(f"  [转发失败] 原件封装失败 {orig_subject}: {e}", file=sys.stderr)
+        return
+    rfc.add_header("Content-Disposition", "attachment", filename="original.eml")
+    msg.attach(rfc)
+    try:
+        _smtp_send(pa_cfg, msg, to_list + cc_list)
+        print(f"  [转发成功] {orig_subject} → {', '.join(to_list)}"
+              + (f" (CC {', '.join(cc_list)})" if cc_list else ""), file=sys.stderr)
+    except Exception as e:
+        print(f"  [转发失败] {orig_subject} → {', '.join(to_list)}: {e}", file=sys.stderr)
+
+
 def send_review_links_email(links):
     """按准备人分组，把各自名下的审核链接分别发给对应准备人。"""
     if not links:
@@ -843,6 +916,7 @@ def read_emails(account_cfg, folder="INBOX", since=None, before=None,
         msg = email.message_from_bytes(raw)
         parsed = parse_message(msg, attachment_dir)
         parsed["seq"] = i + 1
+        parsed["raw_bytes"] = raw   # 原始 MIME，供二期"原样转发"用
         # 汇报信侧扩展：保存 PDF 附件到 _inbox，留待写库时移到 output/{案号}/source/
         parsed["saved_pdfs"] = _save_pdf_attachments_to_inbox(msg, parsed.get("message_id", ""), i + 1)
         results.append(parsed)
@@ -1026,6 +1100,9 @@ def dispatch_report(all_results, all_emails, dry_run=False):
         em.get("message_id", ""): em.get("saved_pdfs", [])
         for (_acc, em) in all_emails if em.get("saved_pdfs")
     }
+    # msgid → 原始邮件（二期"原样转发"用其 raw_bytes）
+    msgid_to_email = {em.get("message_id", ""): em for (_acc, em) in (all_emails or [])}
+    _fwd_pa_cfg = load_config().get("accounts", {}).get("pa")   # 转发从 pa 账号发
 
     all_review_links = []  # 收集所有审核链接，最后统一发一封通知邮件
 
@@ -1097,7 +1174,18 @@ def dispatch_report(all_results, all_emails, dry_run=False):
                         tpl_info = None
                     elif act == "skip":
                         fwd = action.get("forward") or {}
-                        print(f"  [规则-skip] {project} {ntype} 不分配汇报信，应转发 to={fwd.get('to')} cc={fwd.get('cc')}（转发二期实现）", file=sys.stderr)
+                        fwd_to = _resolve_forward_targets(fwd.get("to"), project)
+                        fwd_cc = _resolve_forward_targets(fwd.get("cc"), project)
+                        print(f"  [规则-skip] {project} {ntype} 不分配汇报信，转发 to={fwd_to} cc={fwd_cc}", file=sys.stderr)
+                        if not dry_run and fwd_to and _fwd_pa_cfg:
+                            em = msgid_to_email.get(item.get("message_id", ""))
+                            _forward_official_email(
+                                _fwd_pa_cfg,
+                                em.get("raw_bytes") if em else None,
+                                (em.get("subject") if em else "") or item.get("email_subject") or ntype,
+                                fwd_to, fwd_cc)
+                        elif not fwd_to:
+                            print(f"  [转发跳过] {project} {ntype} 未解析到接口人/转发地址", file=sys.stderr)
                         tpl_info = None
                     elif act == "assign":
                         preparer_override = action.get("preparer")

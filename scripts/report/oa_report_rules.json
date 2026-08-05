@@ -18,7 +18,7 @@
       "mei.hu@metis-ip.com": "胡梅",
       "hui.ren@metis-ip.com": "任惠",
       "jing.wang@metis-ip.com": "王晶",
-      "对应案件接口": "占位-需查库/映射，二期实现"
+      "对应案件接口": "查 atw: customer.bspeople(customer_code=案号前5位)→拆人名→users.usermail(username_zn=人名)"
     }
   },
 

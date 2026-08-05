@@ -13,6 +13,7 @@
 """
 import html
 import os
+import re
 import sys
 import json
 
@@ -107,6 +108,41 @@ def query_customer_demands(project):
         return []
 
 
+def query_case_interface(project):
+    """MySQL atw: 案件对应接口人邮箱（用于官文转发）。
+    customer.bspeople(customer_code=案号前5位) → 逗号拆人名 → users.usermail(username_zn=人名)。
+    返回去重邮箱列表；查不到/出错返回 []。"""
+    code = (project or "")[:5]
+    if not code:
+        return []
+    try:
+        from db_query import execute_params
+        rows = execute_params(
+            "SELECT bspeople FROM customer WHERE customer_code = %s", (code,))
+        bspeople = (rows[0].get("bspeople") if rows else "") or ""
+    except Exception as e:
+        print(f"[enrich] 查接口人 bspeople 失败 {project}: {e}", file=sys.stderr)
+        return []
+    names = [n.strip() for n in re.split(r"[,，、;；]+", bspeople) if n.strip()]
+    emails, seen = [], set()
+    for name in names:
+        try:
+            from db_query import execute_params
+            rows = execute_params(
+                "SELECT usermail FROM users WHERE username_zn = %s", (name,))
+            mail = ((rows[0].get("usermail") if rows else "") or "").strip()
+        except Exception as e:
+            print(f"[enrich] 查接口人邮箱失败 {name}: {e}", file=sys.stderr)
+            continue
+        if not mail:
+            print(f"[enrich] 接口人 {name} 无 usermail（{project}）", file=sys.stderr)
+            continue
+        if mail.lower() not in seen:
+            seen.add(mail.lower())
+            emails.append(mail)
+    return emails
+
+
 def query_case_recipients(project):
     """SQL Server IPEasy: 案号 → 客户联系人（汇报信收件人，全取）。
     链路：p_case_info.case_volume = 案号 → customer_id
@@ -180,5 +216,6 @@ if __name__ == "__main__":
         demands = query_customer_demands(project)
         print(json.dumps(demands, ensure_ascii=False, indent=2))
         print("收件人:", json.dumps(query_case_recipients(project), ensure_ascii=False, indent=2))
+        print("接口人:", json.dumps(query_case_interface(project), ensure_ascii=False, indent=2))
     else:
         print("用法: python3 enrich_report.py <代理所案号>", file=sys.stderr)
