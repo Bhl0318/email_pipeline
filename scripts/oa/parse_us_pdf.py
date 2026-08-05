@@ -225,6 +225,61 @@ def parse_pph_decision(pdf_path):
     return _ai_pph_decision_from_images(pdf_path, max_pages=3)
 
 
+# Examiner Interview Summary 无需答复的关键句
+_INTERVIEW_NO_ACTION_PHRASE = "it is not necessary for applicant"
+
+
+def _ai_interview_no_action_from_images(pdf_path, max_pages=3):
+    """扫描件降级：渲染前 N 页发 qwen-vl-max 判断是否含 'It is not necessary for applicant'。"""
+    try:
+        import fitz
+    except ImportError:
+        return False
+    doc = fitz.open(pdf_path)
+    images_b64 = []
+    for i in range(min(max_pages, len(doc))):
+        pix = doc[i].get_pixmap(dpi=200)
+        images_b64.append(base64.b64encode(pix.tobytes("png")).decode("utf-8"))
+    doc.close()
+    if not images_b64:
+        return False
+    client = OpenAI(api_key=QWEN_API_KEY, base_url=QWEN_BASE_URL)
+    content = [{
+        "type": "text",
+        "text": ('This is a USPTO Examiner Interview Summary. Does it contain the statement '
+                 '"It is not necessary for applicant to provide a separate record ...\" '
+                 '(i.e. no separate reply is required)? '
+                 'Return ONLY JSON: {"present": true} or {"present": false}.')
+    }]
+    for b64 in images_b64:
+        content.append({"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b64}"}})
+    try:
+        resp = client.chat.completions.create(
+            model=QWEN_VL_MODEL, max_tokens=30,
+            messages=[{"role": "user", "content": content}])
+        m = re.search(r'\{.*?\}', resp.choices[0].message.content.strip(), re.DOTALL)
+        if m:
+            return bool(json.loads(m.group()).get("present"))
+    except Exception as e:
+        print(f"qwen-vl-max Interview 判断失败: {e}", file=sys.stderr)
+    return False
+
+
+def interview_no_action_needed(pdf_path):
+    """Examiner Interview Summary：官文含 'It is not necessary for applicant' → 无需答复，返回 True（不立项）。
+    先读文字层命中即 True；有文字但未命中 → False；无文字（扫描件）→ OCR 判定。
+    文件不存在/无法判定 → False（默认仍立项，避免误跳过）。"""
+    if not pdf_path or not os.path.exists(pdf_path):
+        return False
+    text, _is_scanned = _pdf_to_text(pdf_path, max_pages=5)
+    low = (text or "").lower()
+    if _INTERVIEW_NO_ACTION_PHRASE in low:
+        return True
+    if low.strip():
+        return False   # 有文字层但未命中 → 仍立项
+    return _ai_interview_no_action_from_images(pdf_path, max_pages=3)
+
+
 def extract_us_deadline(pdf_path, mailing_date=None):
     """
     从 US 官文 PDF 提取答复期限。

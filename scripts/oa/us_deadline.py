@@ -67,8 +67,9 @@ def get_us_deadline(application_no, document_code, oa_doc_date, project):
     print(f"[US] 解析 PDF: {pdf_path}", file=sys.stderr)
     result = extract_us_deadline(pdf_path, mailing_date=mailing_date)
     if not result:
-        print(f"[US] PDF 解析失败", file=sys.stderr)
-        return None
+        # 解析不到期限（EXIN/NOA/补正等）也要保留已下载的 pdf_path，供盖章/转OA附件/Wiki/EXIN判定
+        print(f"[US] PDF 期限解析失败，保留 pdf_path", file=sys.stderr)
+        return {"months": None, "deadline": None, "pdf_path": pdf_path}
 
     result["pdf_path"] = pdf_path
     print(f"[US] 结果: months={result['months']}, deadline={result['deadline']}", file=sys.stderr)

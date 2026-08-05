@@ -1011,6 +1011,18 @@ def dispatch_oa(all_results, all_emails=None, dry_run=False, test_project_prefix
                 print(f"[PPH] {it.get('project')} 判定={decision or '未判定，保留'} → 立项", file=sys.stderr)
         all_results = [r for r in all_results if not r.get("_pph_drop")]
 
+    # Examiner Interview Summary：官文含 "It is not necessary for applicant" → 无需答复，不立项
+    exin_items = [r for r in all_results if r.get("notification_type") == "EXIN"]
+    if exin_items and not dry_run:
+        from parse_us_pdf import interview_no_action_needed
+        for it in exin_items:
+            if interview_no_action_needed(it.get("us_pdf_path", "")):
+                it["_exin_drop"] = True
+                print(f"[EXIN] {it.get('project')} 含『It is not necessary for applicant』→ 不立项", file=sys.stderr)
+            else:
+                print(f"[EXIN] {it.get('project')} → 立项", file=sys.stderr)
+        all_results = [r for r in all_results if not r.get("_exin_drop")]
+
     # 上传官文附件到 OA 信息记录表页：CN/EP 取邮件附件 PDF，US 取下载的官文
     if all_results and dry_run:
         print(f"  [dry-run] 跳过上传官文附件到 OA 信息表页", file=sys.stderr)
