@@ -2012,6 +2012,71 @@ def mark_uspto_uploaded(task_id: str):
     return {"ok": True, "task_id": task_id, "status": "done"}
 
 
+# ═══ 环节8：上传 USPTO 后的文件预览页（只读，纯增量，不影响其它路由）═══
+# 环节7 上传成功后由 env7 机（D:\up_uspto）发链接邮件；链接指向本页，预览该案上传到
+# USPTO 的文件（来自 Z 盘归档 {base}\{码}\{组内号}\{案号}\ 的 仅存档\ + 签署版\）。
+USPTO_REVIEW_HTML = WEB_DIR / "uspto_review.html"
+_USPTO_REVIEW_SUBS = ("仅存档", "签署版")   # 上传包来源；发美代理\ 是未签发出版，不在预览范围
+
+
+def _uspto_zcase_root(case_volume: str) -> str:
+    """该案在 Z 盘的归档根：{base}\\{码}\\{组内号}\\{案号}（码=前5位、组内号=前10位，同 OA/env7 约定）。"""
+    base = (_load_email_config().get("submission") or {}).get("uspto_upload_archive_base") or r"Z:\upload_USPTO"
+    cv = (case_volume or "").strip()
+    return os.path.join(base, cv[:5], cv[:10], cv)
+
+
+def _uspto_safe_name(name: str) -> str:
+    """只允许纯文件名（防路径穿越）：无路径分隔符、非 . / ..，否则 400。"""
+    n = (name or "").strip()
+    if not n or n in (".", "..") or "/" in n or "\\" in n or os.path.basename(n) != n:
+        raise HTTPException(400, "非法文件名")
+    return n
+
+
+@app.get("/submission/uspto-review/{case_volume}")
+def uspto_review_page(case_volume: str):
+    """环节8 预览页（web/uspto_review.html）；案号由前端从 URL 读取后拉 /files。"""
+    if not USPTO_REVIEW_HTML.exists():
+        return PlainTextResponse(
+            f"预览页前端尚未部署（web/uspto_review.html 缺失）。案号: {case_volume}\n"
+            f"可先用 GET /api/submission/uspto-review/{case_volume}/files 查看文件清单。",
+            status_code=200)
+    return FileResponse(str(USPTO_REVIEW_HTML), media_type="text/html; charset=utf-8")
+
+
+@app.get("/api/submission/uspto-review/{case_volume}/files")
+def uspto_review_files(case_volume: str):
+    """列该案 Z 盘 仅存档\\ + 签署版\\ 下的文件（分组、名字、大小）。目录缺失返回空组，不报错。"""
+    root = _uspto_zcase_root(case_volume)
+    groups = []
+    for sub in _USPTO_REVIEW_SUBS:
+        d = os.path.join(root, sub)
+        items = []
+        if os.path.isdir(d):
+            for n in sorted(os.listdir(d)):
+                fp = os.path.join(d, n)
+                if os.path.isfile(fp):
+                    items.append({"name": n, "size": os.path.getsize(fp),
+                                  "is_pdf": n.lower().endswith(".pdf")})
+        groups.append({"sub": sub, "files": items})
+    return {"case_volume": case_volume, "root": root, "groups": groups}
+
+
+@app.get("/api/submission/uspto-review/{case_volume}/file")
+def uspto_review_file(case_volume: str, sub: str, name: str):
+    """返回单个文件：PDF 内联预览、其余作附件下载。sub 限 仅存档/签署版，name 防穿越。"""
+    if sub not in _USPTO_REVIEW_SUBS:
+        raise HTTPException(400, f"非法子目录：{sub}")
+    safe = _uspto_safe_name(name)
+    fp = os.path.join(_uspto_zcase_root(case_volume), sub, safe)
+    if not os.path.isfile(fp):
+        raise HTTPException(404, "文件不存在")
+    if safe.lower().endswith(".pdf"):
+        return FileResponse(fp, media_type="application/pdf", content_disposition_type="inline")
+    return FileResponse(fp, filename=safe)   # 非 PDF → 下载
+
+
 if __name__ == "__main__":
     print(f"启动汇报信审核服务: http://localhost:8501", file=sys.stderr)
     print(f"  - 模板目录: {TEMPLATES_DIR}", file=sys.stderr)

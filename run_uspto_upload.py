@@ -125,6 +125,23 @@ def _mark_uploaded(upload_id, now):
              (now, now, upload_id))
 
 
+def _notify_review(case_volume):
+    """环节8：上传成功后发预览链接邮件给指定人（best-effort，失败只记日志、不影响 done）。
+    链接指向 report_server 预览页；收件人/base 从 email_config.json 取（缺省 hailing.bi + 8501）。"""
+    try:
+        import submission_mailer as _mailer   # scripts/report 已在 sys.path（db_query 同目录）
+        link = f"{_mailer.review_base_url()}/submission/uspto-review/{case_volume}"
+        recipients = _mailer.uspto_review_recipients()
+        html = (f"<p>案号 <b>{case_volume}</b> 已上传至 USPTO Patent Center（存草稿，未递交）。</p>"
+                f"<p>请点击以下链接预览本案实际上传的全套文件，核对后在 Patent Center 正式递交：</p>"
+                f"<p><a href='{link}'>{link}</a></p>"
+                f"<p>本邮件由系统自动发送。</p>")
+        _mailer.send_html(f"【US递交-已上传待复审】{case_volume}", html, recipients)
+        print(f"  ✉️ 已发预览链接邮件给 {', '.join(recipients)}")
+    except Exception as exc:  # noqa: BLE001
+        print(f"  ⚠️ 预览链接邮件发送失败（不影响上传/销账）：{exc}", file=sys.stderr)
+
+
 def run(live=False):
     if not _DB_OK:
         print("[uspto-upload] DB 不可用，退出。")
@@ -166,6 +183,7 @@ def run(live=False):
         now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         _mark_uploaded(c["upload_id"], now)
         print(f"  ✅ 已上传（存草稿）并置 uspto_upload=done（{c['case_volume']}）。")
+        _notify_review(c["case_volume"])   # 环节8：发预览链接邮件（best-effort）
 
 
 def run_loop(interval, live=False):
