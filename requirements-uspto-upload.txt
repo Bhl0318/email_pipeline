@@ -1,0 +1,22 @@
+# 环节7（USPTO 上传）独立部署机专用依赖（如新 Windows 机 D:\up_uspto）。
+# 只含 run_uspto_upload.py + patent_center_ui.py + sendInfobyDing.py 用到的包，
+# 不含主流水线（FastAPI/文档生成等）依赖。
+#
+# 安装：
+#   pip install -r requirements-uspto-upload.txt
+#   playwright install chromium        # 装浏览器内核（pip 之外的一步，必需）
+
+# 连 atw 库（db_query.py）
+pymysql
+
+# 驱动浏览器上传 Patent Center（patent_center_ui.py）
+playwright
+
+# 接收你回复的 Okta 验证码（钉钉 Stream，patent_center_ui.py）
+dingtalk-stream
+
+# 推送 OTP 提示到钉钉（sendInfobyDing.py；best-effort，缺则跳过推送、仍可手动回复机器人）
+alibabacloud_dingtalk
+alibabacloud_tea_openapi
+alibabacloud_tea_util
+requests
