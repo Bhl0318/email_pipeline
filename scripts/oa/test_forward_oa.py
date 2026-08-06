@@ -95,6 +95,18 @@ def test_cc_fixed_plus_contacts():
     ok("qin.zhang@metis-ip.com" in FORWARD_FIXED_CC, "固定抄送含张琴")
 
 
+def test_cc_extra_rule_20608_noa():
+    ex = _fake_execute("", {})   # 无客户接口人，只看固定+特殊规则
+    cc = forward_cc("20608-0320US00", {"notification_type": "NOA"}, execute=ex)
+    ok("xlding@metis-ip.com" in cc, "20608 NOA 抄送含丁晓龙")
+    cc2 = forward_cc("20608-0267US00", {"notification_type": "CTNF"}, execute=ex)
+    ok("xlding@metis-ip.com" not in cc2, "20608 非NOA 不加丁晓龙")
+    cc3 = forward_cc("20618-1061US00", {"notification_type": "NOA"}, execute=ex)
+    ok("xlding@metis-ip.com" not in cc3, "非20608 的NOA 不加丁晓龙")
+    cc4 = forward_cc("20608-0320US00", None, execute=ex)
+    ok("xlding@metis-ip.com" not in cc4, "无 item(未知类型) 不加丁晓龙")
+
+
 def test_cc_dedup():
     # 接口人邮箱恰好是固定人员之一 → 不重复
     ex = _fake_execute("苏雅", {"苏雅": "ya.su@metis-ip.com"})
@@ -157,7 +169,8 @@ def test_attachments_gather():
 if __name__ == "__main__":
     for fn in [test_public_email_mapping, test_public_email_fallback, test_recipients,
                test_split_names, test_contacts_multi, test_contacts_missing_user_skipped,
-               test_contacts_no_customer, test_cc_fixed_plus_contacts, test_cc_dedup,
+               test_contacts_no_customer, test_cc_fixed_plus_contacts,
+               test_cc_extra_rule_20608_noa, test_cc_dedup,
                test_forward_body, test_forward_body_no_deadline,
                test_forward_subject, test_attachments_gather]:
         print(f"[{fn.__name__}]")

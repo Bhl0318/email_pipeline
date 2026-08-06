@@ -575,7 +575,7 @@ def send_forward_oa(all_results, all_emails=None, dry_run=False):
         plans.append({
             "item": item,
             "to": forward_recipients(project),
-            "cc": forward_cc(project),
+            "cc": forward_cc(project, item),
             "subject": build_forward_subject(item, atts),  # 【OA自动立项通知】+ 官文文件名(发文日-官文名-案号)
             "body": build_forward_body(item),
             "atts": atts,

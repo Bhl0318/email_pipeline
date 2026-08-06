@@ -84,10 +84,23 @@ def get_customer_contacts(project, execute=None):
         return []
 
 
-def forward_cc(project, execute=None):
-    """转OA 抄送 = 固定7人(OP02) + 客户接口人。去重保序。execute 可注入(测试用)。"""
+# 特殊抄送规则：(客户码, 官文类型) → 额外抄送邮箱
+EXTRA_CC_RULES = {
+    ("20608", "NOA"): ["xlding@metis-ip.com"],   # 20608 的 NOA 额外抄送丁晓龙
+}
+
+
+def forward_cc(project, item=None, execute=None):
+    """转OA 抄送 = 固定7人(OP02) + 客户接口人 + 特殊规则额外抄送。去重保序。
+    item 提供 notification_type，用于匹配 EXTRA_CC_RULES；execute 可注入(测试用)。"""
     cc = list(FORWARD_FIXED_CC)
     for mail in get_customer_contacts(project, execute=execute):
+        if mail not in cc:
+            cc.append(mail)
+    # (客户码, 官文类型) 特殊规则
+    code = (project or "").split("-")[0].strip()
+    ntype = (item or {}).get("notification_type", "")
+    for mail in EXTRA_CC_RULES.get((code, ntype), []):
         if mail not in cc:
             cc.append(mail)
     return cc
