@@ -46,13 +46,19 @@ def test_predock_skipped():
     ok(classify_us(_ed("PREDOCK.NTF")) is None, "PREDOCK.NTF 不立项")
 
 
+def test_track1_grant_skipped():
+    ok("TRACK1.GRANT" in US_TYPES_SKIP, "TRACK1.GRANT 在跳过表")
+    ok(classify_us(_ed("TRACK1.GRANT")) is None, "TRACK1.GRANT 不立项")
+
+
 def test_normal_still_classifies():
     res = classify_us(_ed("CTNF"))
     ok(res is not None and res[0]["notification_type"] == "CTNF", "CTNF 仍立项")
 
 
 if __name__ == "__main__":
-    for fn in [test_config, test_m327_skipped, test_predock_skipped, test_normal_still_classifies]:
+    for fn in [test_config, test_m327_skipped, test_predock_skipped,
+               test_track1_grant_skipped, test_normal_still_classifies]:
         print(f"[{fn.__name__}]")
         fn()
     print(f"\n全部通过：{_passed} 项断言")
