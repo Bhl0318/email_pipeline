@@ -455,6 +455,7 @@ class ConfirmReq(BaseModel):
     mail_from: str | None = None     # 发送人 key（qxt/zhyc），空则按代理所案号 -H 规则
     mail_to: list[str] | None = None # 收件人（客户邮箱），弹窗手填
     mail_cc: list[str] | None = None # 抄送
+    subject: str | None = None       # 主题（弹窗可自定义编辑，空则用默认规则）
 
 
 class PreviewSendReq(BaseModel):
@@ -551,8 +552,8 @@ def confirm_task(task_id: str, req: ConfirmReq):
         except Exception as e:
             print(f"[confirm] PDF 保存失败 {task_id}: {e}", file=sys.stderr)
 
-    # 3) 构 MIME，写 .eml 备份
-    subject = f"Privileged & Confidential-{base}"
+    # 3) 构 MIME，写 .eml 备份（主题：弹窗自定义优先，否则默认规则）
+    subject = (req.subject or "").strip() or f"Privileged & Confidential-{base}"
     mime_msg = None
     if req.html_body is not None:
         try:

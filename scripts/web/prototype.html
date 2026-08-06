@@ -606,7 +606,7 @@
         <div style="font-size:11px;color:#94a3b8;margin-top:4px;">默认已带出全部联系人，点 ▾ 勾选，或直接编辑</div>
       </div></div>
       <div class="modal-row"><div class="modal-label">抄送</div><div class="modal-value"><input class="modal-input" id="md-cc-inp" placeholder="选填，多个用 ; 分隔" autocomplete="off"></div></div>
-      <div class="modal-row"><div class="modal-label">主题</div><div class="modal-value" id="md-subject">—</div></div>
+      <div class="modal-row"><div class="modal-label">主题</div><div class="modal-value"><input class="modal-input" id="md-subject-inp" placeholder="邮件主题" autocomplete="off"></div></div>
       <div class="modal-row"><div class="modal-label">附件</div><div class="modal-value modal-attachments" id="md-attachments">—</div></div>
     </div>
     <div class="modal-footer">
@@ -1031,7 +1031,7 @@
     // 抄送：可编辑输入框，预填后端给的默认（当前默认空）
     $('md-cc-inp').value = (preview.cc || []).join('; ');
 
-    $('md-subject').textContent = preview.subject || '';
+    $('md-subject-inp').value = preview.subject || '';
 
     // 附件清单
     const att = $('md-attachments');
@@ -1140,6 +1140,7 @@
           mail_from: mailFrom,
           mail_to: mailTo,
           mail_cc: mailCc,
+          subject: $('md-subject-inp').value.trim(),
         }),
       });
       const data = await resp.json();
