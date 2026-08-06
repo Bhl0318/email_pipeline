@@ -1196,6 +1196,19 @@ def dispatch_report(all_results, all_emails, dry_run=False):
                         tpl_info = None
                     elif act == "assign":
                         preparer_override = action.get("preparer")
+                        # 双动作：分配汇报信的同时，把原始官文再转发一份（如韶音 20608 发 shokz+赵彤）
+                        also = action.get("also_forward")
+                        if also and not dry_run and _fwd_pa_cfg:
+                            af_to = _resolve_forward_targets(also.get("to"), project)
+                            af_cc = _resolve_forward_targets(also.get("cc"), project)
+                            if af_to:
+                                em = msgid_to_email.get(item.get("message_id", ""))
+                                print(f"  [assign+转发] {project} {ntype} 分配 {preparer_override} 并转发 to={af_to} cc={af_cc}", file=sys.stderr)
+                                _forward_official_email(
+                                    _fwd_pa_cfg,
+                                    em.get("raw_bytes") if em else None,
+                                    (em.get("subject") if em else "") or item.get("email_subject") or ntype,
+                                    af_to, af_cc)
             if tpl_info:
                 report_actions.append({"message_id": item.get("message_id", ""),
                                        "project": project, "action": "分配汇报信",
