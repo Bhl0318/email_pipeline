@@ -456,6 +456,7 @@ class ConfirmReq(BaseModel):
     mail_to: list[str] | None = None # 收件人（客户邮箱），弹窗手填
     mail_cc: list[str] | None = None # 抄送
     subject: str | None = None       # 主题（弹窗可自定义编辑，空则用默认规则）
+    source_attachments: list[str] | None = None  # 勾选要附的官文(相对路径)；None=全带
 
 
 class PreviewSendReq(BaseModel):
@@ -539,6 +540,10 @@ def confirm_task(task_id: str, req: ConfirmReq):
             source_attachments = json.loads(sa_rows[0]["source_attachments"])
         except Exception:
             pass
+    # 按弹窗勾选过滤官文附件（未传=全带；只保留库里确有的，防越权附任意路径）
+    if req.source_attachments is not None:
+        sel = set(req.source_attachments)
+        source_attachments = [p for p in source_attachments if p in sel]
 
     pdf_bytes = None
     pdf_filename = None

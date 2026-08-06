@@ -1035,16 +1035,18 @@
 
     // 附件清单
     const att = $('md-attachments');
-    const items = [];
-    if (preview.report_pdf_filename) items.push({type: '汇报信', name: preview.report_pdf_filename});
-    (preview.source_attachments || []).forEach(a => items.push({type: '官文', name: a.filename}));
-    if (!items.length) {
-      att.innerHTML = '<div class="none">无附件，仅发送正文</div>';
-    } else {
-      att.innerHTML = '<ul>' + items.map(it =>
-        `<li><span style="color:#94a3b8;">[${it.type}]</span> ${escapeHTML(it.name)}</li>`
-      ).join('') + '</ul>';
+    const lis = [];
+    // 汇报信 PDF：由「附汇报信PDF」开关控制，这里只展示不带勾选
+    if (preview.report_pdf_filename) {
+      lis.push(`<li><span style="color:#94a3b8;">[汇报信]</span> ${escapeHTML(preview.report_pdf_filename)}</li>`);
     }
+    // 官文附件：每个带勾选框，默认勾选，可取消
+    (preview.source_attachments || []).forEach(a => {
+      lis.push(`<li><label style="cursor:pointer;"><input type="checkbox" class="att-chk" value="${escapeHTML(a.path)}" checked> <span style="color:#94a3b8;">[官文]</span> ${escapeHTML(a.filename)}</label></li>`);
+    });
+    att.innerHTML = lis.length
+      ? '<ul>' + lis.join('') + '</ul>'
+      : '<div class="none">无附件，仅发送正文</div>';
 
     // 收件人一个没选则禁用发送
     $('md-send-btn').disabled = !getSelectedRecipients().length;
@@ -1141,6 +1143,7 @@
           mail_to: mailTo,
           mail_cc: mailCc,
           subject: $('md-subject-inp').value.trim(),
+          source_attachments: Array.from(document.querySelectorAll('#md-attachments .att-chk:checked')).map(c => c.value),
         }),
       });
       const data = await resp.json();
