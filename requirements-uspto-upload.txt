@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # 环节7（USPTO 上传）独立部署机专用依赖（如新 Windows 机 D:\up_uspto）。
 # 只含 run_uspto_upload.py + patent_center_ui.py + sendInfobyDing.py 用到的包，
 # 不含主流水线（FastAPI/文档生成等）依赖。
