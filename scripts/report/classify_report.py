@@ -109,12 +109,19 @@ def _ai_parse_ep_deadline(body, issue_date_str):
     return None
 
 
-def _ai_parse_cn_deadline(deadline_text, issue_date_str):
-    """用 DeepSeek 将非标准 CN 答复期限文本转为绝限日期(YYYY-MM-DD)。"""
+def _ai_parse_cn_deadline(deadline_text, issue_date_str, is_pre_exam=False):
+    """用 DeepSeek 将非标准 CN 答复期限文本转为绝限日期(YYYY-MM-DD)。
+    计算规则通过提示词传达：起算(预审=发文日当天/非预审=次日)、工作日跳周末+法定节假日。"""
     client = OpenAI(api_key=_DEEPSEEK_API_KEY, base_url=_DEEPSEEK_BASE_URL)
+    pre_hint = "该案为预审案件" if is_pre_exam else "该案非预审案件"
     prompt = (
-        f"发文日是 {issue_date_str}，答复期限描述为「{deadline_text}」。\n"
-        "请根据发文日和期限描述，计算出最终的答复截止日期。\n"
+        f"发文日是 {issue_date_str}，{pre_hint}，答复期限描述为「{deadline_text}」。\n"
+        "请按以下规则计算最终答复截止日期：\n"
+        "1. 起算：预审案件从发文日当天算作第1天；非预审案件从发文日次日起算。\n"
+        "2. 若为「N个工作日」：只数工作日，跳过周六、周日和中国法定节假日"
+        "(元旦/春节/清明/劳动节/端午/中秋/国庆等)。\n"
+        "3. 若为「N个月」：按自然月计算，即发文日 + N 个月。\n"
+        "4. 若已给出明确日期：直接使用该日期。\n"
         '仅返回 JSON: {"deadline": "YYYY-MM-DD"}\n'
         '如果无法判断，返回: {"deadline": null}'
     )
@@ -421,13 +428,14 @@ def classify_cn(email_data):
         if _parse_date(raw_deadline):
             result["project_deadline"] = raw_deadline
         else:
-            # 非标准格式（如"五个工作日"、"两个月"），交给 DeepSeek 计算
+            # 非标准格式（如"五个工作日"、"两个月"），交给 DeepSeek 计算（规则写在提示词里）
             issue_str = result.get("issue_date", "")
             if issue_str:
-                ai_deadline = _ai_parse_cn_deadline(raw_deadline, issue_str)
+                _pre = "预审案件" in f"{subject}\n{body}\n{email_data.get('html_body', '')}"
+                ai_deadline = _ai_parse_cn_deadline(raw_deadline, issue_str, _pre)
                 if ai_deadline:
                     result["project_deadline"] = ai_deadline
-                    print(f"[DeepSeek] CN期限: '{raw_deadline}' → {ai_deadline}", file=sys.stderr)
+                    print(f"[DeepSeek] CN期限: '{raw_deadline}'(预审={_pre}) → {ai_deadline}", file=sys.stderr)
                 else:
                     result["project_deadline"] = raw_deadline
             else:
