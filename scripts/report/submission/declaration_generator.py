@@ -38,9 +38,14 @@ def _fill_pdf_form(template_path: Path, output_path: Path, field_updates: dict) 
 
 
 def _build_field_dict(special: bool, title: str, inventor: str,
-                      pct_app_no: str, pct_app_date: str) -> tuple:
-    """按模板版本组装字段字典，返回 (模板路径, 字段字典)。"""
-    is_pct = bool(pct_app_no)
+                      pct_app_no: str, pct_app_date: str,
+                      force_attached: bool = False) -> tuple:
+    """按模板版本组装字段字典，返回 (模板路径, 字段字典)。
+
+    force_attached=True（Paris / CIP 落地）时，"This declaration is directed to:" 勾第一项
+    "随附的申请（the attached application）"；否则勾第二项，引用在先 PCT/美国申请号。
+    """
+    is_pct = not force_attached
     if special:
         check_box = (
             {"undefined": "On",
@@ -83,12 +88,17 @@ def generate_declarations(fields: dict, output_dir) -> list:
     advance = fields.get("case_advance_info") or {}
     pct_app_no = (advance.get("pct_app_no") or "").strip()
     pct_app_date = (advance.get("pct_app_date") or "").strip()
+    # Declaration "This declaration is directed to:"：
+    #   落地方式为 Paris（巴黎公约）或 CIP（Continuation in part of）→ 勾第一项"随附的申请"；
+    #   其余（371 / bypass / Continuation of / Division 等）→ 勾第二项，引用在先 PCT/美国申请号。
+    _route = (fields.get("filing_route") or "").strip().lower()
+    force_attached = ("paris" in _route) or ("continuation in part" in _route) or ("cip" in _route)
     names = inventor_names(fields)
     if not names:
         raise ValueError("发明人列表为空，无法生成 Declaration")
 
     special = is_special_client(case_volume)
-    template_path, _ = _build_field_dict(special, title, "", pct_app_no, pct_app_date)
+    template_path, _ = _build_field_dict(special, title, "", pct_app_no, pct_app_date, force_attached)
     if not template_path.exists():
         raise RuntimeError(f"缺少模板 {template_path}")
 
@@ -100,7 +110,7 @@ def generate_declarations(fields: dict, output_dir) -> list:
     merged = fitz.open()
     try:
         for idx, inventor in enumerate(names):
-            template_path, field_dict = _build_field_dict(special, title, inventor, pct_app_no, pct_app_date)
+            template_path, field_dict = _build_field_dict(special, title, inventor, pct_app_no, pct_app_date, force_attached)
             tmp_path = output_dir / f".decl_tmp_{idx}.pdf"
             _fill_pdf_form(template_path, tmp_path, field_dict)
             with fitz.open(str(tmp_path)) as one:
