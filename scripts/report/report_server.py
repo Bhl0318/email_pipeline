@@ -290,7 +290,7 @@ OUTPUT_DIR = ROOT / "output"  # 生成物按 output/{代理所案号}/ 归类
 
 def _safe_filename(fields):
     """按 example/ 的命名拼汇报信文件名（去掉文件名非法字符）"""
-    issue = (fields.get("发文日期") or "").replace("/", "-")
+    issue = datetime.now().strftime("%Y-%m-%d")   # 邮件发送日（原为发文日期，已改）
     ntype = fields.get("通知类型") or "汇报信"
     if not ntype.endswith("转达"):
         ntype += "转达"
