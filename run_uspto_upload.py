@@ -28,7 +28,13 @@ import time
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 OUTPUT_ROOT = os.path.join(SCRIPT_DIR, "uspto_upload")
 REPO_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, "..", ".."))
-SELE_DIR = os.path.join(REPO_ROOT, "us_submission", "seleTest")
+# patent_center_ui.py 位置：优先与本脚本同目录（如新机 D:\up_uspto 平铺部署：
+# run_uspto_upload.py / patent_center_ui.py / sendInfobyDing.py 同级），
+# 找不到再回退仓库内 us_submission/seleTest（开发仓布局）。
+if os.path.exists(os.path.join(SCRIPT_DIR, "patent_center_ui.py")):
+    SELE_DIR = SCRIPT_DIR
+else:
+    SELE_DIR = os.path.join(REPO_ROOT, "us_submission", "seleTest")
 
 # DB（atw.submission_tasks），复用 report 端 db_query。best-effort。
 try:
