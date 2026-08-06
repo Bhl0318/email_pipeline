@@ -586,11 +586,11 @@ class PatentApplicationFormGenerator:
                 data_rows4.append(['Priority No./优先权号', prioritie.get('priority_no') or prioritie.get('priority_num') or ''])
                 data_rows4.append(['Priority Date/优先权日:', prioritie.get('priority_date', '')])
                 data_rows4.append(['DAS code/DAS码', prioritie.get('access_code', '')])
-        # 加速方式单元格：值为 None/none（无加速）→ 显示空白，不显示字面 "None"；
+        # 加速方式单元格：值为 None/none（明确选"无加速"）→ 显示 "None"；
         # 有具体加速方式 → 显示该值；未选 → 列出可选项供客户勾选。
         _ae = (case_info.get('ae_methods') or '').strip()
         if _ae.lower() == 'none':
-            _ae_cell = ''
+            _ae_cell = 'None'
         elif _ae:
             _ae_cell = _ae
         else:
