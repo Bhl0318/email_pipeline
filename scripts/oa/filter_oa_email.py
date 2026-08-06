@@ -109,90 +109,28 @@ def _ai_parse_ep_deadline(body, issue_date_str):
     return None
 
 
-# ── CN 答复期限计算：LLM 只负责“读懂不固定的措辞”→结构化意图；代码负责“确定性算日期” ──
-# 法定节假日（放假当天，(年,月,日)）——★须按每年国务院放假通知核对更新；工作日=非周末且不在此集合。
-CN_HOLIDAYS = {
-    (2026, 1, 1),                                   # 元旦
-    *[(2026, 2, d) for d in range(16, 23)],         # 春节(除夕~初六)
-    *[(2026, 4, d) for d in (4, 5, 6)],             # 清明
-    *[(2026, 5, d) for d in (1, 2, 3, 4, 5)],       # 劳动节
-    *[(2026, 6, d) for d in (19, 20, 21)],          # 端午
-    *[(2026, 9, d) for d in (25, 26, 27)],          # 中秋
-    *[(2026, 10, d) for d in range(1, 8)],          # 国庆
-}
-
-
-def _is_cn_workday(d):
-    """d: datetime。工作日 = 非周六日 且 非法定节假日。"""
-    return d.weekday() < 5 and (d.year, d.month, d.day) not in CN_HOLIDAYS
-
-
-def _nth_cn_workday(base, n, include_base):
-    """从 base 起数第 n 个工作日（跳周末+节假日）。include_base=True 时 base 当天(若为工作日)算第1个。"""
-    d = base if include_base else base + timedelta(days=1)
-    count = 0
-    for _ in range(4000):
-        if _is_cn_workday(d):
-            count += 1
-            if count >= n:
-                return d
-        d += timedelta(days=1)
-    return d
-
-
-def compute_cn_deadline(intent, issue_date, is_pre_exam):
-    """按结构化意图 + 发文日 + 是否预审，确定性算 CN 答复绝限。返回 'YYYY-MM-DD' 或 None。
-    intent: {"type": working_days|months|calendar_days|absolute, "n": int, "date": "YYYY-MM-DD"}。
-    工作日起算：预审=发文日当天算第1个；非预审=发文日次日起算。均跳周末+法定节假日。"""
-    if not intent or not issue_date:
-        return None
-    t = intent.get("type")
-    if t == "absolute":
-        dt = _parse_date(intent.get("date", "") or "")
-        return dt.strftime("%Y-%m-%d") if dt else None
-    n = intent.get("n")
-    if not isinstance(n, int) or n <= 0:
-        return None
-    if t == "working_days":
-        return _nth_cn_workday(issue_date, n, include_base=is_pre_exam).strftime("%Y-%m-%d")
-    if t == "months":
-        return _add_months(issue_date, n).strftime("%Y-%m-%d")
-    if t == "calendar_days":
-        return (issue_date + timedelta(days=n)).strftime("%Y-%m-%d")
-    return None
-
-
-def _ai_cn_deadline_intent(deadline_text):
-    """用 DeepSeek 把不固定的期限措辞归一化为结构化意图（不让模型算日期）。返回 dict 或 None。"""
+def _ai_parse_cn_deadline(deadline_text, issue_date_str):
+    """用 DeepSeek 将非标准 CN 答复期限文本转为绝限日期(YYYY-MM-DD)。"""
     client = OpenAI(api_key=_DEEPSEEK_API_KEY, base_url=_DEEPSEEK_BASE_URL)
     prompt = (
-        f"中国专利官文的答复期限描述：「{deadline_text}」。\n"
-        "只做归一化，不要计算具体日期。按规则输出 JSON：\n"
-        '  N个工作日 → {"type":"working_days","n":N}\n'
-        '  N个月 → {"type":"months","n":N}\n'
-        '  N天/N日(自然日) → {"type":"calendar_days","n":N}\n'
-        '  文中直接给了明确日期 → {"type":"absolute","date":"YYYY-MM-DD"}\n'
-        '  无法判断 → {"type":null}\n'
-        "只返回 JSON。"
+        f"发文日是 {issue_date_str}，答复期限描述为「{deadline_text}」。\n"
+        "请根据发文日和期限描述，计算出最终的答复截止日期。\n"
+        '仅返回 JSON: {"deadline": "YYYY-MM-DD"}\n'
+        '如果无法判断，返回: {"deadline": null}'
     )
     try:
         resp = client.chat.completions.create(
-            model=_DEEPSEEK_MODEL, max_tokens=50,
-            messages=[{"role": "user", "content": prompt}])
-        m = re.search(r'\{.*?\}', resp.choices[0].message.content.strip(), re.DOTALL)
+            model=_DEEPSEEK_MODEL,
+            max_tokens=50,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        content = resp.choices[0].message.content.strip()
+        m = re.search(r'\{.*?\}', content, re.DOTALL)
         if m:
-            return json.loads(m.group())
+            return json.loads(m.group()).get("deadline")
     except Exception as e:
-        print(f"DeepSeek CN期限归一化失败: {e}", file=sys.stderr)
+        print(f"DeepSeek CN期限解析失败: {e}", file=sys.stderr)
     return None
-
-
-def compute_cn_deadline_from_text(deadline_text, issue_date_str, is_pre_exam):
-    """非标准 CN 期限文字 → 绝限日期：LLM 归一化措辞 + 代码算日期（不依赖模型算数）。"""
-    issue_dt = _parse_date(issue_date_str)
-    if not issue_dt:
-        return None
-    return compute_cn_deadline(_ai_cn_deadline_intent(deadline_text), issue_dt, is_pre_exam)
 
 
 def _parse_date(date_str):
@@ -483,14 +421,13 @@ def classify_cn(email_data):
         if _parse_date(raw_deadline):
             result["project_deadline"] = raw_deadline
         else:
-            # 非标准措辞（如"五个工作日"、"两个月"）：LLM 归一化 + 代码算(预审从发文日当天起算)
+            # 非标准格式（如"五个工作日"、"两个月"），交给 DeepSeek 计算
             issue_str = result.get("issue_date", "")
             if issue_str:
-                _pre = "预审案件" in f"{subject}\n{body}\n{email_data.get('html_body', '')}"
-                new_deadline = compute_cn_deadline_from_text(raw_deadline, issue_str, _pre)
-                if new_deadline:
-                    result["project_deadline"] = new_deadline
-                    print(f"[CN期限] '{raw_deadline}'(预审={_pre}) → {new_deadline}", file=sys.stderr)
+                ai_deadline = _ai_parse_cn_deadline(raw_deadline, issue_str)
+                if ai_deadline:
+                    result["project_deadline"] = ai_deadline
+                    print(f"[DeepSeek] CN期限: '{raw_deadline}' → {ai_deadline}", file=sys.stderr)
                 else:
                     result["project_deadline"] = raw_deadline
             else:
