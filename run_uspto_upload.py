@@ -15,12 +15,15 @@
   ⚠️ 环节7 严禁 AI，纯确定性代码；本脚本连真实 DB/USPTO，按项目规矩只提交、由人工在受控环境发起。
 
 用法：
-  python3 run_uspto_upload.py            # dry-run：列待上传 + 规划，不上传、不改库
-  python3 run_uspto_upload.py --live     # 真正驱动 Patent Center 上传并销账（前置补齐后）
+  python3 run_uspto_upload.py                  # 单次 dry-run：列待上传 + 规划，不上传、不改库
+  python3 run_uspto_upload.py --live           # 单次：真正驱动 Patent Center 上传并销账
+  python3 run_uspto_upload.py --loop           # 常驻轮询（默认 60s/轮），单次 dry-run 规划
+  python3 run_uspto_upload.py --loop 30 --live # 常驻轮询：每 30s 扫一次，有齐的就真上传并销账
 """
 import os
 import sys
 import json
+import time
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 OUTPUT_ROOT = os.path.join(SCRIPT_DIR, "uspto_upload")
@@ -159,5 +162,47 @@ def run(live=False):
         print(f"  ✅ 已上传（存草稿）并置 uspto_upload=done（{c['case_volume']}）。")
 
 
+def run_loop(interval, live=False):
+    """常驻轮询：每 interval 秒扫一轮待上传案。单轮内异常不退整体，continue 下一轮。
+    单案上传失败留 pending，下轮自动重试。Ctrl+C / SIGTERM 退出。"""
+    if not _DB_OK:
+        print("[uspto-upload] DB 不可用，无法轮询，退出。")
+        return
+    _log_hdr = f"env7 轮询启动：每 {interval}s 扫一次「附件齐全的待上传案」" \
+               f"（{'真上传' if live else 'dry-run 规划'}，Ctrl+C 退出）"
+    print(_log_hdr)
+    while True:
+        try:
+            run(live=live)
+        except KeyboardInterrupt:
+            print("\n[uspto-upload] 收到中断，退出轮询。")
+            return
+        except Exception as exc:  # noqa: BLE001
+            print(f"[uspto-upload] 本轮异常（忽略，继续下一轮）：{exc}")
+        try:
+            time.sleep(interval)
+        except KeyboardInterrupt:
+            print("\n[uspto-upload] 收到中断，退出轮询。")
+            return
+
+
+def _parse_interval(argv, default=60):
+    """从 argv 取 --loop 后紧跟的秒数；无数字则用默认。返回 (loop?, interval)。"""
+    if "--loop" not in argv:
+        return False, default
+    i = argv.index("--loop")
+    if i + 1 < len(argv):
+        try:
+            return True, max(5, int(argv[i + 1]))
+        except ValueError:
+            pass
+    return True, default
+
+
 if __name__ == "__main__":
-    run(live=("--live" in sys.argv))
+    _live = "--live" in sys.argv
+    _loop, _interval = _parse_interval(sys.argv)
+    if _loop:
+        run_loop(_interval, live=_live)
+    else:
+        run(live=_live)
