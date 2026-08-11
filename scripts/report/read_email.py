@@ -88,7 +88,8 @@ REPORT_TYPE_TO_TEMPLATE = {
         # 只立项、不发汇报信：NOA(分案/续案评估)、EXIN(Examiner Interview)、PPH.DECISION
     },
     "EP": {
-        "European search report":      ("EP_扩展检索报告.md",     True),  # EESR+R.70(2)分类时已合并期限
+        # EESR(European search report) 只立项、不发汇报信；等 R.70(2)/70a(2) 下发才发 EESR 汇报信
+        "Communication R.70(2)":       ("EP_扩展检索报告.md",     True),  # EESR 汇报信触发官文
         "Communication A.94(3)":       ("EP_官方审查意见转达.md", True),
         "Communication R.62a(1)":      ("EP_官方审查意见转达.md", True),
         "Further search fee":          ("EP_部分检索报告.md",     True),

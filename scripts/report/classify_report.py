@@ -859,10 +859,13 @@ def process_emails(emails):
             # oa_remark（备注）：能按类型确定的先定；其他OA留空，dispatch 阶段查 atw 填 同族首案/非同族首案
             item["oa_remark"] = type_oa_remark(item.get("notification_type", ""))
 
-            # standalone_project=False 的 EP 记录（如 R.70(2)）不进最终结果
-            # 先暂存，等全部处理完后再合并期限
+            # standalone_project=False 的 EP 记录（如 R.70(2)/70a(2)）：
+            #  · 仍暂存 ep_pending，把期限合并到同案号 EESR 立项记录（立项侧逻辑不变）
+            #  · 也进 results：供【汇报信 sink】处理——R.70(2)/70a(2) 是 EESR 汇报信的触发官文；
+            #    【立项 sink】dispatch_oa 入口会按 standalone_project=False 过滤掉，行为与原来一致
             if item.get("region") == "EP" and item.get("standalone_project") is False:
                 ep_pending.append(item)
+                results.append(item)
                 continue
 
             # 统计未知类型

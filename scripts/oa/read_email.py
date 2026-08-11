@@ -901,6 +901,12 @@ def dispatch_oa(all_results, all_emails=None, dry_run=False, test_project_prefix
     90009-0895CN00），用于测试时避免撞已存在的 Wiki 页面。
     注：email_pipeline 模式下本函数不再 move 邮件，归档统一交 archive_emails。
     dry_run=True 时：不下载USPTO官文、不建/写Wiki、不上传附件、不发立项通知邮件。"""
+    # 非独立 EP 记录（standalone_project=False，如 R.70(2)/70a(2)）不参与立项：
+    # 这类项原先在分类阶段就被丢弃、从不进立项；现为供汇报信 sink 使用改为保留进 results，
+    # 故在立项入口按此标志过滤掉，保持立项行为与原来完全一致。
+    all_results = [it for it in (all_results or [])
+                   if not (it.get("region") == "EP" and it.get("standalone_project") is False)]
+
     # 已结案案件不立项：查 IPEasy 状态（终止/维持/结案）→ 剔除。用真实案号,故先于测试前缀替换。
     from oainfo_cli import is_case_closed
     all_results = _drop_closed_cases(all_results, is_case_closed)
