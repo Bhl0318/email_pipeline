@@ -288,12 +288,34 @@ def save_task(task_id: str, req: SaveReq):
 OUTPUT_DIR = ROOT / "output"  # 生成物按 output/{代理所案号}/ 归类
 
 
-def _safe_filename(fields):
-    """按 example/ 的命名拼汇报信文件名（去掉文件名非法字符）"""
+def _guanyu_type(template, fields):
+    """取模板「关于：」行破折号(–/—)前的前缀作主题类型段（占位用 fields 填好）。
+    如 CN→'国家知识产权局审查意见'、US→'美国专利商标局审查意见'、EP EESR→'欧洲专利申请扩展检索报告'。
+    取不到（无模板/无关于行）返回 None，调用方回退旧逻辑。"""
+    if not template:
+        return None
+    try:
+        text = (TEMPLATES_DIR / template).read_text(encoding="utf-8")
+    except Exception:
+        return None
+    m = re.search(r'关于[：:]\s*(.+)', text)
+    if not m:
+        return None
+    line = m.group(1).strip().strip('*').strip()
+    line = re.sub(r'\{\{\s*(.+?)\s*\}\}', lambda x: str(fields.get(x.group(1), "")), line)
+    line = re.split(r'[–—]', line)[0].strip()   # 截到第一个破折号前
+    return line or None
+
+
+def _safe_filename(fields, template=None):
+    """按 example/ 的命名拼汇报信文件名（去掉文件名非法字符）。
+    类型段优先用模板「关于：」前缀，取不到则回退 通知类型+转达。"""
     issue = datetime.now().strftime("%Y-%m-%d")   # 邮件发送日（原为发文日期，已改）
-    ntype = fields.get("通知类型") or "汇报信"
-    if not ntype.endswith("转达"):
-        ntype += "转达"
+    ntype = _guanyu_type(template, fields)
+    if not ntype:
+        ntype = fields.get("通知类型") or "汇报信"
+        if not ntype.endswith("转达"):
+            ntype += "转达"
     cref = fields.get("客户案号") or "请提供"
     oref = fields.get("代理所案号") or ""
     name = f"{issue}-{ntype}（委托方案号：{cref}；代理所案号：{oref}）"
@@ -467,12 +489,13 @@ class PreviewSendReq(BaseModel):
 @app.post("/api/tasks/{task_id}/preview-send")
 def preview_send(task_id: str, req: PreviewSendReq):
     """发送前的预览：返回 from/recipients/subject/附件清单，供 modal 显示。"""
-    base = _safe_filename(req.fields) or task_id
+    rows = execute_params("SELECT template, source_attachments FROM report_tasks WHERE id = %s", (task_id,))
+    template = rows[0].get("template") if rows else None
+    base = _safe_filename(req.fields, template) or task_id
     subject = f"Privileged & Confidential-{base}"
 
     # 官文 PDF 清单
     source_attachments = []
-    rows = execute_params("SELECT source_attachments FROM report_tasks WHERE id = %s", (task_id,))
     if rows and rows[0].get("source_attachments"):
         try:
             source_attachments = json.loads(rows[0]["source_attachments"])
@@ -527,14 +550,15 @@ def confirm_task(task_id: str, req: ConfirmReq):
 
     # 2) 生成产出物（.eml + 可选 PDF），按 output/{代理所案号}/ 归类
     fields = req.fields or {}
-    base = _safe_filename(fields) or task_id
+    sa_rows = execute_params("SELECT template, source_attachments FROM report_tasks WHERE id = %s", (task_id,))
+    template = sa_rows[0].get("template") if sa_rows else None
+    base = _safe_filename(fields, template) or task_id
     project = fields.get("代理所案号") or task_id
     case_dir = OUTPUT_DIR / re.sub(r'[\\/:*?"<>|\r\n]', "_", project).strip()
     out = {"task_id": task_id}
 
     # 查官文 PDF 附件路径
     source_attachments = []
-    sa_rows = execute_params("SELECT source_attachments FROM report_tasks WHERE id = %s", (task_id,))
     if sa_rows and sa_rows[0].get("source_attachments"):
         try:
             source_attachments = json.loads(sa_rows[0]["source_attachments"])
