@@ -114,7 +114,8 @@ def _practitioner(case_volume):
     except Exception:
         return None
     ai = (fj.get("filing_extra") or {}).get("agent_info") or {}
-    return (ai.get("Registration Number") or "").strip() or (ai.get("Name") or "").strip() or None
+    # 直接读执业号（Registration Number）→ 上传时用它去下拉文字里定位那条
+    return (ai.get("Registration Number") or "").strip() or None
 
 
 def _build_upload_data(case):
