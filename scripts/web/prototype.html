@@ -833,7 +833,9 @@
     // 模板直接全文渲染（新模板无旧式 # / > 文档头）
     let md = templateMd;
 
-    // 2) 替换 {{字段}} → 直接产出 HTML span（marked 默认保留 raw HTML）
+    // 2) 替换 {{字段}} → 已填字段输出纯文本（不能包 <span>：否则 **{{字段}}** 里的 **
+    //    紧贴 HTML 标签，触发 marked 的 flanking 规则、加粗失效、** 原样漏到正文）。
+    //    缺失字段仍用红色 span 高亮，提醒审核人补填。
     md = md.replace(/\{\{\s*(.+?)\s*\}\}/g, (_, key) => {
       key = key.trim();
       let val;
@@ -846,7 +848,7 @@
         return `<span class="var var-missing">{{${escapeHTML(key)}}}</span>`;
       }
       if (DATE_FIELDS.includes(key)) val = formatDateCN(val);
-      return `<span class="var">${escapeHTML(val)}</span>`;
+      return escapeHTML(val);
     });
 
     // 3) marked 渲染
