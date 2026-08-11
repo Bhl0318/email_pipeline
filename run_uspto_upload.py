@@ -100,6 +100,23 @@ def _submission_type(case_volume):
     return _SUBMISSION_TYPE.get(sm.upper(), "Utility Nonprovisional")
 
 
+def _practitioner(case_volume):
+    """该案签字代理人的执业号(优先)/姓名，用于 Patent Center「I am filing on behalf of」下拉匹配。
+    取同案 filing_preparation.fields_json.filing_extra.agent_info（env4/5「查库带出」的快照）。"""
+    rows = _db_exec(
+        "SELECT fields_json FROM submission_tasks "
+        "WHERE task_type='filing_preparation' AND case_volume=%s ORDER BY created_at DESC LIMIT 1",
+        (case_volume,)) or []
+    if not rows:
+        return None
+    try:
+        fj = json.loads(rows[0].get("fields_json") or "{}") or {}
+    except Exception:
+        return None
+    ai = (fj.get("filing_extra") or {}).get("agent_info") or {}
+    return (ai.get("Registration Number") or "").strip() or (ai.get("Name") or "").strip() or None
+
+
 def _build_upload_data(case):
     """从 Z 盘归档目录取上传件：{base}\\{码}\\{组内号}\\{案号}\\ 下的
     「仅存档」(不签的定稿：说明书/权要/附图等) + 「签署版」(环节6 回收的签署版)。
@@ -114,7 +131,7 @@ def _build_upload_data(case):
     others = [f for f in files if f not in ads]
     return {
         "submission_type": _submission_type(case["case_volume"]),
-        "practitioner": None,                 # None=按 practitioner 列表序号1；后续可从 agent_info 带
+        "practitioner": _practitioner(case["case_volume"]),   # 该案签字代理人执业号/姓名（on behalf of）
         "ads_path": ads[0] if ads else None,
         "other_paths": others,
     }, files
@@ -164,6 +181,7 @@ def run(live=False):
     for c in cases:
         data, files = _build_upload_data(c)
         print(f"\n案 {c['case_volume']}：类型={data['submission_type']} "
+              f"on behalf of={data['practitioner'] or '（缺）'} "
               f"ADS={os.path.basename(data['ads_path']) if data['ads_path'] else '（缺）'} "
               f"其余 {len(data['other_paths'])} 件；Z 盘目录 {_zcase_root(c['case_volume'])}")
         if not files:
@@ -171,6 +189,9 @@ def run(live=False):
             continue
         if not data["ads_path"]:
             print("  ⚠️ 未找到 ADS 件，跳过（上传需 ADS）。")
+            continue
+        if not data["practitioner"]:
+            print("  ⚠️ 该案缺签字代理人(on behalf of)，跳过——请确认 env4/5 已「查库带出」签字代理人。")
             continue
         if not live:
             print("  [dry-run] 满足条件，将触发上传（加 --live 且 UI 联调通后真正执行）。")
