@@ -157,6 +157,7 @@
         <option value="ling.ding@metis-ip.com"></option>
       </datalist></div>
     <div class="field"><label>抄送</label><input id="rvCc"></div>
+    <div class="field"><label>邮件正文（可编辑；<b>【在线审核链接】</b>发送时会自动替换成本页链接）</label><textarea id="rvBody" rows="14"></textarea></div>
     <p style="font-size:12px;color:#64748b;margin:2px 0 8px;">将把本递交页链接发给审核人，供其在线核对 POA/Transmittal/ADS 等文件。不改变任务状态，与「发美代理」互不影响。</p>
     <div class="actions">
       <button onclick="closeReviewerModal()">取消</button>
@@ -913,10 +914,30 @@ async function doConfirm(){
 }
 
 // 发送审核人：把当前递交页链接发给审核人（下拉两个预设 + 可手动编辑），不改任务状态
+const REVIEWER_BODY_TEMPLATE =
+`xxx好，
+
+烦请审核题述申请的递交文件，谢谢！
+
+【在线审核链接】
+
+1. 签字文件：沿用PCT/沿用母案/已签回
+2. 优先权：1个CN优先权，有DAS码/无CN优先权
+3. 申请方式：巴黎公约/CON-bypass/CIP-bypass/（优先权未超期）/续案/分案（未超最早有效申请日6/9年）
+4. 申请人：SHENZHEN SHOKZ CO., LTD.
+5. 页数：说明书64页、附图9页、PA 8页
+6. 权要：20个，3个独权（权1、16、32），无多重从权
+7. 附图：与说明书一致
+8. 本案特殊/额外文件：无 或 Sequence Listing 或Preliminary Amendment或PPH-Request、PPH-IDS 或 彩图petition 或 trackone request 或 微实体证明
+9. 实体+费用：大实体2000美元/小实体730美元/彩图60美元/trackone美元
+10. 上传通道+QC+公司：Utility Nonprovisional/Utility provisional/Design/National Stage/Plant Non provisional/International PCT/International Design (Hague)/ Track One Prioritized Examination/Design Accelerated Examination，龙总/杜总，Poseidon/Porus/Metis
+
+祝好！`;
 function openReviewerModal(){
   if (!taskId) return;
   $("rvTo").value = "";
   $("rvCc").value = "";
+  $("rvBody").value = REVIEWER_BODY_TEMPLATE;
   $("reviewerModal").classList.add("show");
 }
 function closeReviewerModal(){ $("reviewerModal").classList.remove("show"); }
@@ -926,7 +947,7 @@ async function doSendReviewer(){
   const cc = $("rvCc").value.split(/[,，;；]/).map(s=>s.trim()).filter(Boolean);
   $("rvConfirm").disabled = true;
   try {
-    await api("POST", `${API}/${taskId}/send-reviewer`, { recipients, cc });
+    await api("POST", `${API}/${taskId}/send-reviewer`, { recipients, cc, body: $("rvBody").value });
     toast("已发送审核链接");
     closeReviewerModal();
   } catch(e){ toast("发送失败: "+e.message); }

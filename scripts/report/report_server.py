@@ -1775,6 +1775,7 @@ class FilingConfirmReq(BaseModel):
 class SendReviewerReq(BaseModel):
     recipients: list = []          # 审核人邮箱（必填，下拉/手填）
     cc: list = []
+    body: str = ""                 # 邮件正文（可编辑；含【在线审核链接】占位，发送时替换成真链接）
 
 
 def _doc_channel_key(path, docs):
@@ -2001,10 +2002,17 @@ def send_reviewer_link(task_id: str, req: SendReviewerReq):
     account_cfg, _cc = _submission_send_config()
     msg = MIMEMultipart()
     msg["Subject"] = f"【US递交-待审核】{case_volume} 递交文件"
-    msg.attach(MIMEText(
-        f"<p>案号 <b>{case_volume}</b> 的递交文件已生成，请在线审核 POA/Transmittal/ADS 等：</p>"
-        f"<p><a href='{link}'>{link}</a></p><p>本邮件由系统自动发送。</p>",
-        "html", "utf-8"))
+    body = (req.body or "").strip()
+    if body:
+        # 操作员自定义正文：转义 → 把【在线审核链接】占位替换成可点链接（无占位则末尾追加）→ 换行转 <br>
+        link_html = f"<a href='{link}'>{link}</a>"
+        esc = body.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        esc = esc.replace("【在线审核链接】", link_html) if "【在线审核链接】" in esc else esc + "\n\n" + link_html
+        html = esc.replace("\n", "<br>")
+    else:
+        html = (f"<p>案号 <b>{case_volume}</b> 的递交文件已生成，请在线审核 POA/Transmittal/ADS 等：</p>"
+                f"<p><a href='{link}'>{link}</a></p><p>本邮件由系统自动发送。</p>")
+    msg.attach(MIMEText(html, "html", "utf-8"))
     try:
         _send_smtp(msg, account_cfg, recipients, cc or None)
     except Exception as exc:
