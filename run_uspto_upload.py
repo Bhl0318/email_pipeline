@@ -123,16 +123,21 @@ def _build_upload_data(case):
     「仅存档」(不签的定稿：说明书/权要/附图等) + 「签署版」(环节6 回收的签署版)。
     「发美代理」是未签发出版，不上传。名字含 ADS 的作 ads_path，其余 other_paths。"""
     root = _zcase_root(case["case_volume"])
-    files = []
-    for sub in ("仅存档", "签署版"):
+    # 先读「签署版」、再读「仅存档」；按文件名去重，同名以签署版为准，不重复上传。
+    by_name = {}
+    for sub in ("签署版", "仅存档"):
         d = os.path.join(root, sub)
         if os.path.isdir(d):
-            files += sorted(os.path.join(d, n) for n in os.listdir(d) if os.path.isfile(os.path.join(d, n)))
-    ads = [f for f in files if "ADS" in os.path.basename(f).upper()]
+            for n in sorted(os.listdir(d)):
+                fp = os.path.join(d, n)
+                if os.path.isfile(fp) and n not in by_name:   # 先到先得＝签署版优先
+                    by_name[n] = fp
+    files = list(by_name.values())
+    ads = [f for f in files if "ADS" in os.path.basename(f).upper()]   # 签署版先入，ADS 亦优先签署版
     others = [f for f in files if f not in ads]
     return {
         "submission_type": _submission_type(case["case_volume"]),
-        "practitioner": _practitioner(case["case_volume"]),   # 该案签字代理人执业号/姓名（on behalf of）
+        "practitioner": _practitioner(case["case_volume"]),   # 该案签字代理人执业号（on behalf of）
         "ads_path": ads[0] if ads else None,
         "other_paths": others,
     }, files
