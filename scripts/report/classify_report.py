@@ -936,7 +936,7 @@ def process_emails(emails):
         "project", "project_name", "oa_doc_date", "entrust_date",
         "oaNum", "applytype", "project_deadline", "dueDate",
         "now_status", "project_phase", "submitby", "oa_remark",
-        "wikiurl", "us_ref_docs", "prescreen_note",
+        "wikiurl", "us_ref_docs", "prescreen_note", "standalone_project",
         # 汇报信侧需要：关联 _inbox 里的官文 PDF
         "message_id", "email_subject", "email_from",
     ]
@@ -949,7 +949,9 @@ def process_emails(emails):
                 dt = _parse_date(str(val))
                 if dt:
                     item[df] = dt.strftime("%Y-%m-%d")
-        final_results.append({k: (item.get(k, "") or "") for k in OUTPUT_FIELDS})
+        # 保留布尔值（standalone_project 等），避免 False 被 `or ""` 变成空串而失去含义
+        final_results.append({k: (lambda v: v if isinstance(v, bool) else (v or ""))(item.get(k, ""))
+                              for k in OUTPUT_FIELDS})
 
     return final_results, skipped, unknown_types
 
