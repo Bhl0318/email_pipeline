@@ -157,7 +157,7 @@
         <option value="ling.ding@metis-ip.com"></option>
       </datalist></div>
     <div class="field"><label>抄送</label><input id="rvCc"></div>
-    <div class="field"><label>邮件正文（可编辑；<b>【在线审核链接】</b>发送时会自动替换成本页链接）</label><textarea id="rvBody" rows="14"></textarea></div>
+    <div class="field"><label>邮件正文（可编辑；已自动填入本页正式审核链接）</label><textarea id="rvBody" rows="14"></textarea></div>
     <p style="font-size:12px;color:#64748b;margin:2px 0 8px;">将把本递交页链接发给审核人，供其在线核对 POA/Transmittal/ADS 等文件。不改变任务状态，与「发美代理」互不影响。</p>
     <div class="actions">
       <button onclick="closeReviewerModal()">取消</button>
@@ -937,7 +937,8 @@ function openReviewerModal(){
   if (!taskId) return;
   $("rvTo").value = "";
   $("rvCc").value = "";
-  $("rvBody").value = REVIEWER_BODY_TEMPLATE;
+  const link = `${location.origin}/submission/filing/${taskId}`;   // 本页正式链接
+  $("rvBody").value = REVIEWER_BODY_TEMPLATE.replace("【在线审核链接】", link);
   $("reviewerModal").classList.add("show");
 }
 function closeReviewerModal(){ $("reviewerModal").classList.remove("show"); }

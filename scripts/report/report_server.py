@@ -2004,10 +2004,13 @@ def send_reviewer_link(task_id: str, req: SendReviewerReq):
     msg["Subject"] = f"【US递交-待审核】{case_volume} 递交文件"
     body = (req.body or "").strip()
     if body:
-        # 操作员自定义正文：转义 → 把【在线审核链接】占位替换成可点链接（无占位则末尾追加）→ 换行转 <br>
+        # 操作员自定义正文（前端已把链接填进正文）：转义 → 兼容旧【在线审核链接】占位 →
+        # 裸 http(s) URL 自动变可点（负向后视避开已在 <a href='…'> 里的 URL）→ 换行转 <br>
         link_html = f"<a href='{link}'>{link}</a>"
         esc = body.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-        esc = esc.replace("【在线审核链接】", link_html) if "【在线审核链接】" in esc else esc + "\n\n" + link_html
+        if "【在线审核链接】" in esc:
+            esc = esc.replace("【在线审核链接】", link_html)
+        esc = re.sub(r"(?<!['\">=])(https?://[^\s<]+)", r"<a href='\1'>\1</a>", esc)
         html = esc.replace("\n", "<br>")
     else:
         html = (f"<p>案号 <b>{case_volume}</b> 的递交文件已生成，请在线审核 POA/Transmittal/ADS 等：</p>"
