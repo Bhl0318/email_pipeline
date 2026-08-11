@@ -947,6 +947,29 @@ def _submission_send_config():
     return account_cfg, sub.get("cc", [])
 
 
+def _filing_firm_key(agent_firm):
+    """代理所名归一到发件人账号 key（Metis/Poseidon/Porus）：子串不敏感匹配，找不到返回 ''。"""
+    f = (agent_firm or "").strip().lower()
+    for key in ("metis", "poseidon", "porus"):
+        if key in f:
+            return key.capitalize()   # metis→Metis / poseidon→Poseidon / porus→Porus
+    return ""
+
+
+def _filing_send_config(agent_firm):
+    """发美代理发信账号：按代理所 agent_firm 选 submission.firm_send_accounts 里的账号
+    （Metis→patent_filling@metis-ip.com 等）；识别不出/未配 → firm_send_default，
+    再兜底回退 _submission_send_config()（pa）。返回 (account_cfg, cc)。"""
+    cfg = _load_email_config()
+    sub = cfg.get("submission", {})
+    fmap = sub.get("firm_send_accounts") or {}
+    acct_key = fmap.get(_filing_firm_key(agent_firm)) or sub.get("firm_send_default")
+    account_cfg = cfg.get("accounts", {}).get(acct_key) if acct_key else None
+    if account_cfg:
+        return account_cfg, sub.get("cc", [])
+    return _submission_send_config()
+
+
 class EmailModulesReq(BaseModel):
     fields_json: dict = None       # 页面当前编辑值；缺省用库中值
     params: dict = {}              # 超权费/超页费输入：claims_total / pages_total / pages_excess
@@ -1894,7 +1917,7 @@ def confirm_filing_task(task_id: str, req: FilingConfirmReq):
             part = MIMEApplication(p.read_bytes())
             part.add_header("Content-Disposition", "attachment", filename=("utf-8", "", p.name))
             msg.attach(part)
-        account_cfg, _cc = _submission_send_config()
+        account_cfg, _cc = _filing_send_config(agent_firm)   # 发美代理发件人按代理所切换
         try:
             _send_smtp(msg, account_cfg, recipients, req.cc or None)
         except Exception as exc:
