@@ -81,12 +81,14 @@ def main():
         with open(args.file, encoding="utf-8", errors="replace") as f:
             text = f.read()
 
-    # 诊断：抽到的文字长度 + 关键短语位置（EP 提示词只取正文前 3000 字）
-    _low = (text or "").lower()
-    _idx4 = _low.find("four months")
-    _idxinv = _low.find("you are invited")
-    print(f"[diag] 抽到文字 {len(text)} 字；'four months'@{_idx4}；'you are invited'@{_idxinv}"
-          f"（EP 提示词截前 12000 字）", file=sys.stderr)
+    # 诊断：按 region 显示（EP 找英文期限句 / CN 找答复期限·预审案件）
+    print(f"[diag] region={args.region}  抽到文字 {len(text)} 字  发文日={args.issue_date or '(未定)'}", file=sys.stderr)
+    if args.region == "EP":
+        _low = (text or "").lower()
+        print(f"       'four months'@{_low.find('four months')}  "
+              f"'you are invited'@{_low.find('you are invited')}  (EP提示词截前12000字)", file=sys.stderr)
+    else:
+        print(f"       '答复期限'@{text.find('答复期限')}  '预审案件'@{text.find('预审案件')}", file=sys.stderr)
     if args.show_text:
         print("=" * 20 + " 抽到的文字 " + "=" * 20, file=sys.stderr)
         print(text, file=sys.stderr)
@@ -110,7 +112,8 @@ def main():
             sys.exit(2)
         pre = args.pre_exam or ("预审案件" in text)
         deadline = _ai_parse_cn_deadline(dtext, args.issue_date, pre)
-        print({"deadline_text": dtext, "is_pre_exam": pre, "deadline": deadline})
+        print({"issue_date": args.issue_date, "deadline_text": dtext,
+               "is_pre_exam": pre, "deadline": deadline})
 
 
 if __name__ == "__main__":
