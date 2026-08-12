@@ -130,17 +130,19 @@ def query_case_interface(project):
         if name in seen:
             continue
         seen.add(name)
+        mail, phone = "", ""
         try:
             from db_query import execute_params
             rows = execute_params(
-                "SELECT usermail FROM users WHERE username_zn = %s", (name,))
-            mail = ((rows[0].get("usermail") if rows else "") or "").strip()
+                "SELECT usermail, mobile FROM users WHERE username_zn = %s", (name,))
+            if rows:
+                mail = (rows[0].get("usermail") or "").strip()
+                phone = (rows[0].get("mobile") or "").strip()
         except Exception as e:
-            print(f"[enrich] 查接口人邮箱失败 {name}: {e}", file=sys.stderr)
-            mail = ""
+            print(f"[enrich] 查接口人邮箱/手机失败 {name}: {e}", file=sys.stderr)
         if not mail:
             print(f"[enrich] 接口人 {name} 无 usermail（{project}）", file=sys.stderr)
-        out.append({"name": name, "email": mail})
+        out.append({"name": name, "email": mail, "phone": phone})
     return out
 
 

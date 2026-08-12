@@ -234,6 +234,8 @@ def get_task(task_id: str):
             merged["联系人"] = interface_contacts[0]["name"]
         if merged.get("联系人邮箱") in ("", None, "请提供"):
             merged["联系人邮箱"] = interface_contacts[0]["email"]
+        if merged.get("联系人手机") in ("", None, "请提供"):
+            merged["联系人手机"] = interface_contacts[0].get("phone", "")
 
     # 解析官文附件路径列表
     source_attachments = []
