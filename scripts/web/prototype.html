@@ -925,18 +925,22 @@
     });
     // 容器整体样式（匹配实际邮件：宋体/Times New Roman，12pt，行距150%）
     clone.setAttribute('style', 'font-family:宋体,"SimSun","Times New Roman",serif;font-size:12pt;line-height:1.5;color:#000000;');
+    // 段落 1.5 倍行距（Outlook 不继承外层 line-height，需写到每个 <p> 上）
+    clone.querySelectorAll('p').forEach(p => {
+      p.setAttribute('style', (p.getAttribute('style') || '') + 'line-height:1.5;margin:0 0 10px;');
+    });
     // 移除表格表头行（模板中"字段/值"占位表头，不需要显示）
     clone.querySelectorAll('table thead').forEach(thead => thead.remove());
     // 表格：无边框，两列，贴近 Outlook 实际邮件风格
     clone.querySelectorAll('table').forEach(t => {
-      t.setAttribute('style', 'border-collapse:collapse;width:100%;margin:10px 0 16px;font-size:12pt;font-family:宋体,"SimSun","Times New Roman",serif;');
+      t.setAttribute('style', 'border-collapse:collapse;width:100%;margin:10px 0 16px;font-size:12pt;line-height:1.5;font-family:宋体,"SimSun","Times New Roman",serif;');
     });
     clone.querySelectorAll('td, th').forEach(c => {
-      c.setAttribute('style', 'border:none;padding:3px 8px 3px 0;text-align:left;vertical-align:top;');
+      c.setAttribute('style', 'border:none;padding:3px 8px 3px 0;text-align:left;vertical-align:top;line-height:1.5;');
     });
     // 第一列固定宽度，不换行
     clone.querySelectorAll('tr > td:first-child, tr > th:first-child').forEach(c => {
-      c.setAttribute('style', 'border:none;padding:3px 8px 3px 0;text-align:left;vertical-align:top;width:140px;white-space:nowrap;');
+      c.setAttribute('style', 'border:none;padding:3px 8px 3px 0;text-align:left;vertical-align:top;line-height:1.5;width:140px;white-space:nowrap;');
     });
     return clone;
   }
