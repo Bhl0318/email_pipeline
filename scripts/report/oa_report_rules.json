@@ -707,13 +707,6 @@
         "_备注": "所有客户→王晶"
       }
     },
-    "Intention to grant": {
-      "*": {
-        "action": "assign",
-        "preparer": "jing.wang@metis-ip.com",
-        "_备注": "含 Decision to grant A.97(1)；所有客户→王晶"
-      }
-    },
     "Summons to oral proceedings": {
       "*": {
         "action": "assign",
