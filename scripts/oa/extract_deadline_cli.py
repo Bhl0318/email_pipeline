@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """用流水线里的 AI 提示词从文件提取答复期限日期（诊断/人工核对用，直接调 filter_oa_email / parse_us_pdf 的现有函数）。
 
+输入文件可为：.txt 文本 / .pdf 官文(自动抽文字层) / .msg 邮件(extract_msg 取正文，主题里的日期兜底作发文日)。
+
 用法：
-  # EP：文件是邮件正文文本 → 调 _ai_parse_ep_deadline（抽 issue_date + deadline）
-  python3 extract_deadline_cli.py <text_file> --region EP [--issue-date 2026-08-05]
+  # EP：邮件正文文本/PDF/.msg → 调 _ai_parse_ep_deadline（抽 issue_date + deadline）
+  python3 extract_deadline_cli.py <file.txt|.pdf|.msg> --region EP [--issue-date 2026-08-05]
 
   # CN：文件是邮件正文文本 → 用 CN_DEADLINE_RE 抠「答复期限」再调 _ai_parse_cn_deadline
   python3 extract_deadline_cli.py <text_file> --region CN --issue-date 2026-08-05 [--pre-exam] [--deadline-text "五个工作日"]
@@ -41,14 +43,34 @@ def main():
         print(result)
         return
 
-    # EP / CN 读文本（PDF 自动抽文字层）
-    if args.file.lower().endswith(".pdf"):
+    # EP / CN 读文本（.pdf 抽文字层；.msg 用 extract_msg 取正文；否则按文本读）
+    low = args.file.lower()
+    if low.endswith(".pdf"):
         from parse_us_pdf import _pdf_to_text
         text, is_scanned = _pdf_to_text(args.file, max_pages=10)
         if not (text or "").strip():
             print("PDF 无文字层（可能是扫描件），EP/CN 文本提示词无法处理；"
                   "请改用带文字层的 PDF 或直接给文本文件。", file=sys.stderr)
             sys.exit(3)
+    elif low.endswith(".msg"):
+        try:
+            import extract_msg
+        except ImportError:
+            print("读 .msg 需要 extract_msg 库：pip install extract-msg", file=sys.stderr)
+            sys.exit(2)
+        m = extract_msg.Message(args.file)
+        text = m.body or ""
+        html = m.htmlBody
+        if html:
+            if isinstance(html, bytes):
+                html = html.decode("utf-8", errors="replace")
+            text = f"{text}\n{html}"
+        if not args.issue_date and m.subject:  # 主题里常带 日期-类型-案号，兜底作发文日提示
+            import re as _re
+            _dm = _re.search(r'(\d{4}-\d{2}-\d{2})', m.subject)
+            if _dm:
+                args.issue_date = _dm.group(1)
+        m.close()
     else:
         with open(args.file, encoding="utf-8", errors="replace") as f:
             text = f.read()
