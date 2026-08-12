@@ -40,9 +40,17 @@ def main():
         print(result)
         return
 
-    # EP / CN 读文本
-    with open(args.file, encoding="utf-8", errors="replace") as f:
-        text = f.read()
+    # EP / CN 读文本（PDF 自动抽文字层）
+    if args.file.lower().endswith(".pdf"):
+        from parse_us_pdf import _pdf_to_text
+        text, is_scanned = _pdf_to_text(args.file, max_pages=10)
+        if not (text or "").strip():
+            print("PDF 无文字层（可能是扫描件），EP/CN 文本提示词无法处理；"
+                  "请改用带文字层的 PDF 或直接给文本文件。", file=sys.stderr)
+            sys.exit(3)
+    else:
+        with open(args.file, encoding="utf-8", errors="replace") as f:
+            text = f.read()
 
     if args.region == "EP":
         from filter_oa_email import _ai_parse_ep_deadline
