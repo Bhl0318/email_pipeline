@@ -64,7 +64,13 @@ def main():
         if html:
             if isinstance(html, bytes):
                 html = html.decode("utf-8", errors="replace")
-            text = f"{text}\n{html}"
+            import re as _re
+            import html as _htmlmod
+            # 去标签转纯文本，否则「答复期限：<span…>」会被 CN 正则抓成 "<span"
+            _plain = _re.sub(r'(?is)<(script|style)[^>]*>.*?</\1>', ' ', html)
+            _plain = _re.sub(r'(?i)<br\s*/?>|</p>|</div>', '\n', _plain)
+            _plain = _htmlmod.unescape(_re.sub(r'<[^>]+>', '', _plain))
+            text = f"{text}\n{_plain}"
         if not args.issue_date and m.subject:  # 主题里常带 日期-类型-案号，兜底作发文日提示
             import re as _re
             _dm = _re.search(r'(\d{4}-\d{2}-\d{2})', m.subject)
