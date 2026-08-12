@@ -93,10 +93,11 @@ REPORT_TYPE_TO_TEMPLATE = {
         "Communication A.94(3)":       ("EP_官方审查意见转达.md", True),
         "Communication R.62a(1)":      ("EP_官方审查意见转达.md", True),
         "Further search fee":          ("EP_部分检索报告.md",     True),
-        "Intention to grant":          ("EP_预授权通知.md",       True),  # 主题含 R.71(3) 时规则表判 skip/ignore
+        "Intention to grant":          ("EP_预授权通知.md",       True),  # R.71(3)授权意向/缴费，主题含R.71(3)时规则表判 skip/ignore
+        "Decision to Grant":           ("EP_预授权通知.md",       True),  # A.97(1)授权决定书:所有客户→王晶,只发汇报信不立项(复用预授权模板)
         "Summons to oral proceedings": ("EP_庭审邀请.md",         True),
         # R.70(2): 分类时合并到 EESR result，不作独立 task，不发汇报信
-        # TODO: R.161(2)+162 / Decision to grant / R.53(3)优先权翻译 待补模板&分类规则
+        # TODO: R.161(2)+162 / R.53(3)优先权翻译 待补模板&分类规则
     },
 }
 REVIEW_BASE_URL = "http://10.10.70.88:8501"

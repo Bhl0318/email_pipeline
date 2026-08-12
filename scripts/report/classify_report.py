@@ -469,6 +469,8 @@ EP_TYPES = {
     "Communication R.70(2)": (None, False, False),  # 不单独立项，和 EESR 合并
     "Communication A.94(3)": ("Communication Pursuant to Article 94(3) EPC答复", True, True),
     "Intention to grant": ("Communication under Rule 71(3) EPC（授权意向通告）答复", True, False),
+    # 授权决定书 Decision to Grant / A.97(1)：只发汇报信、不立项(standalone=False)，主题形如【Communication A. 97(1) EPC / Decision to Grant】
+    "Decision to Grant": ("授权决定书(Decision to Grant A.97(1) EPC)", False, False),
     "Further search fee": ("Partial Supplementary European Search Report", True, False),
     "Communication R.62a(1)": ("Communication pursuant to Rule 62a(1) EPC答复", True, False),
     "Summons to oral proceedings": ("Summons to attend oral proceedings pursuant to Rule 115(1)EPC（口头审理通知书）答复", True, True),

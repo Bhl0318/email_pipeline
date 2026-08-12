@@ -719,7 +719,14 @@
       "*": {
         "action": "assign",
         "preparer": "jing.wang@metis-ip.com",
-        "_备注": "含 Decision to grant A.97(1)；所有客户→王晶。主题含 R.71(3) 时走 'Intention to grant@R71(3)'"
+        "_备注": "R.71(3)授权意向/缴费通知；主题含 R.71(3) 时走 'Intention to grant@R71(3)'。授权决定书 A.97(1) 见独立类型 'Decision to Grant'"
+      }
+    },
+    "Decision to Grant": {
+      "*": {
+        "action": "assign",
+        "preparer": "jing.wang@metis-ip.com",
+        "_备注": "授权决定书 A.97(1)/Decision to Grant，所有客户→王晶，只发汇报信不立项"
       }
     },
     "Intention to grant@R71(3)": {
