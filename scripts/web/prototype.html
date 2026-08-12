@@ -324,7 +324,8 @@
         <div class="form-row">
           <div class="form-group">
             <label>联系人</label>
-            <select id="f-contact-name"><option value="">（无接口人）</option></select>
+            <input type="text" id="f-contact-name" list="contact-datalist" placeholder="选择或手填联系人" autocomplete="off">
+            <datalist id="contact-datalist"></datalist>
             <div class="field-source"><span class="src-manual">&#9679;</span> 手填</div>
           </div>
           <div class="form-group">
@@ -761,22 +762,21 @@
     return (t || '').replace(/^(CN|US|EP|PCT)_/, '').replace(/\.md$/, '');
   }
 
-  // 联系人下拉：用接口人[{name,email}]建选项；选中带出对应邮箱。默认由 get_task 填第一个。
+  // 联系人：可下拉选接口人、也可手填（input + datalist）。选中/输入匹配接口人时带出邮箱(+手机)。
   function populateContactSelect() {
-    const sel = $('f-contact-name');
-    if (!sel || sel.tagName !== 'SELECT') return;
+    const inp = $('f-contact-name');
+    const dl = $('contact-datalist');
+    if (!inp || !dl) return;
     const contacts = currentInterfaceContacts || [];
     const names = [];
     contacts.forEach(c => { if (c.name && !names.includes(c.name)) names.push(c.name); });
-    // 当前联系人若不在接口人列表里（历史手填值），也保留为一个选项
-    const cur = currentFields['联系人'];
-    if (cur && cur !== '请提供' && !names.includes(cur)) names.unshift(cur);
-    sel.innerHTML = names.length
-      ? names.map(n => `<option value="${escapeHTML(n)}">${escapeHTML(n)}</option>`).join('')
-      : '<option value="">（无接口人）</option>';
-    sel.onchange = () => {
-      const c = (currentInterfaceContacts || []).find(x => x.name === sel.value);
-      if (c && c.email) $('f-contact-email').value = c.email;
+    dl.innerHTML = names.map(n => `<option value="${escapeHTML(n)}"></option>`).join('');
+    inp.oninput = () => {
+      const c = (currentInterfaceContacts || []).find(x => x.name === inp.value.trim());
+      if (c) {
+        if (c.email) $('f-contact-email').value = c.email;
+        if (c.phone) $('f-contact-phone').value = c.phone;
+      }
     };
   }
 
