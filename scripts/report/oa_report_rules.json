@@ -19,7 +19,8 @@
       "mei.hu@metis-ip.com": "胡梅",
       "hui.ren@metis-ip.com": "任惠",
       "jing.wang@metis-ip.com": "王晶",
-      "对应案件接口": "查 atw: customer.bspeople(customer_code=案号前5位)→拆人名→users.usermail(username_zn=人名)"
+      "对应案件接口": "查 atw: customer.bspeople(customer_code=案号前5位)→拆人名→users.usermail(username_zn=人名)",
+      "lei.wang@metis-ip.com": "王磊"
     }
   },
   "CN": {
@@ -712,6 +713,54 @@
         "action": "assign",
         "preparer": "jing.wang@metis-ip.com",
         "_备注": "所有客户→王晶"
+      }
+    },
+    "Intention to grant": {
+      "*": {
+        "action": "assign",
+        "preparer": "jing.wang@metis-ip.com",
+        "_备注": "含 Decision to grant A.97(1)；所有客户→王晶。主题含 R.71(3) 时走 'Intention to grant@R71(3)'"
+      }
+    },
+    "Intention to grant@R71(3)": {
+      "20618": {
+        "action": "skip",
+        "forward": {
+          "to": [
+            "report@metis-ip.com"
+          ],
+          "cc": [
+            "ui_pa@metis-ip.com"
+          ]
+        }
+      },
+      "20633": {
+        "action": "skip",
+        "forward": {
+          "to": [
+            "report@metis-ip.com"
+          ],
+          "cc": [
+            "patent8@metis-ip.com"
+          ]
+        }
+      },
+      "20615": {
+        "action": "skip",
+        "forward": {
+          "to": [
+            "report@metis-ip.com"
+          ],
+          "cc": [
+            "lei.wang@metis-ip.com"
+          ]
+        }
+      },
+      "20608": {
+        "action": "ignore"
+      },
+      "其他": {
+        "action": "ignore"
       }
     }
   }

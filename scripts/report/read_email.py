@@ -93,7 +93,7 @@ REPORT_TYPE_TO_TEMPLATE = {
         "Communication A.94(3)":       ("EP_官方审查意见转达.md", True),
         "Communication R.62a(1)":      ("EP_官方审查意见转达.md", True),
         "Further search fee":          ("EP_部分检索报告.md",     True),
-        # Intention to grant / R.71(3) EPC（授权意向/预授权通知）不分配汇报信（V4 EP-其他官文表：不分配）
+        "Intention to grant":          ("EP_预授权通知.md",       True),  # 主题含 R.71(3) 时规则表判 skip/ignore
         "Summons to oral proceedings": ("EP_庭审邀请.md",         True),
         # R.70(2): 分类时合并到 EESR result，不作独立 task，不发汇报信
         # TODO: R.161(2)+162 / Decision to grant / R.53(3)优先权翻译 待补模板&分类规则
@@ -152,6 +152,11 @@ def _resolve_oa_action(region, ntype, project, item):
     rule_type = ntype
     if region == "CN" and ntype == "审查意见通知书":
         rule_type = "审查意见通知书@1" if _oa_ordinal_is_first(item) else "审查意见通知书@2+"
+    # EP Intention to grant：主题含 R.71(3) 时按 EP-其他官文的 Rule 71(3) 规则走（不分配/转发）
+    if region == "EP" and ntype == "Intention to grant":
+        subj = item.get("email_subject") or ""
+        if re.search(r'R\.?\s*71\s*\(\s*3\s*\)|Rule\s*71\s*\(\s*3\s*\)', subj, re.IGNORECASE):
+            rule_type = "Intention to grant@R71(3)"
     type_rules = region_rules.get(rule_type)
     if not type_rules:
         return None
