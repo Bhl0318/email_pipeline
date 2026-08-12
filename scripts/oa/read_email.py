@@ -540,6 +540,31 @@ def send_notification(results):
         print(f"[通知邮件] 发送失败: {e}", file=sys.stderr)
 
 
+def _all_email_attachments(raw_bytes):
+    """从原始邮件 MIME 提取全部附件 → [(filename, payload_bytes)]（含 zip 等所有类型）。"""
+    import email as _email
+    out = []
+    if not raw_bytes:
+        return out
+    try:
+        m = _email.message_from_bytes(raw_bytes)
+    except Exception:
+        return out
+    for part in m.walk():
+        if part.get_content_maintype() == "multipart":
+            continue
+        fname = part.get_filename()   # Python 会解码 RFC2047 文件名
+        if not fname:
+            continue
+        try:
+            payload = part.get_payload(decode=True)
+        except Exception:
+            payload = None
+        if payload:
+            out.append((fname, payload))
+    return out
+
+
 def send_forward_oa(all_results, all_emails=None, dry_run=False):
     """转OA：把每条立项逐案转给 OA 处理团队（替换原 send_notification 总表→qin.zhang）。
     收件人=杨姣/薄佳璐/客户公共邮箱；抄送=固定7人+客户接口人；主题保留原邮件；
@@ -560,10 +585,15 @@ def send_forward_oa(all_results, all_emails=None, dry_run=False):
 
     # msgid -> _inbox 官文 PDF（CN/EP 附件来源）
     msgid_to_pdfs = {}
+    msgid_to_raw = {}   # msgid -> 原始 MIME（20608 需带原始邮件全部附件，含 zip）
     for _acc, _em in (all_emails or []):
         mid = _em.get("message_id", "")
-        if mid and _em.get("saved_pdfs"):
+        if not mid:
+            continue
+        if _em.get("saved_pdfs"):
             msgid_to_pdfs[mid] = _em.get("saved_pdfs", [])
+        if _em.get("raw_bytes"):
+            msgid_to_raw[mid] = _em.get("raw_bytes")
 
     # 逐案预构建
     plans = []
@@ -594,6 +624,11 @@ def send_forward_oa(all_results, all_emails=None, dry_run=False):
     if dry_run:
         for p in plans:
             atts = [os.path.basename(a) for a in p["atts"]]
+            if (p["item"].get("project", "") or "")[:5] == "20608":
+                raw = msgid_to_raw.get(p["item"].get("message_id", ""))
+                for fname, _ in _all_email_attachments(raw):
+                    if fname not in atts:
+                        atts.append(fname + "(原始邮件附件)")
             print(f"  [dry-run][转OA] {p['item'].get('project')}", file=sys.stderr)
             print(f"      主题: {p['subject']}", file=sys.stderr)
             print(f"      收件人({len(p['to'])}): {', '.join(p['to'])}", file=sys.stderr)
@@ -630,6 +665,7 @@ def send_forward_oa(all_results, all_emails=None, dry_run=False):
                 msg["Cc"] = ", ".join(p["cc"])
             msg["Subject"] = p["subject"]
             msg.attach(MIMEText(p["body"], "plain", "utf-8"))
+            attached_names = set()
             for fp in p["atts"]:
                 with open(fp, "rb") as fh:
                     part = MIMEBase("application", "octet-stream")
@@ -638,6 +674,24 @@ def send_forward_oa(all_results, all_emails=None, dry_run=False):
                 part.add_header("Content-Disposition", "attachment",
                                 filename=("utf-8", "", os.path.basename(fp)))
                 msg.attach(part)
+                attached_names.add(os.path.basename(fp))
+            # 20608（韶音）：额外带上原始邮件的全部附件（含 zip），按文件名去重
+            if (p["item"].get("project", "") or "")[:5] == "20608":
+                raw = msgid_to_raw.get(p["item"].get("message_id", ""))
+                extra = 0
+                for fname, payload in _all_email_attachments(raw):
+                    if fname in attached_names:
+                        continue
+                    attached_names.add(fname)
+                    part = MIMEBase("application", "octet-stream")
+                    part.set_payload(payload)
+                    encoders.encode_base64(part)
+                    part.add_header("Content-Disposition", "attachment",
+                                    filename=("utf-8", "", fname))
+                    msg.attach(part)
+                    extra += 1
+                if extra:
+                    print(f"[转OA] {p['item'].get('project')} 20608 额外附原始邮件 {extra} 个附件(含zip)", file=sys.stderr)
             smtp.sendmail(pa_cfg["user"], p["to"] + p["cc"], msg.as_string())
             sent += 1
             print(f"[转OA] {p['item'].get('project')} 已发 → {', '.join(p['to'])}", file=sys.stderr)
