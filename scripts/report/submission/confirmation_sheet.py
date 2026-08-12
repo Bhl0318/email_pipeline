@@ -15,6 +15,7 @@ from .common import blank_none
 # 生成器对第一申请人有硬取键访问，页面编辑/新增的申请人可能缺键 → 统一补默认空值
 _APPLICANT_KEYS = (
     "applicant_name_en", "applicant_name_cn", "contact_address_en", "contact_address_cn",
+    "contact_address_cn2",
     "address1", "address2", "postcode", "country_en_us", "country_zh_cn",
     "entity_en", "entity_cn", "city_en", "city_cn", "province_city_en_us", "province_city_zh_cn",
 )

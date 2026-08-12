@@ -467,7 +467,7 @@ class PatentApplicationFormGenerator:
         _EMPTY_APP = {k: "" for k in (
             "applicant_name_en", "applicant_name_cn", "address1", "address2", "city_en", "city_cn",
             "province_city_en_us", "province_city_zh_cn", "postcode", "country_en_us", "country_zh_cn",
-            "contact_address_cn")}
+            "contact_address_cn", "contact_address_cn2")}
         LaborInfo = applicants_list[0] if applicants_list else _EMPTY_APP
 
         def _norm(s):
@@ -503,7 +503,7 @@ class PatentApplicationFormGenerator:
         def _detail_rows(app):
             return [
                 ["Address1/地址1:", app.get("address1", ""), app.get("contact_address_cn", "")],
-                ["Address2/地址2:", app.get("address2", ""), ''],
+                ["Address2/地址2:", app.get("address2", ""), app.get("contact_address_cn2", "")],
                 ["City/城市:", app.get("city_en", ""), app.get("city_cn", "")],
                 ["State/Province/州/省", app.get("province_city_en_us", ""), app.get("province_city_zh_cn", "")],
                 ["Post/邮编:", app.get("postcode", ""), ''],
