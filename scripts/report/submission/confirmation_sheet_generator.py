@@ -496,7 +496,8 @@ class PatentApplicationFormGenerator:
         def _residence(app):
             res_en = ", ".join([x for x in [app.get("address1", ""), app.get("address2", ""), app.get("city_en", ""),
                                             app.get("province_city_en_us", ""), app.get("postcode", ""), app.get("country_en_us", "")] if x])
-            res_cn = ", ".join([x for x in [app.get("contact_address_cn", ""), app.get("city_cn", ""),
+            res_cn = ", ".join([x for x in [app.get("contact_address_cn", ""), app.get("contact_address_cn2", ""),
+                                            app.get("city_cn", ""),
                                             app.get("province_city_zh_cn", ""), app.get("country_zh_cn", "")] if x])
             return res_en, res_cn
 
