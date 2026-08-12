@@ -92,7 +92,7 @@ def _ai_parse_ep_deadline(body, issue_date_str):
         f"\n"
         f'Return ONLY JSON: {{"issue_date": "YYYY-MM-DD", "deadline": "YYYY-MM-DD"}}\n'
         f'For any field not found, use null.\n'
-        f"\n---\n{body[:3000]}\n---"
+        f"\n---\n{body[:12000]}\n---"
     )
     try:
         resp = client.chat.completions.create(

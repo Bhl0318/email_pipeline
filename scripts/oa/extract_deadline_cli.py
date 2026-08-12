@@ -58,7 +58,7 @@ def main():
     _idx4 = _low.find("four months")
     _idxinv = _low.find("you are invited")
     print(f"[diag] 抽到文字 {len(text)} 字；'four months'@{_idx4}；'you are invited'@{_idxinv}"
-          f"（EP 提示词只截前 3000 字）", file=sys.stderr)
+          f"（EP 提示词截前 12000 字）", file=sys.stderr)
     if args.show_text:
         print("=" * 20 + " 抽到的文字 " + "=" * 20, file=sys.stderr)
         print(text, file=sys.stderr)
