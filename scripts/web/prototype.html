@@ -557,6 +557,14 @@
         <div id="source-attachment-list"></div>
       </div>
 
+      <!-- 手动上传附件（额外随汇报信发给客户）-->
+      <div class="form-section" id="section-manual-attachments">
+        <h3><span class="icon icon-orange">&#128228;</span> 上传附件
+          <span style="font-weight:400;font-size:12px;color:#94a3b8;">（额外随汇报信发给客户，可多选）</span></h3>
+        <input type="file" id="f-manual-file" multiple style="font-size:13px;" onchange="uploadManualAttachments(this)">
+        <div id="manual-attachment-list" style="margin-top:8px;"></div>
+      </div>
+
     </div>
 
     <!-- Actions -->
@@ -703,6 +711,49 @@
   function extractOrdinal(notifType) {
     const m = (notifType || '').match(/第([一二三四五六七八九十百零0-9]+)次/);
     return m ? m[1] : '一';
+  }
+
+  // ───────────── 手动上传附件 ─────────────
+  async function uploadManualAttachments(inputEl) {
+    if (!currentTaskId || !inputEl.files.length) return;
+    for (const f of inputEl.files) {
+      const fd = new FormData();
+      fd.append('file', f);
+      try {
+        const r = await fetch(`/api/tasks/${currentTaskId}/upload-attachment`, { method: 'POST', body: fd });
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      } catch (e) {
+        showToast(`上传失败 ${f.name}: ${e.message}`, 'error');
+      }
+    }
+    inputEl.value = '';
+    loadManualAttachments();
+  }
+
+  async function loadManualAttachments() {
+    const listEl = $('manual-attachment-list');
+    if (!listEl || !currentTaskId) return;
+    let atts = [];
+    try {
+      const r = await fetch(`/api/tasks/${currentTaskId}/attachments`);
+      if (r.ok) atts = (await r.json()).attachments || [];
+    } catch (e) { /* ignore */ }
+    listEl.innerHTML = atts.length
+      ? atts.map(a =>
+          `<div style="display:flex;align-items:center;gap:8px;font-size:13px;color:#334155;padding:3px 0;">` +
+          `<span>&#128206; ${escapeHTML(a.name)}</span>` +
+          `<button type="button" style="border:none;background:none;color:#dc2626;cursor:pointer;font-size:12px;" ` +
+          `onclick="deleteManualAttachment('${escapeHTML(a.name).replace(/'/g, "\\'")}')">删除</button></div>`
+        ).join('')
+      : '<div style="font-size:12px;color:#cbd5e1;">未上传附件</div>';
+  }
+
+  async function deleteManualAttachment(name) {
+    if (!currentTaskId) return;
+    try {
+      await fetch(`/api/tasks/${currentTaskId}/attachment/${encodeURIComponent(name)}`, { method: 'DELETE' });
+    } catch (e) { /* ignore */ }
+    loadManualAttachments();
   }
 
   function renderAttachments() {
@@ -1084,6 +1135,10 @@
     (preview.source_attachments || []).forEach(a => {
       lis.push(`<li><label style="cursor:pointer;"><input type="checkbox" class="att-chk" value="${escapeHTML(a.path)}" checked> <span style="color:#94a3b8;">[官文]</span> ${escapeHTML(a.filename)}</label></li>`);
     });
+    // 手动上传的附件：同样带勾选框，默认勾选
+    (preview.manual_attachments || []).forEach(a => {
+      lis.push(`<li><label style="cursor:pointer;"><input type="checkbox" class="att-chk" value="${escapeHTML(a.path)}" checked> <span style="color:#94a3b8;">[上传]</span> ${escapeHTML(a.filename)}</label></li>`);
+    });
     att.innerHTML = lis.length
       ? '<ul>' + lis.join('') + '</ul>'
       : '<div class="none">无附件，仅发送正文</div>';
@@ -1370,6 +1425,7 @@
       updateHeader();
       renderPreview();
       renderAttachments(); // applyTemplateFieldVisibility 之后调用，避免被覆盖
+      loadManualAttachments(); // 手动上传的附件列表
       $('hint').textContent = `task: ${currentTaskId.substring(0, 8)}…`;
       $('status').innerHTML = '&#10003; 已加载';
     } finally {

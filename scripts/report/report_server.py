@@ -542,6 +542,7 @@ def preview_send(task_id: str, req: PreviewSendReq):
         "subject": subject,
         "report_pdf_filename": (base + ".pdf") if req.attach_pdf else None,
         "source_attachments": [{"path": rel, "filename": rel.rsplit("/", 1)[-1]} for rel in source_attachments],
+        "manual_attachments": [{"path": a["path"], "filename": a["name"]} for a in _report_manual_attachments(task_id)],
     }
 
 
@@ -576,10 +577,14 @@ def confirm_task(task_id: str, req: ConfirmReq):
             source_attachments = json.loads(sa_rows[0]["source_attachments"])
         except Exception:
             pass
-    # 按弹窗勾选过滤官文附件（未传=全带；只保留库里确有的，防越权附任意路径）
+    # 官文 PDF + 手动上传附件；按弹窗勾选过滤（未传=全带；只保留确有的，防越权附任意路径）
+    manual_paths = [a["path"] for a in _report_manual_attachments(task_id)]
+    all_atts = source_attachments + manual_paths
     if req.source_attachments is not None:
         sel = set(req.source_attachments)
-        source_attachments = [p for p in source_attachments if p in sel]
+        source_attachments = [p for p in all_atts if p in sel]
+    else:
+        source_attachments = all_atts
 
     pdf_bytes = None
     pdf_filename = None
@@ -663,6 +668,51 @@ def skip_task(task_id: str):
         (task_id,),
     )
     return {"ok": True, "task_id": task_id, "status": "skipped"}
+
+
+# ─── 手动上传附件（随汇报信一起发给客户）────────────────────
+
+def _report_manual_dir(task_id: str) -> Path:
+    """审核人手动上传的汇报信附件目录（output/_manual/{task_id}/）。"""
+    return OUTPUT_DIR / "_manual" / re.sub(r'[\\/:*?"<>|\r\n\t]+', "_", task_id)
+
+
+def _report_manual_attachments(task_id: str):
+    """手动上传附件的相对 OUTPUT_DIR 路径列表 [{name,path}]（供弹窗展示与 _build_mime）。"""
+    d = _report_manual_dir(task_id)
+    out = []
+    if d.is_dir():
+        tid = d.name
+        for p in sorted(d.iterdir()):
+            if p.is_file():
+                out.append({"name": p.name, "path": f"_manual/{tid}/{p.name}"})
+    return out
+
+
+@app.post("/api/tasks/{task_id}/upload-attachment")
+def upload_report_attachment(task_id: str, file: UploadFile = File(...)):
+    """审核人手动上传附件（存 output/_manual/{task_id}/，发汇报信时一并附上）。"""
+    dest_dir = _report_manual_dir(task_id)
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    name = re.sub(r'[\\/:*?"<>|\r\n\t]+', "_", file.filename or "upload.bin").strip() or "upload.bin"
+    (dest_dir / name).write_bytes(file.file.read())
+    return {"ok": True, "name": name}
+
+
+@app.get("/api/tasks/{task_id}/attachments")
+def list_report_attachments(task_id: str):
+    """列手动上传的附件。"""
+    return {"attachments": _report_manual_attachments(task_id)}
+
+
+@app.delete("/api/tasks/{task_id}/attachment/{name}")
+def delete_report_attachment(task_id: str, name: str):
+    """删除手动上传的附件。"""
+    safe = re.sub(r'[\\/:*?"<>|\r\n\t]+', "_", name)
+    p = _report_manual_dir(task_id) / safe
+    if p.is_file():
+        p.unlink()
+    return {"ok": True, "name": safe}
 
 
 # ═══ US 递交在线审核（/submission 路由组，表 submission_tasks）═══
