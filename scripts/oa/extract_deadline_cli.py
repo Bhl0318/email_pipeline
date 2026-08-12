@@ -25,6 +25,7 @@ def main():
     ap.add_argument("--issue-date", default="", help="发文日 YYYY-MM-DD（US 必填=邮戳日；CN 必填；EP 选填作提示）")
     ap.add_argument("--deadline-text", default="", help="CN：直接指定期限文字，不从文件抠")
     ap.add_argument("--pre-exam", action="store_true", help="CN：按预审案件（否则看正文是否含“预审案件”）")
+    ap.add_argument("--show-text", action="store_true", help="打印从文件抽到的文字(诊断用)")
     args = ap.parse_args()
 
     if not os.path.exists(args.file):
@@ -51,6 +52,17 @@ def main():
     else:
         with open(args.file, encoding="utf-8", errors="replace") as f:
             text = f.read()
+
+    # 诊断：抽到的文字长度 + 关键短语位置（EP 提示词只取正文前 3000 字）
+    _low = (text or "").lower()
+    _idx4 = _low.find("four months")
+    _idxinv = _low.find("you are invited")
+    print(f"[diag] 抽到文字 {len(text)} 字；'four months'@{_idx4}；'you are invited'@{_idxinv}"
+          f"（EP 提示词只截前 3000 字）", file=sys.stderr)
+    if args.show_text:
+        print("=" * 20 + " 抽到的文字 " + "=" * 20, file=sys.stderr)
+        print(text, file=sys.stderr)
+        print("=" * 52, file=sys.stderr)
 
     if args.region == "EP":
         from filter_oa_email import _ai_parse_ep_deadline
