@@ -804,8 +804,8 @@ def _resolve_forward_targets(addrs, project):
         if a == "对应案件接口":
             try:
                 from enrich_report import query_case_interface
-                for m in query_case_interface(project):
-                    _add(m)
+                for c in query_case_interface(project):
+                    _add(c.get("email"))   # 现在返回 [{name,email}]，取邮箱（空的 _add 会跳过）
             except Exception as e:
                 print(f"  [转发] 查接口人失败 {project}: {e}", file=sys.stderr)
         else:

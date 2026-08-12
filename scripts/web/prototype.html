@@ -324,7 +324,7 @@
         <div class="form-row">
           <div class="form-group">
             <label>联系人</label>
-            <input type="text" id="f-contact-name" placeholder="如：钱祎">
+            <select id="f-contact-name"><option value="">（无接口人）</option></select>
             <div class="field-source"><span class="src-manual">&#9679;</span> 手填</div>
           </div>
           <div class="form-group">
@@ -679,6 +679,7 @@
   let currentTemplate = null;
   let templateMd = null;
   let currentFields = {};
+  let currentInterfaceContacts = [];   // 接口人 [{name,email}]，联系人下拉数据源
   let currentSourceAttachments = [];
   let currentPdfBlobUrl = null;   // 预览用 blob URL
   let currentPdfBase64 = null;    // 发送用 base64（与 blobUrl 同步生成）
@@ -758,6 +759,25 @@
 
   function typeFromTemplate(t) {
     return (t || '').replace(/^(CN|US|EP|PCT)_/, '').replace(/\.md$/, '');
+  }
+
+  // 联系人下拉：用接口人[{name,email}]建选项；选中带出对应邮箱。默认由 get_task 填第一个。
+  function populateContactSelect() {
+    const sel = $('f-contact-name');
+    if (!sel || sel.tagName !== 'SELECT') return;
+    const contacts = currentInterfaceContacts || [];
+    const names = [];
+    contacts.forEach(c => { if (c.name && !names.includes(c.name)) names.push(c.name); });
+    // 当前联系人若不在接口人列表里（历史手填值），也保留为一个选项
+    const cur = currentFields['联系人'];
+    if (cur && cur !== '请提供' && !names.includes(cur)) names.unshift(cur);
+    sel.innerHTML = names.length
+      ? names.map(n => `<option value="${escapeHTML(n)}">${escapeHTML(n)}</option>`).join('')
+      : '<option value="">（无接口人）</option>';
+    sel.onchange = () => {
+      const c = (currentInterfaceContacts || []).find(x => x.name === sel.value);
+      if (c && c.email) $('f-contact-email').value = c.email;
+    };
   }
 
   // ───────────── 表单 ↔ currentFields ─────────────
@@ -1297,6 +1317,7 @@
 
       currentTemplate = task.template;
       currentFields = task.fields || {};
+      currentInterfaceContacts = task.interface_contacts || [];   // 接口人[{name,email}]，供联系人下拉
       $('hd-status').textContent = task.status || 'pending';
       $('f-attach-pdf').checked = task.attach_pdf !== false;
 
@@ -1328,6 +1349,7 @@
         return;
       }
 
+      populateContactSelect();   // 先建下拉选项，fillFormFromFields 才能设中当前值
       fillFormFromFields();
       applyTemplateFieldVisibility();
       updateHeader();

@@ -109,9 +109,10 @@ def query_customer_demands(project):
 
 
 def query_case_interface(project):
-    """MySQL atw: 案件对应接口人邮箱（用于官文转发）。
-    customer.bspeople(customer_code=案号前5位) → 逗号拆人名 → users.usermail(username_zn=人名)。
-    返回去重邮箱列表；查不到/出错返回 []。"""
+    """MySQL atw: 案件对应接口人（姓名+邮箱）。
+    customer.bspeople(customer_code=案号前5位) → 逗号/顿号拆人名 → users.usermail(username_zn=人名)。
+    返回**按人名去重、保持顺序**的 [{"name":.., "email":..}]（用于官文转发的接口人 + 汇报信联系人下拉）；
+    查不到/出错返回 []。"""
     code = (project or "")[:5]
     if not code:
         return []
@@ -124,8 +125,11 @@ def query_case_interface(project):
         print(f"[enrich] 查接口人 bspeople 失败 {project}: {e}", file=sys.stderr)
         return []
     names = [n.strip() for n in re.split(r"[,，、;；]+", bspeople) if n.strip()]
-    emails, seen = [], set()
+    out, seen = [], set()
     for name in names:
+        if name in seen:
+            continue
+        seen.add(name)
         try:
             from db_query import execute_params
             rows = execute_params(
@@ -133,14 +137,11 @@ def query_case_interface(project):
             mail = ((rows[0].get("usermail") if rows else "") or "").strip()
         except Exception as e:
             print(f"[enrich] 查接口人邮箱失败 {name}: {e}", file=sys.stderr)
-            continue
+            mail = ""
         if not mail:
             print(f"[enrich] 接口人 {name} 无 usermail（{project}）", file=sys.stderr)
-            continue
-        if mail.lower() not in seen:
-            seen.add(mail.lower())
-            emails.append(mail)
-    return emails
+        out.append({"name": name, "email": mail})
+    return out
 
 
 def query_case_recipients(project):

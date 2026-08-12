@@ -213,11 +213,13 @@ def get_task(task_id: str):
     project = row.get("p_project") or user_fields.get("代理所案号", "")
     enriched = {}
     customer_demands = []
+    interface_contacts = []   # 接口人[{name,email}]，供联系人下拉
     if project:
         try:
-            from enrich_report import enrich_cn_fields, query_customer_demands
+            from enrich_report import enrich_cn_fields, query_customer_demands, query_case_interface
             enriched = enrich_cn_fields(project)
             customer_demands = query_customer_demands(project)
+            interface_contacts = query_case_interface(project)
         except Exception as e:
             print(f"[warn] task {task_id} enrich 失败: {e}", file=sys.stderr)
 
@@ -225,6 +227,13 @@ def get_task(task_id: str):
     # 注：fields_json 里值为 ""/None 的是占位，不应覆盖 enrich 查到的真实值
     effective_user = {k: v for k, v in user_fields.items() if v not in ("", None)}
     merged = {**p_defaults, **enriched, **effective_user}
+
+    # 联系人：审核人没填过（仍是占位/空）时，默认填第一个接口人（姓名+邮箱）
+    if interface_contacts:
+        if merged.get("联系人") in ("", None, "请提供"):
+            merged["联系人"] = interface_contacts[0]["name"]
+        if merged.get("联系人邮箱") in ("", None, "请提供"):
+            merged["联系人邮箱"] = interface_contacts[0]["email"]
 
     # 解析官文附件路径列表
     source_attachments = []
@@ -243,6 +252,7 @@ def get_task(task_id: str):
         "reviewer": row.get("reviewer"),
         "fields": merged,
         "customer_demands": customer_demands,
+        "interface_contacts": interface_contacts,   # [{name,email}] 供联系人下拉
     }
 
 
