@@ -149,6 +149,7 @@
   .modal-input:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,.15); }
   .combo { position: relative; }
   .combo .modal-input { padding-right: 30px; }
+  .combo > input { padding-right: 28px; }
   .combo-btn { position: absolute; top: 0; right: 0; height: 100%; width: 28px; border: none; background: transparent; color: #64748b; font-size: 12px; cursor: pointer; border-left: 1px solid #e2e8f0; }
   .combo-btn:hover { color: #3b82f6; }
   .combo-panel { display: none; position: absolute; top: calc(100% + 2px); left: 0; right: 0; z-index: 10; border: 1px solid #e2e8f0; border-radius: 6px; background: #fff; box-shadow: 0 6px 20px rgba(0,0,0,.12); max-height: 200px; overflow-y: auto; padding: 4px 0; }
@@ -324,8 +325,11 @@
         <div class="form-row">
           <div class="form-group">
             <label>联系人</label>
-            <input type="text" id="f-contact-name" list="contact-datalist" placeholder="选择或手填联系人" autocomplete="off">
-            <datalist id="contact-datalist"></datalist>
+            <div class="combo">
+              <input type="text" id="f-contact-name" placeholder="选择或手填联系人" autocomplete="off">
+              <button type="button" class="combo-btn" id="f-contact-toggle" title="从接口人选择">&#9662;</button>
+              <div class="combo-panel" id="f-contact-panel"></div>
+            </div>
             <div class="field-source"><span class="src-manual">&#9679;</span> 手填</div>
           </div>
           <div class="form-group">
@@ -762,22 +766,32 @@
     return (t || '').replace(/^(CN|US|EP|PCT)_/, '').replace(/\.md$/, '');
   }
 
-  // 联系人：可下拉选接口人、也可手填（input + datalist）。选中/输入匹配接口人时带出邮箱(+手机)。
+  // 联系人：input + ▾ 折叠面板列出全部接口人，可点选(带出邮箱+手机)、也可手填。
   function populateContactSelect() {
     const inp = $('f-contact-name');
-    const dl = $('contact-datalist');
-    if (!inp || !dl) return;
+    const panel = $('f-contact-panel');
+    const btn = $('f-contact-toggle');
+    if (!inp || !panel || !btn) return;
     const contacts = currentInterfaceContacts || [];
-    const names = [];
-    contacts.forEach(c => { if (c.name && !names.includes(c.name)) names.push(c.name); });
-    dl.innerHTML = names.map(n => `<option value="${escapeHTML(n)}"></option>`).join('');
-    inp.oninput = () => {
-      const c = (currentInterfaceContacts || []).find(x => x.name === inp.value.trim());
-      if (c) {
-        if (c.email) $('f-contact-email').value = c.email;
-        if (c.phone) $('f-contact-phone').value = c.phone;
-      }
-    };
+    panel.innerHTML = contacts.length
+      ? contacts.map(c =>
+          `<div class="checkitem" data-name="${escapeHTML(c.name)}">${escapeHTML(c.name)}` +
+          (c.email ? ` <span style="color:#94a3b8;">&lt;${escapeHTML(c.email)}&gt;</span>` : '') + `</div>`
+        ).join('')
+      : '<div class="checklist-empty">无接口人（可手填）</div>';
+    panel.querySelectorAll('.checkitem').forEach(el => {
+      el.onclick = () => {
+        const name = el.getAttribute('data-name');
+        inp.value = name;
+        const c = contacts.find(x => x.name === name);
+        if (c) {
+          if (c.email) $('f-contact-email').value = c.email;
+          if (c.phone) $('f-contact-phone').value = c.phone;
+        }
+        panel.classList.remove('show');
+      };
+    });
+    btn.onclick = (e) => { e.stopPropagation(); panel.classList.toggle('show'); };
   }
 
   // ───────────── 表单 ↔ currentFields ─────────────
@@ -1135,10 +1149,11 @@
     syncRecipBtn();
   }
 
-  // 点面板外收起
+  // 点面板外收起（对所有 combo 面板通用：收件人、联系人等）
   document.addEventListener('click', (e) => {
-    const panel = $('md-to-panel');
-    if (panel && !e.target.closest('.combo')) panel.classList.remove('show');
+    if (!e.target.closest('.combo')) {
+      document.querySelectorAll('.combo-panel.show').forEach(p => p.classList.remove('show'));
+    }
   });
 
   async function doSend() {
