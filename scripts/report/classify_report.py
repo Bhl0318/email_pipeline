@@ -113,17 +113,25 @@ def _ai_parse_cn_deadline(deadline_text, issue_date_str, is_pre_exam=False):
     """用 DeepSeek 将非标准 CN 答复期限文本转为绝限日期(YYYY-MM-DD)。
     计算规则通过提示词传达：起算(预审=发文日当天/非预审=次日)、工作日跳周末+法定节假日。"""
     client = OpenAI(api_key=_DEEPSEEK_API_KEY, base_url=_DEEPSEEK_BASE_URL)
-    pre_hint = "该案为预审案件" if is_pre_exam else "该案非预审案件"
+    try:
+        _wd = f"（星期{'一二三四五六日'[datetime.strptime(issue_date_str[:10], '%Y-%m-%d').weekday()]}）"
+    except Exception:
+        _wd = ""
+    start_rule = ("预审案件：发文日当天就是第1个工作日（发文日本身算第1天）。"
+                  if is_pre_exam else
+                  "非预审案件：从发文日的次日开始数第1个工作日（发文日本身不算）。")
+    case_hint = "该案为预审案件。" if is_pre_exam else "该案非预审案件。"
     prompt = (
-        f"发文日是 {issue_date_str}，{pre_hint}，答复期限描述为「{deadline_text}」。\n"
-        "请按以下规则计算最终答复截止日期：\n"
-        "1. 起算：预审案件从发文日当天算作第1天；非预审案件从发文日次日起算。\n"
-        "2. 若为「N个工作日」：只数工作日，跳过周六、周日和中国法定节假日"
-        "(元旦/春节/清明/劳动节/端午/中秋/国庆等)。\n"
-        "3. 若为「N个月」：按自然月计算，即发文日 + N 个月。\n"
-        "4. 若已给出明确日期：直接使用该日期。\n"
-        '仅返回 JSON: {"deadline": "YYYY-MM-DD"}\n'
-        '如果无法判断，返回: {"deadline": null}'
+        f"发文日 = {issue_date_str}{_wd}。{case_hint}\n"
+        f"答复期限描述 = 「{deadline_text}」。\n"
+        "请严格按下列规则计算答复截止日期，务必一步步把工作日数清楚，不要凭感觉：\n"
+        f"规则A（起算）：{start_rule}\n"
+        "规则B（工作日）：只算周一至周五，且跳过中国法定节假日（元旦/春节/清明/劳动节/端午/中秋/国庆）；周六周日不是工作日。\n"
+        "规则C（N个工作日）：从起算日开始按规则B逐日累计，第N个工作日那天即截止日。\n"
+        "规则D（N个月）：发文日 + N 个自然月（同一日号）。\n"
+        "规则E（明确日期）：若描述本身就是具体日期，直接用它。\n"
+        "示例（务必照此数）：预审、发文日是某周五、五个工作日 → 周五=第1、下周一=第2、下周二=第3、下周三=第4、下周四=第5 → 截止日=下周四。\n"
+        '只返回 JSON：{"deadline": "YYYY-MM-DD"}；无法判断返回 {"deadline": null}。'
     )
     try:
         resp = client.chat.completions.create(
