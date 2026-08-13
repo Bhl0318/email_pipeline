@@ -78,6 +78,7 @@ def _resolve_template(name):
 
 WEB_DIR = ROOT / "web"
 PROTOTYPE_HTML = WEB_DIR / "prototype.html"
+TEMPLATES_PREVIEW_HTML = WEB_DIR / "templates_preview.html"
 EMAIL_CONFIG_PATH = SCRIPT_DIR / "email_config.json"
 
 sys.path.insert(0, str(SCRIPT_DIR))
@@ -284,6 +285,27 @@ def get_template(name: str):
     if not p:
         raise HTTPException(404, f"template {name} not found")
     return PlainTextResponse(p.read_text(encoding="utf-8"), media_type="text/plain; charset=utf-8")
+
+
+@app.get("/api/templates")
+def list_templates():
+    """列出所有 md 模板，按一级子目录(OA / 结项通知 / …)分组，供模板预览页浏览。"""
+    cats = {}
+    if TEMPLATES_DIR.exists():
+        for p in TEMPLATES_DIR.rglob("*.md"):
+            rel = p.relative_to(TEMPLATES_DIR)
+            cat = rel.parts[0] if len(rel.parts) > 1 else "(根目录)"
+            cats.setdefault(cat, []).append(p.name)
+    return {"categories": [{"name": k, "files": sorted(v)}
+                           for k, v in sorted(cats.items())]}
+
+
+@app.get("/templates-preview")
+def templates_preview_page():
+    """模板预览页：浏览/核对所有 md 模板的渲染效果。"""
+    if not TEMPLATES_PREVIEW_HTML.exists():
+        raise HTTPException(500, "templates_preview.html not found")
+    return FileResponse(TEMPLATES_PREVIEW_HTML, media_type="text/html; charset=utf-8")
 
 
 # ─── 保存字段 ────────────────────────────────────────────
