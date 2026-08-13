@@ -914,31 +914,58 @@ async function doConfirm(){
 }
 
 // 发送审核人：把当前递交页链接发给审核人（下拉两个预设 + 可手动编辑），不改任务状态
-const REVIEWER_BODY_TEMPLATE =
-`xxx好，
+// 审核人正文里能从案件数据自动带出的字段
+function _rvUniq(arr){ return [...new Set((arr||[]).map(s=>(s||"").trim()).filter(Boolean))]; }
+function rvApplicants(){ return _rvUniq((fields.applicants||[]).map(a=>a.applicant_name_en)).join("；"); }
+function rvPriority(){
+  const ps = fields.priorities||[];
+  if (!ps.length) return "无优先权";
+  const c = _rvUniq(ps.map(p=>p.priority_country_id)).join("、");
+  const das = ps.some(p=>(p.access_code||"").trim());
+  return `${ps.length}个${c?c+" ":""}优先权${das?"，有DAS码":"，无DAS码"}`;
+}
+function rvFirm(){
+  const f = ((fields.filing_extra||{}).agent_firm||"").toLowerCase();
+  if (f.includes("poseidon")) return "Poseidon";
+  if (f.includes("porus")) return "Porus";
+  if (f.includes("metis")) return "Metis";
+  return (fields.filing_extra||{}).agent_firm||"";
+}
+function rvUploadType(){
+  const sm = (fields.subject_matter||"").toUpperCase();
+  return ({UTL:"Utility Nonprovisional", "371":"National Stage", DES:"Design"})[sm] || sm || "";
+}
+function rvEntity(){
+  const e = (((fields.applicants||[])[0]||{}).entity_en||"").toLowerCase();
+  return ({large:"大实体", small:"小实体", micro:"微实体"})[e] || "";
+}
+function buildReviewerBody(link){
+  const route = (fields.filing_route||"").trim();
+  return `xxx好，
 
 烦请审核题述申请的递交文件，谢谢！
 
-【在线审核链接】
+${link}
 
 1. 签字文件：沿用PCT/沿用母案/已签回
-2. 优先权：1个CN优先权，有DAS码/无CN优先权
-3. 申请方式：巴黎公约/CON-bypass/CIP-bypass/（优先权未超期）/续案/分案（未超最早有效申请日6/9年）
-4. 申请人：SHENZHEN SHOKZ CO., LTD.
-5. 页数：说明书64页、附图9页、PA 8页
-6. 权要：20个，3个独权（权1、16、32），无多重从权
+2. 优先权：${rvPriority()}
+3. 申请方式：${route || "巴黎公约/CON-bypass/CIP-bypass/（优先权未超期）/续案/分案（未超最早有效申请日6/9年）"}
+4. 申请人：${rvApplicants()}
+5. 页数：说明书__页、附图__页、PA__页
+6. 权要：__个，__个独权（权__），无多重从权
 7. 附图：与说明书一致
 8. 本案特殊/额外文件：无 或 Sequence Listing 或Preliminary Amendment或PPH-Request、PPH-IDS 或 彩图petition 或 trackone request 或 微实体证明
-9. 实体+费用：大实体2000美元/小实体730美元/彩图60美元/trackone美元
-10. 上传通道+QC+公司：Utility Nonprovisional/Utility provisional/Design/National Stage/Plant Non provisional/International PCT/International Design (Hague)/ Track One Prioritized Examination/Design Accelerated Examination，龙总/杜总，Poseidon/Porus/Metis
+9. 实体+费用：${rvEntity() || "大实体/小实体/微实体"}，费用__美元
+10. 上传通道+QC+公司：${rvUploadType() || "Utility Nonprovisional/Design/National Stage/…"}，龙总/杜总，${rvFirm() || "Poseidon/Porus/Metis"}
 
 祝好！`;
+}
 function openReviewerModal(){
   if (!taskId) return;
   $("rvTo").value = "";
   $("rvCc").value = "";
   const link = `${location.origin}/submission/filing/${taskId}`;   // 本页正式链接
-  $("rvBody").value = REVIEWER_BODY_TEMPLATE.replace("【在线审核链接】", link);
+  $("rvBody").value = buildReviewerBody(link);
   $("reviewerModal").classList.add("show");
 }
 function closeReviewerModal(){ $("reviewerModal").classList.remove("show"); }
