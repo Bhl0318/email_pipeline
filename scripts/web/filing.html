@@ -945,6 +945,19 @@ function rvPagesLine(){
   const draw = (($("o-draw")||{}).value || (opts.drawing_sheets||"")).toString().trim();
   return `说明书${spec||"__"}页、附图${draw||"__"}页、PA__页`;
 }
+// 特殊/额外文件：读 Transmittal 递交清单里勾选的项（勾了哪些就列哪些，都没勾=无）
+function rvExtraDocs(){
+  const chk = k => { const el = $("o-has_"+k); return el ? el.checked : !!opts["has_"+k]; };
+  const items = [];
+  if (chk("seq_listing")||chk("seq_crf")||chk("seq_statements")) items.push("Sequence Listing");
+  if (chk("preliminary_amendment")) items.push("Preliminary Amendment");
+  if (chk("ids")||chk("ids_copies")) items.push("IDS");
+  if (chk("assignment")) items.push("Assignment");
+  if (chk("english_translation")) items.push("英文译文");
+  if (chk("priority_copy")||chk("foreign_copies")) items.push("优先权/在先文本副本");
+  if (chk("expedited_design")) items.push("Design 加速审查");
+  return items.length ? items.join("、") : "无";
+}
 function buildReviewerBody(link){
   const route = (fields.filing_route||"").trim();
   return `xxx好，
@@ -960,7 +973,7 @@ ${link}
 5. 页数：${rvPagesLine()}
 6. 权要：__个，__个独权（权__），无多重从权
 7. 附图：与说明书一致
-8. 本案特殊/额外文件：无 或 Sequence Listing 或Preliminary Amendment或PPH-Request、PPH-IDS 或 彩图petition 或 trackone request 或 微实体证明
+8. 本案特殊/额外文件：${rvExtraDocs()}
 9. 实体+费用：${rvEntity() || "大实体/小实体/微实体"}，费用__美元
 10. 上传通道+QC+公司：${rvUploadType() || "Utility Nonprovisional/Design/National Stage/…"}，龙总/杜总，${rvFirm() || "Poseidon/Porus/Metis"}
 
