@@ -956,9 +956,19 @@ function rvExtraDocs(){
   if (chk("ids")||chk("ids_copies")) items.push("IDS");
   const ent = (($("o-entity")||{}).value || opts.entity || "").toLowerCase();
   if (ent === "micro") items.push("微实体证明");  // 实体选 micro＝Applicant certifies micro entity
-  // Other 备注(o-remark)里填的：PPH-Request / 彩图petition / trackone request 等，原样带出
+  // Other 备注(o-remark)里填的官方全名 → 精确匹配成简短标签；不认识的原样带出
   const other = (($("o-remark")||{}).value || opts.remark || "").trim();
-  if (other) items.push(other);
+  if (other) {
+    const norm = s => (s||"").toLowerCase().replace(/\s+/g, " ").trim();
+    const OTHER_MAP = [
+      ["Patent Prosecution Highway (PPH) Request", "PPH-Request"],
+      ["Petition for submission of color formal drawing and request to accept color drawing", "彩图petition"],
+      ["Certification and Request for Prioritized Examination (Track 1)", "trackone request"],
+    ];
+    const n = norm(other);
+    const hit = OTHER_MAP.filter(([full]) => n.includes(norm(full))).map(([, label]) => label);
+    items.push(...(hit.length ? hit : [other]));   // 没匹配到官方全名 → 原样带出
+  }
   return items.length ? items.join("、") : "无";
 }
 function buildReviewerBody(link){
