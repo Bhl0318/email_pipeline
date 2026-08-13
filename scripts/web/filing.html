@@ -335,7 +335,7 @@ function buildChecklist(declKind){
       <div class="checks" style="margin-top:8px;">
         <label><input type="checkbox" id="o-use_customer_number" ${opts.use_customer_number!==false?"checked":""}>17 通信地址用 Customer Number（号码取签字人 Customer No）</label>
       </div>
-      <div class="field" style="margin-top:10px;"><label>16 Other（备注，勾选并填文本）</label>${otherPicker}<input id="o-remark" value="${esc(opts.remark||"")}"></div>
+      <div class="field" style="margin-top:10px;"><label>16 Other（备注，勾选并填文本；多项用<b>英文分号 ;</b> 分隔＝分行）</label>${otherPicker}<input id="o-remark" value="${esc(opts.remark||"")}"></div>
     </div></div>`;
   }
 
@@ -394,7 +394,7 @@ function buildChecklist(declKind){
         <label><input type="checkbox" id="o-use_customer_number" ${opts.use_customer_number!==false?"checked":""}>19 通信地址用 Customer Number（号码取签字人 Customer No）</label>
       </div>
 
-      <div class="field" style="margin-top:10px;"><label>18 Other（备注，勾选并填文本）</label>${otherPicker}<input id="o-remark" value="${esc(opts.remark||"")}"></div>
+      <div class="field" style="margin-top:10px;"><label>18 Other（备注，勾选并填文本；多项用<b>英文分号 ;</b> 分隔＝分行）</label>${otherPicker}<input id="o-remark" value="${esc(opts.remark||"")}"></div>
     </div></div>`;
 }
 // 按发明人 employer 取对应申请人地址（镜像后端 fields_mapping._inventor_applicant_addr / 确认函逻辑）
