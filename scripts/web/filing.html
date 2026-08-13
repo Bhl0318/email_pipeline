@@ -289,6 +289,13 @@ function deriveDeclKind(){
 function buildChecklist(declKind){
   const sm = (fields.subject_matter||"").toUpperCase();
   const ck = (k)=> opts[k] ? "checked" : "";
+  // Other 常用项下拉：选一个把官方全名追加进 o-remark（文本框仍可手动编辑；可多次选=多选）
+  const otherPicker = `<select onchange="addOther(this)" style="margin-bottom:4px;max-width:100%;">
+      <option value="">＋ 添加常用项（PPH / 彩图petition / Track One）…</option>
+      <option value="Patent Prosecution Highway (PPH) Request">PPH-Request</option>
+      <option value="Petition for submission of color formal drawing and request to accept color drawing">彩图petition</option>
+      <option value="Certification and Request for Prioritized Examination (Track 1)">trackone request</option>
+    </select>`;
   // 以下 entitySel/specDraw/declBlock 仅 DES 分支使用（编号=Design-Transmittal 表实物条目号）
   const entitySel = `<div class="field"><label>2/3 实体</label><select id="o-entity">
       <option value="large" ${opts.entity==="large"?"selected":""}>大实体</option>
@@ -328,7 +335,7 @@ function buildChecklist(declKind){
       <div class="checks" style="margin-top:8px;">
         <label><input type="checkbox" id="o-use_customer_number" ${opts.use_customer_number!==false?"checked":""}>17 通信地址用 Customer Number（号码取签字人 Customer No）</label>
       </div>
-      <div class="field" style="margin-top:10px;"><label>16 Other（备注，勾选并填文本）</label><input id="o-remark" value="${esc(opts.remark||"")}"></div>
+      <div class="field" style="margin-top:10px;"><label>16 Other（备注，勾选并填文本）</label>${otherPicker}<input id="o-remark" value="${esc(opts.remark||"")}"></div>
     </div></div>`;
   }
 
@@ -387,7 +394,7 @@ function buildChecklist(declKind){
         <label><input type="checkbox" id="o-use_customer_number" ${opts.use_customer_number!==false?"checked":""}>19 通信地址用 Customer Number（号码取签字人 Customer No）</label>
       </div>
 
-      <div class="field" style="margin-top:10px;"><label>18 Other（备注，勾选并填文本）</label><input id="o-remark" value="${esc(opts.remark||"")}"></div>
+      <div class="field" style="margin-top:10px;"><label>18 Other（备注，勾选并填文本）</label>${otherPicker}<input id="o-remark" value="${esc(opts.remark||"")}"></div>
     </div></div>`;
 }
 // 按发明人 employer 取对应申请人地址（镜像后端 fields_mapping._inventor_applicant_addr / 确认函逻辑）
@@ -674,6 +681,15 @@ async function refreshFinalDocs(){
   data.final_docs = fresh.final_docs || [];
   data.poa_scan = fresh.poa_scan || null;
   renderForm();
+}
+// Other 下拉选常用项 → 把官方全名追加进 o-remark（已有则不重复；文本框仍可手动改）
+function addOther(sel){
+  const v = sel.value; sel.value = "";
+  if (!v) return;
+  const inp = $("o-remark"); if (!inp) return;
+  const cur = (inp.value||"").trim();
+  if (cur.includes(v)) return;
+  inp.value = cur ? (cur + "；" + v) : v;
 }
 async function uploadFinal(){
   const files = [...$("finalFile").files];
