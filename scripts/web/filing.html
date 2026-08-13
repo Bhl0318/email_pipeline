@@ -689,7 +689,7 @@ function addOther(sel){
   const inp = $("o-remark"); if (!inp) return;
   const cur = (inp.value||"").trim();
   if (cur.includes(v)) return;
-  inp.value = cur ? (cur + "；" + v) : v;
+  inp.value = cur ? (cur + "; " + v) : v;   // 英文分号+空格：PDF 显示正常且可在空格处换行
 }
 async function uploadFinal(){
   const files = [...$("finalFile").files];
