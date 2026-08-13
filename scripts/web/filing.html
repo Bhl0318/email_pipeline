@@ -967,7 +967,7 @@ function rvExtraDocs(){
     ];
     const n = norm(other);
     const hit = OTHER_MAP.filter(([full]) => n.includes(norm(full))).map(([, label]) => label);
-    items.push(...(hit.length ? hit : [other]));   // 没匹配到官方全名 → 原样带出
+    items.push(...hit);   // 只保留识别到的这三个；其他 Other 内容不显示
   }
   return items.length ? items.join("、") : "无";
 }
