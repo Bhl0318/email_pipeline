@@ -85,10 +85,9 @@ def get_customer_contacts(project, execute=None):
         return []
 
 
-# 特殊抄送规则：(客户码, 官文类型) → 额外抄送邮箱
-EXTRA_CC_RULES = {
-    ("20608", "NOA"): ["xlding@metis-ip.com"],   # 20608 的 NOA 额外抄送丁晓龙
-}
+# 特殊抄送规则：(客户码, 官文类型) → 额外抄送邮箱。当前为空
+# （原 (20608, NOA)→丁晓龙 已移除：NOA 不再立项，转OA 不会发出，规则永不触发）。
+EXTRA_CC_RULES = {}
 
 
 def forward_cc(project, item=None, execute=None):

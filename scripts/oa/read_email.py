@@ -1009,7 +1009,7 @@ def dispatch_oa(all_results, all_emails=None, dry_run=False, test_project_prefix
         from us_deadline import get_us_deadline
         from filter_oa_email import _parse_date, _add_months, calc_dueDate
         # 兜底标准期限（P1-综合期限速查表）：官文解析失败时，用 发文日(邮戳)+标准月数
-        US_STANDARD_MONTHS = {"CTNF": 3, "CTFR": 3, "CTRS": 2, "NOA": 3}
+        US_STANDARD_MONTHS = {"CTNF": 3, "CTFR": 3, "CTRS": 2}   # NOA 已不立项，移除
         print(f"\n{len(us_items)} 条 US 记录需要获取答复期限...", file=sys.stderr)
         for item in us_items:
             try:
@@ -1068,18 +1068,7 @@ def dispatch_oa(all_results, all_emails=None, dry_run=False, test_project_prefix
             except Exception as e:
                 print(f"[US] {item['project']} 异常: {e}", file=sys.stderr)
 
-    # PPH Decision：读下载的官文判 dismissed/granted —— granted 不立项（只发汇报信），dismissed 保留
-    pph_items = [r for r in all_results if r.get("notification_type") == "PPH.DECISION"]
-    if pph_items and not dry_run:
-        from parse_us_pdf import parse_pph_decision
-        for it in pph_items:
-            decision = parse_pph_decision(it.get("us_pdf_path", ""))
-            if decision == "granted":
-                it["_pph_drop"] = True
-                print(f"[PPH] {it.get('project')} granted → 不立项（只发汇报信）", file=sys.stderr)
-            else:
-                print(f"[PPH] {it.get('project')} 判定={decision or '未判定，保留'} → 立项", file=sys.stderr)
-        all_results = [r for r in all_results if not r.get("_pph_drop")]
+    # 注：PPH.DECISION 已一律不立项（移入 US_TYPES_SKIP），原"读官文判 dismissed/granted"逻辑随之移除。
 
     # Examiner Interview Summary：官文含 "It is not necessary for applicant" → 无需答复，不立项
     exin_items = [r for r in all_results if r.get("notification_type") == "EXIN"]
