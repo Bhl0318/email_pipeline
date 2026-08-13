@@ -936,7 +936,9 @@ function rvUploadType(){
   return ({UTL:"Utility Nonprovisional", "371":"National Stage", DES:"Design"})[sm] || sm || "";
 }
 function rvEntity(){
-  const e = (((fields.applicants||[])[0]||{}).entity_en||"").toLowerCase();
+  // 优先读 Transmittal 递交清单的实体下拉(o-entity: large/small/micro)，退申请人 entity_en
+  const e = (($("o-entity")||{}).value || opts.entity
+            || ((fields.applicants||[])[0]||{}).entity_en || "").toLowerCase();
   return ({large:"大实体", small:"小实体", micro:"微实体"})[e] || "";
 }
 // 页数直接读 Transmittal 递交清单里已填的「说明书总页数(o-spec)/附图总页数(o-draw)」
