@@ -939,6 +939,12 @@ function rvEntity(){
   const e = (((fields.applicants||[])[0]||{}).entity_en||"").toLowerCase();
   return ({large:"大实体", small:"小实体", micro:"微实体"})[e] || "";
 }
+// 页数直接读 Transmittal 递交清单里已填的「说明书总页数(o-spec)/附图总页数(o-draw)」
+function rvPagesLine(){
+  const spec = (($("o-spec")||{}).value || (opts.spec_pages||"")).toString().trim();
+  const draw = (($("o-draw")||{}).value || (opts.drawing_sheets||"")).toString().trim();
+  return `说明书${spec||"__"}页、附图${draw||"__"}页、PA__页`;
+}
 function buildReviewerBody(link){
   const route = (fields.filing_route||"").trim();
   return `xxx好，
@@ -951,7 +957,7 @@ ${link}
 2. 优先权：${rvPriority()}
 3. 申请方式：${route || "巴黎公约/CON-bypass/CIP-bypass/（优先权未超期）/续案/分案（未超最早有效申请日6/9年）"}
 4. 申请人：${rvApplicants()}
-5. 页数：说明书__页、附图__页、PA__页
+5. 页数：${rvPagesLine()}
 6. 权要：__个，__个独权（权__），无多重从权
 7. 附图：与说明书一致
 8. 本案特殊/额外文件：无 或 Sequence Listing 或Preliminary Amendment或PPH-Request、PPH-IDS 或 彩图petition 或 trackone request 或 微实体证明
