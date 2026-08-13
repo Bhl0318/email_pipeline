@@ -947,17 +947,18 @@ function rvPagesLine(){
   const draw = (($("o-draw")||{}).value || (opts.drawing_sheets||"")).toString().trim();
   return `说明书${spec||"__"}页、附图${draw||"__"}页、PA__页`;
 }
-// 特殊/额外文件：读 Transmittal 递交清单里勾选的项（勾了哪些就列哪些，都没勾=无）
+// 特殊/额外文件：读 Transmittal 递交清单里的勾选 + 实体(micro) + Other 备注文本
 function rvExtraDocs(){
   const chk = k => { const el = $("o-has_"+k); return el ? el.checked : !!opts["has_"+k]; };
   const items = [];
-  if (chk("seq_listing")||chk("seq_crf")||chk("seq_statements")) items.push("Sequence Listing");
+  if (chk("seq_listing")) items.push("Sequence Listing");          // 9b 序列表
   if (chk("preliminary_amendment")) items.push("Preliminary Amendment");
   if (chk("ids")||chk("ids_copies")) items.push("IDS");
-  if (chk("assignment")) items.push("Assignment");
-  if (chk("english_translation")) items.push("英文译文");
-  if (chk("priority_copy")||chk("foreign_copies")) items.push("优先权/在先文本副本");
-  if (chk("expedited_design")) items.push("Design 加速审查");
+  const ent = (($("o-entity")||{}).value || opts.entity || "").toLowerCase();
+  if (ent === "micro") items.push("微实体证明");  // 实体选 micro＝Applicant certifies micro entity
+  // Other 备注(o-remark)里填的：PPH-Request / 彩图petition / trackone request 等，原样带出
+  const other = (($("o-remark")||{}).value || opts.remark || "").trim();
+  if (other) items.push(other);
   return items.length ? items.join("、") : "无";
 }
 function buildReviewerBody(link){
