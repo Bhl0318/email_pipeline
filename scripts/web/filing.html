@@ -524,7 +524,7 @@ function renderForm(){
 
     <div class="section"><div class="section-head">定稿文件（说明书/权要/附图终版，手动上传）</div><div class="section-body">
       <div id="finalDocs">${docs}</div>
-      <div style="margin-top:8px;"><input type="file" id="finalFile"> <button onclick="uploadFinal()">上传定稿</button></div>
+      <div style="margin-top:8px;"><input type="file" id="finalFile" multiple> <button onclick="uploadFinal()">上传定稿</button><span style="font-size:11px;color:#94a3b8;margin-left:6px;">可一次多选</span></div>
     </div></div>
 
     <div class="section"><div class="section-head">POA 扫描页（PDF，作为 POA 第二页；可选）</div><div class="section-body">
@@ -676,12 +676,18 @@ async function refreshFinalDocs(){
   renderForm();
 }
 async function uploadFinal(){
-  const f = $("finalFile").files[0];
-  if (!f) { toast("请先选择文件"); return; }
+  const files = [...$("finalFile").files];
+  if (!files.length) { toast("请先选择文件"); return; }
   collectOpts();                                   // 快照当前编辑，防重渲染丢失
-  const fd = new FormData(); fd.append("file", f);
-  try { await api("POST", `${API}/${taskId}/upload-final`, fd, true); toast("上传成功"); await refreshFinalDocs(); }
-  catch(e){ toast("上传失败: "+e.message); }
+  let ok = 0; const bad = [];
+  for (const f of files) {                         // 逐个上传（复用单文件接口），保持顺序
+    const fd = new FormData(); fd.append("file", f);
+    try { await api("POST", `${API}/${taskId}/upload-final`, fd, true); ok++; }
+    catch(e){ bad.push(f.name); }
+  }
+  await refreshFinalDocs();
+  $("finalFile").value = "";                        // 清空已选
+  toast(bad.length ? `上传完成：成功${ok}，失败${bad.length}（${bad.join("、")}）` : `上传成功 ${ok} 个`);
 }
 async function delFinal(name){
   collectOpts();                                   // 同上，删除也只刷新文件列表
