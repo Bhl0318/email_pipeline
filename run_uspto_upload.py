@@ -24,6 +24,10 @@ import os
 import sys
 import json
 import time
+import glob
+import shutil
+import tempfile
+import subprocess
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 OUTPUT_ROOT = os.path.join(SCRIPT_DIR, "uspto_upload")
@@ -98,6 +102,46 @@ def _submission_type(case_volume):
         except Exception:
             sm = ""
     return _SUBMISSION_TYPE.get(sm.upper(), "Utility Nonprovisional")
+
+
+def _gs_bin():
+    """定位 Ghostscript 可执行文件（Windows gswin64c/gswin32c、Linux gs）。找不到返回 None。"""
+    for name in ("gswin64c", "gswin32c", "gs"):
+        p = shutil.which(name)
+        if p:
+            return p
+    for pat in (r"C:\Program Files\gs\gs*\bin\gswin64c.exe",
+                r"C:\Program Files (x86)\gs\gs*\bin\gswin32c.exe"):
+        hits = sorted(glob.glob(pat))
+        if hits:
+            return hits[-1]
+    return None
+
+
+def _to_pdfa(src, out_dir, timeout=300):
+    """把单个 PDF 转成 PDF/A-2b（Ghostscript）；输出到 out_dir（同名）。失败抛异常。"""
+    gs = _gs_bin()
+    if not gs:
+        raise RuntimeError("未找到 Ghostscript（gswin64c），无法转 PDF/A；请在上传机安装 Ghostscript。")
+    out = os.path.join(out_dir, os.path.basename(src))
+    cmd = [gs, "-dPDFA=2", "-dPDFACompatibilityPolicy=1", "-dBATCH", "-dNOPAUSE",
+           "-sColorConversionStrategy=RGB", "-sDEVICE=pdfwrite",
+           f"-sOutputFile={out}", src]
+    r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+    if r.returncode != 0 or not os.path.isfile(out):
+        raise RuntimeError(f"PDF/A 转换失败（{os.path.basename(src)}）：{(r.stderr or r.stdout)[-300:]}")
+    return out
+
+
+def _others_to_pdfa(others, out_dir):
+    """把非 ADS 的 PDF 逐个转成 PDF/A-2b（临时副本，同名）；非 PDF 原样返回。失败抛异常。"""
+    res = []
+    for p in others:
+        if p.lower().endswith(".pdf"):
+            res.append(_to_pdfa(p, out_dir))
+        else:
+            res.append(p)   # 非 PDF 不转
+    return res
 
 
 def _practitioner(case_volume):
@@ -200,13 +244,19 @@ def run(live=False):
             print("  ⚠️ 该案缺签字代理人(on behalf of)，跳过——请确认 env4/5 已「查库带出」签字代理人。")
             continue
         if not live:
-            print("  [dry-run] 满足条件，将触发上传（加 --live 且 UI 联调通后真正执行）。")
+            print(f"  [dry-run] 满足条件，将触发上传（非 ADS 的 PDF 会转 PDF/A-2b；Ghostscript={'有' if _gs_bin() else '缺(需装)'}）。")
             continue
+        # 上传前：非 ADS 的 PDF 转 PDF/A-2b（ADS 不转，XFA 由 USPTO 单独处理）
+        pdfa_tmp = tempfile.mkdtemp(prefix="pdfa_")
         try:
+            data["other_paths"] = _others_to_pdfa(data["other_paths"], pdfa_tmp)
+            print(f"  已转 PDF/A-2b：{len([p for p in data['other_paths'] if p.lower().endswith('.pdf')])} 件")
             runner.run(data, dry_run=False)
         except Exception as exc:  # noqa: BLE001
+            shutil.rmtree(pdfa_tmp, ignore_errors=True)
             print(f"  ❌ 上传失败：{exc}（保留 pending 待重试/人工）")
             continue
+        shutil.rmtree(pdfa_tmp, ignore_errors=True)
         now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         _mark_uploaded(c["upload_id"], now)
         print(f"  ✅ 已上传（存草稿）并置 uspto_upload=done（{c['case_volume']}）。")
