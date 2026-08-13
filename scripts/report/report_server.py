@@ -61,6 +61,21 @@ import uvicorn
 SCRIPT_DIR = Path(__file__).resolve().parent
 ROOT = SCRIPT_DIR.parent                       # DS/汇报信流程/
 TEMPLATES_DIR = ROOT / "templates" / "md"
+
+
+def _resolve_template(name):
+    """按文件名在 templates/md/ 及其分类子目录(md/OA/、以后 md/其他类别/…)中查找模板。
+    模板已按类别分子目录存放、文件名唯一，故跨目录按 basename 解析；找不到返回 None。
+    （name 已由调用方校验为纯文件名，不含 / \\ ..）"""
+    direct = TEMPLATES_DIR / name
+    if direct.is_file():
+        return direct
+    for p in TEMPLATES_DIR.rglob(name):
+        if p.is_file():
+            return p
+    return None
+
+
 WEB_DIR = ROOT / "web"
 PROTOTYPE_HTML = WEB_DIR / "prototype.html"
 EMAIL_CONFIG_PATH = SCRIPT_DIR / "email_config.json"
@@ -265,8 +280,8 @@ def get_template(name: str):
     """返回 templates/md/{name} 原文。"""
     if "/" in name or "\\" in name or ".." in name:
         raise HTTPException(400, "invalid template name")
-    p = TEMPLATES_DIR / name
-    if not p.is_file():
+    p = _resolve_template(name)
+    if not p:
         raise HTTPException(404, f"template {name} not found")
     return PlainTextResponse(p.read_text(encoding="utf-8"), media_type="text/plain; charset=utf-8")
 
@@ -306,8 +321,11 @@ def _guanyu_type(template, fields):
     取不到（无模板/无关于行）返回 None，调用方回退旧逻辑。"""
     if not template:
         return None
+    p = _resolve_template(template)
+    if not p:
+        return None
     try:
-        text = (TEMPLATES_DIR / template).read_text(encoding="utf-8")
+        text = p.read_text(encoding="utf-8")
     except Exception:
         return None
     m = re.search(r'关于[：:]\s*(.+)', text)
