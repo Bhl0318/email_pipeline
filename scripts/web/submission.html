@@ -612,7 +612,7 @@ function renderForm() {
         </select></div>
       <div class="field"><label>接口人邮箱（审核链接/成品收件人）</label>
         <input id="contactEmail" value="${esc(task.contact_email || "")}"></div>
-      <div class="field"><label>递交人邮箱</label>
+      <div class="field"><label>递交人邮箱 <span style="color:#dc2626">*</span></label>
         <input id="filerEmail" value="${esc(task.filer_email || "")}" placeholder="如 hailing.bi@metis-ip.com"></div>
     </div></div></div>
 
@@ -948,6 +948,12 @@ async function deleteAttachment(i) {
 }
 async function openSendModal() {
   if (!taskId) return;
+  // 递交人邮箱必填：空则拦（环节3/5 路由 + 环节5 责任归属都靠它）
+  if ($("filerEmail") && !$("filerEmail").value.trim()) {
+    toast("递交人邮箱为必填，请先填写后再发送", 3500);
+    $("filerEmail").focus();
+    return;
+  }
   try {
     const d = await api("POST", `${API}/tasks/${taskId}/preview-send`, { fields_json: fields });
     $("mFrom").value = d.from || "";
