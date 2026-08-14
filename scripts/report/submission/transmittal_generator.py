@@ -41,11 +41,11 @@ def _select_template(subject_matter: str, is_371: bool = False):
     Design→Design-Transmittal；Utility/Plant→普通 Transmittal(PTO/AIA/15)。
     兼容旧值 UTL/DES/371。"""
     sm = (subject_matter or "").strip().lower()
-    if is_371 or sm == "371":
-        return TRANSMITTAL_371_TEMPLATE, "371-Transmittal"
     if sm in ("des", "design"):
-        return TRANSMITTAL_DESIGN_TEMPLATE, "Design-Transmittal"
-    return TRANSMITTAL_TEMPLATE, "Transmittal"   # utility / plant / utl / 其余
+        return TRANSMITTAL_DESIGN_TEMPLATE, "Design-Transmittal"   # 设计优先：设计走 Hague，不走 371
+    if is_371 or sm == "371":
+        return TRANSMITTAL_371_TEMPLATE, "371-Transmittal"          # 371 仅对 Utility/Plant 国家阶段
+    return TRANSMITTAL_TEMPLATE, "Transmittal"                      # utility / plant / 其余
 
 
 def _options_fields(ttype: str, opts: dict) -> dict:
