@@ -466,19 +466,36 @@ def normalize_parents(fields: dict) -> dict:
     return fields
 
 
-def infer_subject_matter(fields: dict) -> str:
-    """推断 Subject Matter（UTL/DES/371），审核页可改（方案 2.2 来源3）。
+def norm_subject_matter(sm: str) -> str:
+    """归一申请类型到 Utility/Plant/Design（与 ADS us_submission_type 一致）。
+    兼容旧值 UTL/DES/PLT 及中文；371 是落地方式(国家阶段)不是申请类型 → 归 Utility。"""
+    s = (sm or "").strip().lower()
+    if s in ("des", "design", "外观"):
+        return "Design"
+    if s in ("plt", "plant", "植物"):
+        return "Plant"
+    return "Utility"   # utl / utility / 371 / 空 / 其余 → Utility
 
-    规则：外观 → DES；落地方式/业务类型含 371 或 PCT国家阶段 → 371；其余 → UTL。
-    """
-    if fields.get("subject_matter"):
-        return fields["subject_matter"]
-    if (fields.get("application_type") or "") == "外观":
-        return "DES"
+
+def is_371(fields: dict) -> bool:
+    """是否 371 国家阶段（落地方式判定，不看 subject_matter）。
+    兼容旧数据 subject_matter=='371'。"""
     route = (fields.get("filing_route") or "") + (fields.get("business_type_zh_cn") or "")
     if "371" in route or "国家阶段" in route:
-        return "371"
-    return "UTL"
+        return True
+    return (fields.get("subject_matter") or "").strip() == "371"
+
+
+def infer_subject_matter(fields: dict) -> str:
+    """推断申请类型 Utility/Plant/Design（371 属落地方式，见 is_371，不在此）。审核页可改。"""
+    if fields.get("subject_matter"):
+        return norm_subject_matter(fields["subject_matter"])
+    at = (fields.get("application_type") or "")
+    if at == "外观":
+        return "Design"
+    if at in ("植物", "Plant", "plant"):
+        return "Plant"
+    return "Utility"
 
 
 def build_priority_rows(fields: dict) -> list:

@@ -608,7 +608,7 @@ function renderForm() {
         </select></div>
       <div class="field"><label>Subject Matter（推断值可改）</label>
         <select data-path='["subject_matter"]'>
-          ${["UTL", "DES", "371"].map(v => `<option value="${v}" ${fields.subject_matter === v ? "selected" : ""}>${v}</option>`).join("")}
+          ${["Utility", "Plant", "Design"].map(v => `<option value="${v}" ${(fields.subject_matter||"").toLowerCase() === v.toLowerCase() ? "selected" : ""}>${v}</option>`).join("")}
         </select></div>
       <div class="field"><label>接口人邮箱（审核链接/成品收件人）</label>
         <input id="contactEmail" value="${esc(task.contact_email || "")}"></div>

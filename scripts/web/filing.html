@@ -312,7 +312,7 @@ function buildChecklist(declKind){
         <div class="field"><label>6 Declaration 总页数</label><input id="o-decl" value="${esc(opts.declaration_pages||"")}"></div>
       </div>`;
 
-  if (sm === "DES") {  // 外观 Design-Transmittal
+  if (sm.startsWith("DES")) {  // 外观 Design-Transmittal（兼容旧 DES 与新 Design）
     return `<div class="section"><div class="section-head">Transmittal 递交清单（编号对应外观 Design-Transmittal 表条目；勾选本次实际递交的）</div><div class="section-body">
       <div class="grid">${entitySel}${specDraw}</div>
       ${declBlock}
@@ -954,8 +954,13 @@ function rvFirm(){
   return (fields.filing_extra||{}).agent_firm||"";
 }
 function rvUploadType(){
-  const sm = (fields.subject_matter||"").toUpperCase();
-  return ({UTL:"Utility Nonprovisional", "371":"National Stage", DES:"Design"})[sm] || sm || "";
+  // 371 国家阶段看落地方式；否则按申请类型 Utility/Plant/Design（兼容旧 UTL/DES/371）
+  const route = (fields.filing_route||"") + (fields.business_type_zh_cn||"");
+  if (/371|国家阶段/.test(route) || (fields.subject_matter||"").trim() === "371") return "National Stage";
+  const sm = (fields.subject_matter||"").toLowerCase();
+  if (sm.startsWith("des")) return "Design";
+  if (sm.startsWith("pl")) return "Plant";
+  return "Utility Nonprovisional";
 }
 function rvEntity(){
   // 优先读 Transmittal 递交清单的实体下拉(o-entity: large/small/micro)，退申请人 entity_en

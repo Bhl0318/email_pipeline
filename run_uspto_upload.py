@@ -49,9 +49,10 @@ except Exception as exc:  # noqa: BLE001
     print(f"[uspto-upload] DB 不可用：{exc}", file=sys.stderr)
     _DB_OK = False
 
-# subject_matter → Patent Center 申请类型
-_SUBMISSION_TYPE = {"UTL": "Utility Nonprovisional", "371": "Utility Nonprovisional",
-                    "DES": "Design"}
+# 申请类型 → Patent Center 提交类型（371 国家阶段优先，见 _submission_type）
+_SUBMISSION_TYPE = {"design": "Design", "des": "Design",
+                    "plant": "Plant", "plt": "Plant",
+                    "utility": "Utility Nonprovisional", "utl": "Utility Nonprovisional"}
 
 
 def _archive_base():
@@ -90,18 +91,24 @@ def _ready_cases():
 
 
 def _submission_type(case_volume):
-    """从同案 filing_preparation 的 fields_json.subject_matter 推申请类型（缺省 Utility Nonprovisional）。"""
+    """从同案 filing_preparation 推 Patent Center 提交类型。
+    371 国家阶段(看 filing_route/业务类型，或旧 subject_matter=='371') → National Stage；
+    否则按 subject_matter：Design/Plant/Utility(缺省 Utility Nonprovisional)。"""
     rows = _db_exec(
         "SELECT fields_json FROM submission_tasks "
         "WHERE task_type='filing_preparation' AND case_volume=%s ORDER BY created_at DESC LIMIT 1",
         (case_volume,)) or []
-    sm = ""
+    fj = {}
     if rows:
         try:
-            sm = (json.loads(rows[0].get("fields_json") or "{}") or {}).get("subject_matter") or ""
+            fj = json.loads(rows[0].get("fields_json") or "{}") or {}
         except Exception:
-            sm = ""
-    return _SUBMISSION_TYPE.get(sm.upper(), "Utility Nonprovisional")
+            fj = {}
+    sm = (fj.get("subject_matter") or "").strip()
+    route = (fj.get("filing_route") or "") + (fj.get("business_type_zh_cn") or "")
+    if "371" in route or "国家阶段" in route or sm == "371":
+        return "National Stage"
+    return _SUBMISSION_TYPE.get(sm.lower(), "Utility Nonprovisional")
 
 
 def _gs_bin():

@@ -18,7 +18,7 @@ import json
 import re
 from pathlib import Path
 
-from .common import clean_priority_no, infer_subject_matter, blank_none
+from .common import clean_priority_no, infer_subject_matter, norm_subject_matter, is_371, blank_none
 
 # 签字代理人/Customer Number/Deposit 全局配置（gitignore，本地维护；模板见 agent_config.example.json）
 AGENT_CONFIG_PATH = Path(__file__).resolve().parent / "agent_config.json"
@@ -255,7 +255,9 @@ def fields_to_case_info(fields: dict, agent_info: dict = None) -> dict:
             "Priority date": p.get("priority_date", ""),
         })
 
-    subject = fields.get("subject_matter") or infer_subject_matter(fields) or ""
+    # 申请类型归一到 Utility/Plant/Design（与 ADS 一致）；371 单独作落地方式标记供 Transmittal 选模板
+    subject = norm_subject_matter(fields.get("subject_matter") or infer_subject_matter(fields))
+    subject_is_371 = is_371(fields)
 
     # 图纸页数复用递交清单的附图页数；Small Entity 由实体派生（small/micro→Yes）
     _opts = fields.get("transmittal_options") or {}
@@ -301,8 +303,9 @@ def fields_to_case_info(fields: dict, agent_info: dict = None) -> dict:
         "Assignees": assignees,
         "Parent Applications": parents,
         "Priorities": priorities,
-        # 顶层 Subject Matter：Transmittal 选模板用
+        # 顶层 Subject Matter（Utility/Plant/Design）+ 371 标记：Transmittal 选模板用
         "Subject Matter": subject,
+        "Is 371": subject_is_371,
         "Application Information": {
             "Application Type": "REGULAR",
             "Subject Matter": subject,

@@ -36,12 +36,16 @@ from .common import (
 )
 
 
-def _select_template(subject_matter: str):
-    if subject_matter == "UTL":
-        return TRANSMITTAL_TEMPLATE, "Transmittal"
-    if subject_matter == "DES":
+def _select_template(subject_matter: str, is_371: bool = False):
+    """按 371(落地方式) + 申请类型选模板。371→371-Transmittal；否则
+    Design→Design-Transmittal；Utility/Plant→普通 Transmittal(PTO/AIA/15)。
+    兼容旧值 UTL/DES/371。"""
+    sm = (subject_matter or "").strip().lower()
+    if is_371 or sm == "371":
+        return TRANSMITTAL_371_TEMPLATE, "371-Transmittal"
+    if sm in ("des", "design"):
         return TRANSMITTAL_DESIGN_TEMPLATE, "Design-Transmittal"
-    return TRANSMITTAL_371_TEMPLATE, "371-Transmittal"
+    return TRANSMITTAL_TEMPLATE, "Transmittal"   # utility / plant / utl / 其余
 
 
 def _options_fields(ttype: str, opts: dict) -> dict:
@@ -170,7 +174,7 @@ def generate_transmittal(case_info: dict, output_dir, template_pdf=None, options
     subject = (case_info.get("Subject Matter")
                or case_info.get("Application Information", {}).get("Subject Matter", ""))
 
-    tmpl, ttype = _select_template(subject)
+    tmpl, ttype = _select_template(subject, bool(case_info.get("Is 371")))
     template_pdf = template_pdf or tmpl
     warnings = []
     if ttype == "371-Transmittal" and options:
