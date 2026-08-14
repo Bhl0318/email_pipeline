@@ -1256,6 +1256,46 @@ def dispatch_report(all_results, all_emails, dry_run=False):
                         except Exception as e:
                             print(f"  [移动官文 PDF 失败] {src}: {e}", file=sys.stderr)
 
+                # 20608(韶音)：OA 汇报信需带上原邮件的全部附件(含 zip 等非 PDF)。
+                # PDF 已由上面的 _inbox 流程移入 source；这里从原邮件 raw_bytes 补出其余附件。
+                # 与 OA 立项侧 send_forward_oa 的 20608 处理保持一致(均带原邮件全部附件含 zip)。
+                if project and project[:5] == "20608":
+                    em = msgid_to_email.get(item_msgid)
+                    raw = em.get("raw_bytes") if em else None
+                    if raw:
+                        try:
+                            orig_msg = email.message_from_bytes(raw)
+                            case_source_dir = os.path.join(OUTPUT_DIR, project, "source")
+                            added = []
+                            # 与 OA 侧 _all_email_attachments 一致：任何带文件名的 part 都算附件
+                            # (不依赖 Content-Disposition，避免只带 Content-Type name= 的 zip 被漏)
+                            for part in orig_msg.walk():
+                                if part.get_content_maintype() == "multipart":
+                                    continue
+                                fname = decode_str(part.get_filename())
+                                if not fname:
+                                    continue
+                                fname = _safe_filename(fname)
+                                rel = f"{project}/source/{fname}"
+                                if rel in source_attachments:
+                                    continue  # PDF 已由 _inbox 流程带入，跳过
+                                if dry_run:
+                                    added.append(fname)
+                                    continue
+                                payload = part.get_payload(decode=True)
+                                if not payload:
+                                    continue
+                                os.makedirs(case_source_dir, exist_ok=True)
+                                with open(os.path.join(case_source_dir, fname), "wb") as fh:
+                                    fh.write(payload)
+                                source_attachments.append(rel)
+                                added.append(fname)
+                            if added:
+                                tag = "dry-run 将补带" if dry_run else "汇报信补带原邮件附件(含zip)"
+                                print(f"  [20608] {tag}: {added}", file=sys.stderr)
+                        except Exception as e:
+                            print(f"  [20608 附件补带失败] {item_msgid}: {e}", file=sys.stderr)
+
                 # US 官文 PDF 不走邮件附件：uspto.gov 通知邮件常不带 PDF，官文由 OA sink
                 # 经 USPTO API 下载（item['us_pdf_path']）。把它也并入审核任务附件。
                 # 依赖 OA sink 先于本 sink 跑（main.py 已保证）；OA 关或没下到则无此附件。
