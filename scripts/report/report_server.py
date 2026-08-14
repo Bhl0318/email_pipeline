@@ -1712,6 +1712,10 @@ def get_filing_task(task_id: str):
                   if final_dir.exists() else [])
     scan = _filing_poa_scan_path(task_id)
     poa_scan = {"name": scan.name, "url": _output_url(scan)} if scan else None
+    # 同案确认函任务 id（供送审邮件附「确认函及参考文件页」链接 /submission/review/{id}）
+    conf = execute_params(
+        "SELECT id FROM submission_tasks WHERE task_type='filing_confirmation' AND case_volume=%s "
+        "ORDER BY created_at DESC LIMIT 1", (row["case_volume"],))
     return {
         "id": row["id"],
         "task_type": row["task_type"],
@@ -1721,6 +1725,7 @@ def get_filing_task(task_id: str):
         "transmittal_options": fields.get("transmittal_options") or {},
         "final_docs": final_docs,
         "poa_scan": poa_scan,
+        "confirmation_task_id": conf[0]["id"] if conf else None,
     }
 
 

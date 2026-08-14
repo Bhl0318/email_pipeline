@@ -993,13 +993,17 @@ function rvExtraDocs(){
   }
   return items.length ? items.join("、") : "无";
 }
-function buildReviewerBody(link){
+function buildReviewerBody(){
   const route = (fields.filing_route||"").trim();
+  const base = location.origin;
+  const filingLink = `${base}/submission/filing/${taskId}`;
+  const confId = data && data.confirmation_task_id;
+  const confLine = confId ? `【确认函及参考文件页】${base}/submission/review/${confId}\n` : "";
   return `xxx好，
 
 烦请审核题述申请的递交文件，谢谢！
 
-${link}
+${confLine}【递交文件审核页】${filingLink}
 
 1. 签字文件：沿用PCT/沿用母案/已签回
 2. 优先权：${rvPriority()}
@@ -1018,8 +1022,7 @@ function openReviewerModal(){
   if (!taskId) return;
   $("rvTo").value = "";
   $("rvCc").value = "";
-  const link = `${location.origin}/submission/filing/${taskId}`;   // 本页正式链接
-  $("rvBody").value = buildReviewerBody(link);
+  $("rvBody").value = buildReviewerBody();   // 正文内含 确认函页 + 递交页 两个链接
   $("reviewerModal").classList.add("show");
 }
 function closeReviewerModal(){ $("reviewerModal").classList.remove("show"); }
