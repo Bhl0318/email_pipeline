@@ -540,6 +540,10 @@ def send_notification(results):
         print(f"[通知邮件] 发送失败: {e}", file=sys.stderr)
 
 
+# 压缩包扩展名：20608 只需从原邮件补带压缩包文件
+_ARCHIVE_EXT = (".zip", ".rar", ".7z")
+
+
 def _all_email_attachments(raw_bytes):
     """从原始邮件 MIME 提取全部附件 → [(filename, payload_bytes)]（含 zip 等所有类型）。"""
     import email as _email
@@ -627,8 +631,10 @@ def send_forward_oa(all_results, all_emails=None, dry_run=False):
             if (p["item"].get("project", "") or "")[:5] == "20608":
                 raw = msgid_to_raw.get(p["item"].get("message_id", ""))
                 for fname, _ in _all_email_attachments(raw):
+                    if not fname.lower().endswith(_ARCHIVE_EXT):
+                        continue
                     if fname not in atts:
-                        atts.append(fname + "(原始邮件附件)")
+                        atts.append(fname + "(原始邮件压缩包)")
             print(f"  [dry-run][转OA] {p['item'].get('project')}", file=sys.stderr)
             print(f"      主题: {p['subject']}", file=sys.stderr)
             print(f"      收件人({len(p['to'])}): {', '.join(p['to'])}", file=sys.stderr)
@@ -675,11 +681,13 @@ def send_forward_oa(all_results, all_emails=None, dry_run=False):
                                 filename=("utf-8", "", os.path.basename(fp)))
                 msg.attach(part)
                 attached_names.add(os.path.basename(fp))
-            # 20608（韶音）：额外带上原始邮件的全部附件（含 zip），按文件名去重
+            # 20608（韶音）：额外带上原始邮件的压缩包文件，按文件名去重
             if (p["item"].get("project", "") or "")[:5] == "20608":
                 raw = msgid_to_raw.get(p["item"].get("message_id", ""))
                 extra = 0
                 for fname, payload in _all_email_attachments(raw):
+                    if not fname.lower().endswith(_ARCHIVE_EXT):
+                        continue
                     if fname in attached_names:
                         continue
                     attached_names.add(fname)
@@ -691,7 +699,7 @@ def send_forward_oa(all_results, all_emails=None, dry_run=False):
                     msg.attach(part)
                     extra += 1
                 if extra:
-                    print(f"[转OA] {p['item'].get('project')} 20608 额外附原始邮件 {extra} 个附件(含zip)", file=sys.stderr)
+                    print(f"[转OA] {p['item'].get('project')} 20608 额外附原始邮件 {extra} 个压缩包", file=sys.stderr)
             smtp.sendmail(pa_cfg["user"], p["to"] + p["cc"], msg.as_string())
             sent += 1
             print(f"[转OA] {p['item'].get('project')} 已发 → {', '.join(p['to'])}", file=sys.stderr)

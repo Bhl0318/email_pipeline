@@ -50,6 +50,8 @@ CHECKPOINT_PATH = os.path.join(SCRIPT_DIR, "checkpoint.json")
 # 汇报信侧：转达邮件的官文 PDF 临时保存到 _inbox，写库时再移到 output/{案号}/source/
 OUTPUT_DIR = os.path.normpath(os.path.join(SCRIPT_DIR, "..", "output"))
 OUTPUT_INBOX_DIR = os.path.join(OUTPUT_DIR, "_inbox")
+# 压缩包扩展名：20608 汇报信只需从原邮件补带压缩包文件
+_ARCHIVE_EXT = (".zip", ".rar", ".7z")
 
 # 汇报信：(地区, 通知类型) → (模板文件名, 是否附 PDF)
 # 缺模板的类型在字典里留空，写库时会被跳过，等模板补好再加进来。
@@ -1256,9 +1258,9 @@ def dispatch_report(all_results, all_emails, dry_run=False):
                         except Exception as e:
                             print(f"  [移动官文 PDF 失败] {src}: {e}", file=sys.stderr)
 
-                # 20608(韶音)：OA 汇报信需带上原邮件的全部附件(含 zip 等非 PDF)。
-                # PDF 已由上面的 _inbox 流程移入 source；这里从原邮件 raw_bytes 补出其余附件。
-                # 与 OA 立项侧 send_forward_oa 的 20608 处理保持一致(均带原邮件全部附件含 zip)。
+                # 20608(韶音)：OA 汇报信需带上原邮件的压缩包文件。
+                # PDF 已由上面的 _inbox 流程移入 source；这里从原邮件 raw_bytes 补出压缩包。
+                # 与 OA 立项侧 send_forward_oa 的 20608 处理保持一致(均只补带压缩包)。
                 if project and project[:5] == "20608":
                     em = msgid_to_email.get(item_msgid)
                     raw = em.get("raw_bytes") if em else None
@@ -1267,8 +1269,7 @@ def dispatch_report(all_results, all_emails, dry_run=False):
                             orig_msg = email.message_from_bytes(raw)
                             case_source_dir = os.path.join(OUTPUT_DIR, project, "source")
                             added = []
-                            # 与 OA 侧 _all_email_attachments 一致：任何带文件名的 part 都算附件
-                            # (不依赖 Content-Disposition，避免只带 Content-Type name= 的 zip 被漏)
+                            # 任何带文件名的 part 都看(不依赖 Content-Disposition)，只留压缩包
                             for part in orig_msg.walk():
                                 if part.get_content_maintype() == "multipart":
                                     continue
@@ -1276,9 +1277,11 @@ def dispatch_report(all_results, all_emails, dry_run=False):
                                 if not fname:
                                     continue
                                 fname = _safe_filename(fname)
+                                if not fname.lower().endswith(_ARCHIVE_EXT):
+                                    continue
                                 rel = f"{project}/source/{fname}"
                                 if rel in source_attachments:
-                                    continue  # PDF 已由 _inbox 流程带入，跳过
+                                    continue
                                 if dry_run:
                                     added.append(fname)
                                     continue
@@ -1291,7 +1294,7 @@ def dispatch_report(all_results, all_emails, dry_run=False):
                                 source_attachments.append(rel)
                                 added.append(fname)
                             if added:
-                                tag = "dry-run 将补带" if dry_run else "汇报信补带原邮件附件(含zip)"
+                                tag = "dry-run 将补带压缩包" if dry_run else "汇报信补带原邮件压缩包"
                                 print(f"  [20608] {tag}: {added}", file=sys.stderr)
                         except Exception as e:
                             print(f"  [20608 附件补带失败] {item_msgid}: {e}", file=sys.stderr)
