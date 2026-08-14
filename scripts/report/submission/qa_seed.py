@@ -11,13 +11,21 @@ import random
 SEED_RATE = 0.15   # 抽样比例（10–20% 取中）
 
 # 可播种字段池：路径（点号 + 数字下标定位 fields_json）+ 人可读标签。
-# 只选"可审、改了不影响生成、还原无副作用"的字段。
+# 只选"可审、改了不影响生成、还原无副作用、且为拉丁/数字（错一位/一字母仍是可信错值）"的字段；
+# 不含中文字段（拉丁替换会变乱码、太明显）、不含代码/下拉/驱动生成的字段（国别、实体、落地方式、
+# 续案类型等，改了会崩或不可信）。
 POOL = [
-    {"path": "priorities.0.priority_no",     "label": "优先权号"},
-    {"path": "priorities.0.priority_date",   "label": "优先权日"},
-    {"path": "applicants.0.city_en",         "label": "申请人城市"},
-    {"path": "applicants.0.postcode",        "label": "申请人邮编"},
-    {"path": "inventors.0.last_name_en",     "label": "发明人姓"},
+    {"path": "priorities.0.priority_no",           "label": "优先权号"},
+    {"path": "priorities.0.priority_date",         "label": "优先权日"},
+    {"path": "priorities.0.access_code",           "label": "优先权 DAS 码"},
+    {"path": "applicants.0.applicant_name_en",     "label": "申请人英文名"},
+    {"path": "applicants.0.address1",              "label": "申请人地址1（英文）"},
+    {"path": "applicants.0.city_en",               "label": "申请人城市（英文）"},
+    {"path": "applicants.0.province_city_en_us",   "label": "申请人州/省（英文）"},
+    {"path": "applicants.0.postcode",              "label": "申请人邮编"},
+    {"path": "inventors.0.last_name_en",           "label": "发明人姓（英文）"},
+    {"path": "inventors.0.first_name_en",          "label": "发明人名（英文）"},
+    {"path": "case_info.case_name_en",             "label": "申请名称（英文）"},
 ]
 
 
