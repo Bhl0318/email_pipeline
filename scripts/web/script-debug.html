@@ -1,0 +1,2272 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="data:,">
+  <title>指令调试</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/element-plus/2.9.1/index.min.css">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f0f2f5; height: 100vh; overflow: hidden;
+      display: flex; flex-direction: column;
+    }
+
+    /* ── 顶部 Header ── */
+    .dbg-header {
+      height: 52px; background: #1a2b4a; flex-shrink: 0;
+      display: flex; align-items: center; padding: 0 16px; gap: 12px;
+      box-shadow: 0 2px 6px rgba(0,0,0,.2);
+    }
+    .dbg-header__back {
+      display: flex; align-items: center; gap: 5px;
+      color: rgba(255,255,255,.55); font-size: 13px; cursor: pointer;
+      padding: 4px 8px; border-radius: 4px; transition: all .2s; text-decoration: none;
+    }
+    .dbg-header__back:hover { color: #fff; background: rgba(255,255,255,.1); }
+    .dbg-header__divider { width: 1px; height: 18px; background: rgba(255,255,255,.2); }
+    .dbg-header__case { font-size: 13px; color: rgba(255,255,255,.55); max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .dbg-header__tab  { font-size: 14px; font-weight: 600; color: #fff; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .dbg-header__tool-tag {
+      font-size: 11px; padding: 2px 8px; border-radius: 10px;
+      background: rgba(74,144,217,.25); color: #7ec8f8; border: 1px solid rgba(74,144,217,.4);
+      white-space: nowrap;
+    }
+    .dbg-header__spacer { flex: 1; }
+    .dbg-header__env-badge {
+      font-size: 11px; padding: 2px 10px; border-radius: 10px;
+      background: rgba(245,108,108,.2); color: #f88; border: 1px solid rgba(245,108,108,.35);
+      white-space: nowrap;
+    }
+
+    /* ── 主体三栏 ── */
+    :root { --col-left: 10%; --col-right: 40%; }
+    .dbg-body { flex: 1; display: flex; overflow: hidden; }
+    .dbg-divider {
+      width: 4px; flex-shrink: 0; background: #e8e8e8; cursor: col-resize;
+      transition: background .15s; z-index: 10;
+    }
+    .dbg-divider:hover, .dbg-divider--dragging { background: #4a90d9; }
+
+    /* ── 左栏：步骤列表 ── */
+    .step-list {
+      width: var(--col-left, 33.33%); flex-shrink: 0; background: #fff;
+      display: flex; flex-direction: column; overflow: hidden; min-width: 160px;
+    }
+    .step-list__header {
+      padding: 10px 14px 8px; font-size: 11px; font-weight: 600; color: #8c8c8c;
+      letter-spacing: .5px; border-bottom: 1px solid #f0f0f0; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .step-list__body { flex: 1; overflow-y: auto; padding: 6px 0; }
+    .step-item {
+      display: flex; align-items: center; gap: 8px;
+      padding: 9px 12px; cursor: pointer; font-size: 13px; color: #8c8c8c;
+      transition: background .15s; border-left: 3px solid transparent; user-select: none;
+    }
+    .step-item--result { color: #262626; }
+    .step-item:hover { background: #f5f7ff; color: #4a90d9; }
+    .step-item--active { background: #eef4ff; color: #4a90d9; border-left-color: #4a90d9; font-weight: 500; }
+    .step-item--result .step-item__name { font-weight: 600; }
+    .step-item--done   { color: #67c23a; }
+    .step-item--running { color: #4a90d9; }
+    .step-item--error  { color: #f56c6c; }
+    .step-item__index {
+      width: 20px; height: 20px; border-radius: 50%; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 700; background: #f0f0f0; color: #8c8c8c;
+    }
+    .step-item--result  .step-item__index { background: #67c23a; color: #fff; }
+    .step-item--active  .step-item__index { background: #4a90d9; color: #fff; }
+    .step-item--active.step-item--result .step-item__index { background: #67c23a; color: #fff; }
+    .step-item--done    .step-item__index { background: #67c23a; color: #fff; }
+    .step-item--running .step-item__index { background: #4a90d9; color: #fff; }
+    .step-item--error   .step-item__index { background: #f56c6c; color: #fff; }
+    .step-item__name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: default; }
+    .step-item__name-input {
+      flex: 1; min-width: 0; height: 22px; border: 1px solid #4a90d9; border-radius: 3px;
+      padding: 0 6px; font-size: 13px; font-family: inherit; color: #262626;
+      background: #fff; outline: none;
+    }
+    .step-item__more-btn {
+      width: 22px; height: 22px; border-radius: 3px; border: none; background: none;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      font-size: 15px; color: #c0c4cc; transition: all .15s; font-family: inherit;
+      flex-shrink: 0; opacity: 0;
+    }
+    .step-item:hover .step-item__more-btn { opacity: 1; }
+    .step-item__more-btn:hover { background: #e8e8e8; color: #595959; }
+    .step-list__add {
+      padding: 10px 14px; border-top: 1px solid #f0f0f0; flex-shrink: 0;
+      font-size: 13px; color: #8c8c8c; cursor: pointer; display: flex; align-items: center; gap: 6px;
+      transition: all .15s;
+    }
+    .step-list__add:hover { color: #4a90d9; background: #f5f7ff; }
+
+    /* ── 中栏：步骤编辑器 ── */
+    .step-editor {
+      flex: 1; display: flex; flex-direction: column; overflow: hidden;
+      background: #f8f9fc; border-right: 1px solid #e8e8e8; min-width: 0;
+    }
+    .step-editor__header {
+      padding: 10px 16px; background: #fff; border-bottom: 1px solid #f0f0f0;
+      flex-shrink: 0; display: flex; align-items: center; gap: 10px;
+    }
+    .step-editor__title { font-size: 14px; font-weight: 600; color: #262626; }
+    .step-editor__body { flex: 1; overflow: hidden; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+    .editor-card--script { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+    .editor-card--script .editor-card__body { flex: 1; display: flex; flex-direction: column; min-height: 0; padding: 0; }
+    .editor-card--script .script-textarea { flex: 1; min-height: 0; resize: none; margin: 0; border-radius: 0 0 6px 6px; border: none; border-left: 1px solid #f0f0f0; padding: 12px 14px; }
+    .editor-card--script .script-textarea:focus { outline: none; box-shadow: none; }
+
+    /* Markdown 预览布局（指令区） */
+    .script-layout { display: flex; flex: 1; min-height: 0; }
+    .script-outline { width: 116px; flex-shrink: 0; border-right: 1px solid #f0f0f0; overflow-y: auto; padding: 8px 0; background: #fafbfc; border-radius: 0 0 0 6px; }
+    .script-outline__item { display: block; padding: 4px 8px 4px 10px; font-size: 11px; color: #8c8c8c; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: color .15s, background .15s; text-decoration: none; }
+    .script-outline__item:hover { color: #4a90d9; background: #f0f4ff; }
+    .script-outline__item--h3 { padding-left: 18px; font-size: 11px; }
+    .script-outline__empty { padding: 10px; font-size: 11px; color: #c0c4cc; text-align: center; }
+    .script-preview-content { flex: 1; overflow-y: auto; padding: 12px 14px; min-height: 0; cursor: text; }
+    .script-preview-wrap { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; }
+    .script-preview-wrap::after {
+      content: '双击编辑'; position: absolute; top: 7px; right: 7px;
+      font-size: 10px; color: #bfbfbf; background: rgba(255,255,255,.9);
+      padding: 2px 7px; border-radius: 3px; border: 1px solid #e8e8e8;
+      opacity: 0; transition: opacity .2s; pointer-events: none;
+    }
+    .script-preview-wrap:hover::after { opacity: 1; }
+
+    /* Markdown 排版（通用，指令区和执行结果共用） */
+    .md-body { font-size: 13px; color: #2c2c2c; line-height: 1.8; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+    .md-body > *:first-child { margin-top: 0; }
+    .md-body > *:last-child { margin-bottom: 0; }
+    .md-body h1, .md-body h2 { font-size: 14px; font-weight: 600; color: #1a1a1a; margin: 14px 0 6px; padding-bottom: 4px; border-bottom: 1px solid #f0f0f0; }
+    .md-body h3 { font-size: 13px; font-weight: 600; color: #303133; margin: 10px 0 4px; }
+    .md-body p { margin: 0 0 8px; }
+    .md-body ul, .md-body ol { padding-left: 20px; margin: 0 0 8px; }
+    .md-body li { margin-bottom: 3px; }
+    .md-body code { background: #f3f4f6; border-radius: 3px; padding: 1px 5px; font-size: 12px; font-family: 'Menlo', 'Monaco', monospace; color: #c0392b; }
+    .md-body pre { background: #f8fafc; border: 1px solid #edf0f5; border-radius: 4px; padding: 10px 12px; overflow-x: auto; margin: 0 0 8px; }
+    .md-body pre code { background: none; padding: 0; color: #2c2c2c; font-size: 12px; }
+    .md-body strong { font-weight: 600; color: #1a1a1a; }
+    .md-body em { font-style: italic; color: #595959; }
+    .md-body blockquote { border-left: 3px solid #4a90d9; padding: 2px 0 2px 10px; color: #595959; margin: 0 0 8px; background: #f5f8ff; border-radius: 0 3px 3px 0; }
+    .md-body table { border-collapse: collapse; width: 100%; margin-bottom: 8px; font-size: 12px; }
+    .md-body th, .md-body td { border: 1px solid #e4e7ed; padding: 5px 10px; }
+    .md-body th { background: #f7f9fc; font-weight: 600; }
+    .md-body hr { border: none; border-top: 1px solid #f0f0f0; margin: 10px 0; }
+
+    /* 执行结果 Markdown 渲染区 */
+    .exec-result-layout { display: flex; flex: 1; min-height: 0; gap: 0; border: 1px solid #edf0f5; border-radius: 4px; overflow: hidden; background: #f8fafc; }
+    .exec-result-outline { width: 106px; flex-shrink: 0; border-right: 1px solid #edf0f5; overflow-y: auto; padding: 8px 0; background: #f4f6fa; }
+    .exec-result-outline__item { display: block; padding: 4px 8px 4px 10px; font-size: 11px; color: #8c8c8c; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: color .15s, background .15s; }
+    .exec-result-outline__item:hover { color: #4a90d9; background: #eef2ff; }
+    .exec-result-outline__item--h3 { padding-left: 18px; }
+    .exec-result-outline__empty { padding: 10px 8px; font-size: 11px; color: #c0c4cc; }
+    .exec-result-md { flex: 1; padding: 10px 12px; overflow-y: auto; }
+    .exec-entry--expanded .exec-entry__body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+    .exec-entry--expanded .exec-result-layout { flex: 1; min-height: 0; }
+    .exec-entry--expanded .exec-edit-textarea { flex: 1; min-height: 0; resize: none; }
+    .exec-result-layout .exec-edit-textarea { border: none; border-radius: 0; box-shadow: none; resize: none; min-height: 0; }
+
+    /* 编辑器区块卡片 */
+    .editor-card {
+      background: #fff; border-radius: 6px; border: 1px solid #e8e8e8;
+      box-shadow: 0 1px 3px rgba(0,0,0,.04);
+    }
+    .editor-card__header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 9px 14px; border-bottom: 1px solid #f5f5f5;
+    }
+    .editor-card__header--clickable { cursor: pointer; user-select: none; }
+    .editor-card__header--clickable:hover { background: #fafafa; }
+    .editor-card__title { font-size: 12px; font-weight: 600; color: #595959; }
+    .editor-card--result-page { border-color: #b7e0b7; background: #f6fff6; }
+    .editor-card__body  { padding: 12px 14px; }
+
+    /* 脚本内容文本区 */
+    .script-textarea {
+      width: 100%; box-sizing: border-box; border: 1px solid #e4e7ed; border-radius: 4px;
+      padding: 10px 12px; font-size: 13px; font-family: 'Menlo','Consolas','Courier New',monospace;
+      color: #2c2c2c; background: #fafcff; resize: vertical; outline: none; line-height: 1.7;
+      transition: border-color .2s; min-height: 280px;
+    }
+    .script-textarea:focus { border-color: #4a90d9; box-shadow: 0 0 0 2px rgba(74,144,217,.1); }
+
+    /* 输入区块 */
+    .input-section__title { font-size: 12px; font-weight: 600; color: #595959; margin-bottom: 8px; }
+    .input-section__group-label { font-size: 11px; color: #8c8c8c; margin-bottom: 4px; padding-left: 2px; font-weight: 500; }
+    .input-section__divider { height: 1px; background: #f0f0f0; margin: 12px 0; }
+
+    /* 输入配置卡片——折叠/左右布局 */
+    .editor-card--input { flex: 0 0 40%; min-height: 0; display: flex; flex-direction: column; }
+    .editor-card--input.is-collapsed { flex: 0 0 auto; }
+    .editor-card--input .editor-card__body { flex: 1; min-height: 0; overflow: hidden; display: flex; padding: 0; }
+    .input-col { overflow-y: auto; padding: 10px 12px; }
+    .input-col--steps { flex: 0 0 44%; border-right: 1px solid #f0f0f0; }
+    .input-col--pages { flex: 1; }
+    .input-summary { padding: 6px 14px 8px; font-size: 12px; color: #8c8c8c; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-top: 1px solid #f5f5f5; }
+    .editor-card__collapse-btn { width: 22px; height: 22px; border: none; background: none; cursor: pointer; display: flex; align-items: center; justify-content: center; color: #c0c4cc; border-radius: 3px; transition: all .15s; font-size: 11px; flex-shrink: 0; font-family: inherit; }
+    .editor-card__collapse-btn:hover { background: #f5f7fa; color: #595959; }
+
+    /* 文件列表勾选 */
+    .file-check-list { display: flex; flex-direction: column; gap: 6px; max-height: 160px; overflow-y: auto; }
+    .file-check-item {
+      display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 4px;
+      font-size: 13px; color: #303133; cursor: pointer; transition: background .12s;
+    }
+    .file-check-item:hover { background: #f5f7fa; }
+    .file-check-item input[type="checkbox"] { accent-color: #4a90d9; cursor: pointer; flex-shrink: 0; }
+    .file-tag { font-size: 11px; padding: 1px 6px; border-radius: 3px; white-space: nowrap; flex-shrink: 0; }
+    .file-tag--jiaodi { background: #e8f0fe; color: #4a90d9; }
+    .file-tag--scyj   { background: #fff7e6; color: #e6a23c; }
+    .file-tag--dbwj   { background: #f0f4ff; color: #7c5cbf; }
+    .file-tag--qlqy   { background: #f0fdf4; color: #22c55e; }
+    .file-tag--sqwj   { background: #f5f5f5; color: #8c8c8c; }
+    .file-tag--other  { background: #f5f5f5; color: #8c8c8c; }
+    .file-tag--debug  { background: #fff3e6; color: #e6862a; border: 1px solid #fcd34d; }
+    .file-link { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:13px; color:#4a90d9; text-decoration:none; cursor:pointer; }
+    .file-link:hover { text-decoration:underline; }
+    .debug-upload-row { margin-top:8px; }
+    .debug-upload-btn { font-size:12px; padding:4px 10px; border:1px dashed #c0c4cc; border-radius:4px; background:#fafafa; color:#595959; cursor:pointer; transition:all .15s; font-family:inherit; }
+    .debug-upload-btn:hover { border-color:#4a90d9; color:#4a90d9; background:#f0f4ff; }
+    .debug-upload-note { font-size:11px; color:#c0c4cc; margin-top:4px; }
+    .file-tag--step   { background: #f0f4ff; color: #4a6ed9; }
+    .file-tag--result { background: #fff3e6; color: #e6862a; }
+
+    /* 参数行 */
+    .param-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+    .param-row:last-child { margin-bottom: 0; }
+    .param-label { font-size: 12px; color: #8c8c8c; white-space: nowrap; min-width: 48px; }
+    .param-input {
+      height: 32px; border: 1px solid #dcdfe6; border-radius: 4px; padding: 0 10px;
+      font-size: 13px; color: #303133; outline: none; transition: border-color .2s; font-family: inherit;
+    }
+    .param-input:focus { border-color: #4a90d9; }
+    .param-input--sm { width: 60px; }
+    .param-input--md { width: 140px; }
+    .param-select {
+      flex: 1; height: 32px; border: 1px solid #dcdfe6; border-radius: 4px; padding: 0 8px;
+      font-size: 12px; color: #303133; outline: none; transition: border-color .2s;
+      font-family: inherit; background: #fff; cursor: pointer;
+    }
+    .param-select:focus { border-color: #4a90d9; }
+    .script-model-select {
+      height: 24px; border: 1px solid #e4e7ed; border-radius: 3px; padding: 0 4px;
+      font-size: 11px; color: #595959; outline: none; background: #fafafa;
+      cursor: pointer; font-family: inherit; flex: 1; min-width: 0;
+    }
+    .script-model-select:focus { border-color: #4a90d9; }
+
+    /* 输出变量 */
+    .output-var-row { display: flex; align-items: center; gap: 8px; }
+    .output-var-badge {
+      font-size: 12px; padding: 3px 10px; border-radius: 4px;
+      background: #f0f4ff; border: 1px solid #c0d0f4; color: #4a6ed9; font-family: monospace;
+    }
+
+    /* ── 右栏：执行面板 ── */
+    .exec-panel {
+      width: var(--col-right, 33.33%); flex-shrink: 0; background: #fff;
+      display: flex; flex-direction: column; overflow: hidden; min-width: 200px; min-height: 0;
+    }
+    .exec-panel__header {
+      padding: 10px 14px 8px; border-bottom: 1px solid #f0f0f0; flex-shrink: 0;
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .exec-panel__header-row { display: flex; align-items: center; justify-content: space-between; }
+    .exec-panel__title { font-size: 12px; font-weight: 600; color: #8c8c8c; letter-spacing: .5px; }
+    .exec-panel__btns { display: flex; gap: 6px; }
+
+    .exec-panel__body { flex: 1; min-height: 0; overflow: hidden; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+
+    /* 执行日志条目 */
+    .exec-entry {
+      border: 1px solid #f0f0f0; border-radius: 6px; overflow: hidden;
+    }
+    .exec-entry__head {
+      display: flex; align-items: center; gap: 8px; padding: 8px 12px;
+      background: #fafafa; cursor: pointer; user-select: none;
+      transition: background .15s;
+    }
+    .exec-entry__head:hover { background: #f0f4ff; }
+    .exec-entry--running .exec-entry__head { background: #f0f7ff; }
+    .exec-entry--done    .exec-entry__head { background: #f6ffed; }
+    .exec-entry--error   .exec-entry__head { background: #fff1f0; }
+    .exec-entry__idx {
+      width: 18px; height: 18px; border-radius: 50%; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 10px; font-weight: 700; background: #e0e0e0; color: #8c8c8c;
+    }
+    .exec-entry--done  .exec-entry__idx { background: #67c23a; color: #fff; }
+    .exec-entry--running .exec-entry__idx { background: #4a90d9; color: #fff; }
+    .exec-entry--error .exec-entry__idx { background: #f56c6c; color: #fff; }
+    .exec-entry__name { font-size: 13px; font-weight: 500; color: #303133; flex: 1; }
+    .exec-entry__status { font-size: 11px; white-space: nowrap; }
+    .exec-entry--pending .exec-entry__status { color: #c0c4cc; }
+    .exec-entry--running .exec-entry__status { color: #4a90d9; }
+    .exec-entry--done    .exec-entry__status { color: #67c23a; }
+    .exec-entry--error   .exec-entry__status { color: #f56c6c; }
+    .exec-entry__time { font-size: 11px; color: #c0c4cc; white-space: nowrap; }
+    .exec-entry__arrow { font-size: 10px; color: #c0c4cc; transition: transform .2s; }
+    .exec-entry--expanded .exec-entry__arrow { transform: rotate(180deg); }
+    .exec-entry--expanded { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+    .exec-entry__body { padding: 10px 12px; border-top: 1px solid #f5f5f5; background: #fff; }
+    .exec-entry__save-tip {
+      font-size: 11px; color: #8c8c8c; margin-top: 6px;
+      display: flex; align-items: center; gap: 4px;
+    }
+    .exec-edited-badge {
+      font-size: 11px; padding: 2px 8px; border-radius: 10px;
+      background: #fff7e6; color: #e6a23c; border: 1px solid #fcd34d;
+    }
+    .exec-edit-btn {
+      font-size: 12px; padding: 3px 10px; border-radius: 4px;
+      border: 1px solid #dcdfe6; background: #fff; color: #606266;
+      cursor: pointer; transition: all .15s; font-family: inherit;
+    }
+    .exec-edit-btn:hover { border-color: #4a90d9; color: #4a90d9; }
+    .exec-edit-btn--cancel:hover { border-color: #c0c4cc; color: #909399; }
+    .ref-edited-badge { font-size: 10px; padding: 1px 5px; border-radius: 8px; background: #fff7e6; color: #e6a23c; border: 1px solid #fcd34d; white-space: nowrap; flex-shrink: 0; }
+    .input-snap-tag { font-size: 11px; padding: 1px 7px; border-radius: 10px; white-space: nowrap; flex-shrink: 0; }
+    .input-snap-tag--step { background: #f0f4ff; color: #4a6ed9; border: 1px solid #c5d3f5; }
+    .input-snap-tag--step-edited { background: #fff7e6; color: #e6862a; border: 1px solid #fcd34d; }
+    .input-snap-tag--page { background: #f5f5f5; color: #595959; border: 1px solid #e4e7ed; }
+    .exec-edit-textarea {
+      width: 100%; min-height: 160px; border: 1px solid #4a90d9; border-radius: 4px;
+      padding: 10px 12px; font-size: 12px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      color: #2c2c2c; resize: vertical; outline: none; line-height: 1.7;
+      box-shadow: 0 0 0 2px rgba(74,144,217,.1);
+    }
+    /* Markdown 工具栏 */
+    .script-editor-wrap { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+    .script-editor-wrap .script-textarea { flex: 1; min-height: 0; resize: none; }
+    .exec-editor-wrap { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+    .exec-editor-wrap .exec-edit-textarea { flex: 1; min-height: 0; resize: none; }
+    .md-toolbar {
+      display: flex; align-items: center; gap: 2px; padding: 4px 8px;
+      background: #f5f7fa; border-bottom: 1px solid #e8e8e8; flex-shrink: 0; flex-wrap: wrap;
+    }
+    .md-toolbar__btn {
+      height: 24px; min-width: 28px; padding: 0 6px;
+      border: 1px solid transparent; border-radius: 3px; background: none;
+      font-size: 12px; color: #595959; cursor: pointer; font-family: inherit;
+      transition: background .12s, border-color .12s, color .12s;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .md-toolbar__btn:hover { background: #fff; border-color: #c5d3f5; color: #4a90d9; }
+    .md-toolbar__btn b { font-size: 13px; line-height: 1; }
+    .md-toolbar__btn--i { font-style: italic; font-weight: 600; }
+    .md-toolbar__sep { width: 1px; height: 14px; background: #e4e7ed; margin: 0 3px; flex-shrink: 0; }
+
+    .exec-spin {
+      width: 12px; height: 12px; border-radius: 50%;
+      border: 2px solid rgba(74,144,217,.3); border-top-color: #4a90d9;
+      animation: exec-rotate .7s linear infinite; flex-shrink: 0; display: inline-block;
+    }
+    @keyframes exec-rotate { to { transform: rotate(360deg); } }
+
+    /* 空状态 */
+    .exec-empty {
+      flex: 1; display: flex; flex-direction: column; align-items: center;
+      justify-content: center; color: #c0c4cc; font-size: 13px; gap: 10px; padding: 30px 0;
+    }
+    .exec-empty__icon { font-size: 32px; }
+
+    /* ── 滚动条 ── */
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
+    ::-webkit-scrollbar-thumb { background: #dcdfe6; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #c0c4cc; }
+
+    /* ── 新手引导 Overlay ── */
+    /* ── 新手引导 ── */
+    .guide-mask-piece {
+      position: fixed; background: rgba(0,0,0,0.55); z-index: 9000; pointer-events: auto;
+      transition: top 0.28s cubic-bezier(0.4,0,0.2,1), left 0.28s cubic-bezier(0.4,0,0.2,1),
+                  width 0.28s cubic-bezier(0.4,0,0.2,1), height 0.28s cubic-bezier(0.4,0,0.2,1);
+    }
+    .guide-highlight-ring {
+      position: fixed; z-index: 9001; border-radius: 6px; pointer-events: none;
+      outline: 2px solid #409eff;
+      box-shadow: 0 0 0 4px rgba(64,158,255,0.22), 0 0 18px 4px rgba(64,158,255,0.15);
+      transition: top 0.28s cubic-bezier(0.4,0,0.2,1), left 0.28s cubic-bezier(0.4,0,0.2,1),
+                  width 0.28s cubic-bezier(0.4,0,0.2,1), height 0.28s cubic-bezier(0.4,0,0.2,1);
+    }
+    .guide-click-blocker {
+      position: fixed; z-index: 9002; background: transparent; cursor: not-allowed; pointer-events: all;
+    }
+    .guide-tooltip {
+      position: fixed; z-index: 9003; background: #fff; border-radius: 10px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.08);
+      padding: 20px 22px 16px; width: 300px; max-width: calc(100vw - 32px); pointer-events: auto;
+    }
+    .guide-tooltip__step  { font-size: 11px; color: #909399; font-weight: 600; letter-spacing: 0.06em; margin-bottom: 6px; }
+    .guide-tooltip__title { font-size: 15px; font-weight: 700; color: #303133; margin-bottom: 8px; line-height: 1.4; }
+    .guide-tooltip__desc  { font-size: 13px; color: #606266; line-height: 1.75; margin-bottom: 16px; white-space: pre-line; }
+    .guide-tooltip__dots  { display: flex; gap: 5px; align-items: center; margin-bottom: 14px; }
+    .guide-tooltip__dot   { width: 6px; height: 6px; border-radius: 50%; background: #dcdfe6; transition: all 0.2s; flex-shrink: 0; }
+    .guide-tooltip__dot--active { background: #409eff; width: 16px; border-radius: 3px; }
+    .guide-tooltip__actions { display: flex; align-items: center; gap: 8px; }
+    .guide-btn-prev { padding: 5px 14px; font-size: 12px; border: 1px solid #dcdfe6; background: #fff; border-radius: 5px; cursor: pointer; color: #606266; transition: all 0.15s; }
+    .guide-btn-prev:hover { background: #f5f7fa; border-color: #c0c4cc; }
+    .guide-btn-next { padding: 5px 18px; font-size: 13px; font-weight: 600; border: none; background: #409eff; color: #fff; border-radius: 5px; cursor: pointer; transition: background 0.15s; }
+    .guide-btn-next:hover { background: #337ecc; }
+    @keyframes guide-next-flash {
+      0%,100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(64,158,255,0); }
+      35%      { transform: scale(1.16); box-shadow: 0 0 0 6px rgba(64,158,255,0.42); }
+      65%      { transform: scale(1.08); box-shadow: 0 0 0 3px rgba(64,158,255,0.22); }
+    }
+    .guide-btn-next-flash { animation: guide-next-flash 0.55s ease forwards; }
+    .guide-btn-skip { margin-left: auto; font-size: 12px; color: #c0c4cc; background: none; border: none; cursor: pointer; padding: 4px 2px; transition: color 0.15s; }
+    .guide-btn-skip:hover { color: #909399; }
+    .guide-fade-enter-active { transition: opacity 0.22s ease, transform 0.22s cubic-bezier(0.34,1.56,0.64,1); }
+    .guide-fade-leave-active { transition: opacity 0.15s ease, transform 0.15s ease; }
+    .guide-fade-enter-from, .guide-fade-leave-to { opacity: 0; transform: scale(0.92); }
+  </style>
+</head>
+<body>
+<div id="app" style="display:flex;flex-direction:column;height:100vh;overflow:hidden">
+
+  <!-- Component: DebugHeader -->
+  <div class="dbg-header">
+    <a class="dbg-header__back" data-guide="back-btn" @click.prevent="showExitDialog = true">← 返回</a>
+    <div class="dbg-header__divider"></div>
+    <span class="dbg-header__case">{{ caseName }}</span>
+    <span style="color:rgba(255,255,255,.3);font-size:12px">/</span>
+    <span class="dbg-header__tab">{{ tabName }}</span>
+    <span class="dbg-header__tool-tag">{{ toolTypeLabel }}</span>
+    <div class="dbg-header__spacer"></div>
+    <span class="dbg-header__env-badge">测试环境</span>
+  </div>
+  <!-- /Component: DebugHeader -->
+
+  <div class="dbg-body">
+
+    <!-- Component: StepList -->
+    <div class="step-list" data-guide="step-list">
+      <div class="step-list__header">
+        <span>流程步骤</span>
+        <span style="font-size:12px;color:#c0c4cc;font-weight:400">{{ steps.length }} 步</span>
+      </div>
+      <div class="step-list__body">
+        <div v-for="(step, idx) in steps" :key="step.id"
+          :class="['step-item',
+            activeStepId === step.id && 'step-item--active',
+            step.writeToResult && 'step-item--result',
+            execState[step.id] === 'done'    && activeStepId !== step.id && 'step-item--done',
+            execState[step.id] === 'running' && 'step-item--running',
+            execState[step.id] === 'error'   && 'step-item--error',
+          ]"
+          @click="activeStepId = step.id">
+          <div class="step-item__index">
+            <template v-if="execState[step.id] === 'running'">
+              <span class="exec-spin" style="width:10px;height:10px;border-width:1.5px"></span>
+            </template>
+            <template v-else-if="execState[step.id] === 'done'">✓</template>
+            <template v-else-if="execState[step.id] === 'error'">✕</template>
+            <template v-else>{{ idx + 1 }}</template>
+          </div>
+          <input v-if="step._editing" class="step-item__name-input"
+            :value="step.name"
+            @input="step.name = $event.target.value"
+            @blur="step._editing = false"
+            @keyup.enter="step._editing = false"
+            @keyup.escape="step._editing = false"
+            @click.stop
+            v-focus-on="step._editing">
+          <span v-else class="step-item__name" data-guide="step-name" @dblclick.stop="step._editing = true">{{ step.name }}</span>
+          <el-dropdown trigger="click" @click.stop @command="handleStepCmd(step, idx, $event)">
+            <button class="step-item__more-btn" data-guide="step-more-btn" @click.stop>⋯</button>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item command="up" :disabled="idx === 0">上移</el-dropdown-item>
+                <el-dropdown-item command="down" :disabled="idx === steps.length - 1">下移</el-dropdown-item>
+                <el-dropdown-item command="rename">重命名</el-dropdown-item>
+                <el-dropdown-item command="toggleResult" divided>
+                  {{ step.writeToResult ? '取消成果页' : '设为成果页' }}
+                </el-dropdown-item>
+                <el-dropdown-item command="delete" divided style="color:#f56c6c">删除</el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
+        </div>
+      </div>
+      <div class="step-list__add" data-guide="step-add" @click="addStep">
+        <span style="font-size:16px;line-height:1">＋</span> 添加步骤
+      </div>
+    </div>
+    <!-- /Component: StepList -->
+
+    <div class="dbg-divider" id="divider-left"></div>
+
+    <!-- Component: StepEditor -->
+    <div class="step-editor">
+      <div class="step-editor__header">
+        <span class="step-editor__title">
+          {{ activeStep ? '步骤 ' + (activeStepIndex + 1) + '：' + activeStep.name : '请选择步骤' }}
+        </span>
+        <div style="display:flex;align-items:center;gap:10px">
+          <el-button v-if="activeStep" size="small" type="primary" data-guide="run-step-btn"
+            :loading="execState[activeStep.id] === 'running'"
+            @click="runStep(activeStep)">
+            ▶ 单步执行
+          </el-button>
+        </div>
+      </div>
+
+      <div v-if="activeStep" class="step-editor__body">
+
+        <!-- 输入配置 -->
+        <div :class="['editor-card', 'editor-card--input', { 'is-collapsed': isInputCollapsed }]"
+          data-guide="input-config">
+          <div class="editor-card__header editor-card__header--clickable"
+            @click="isInputCollapsed = !isInputCollapsed" :title="isInputCollapsed ? '展开' : '折叠'">
+            <span class="editor-card__title">输入配置</span>
+            <span class="editor-card__collapse-btn">{{ isInputCollapsed ? '▶' : '▼' }}</span>
+          </div>
+          <!-- 折叠摘要 -->
+          <div v-if="isInputCollapsed" class="input-summary">{{ inputSummary }}</div>
+          <!-- 展开：左右双列 -->
+          <!-- API: GET /api/result/script-config params: { caseId, tabId } -->
+          <!-- API: GET /api/case/pages/:caseId -->
+          <div v-else class="editor-card__body">
+            <!-- 左列：引用前序步骤（仅非第一步显示）-->
+            <div v-if="activeStepIndex > 0" class="input-col input-col--steps" data-guide="input-ref-steps">
+              <div class="input-section__title">引用前序步骤</div>
+              <div class="file-check-list">
+                <label v-for="s in steps.slice(0, activeStepIndex)" :key="s.id" class="file-check-item">
+                  <input type="checkbox" :value="s.id" v-model="activeStep.refSteps">
+                  <span class="file-tag file-tag--step">步骤{{ steps.indexOf(s) + 1 }}</span>
+                  <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px">{{ s.name }}</span>
+                  <span v-if="stepOutputs[s.id]?.isEdited" class="ref-edited-badge">已修改</span>
+                </label>
+              </div>
+            </div>
+            <!-- 右列：选择平台页面 -->
+            <div class="input-col input-col--pages" data-guide="input-platform-pages">
+              <div class="input-section__title">选择平台页面</div>
+              <div class="input-section__group-label">资料页</div>
+              <div class="file-check-list" style="margin-bottom:10px">
+                <label v-for="p in dataPages" :key="p.pid" class="file-check-item">
+                  <input type="checkbox" :value="p.pid" v-model="activeStep.refPages">
+                  <span :class="['file-tag', 'file-tag--' + p.subtype]">{{ ptypeLabel(p.subtype) }}</span>
+                  <a :href="p.url" target="_blank" class="file-link" @click.stop>{{ p.name }}</a>
+                </label>
+              </div>
+              <div class="input-section__group-label">成果页</div>
+              <div class="file-check-list">
+                <label v-for="p in resultPages" :key="p.pid" class="file-check-item">
+                  <input type="checkbox" :value="p.pid" v-model="activeStep.refPages">
+                  <span class="file-tag file-tag--result">成果页</span>
+                  <a :href="p.url" target="_blank" class="file-link" @click.stop>{{ p.name }}</a>
+                </label>
+              </div>
+              <!-- 本次调试文件 -->
+              <template v-if="debugFiles.length > 0">
+                <div class="input-section__divider"></div>
+                <div class="input-section__group-label">本次调试文件</div>
+                <div class="file-check-list" style="margin-bottom:8px">
+                  <label v-for="p in debugFiles" :key="p.pid" class="file-check-item">
+                    <input type="checkbox" :value="p.pid" v-model="activeStep.refPages">
+                    <span class="file-tag file-tag--debug">本次调试</span>
+                    <a :href="p.url" target="_blank" class="file-link" @click.stop>{{ p.name }}</a>
+                  </label>
+                </div>
+              </template>
+              <!-- 上传调试文件 -->
+              <div class="debug-upload-row">
+                <input type="file" :ref="el => debugFileInputRef = el" accept="application/pdf,.docx,.doc" style="display:none" @change="handleDebugUpload">
+                <button class="debug-upload-btn" @click="debugFileInputRef && debugFileInputRef.click()">+ 上传调试文件</button>
+              </div>
+              <div class="debug-upload-note">调试文件不会影响案件正式文件</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Component: ScriptEditor -->
+        <!-- API: POST /api/result/script/run body: { caseId, tabId, stepId, script, inputConfig, modelConfig } -->
+        <!-- API: GET /api/platform/models → [{ id, label }] -->
+        <div class="editor-card editor-card--script" data-guide="script-card">
+          <div class="editor-card__header" style="gap:6px">
+            <span class="editor-card__title" style="flex-shrink:0">指令内容</span>
+            <span data-guide="model-temp-row" style="display:inline-flex;align-items:center;gap:6px;flex:1;min-width:0">
+              <select class="script-model-select" v-model="activeStep.model">
+                <option value="claude-sonnet-4-6">Sonnet 4.6</option>
+                <option value="claude-opus-4-8">Opus 4.8</option>
+                <option value="claude-haiku-4-5">Haiku 4.5</option>
+              </select>
+              <span style="font-size:11px;color:#8c8c8c;flex-shrink:0">温度</span>
+              <input type="number" min="0" max="1" step="0.1" class="param-input param-input--sm"
+                style="text-align:center;flex-shrink:0" v-model.number="activeStep.temperature">
+            </span>
+            <button class="editor-card__collapse-btn"
+              style="width:auto;padding:0 8px;font-size:11px;color:#4a90d9;border:1px solid #c5d3f5;border-radius:3px;background:#f0f4ff;flex-shrink:0"
+              @click="isScriptPreview = !isScriptPreview">
+              {{ isScriptPreview ? '编辑' : '预览' }}
+            </button>
+          </div>
+          <div class="editor-card__body">
+            <div class="script-layout">
+              <!-- outline 始终显示，实时跟随编辑内容 -->
+              <nav class="script-outline">
+                <template v-if="scriptOutline.length">
+                  <a v-for="h in scriptOutline" :key="h.text + h.idx"
+                    :class="['script-outline__item', h.level === 3 ? 'script-outline__item--h3' : '']"
+                    @click.prevent="scrollToHeading(h.text)">{{ h.text }}</a>
+                </template>
+                <div v-else class="script-outline__empty">无标题</div>
+              </nav>
+              <!-- 右侧：编辑 or 预览 -->
+              <div v-if="!isScriptPreview" class="script-editor-wrap">
+                <!-- Component: MdToolbar -->
+                <div class="md-toolbar">
+                  <button class="md-toolbar__btn" @click="mdScript('h2')" title="二级标题">H2</button>
+                  <button class="md-toolbar__btn" @click="mdScript('h3')" title="三级标题">H3</button>
+                  <span class="md-toolbar__sep"></span>
+                  <button class="md-toolbar__btn" @click="mdScript('bold')" title="粗体"><b>B</b></button>
+                  <button class="md-toolbar__btn md-toolbar__btn--i" @click="mdScript('italic')" title="斜体">I</button>
+                  <button class="md-toolbar__btn" @click="mdScript('code')" title="行内代码" style="font-family:monospace">`·`</button>
+                  <button class="md-toolbar__btn" @click="mdScript('codeblock')" title="代码块">&lt;/&gt;</button>
+                  <span class="md-toolbar__sep"></span>
+                  <button class="md-toolbar__btn" @click="mdScript('ul')" title="无序列表">— 列表</button>
+                  <button class="md-toolbar__btn" @click="mdScript('ol')" title="有序列表">1. 列表</button>
+                  <button class="md-toolbar__btn" @click="mdScript('quote')" title="引用">&gt; 引用</button>
+                  <button class="md-toolbar__btn" @click="mdScript('hr')" title="分割线">―――</button>
+                </div>
+                <!-- /Component: MdToolbar -->
+                <textarea class="script-textarea" v-model="activeStep.script"
+                  ref="scriptTaRef"
+                  placeholder="在此编写指令内容…"
+                  v-focus-on="true"
+                  @keydown.esc="isScriptPreview = true"></textarea>
+              </div>
+              <div v-else class="script-preview-wrap" @dblclick="isScriptPreview = false">
+                <div class="script-preview-content md-body" ref="scriptPreviewEl"
+                  v-html="markedParse(activeStep.script)"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- /Component: ScriptEditor -->
+
+
+
+      </div>
+
+      <!-- 无选中步骤占位 -->
+      <div v-else style="flex:1;display:flex;align-items:center;justify-content:center;color:#c0c4cc;font-size:13px">
+        从左侧选择或添加步骤
+      </div>
+    </div>
+    <!-- /Component: StepEditor -->
+
+    <div class="dbg-divider" id="divider-right"></div>
+
+    <!-- Component: ExecPanel -->
+    <div class="exec-panel">
+      <div class="exec-panel__header">
+        <div class="exec-panel__header-row">
+          <span class="exec-panel__title">执行结果</span>
+          <div class="exec-panel__btns">
+            <el-button size="small" type="primary" :loading="isRunningAll" @click="runAll" data-guide="run-all-btn">全部执行</el-button>
+          </div>
+        </div>
+
+      </div>
+      <div class="exec-panel__body" data-guide="exec-result">
+        <template v-if="execLog.length">
+          <div v-for="entry in execLog" :key="entry.stepId + '-' + entry.runAt"
+            :class="['exec-entry', 'exec-entry--' + entry.status, entry.expanded && 'exec-entry--expanded']">
+            <div class="exec-entry__head" @click="toggleExpand(entry)">
+              <div :class="['exec-entry__idx']">
+                <span v-if="entry.status === 'running'" class="exec-spin" style="width:10px;height:10px;border-width:1.5px"></span>
+                <template v-else-if="entry.status === 'done'">✓</template>
+                <template v-else-if="entry.status === 'error'">✕</template>
+                <template v-else>{{ entry.stepIndex + 1 }}</template>
+              </div>
+              <span class="exec-entry__name">{{ entry.stepName }}</span>
+              <span class="exec-entry__status">
+                {{ { pending:'等待中', running:'执行中…', done:'完成', error:'失败' }[entry.status] }}
+              </span>
+              <span v-if="entry.elapsed" class="exec-entry__time">{{ entry.elapsed }}</span>
+              <span class="exec-entry__arrow">{{ entry.expanded ? '▲' : '▼' }}</span>
+            </div>
+            <div v-if="entry.expanded" class="exec-entry__body">
+              <div v-if="entry.status === 'running'" style="display:flex;align-items:center;gap:8px;color:#4a90d9;font-size:13px">
+                <span class="exec-spin"></span> 正在生成…
+              </div>
+              <template v-else-if="stepOutputs[entry.stepId] || entry.result">
+                <!-- 展示模式 -->
+                <template v-if="!entry._editMode">
+                  <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;flex-wrap:wrap">
+                    <div style="display:flex;align-items:center;gap:4px;flex:1;flex-wrap:wrap;min-width:0">
+                      <span v-for="s in entry.inputSnapshot?.refSteps" :key="s.id"
+                        :class="['input-snap-tag', s.wasEdited ? 'input-snap-tag--step-edited' : 'input-snap-tag--step']">
+                        步骤{{ s.index }}{{ s.wasEdited ? ' · 已修改' : '' }}
+                      </span>
+                      <span v-for="p in entry.inputSnapshot?.refPages" :key="p.pid" class="input-snap-tag input-snap-tag--page">{{ p.label }}</span>
+                      <span v-if="!entry.inputSnapshot?.refSteps?.length && !entry.inputSnapshot?.refPages?.length"
+                        style="font-size:11px;color:#c0c4cc">无输入配置</span>
+                    </div>
+                    <span v-if="stepOutputs[entry.stepId]?.isEdited" class="exec-edited-badge" style="flex-shrink:0">已修改</span>
+                    <button class="exec-edit-btn" style="flex-shrink:0" @click="startEdit(entry)">编辑</button>
+                  </div>
+                  <div class="exec-result-layout">
+                    <nav class="exec-result-outline">
+                      <template v-if="extractOutline(stepOutputs[entry.stepId]?.content || entry.result).length">
+                        <a v-for="h in extractOutline(stepOutputs[entry.stepId]?.content || entry.result)"
+                          :key="h.text + h.idx"
+                          :class="['exec-result-outline__item', h.level >= 3 ? 'exec-result-outline__item--h3' : '']"
+                          @click.prevent="scrollExecHeading(entry.stepId, h.text)">{{ h.text }}</a>
+                      </template>
+                      <div v-else class="exec-result-outline__empty">无标题</div>
+                    </nav>
+                    <div class="exec-result-md md-body" :data-exec-result="entry.stepId"
+                      v-html="markedParse(stepOutputs[entry.stepId]?.content || entry.result)"></div>
+                  </div>
+                </template>
+                <!-- 编辑模式 -->
+                <template v-else>
+                  <div data-guide="exec-save-btns" style="display:flex;align-items:center;justify-content:flex-end;gap:6px;margin-bottom:6px">
+                    <button class="exec-edit-btn" @click="saveEdit(entry)">保存</button>
+                    <button class="exec-edit-btn exec-edit-btn--cancel" @click="cancelEdit(entry)">取消</button>
+                  </div>
+                  <div class="exec-result-layout">
+                    <nav class="exec-result-outline">
+                      <template v-if="extractOutline(entry._editContent || '').length">
+                        <a v-for="h in extractOutline(entry._editContent || '')"
+                          :key="h.text + h.idx"
+                          :class="['exec-result-outline__item', h.level >= 3 ? 'exec-result-outline__item--h3' : '']"
+                          @click.prevent="scrollEditHeading(entry.stepId, h.text)">{{ h.text }}</a>
+                      </template>
+                      <div v-else class="exec-result-outline__empty">无标题</div>
+                    </nav>
+                    <div class="exec-editor-wrap">
+                      <!-- Component: MdToolbar -->
+                      <div class="md-toolbar">
+                        <button class="md-toolbar__btn" @click="mdExec('h2', entry.stepId)" title="二级标题">H2</button>
+                        <button class="md-toolbar__btn" @click="mdExec('h3', entry.stepId)" title="三级标题">H3</button>
+                        <span class="md-toolbar__sep"></span>
+                        <button class="md-toolbar__btn" @click="mdExec('bold', entry.stepId)" title="粗体"><b>B</b></button>
+                        <button class="md-toolbar__btn md-toolbar__btn--i" @click="mdExec('italic', entry.stepId)" title="斜体">I</button>
+                        <button class="md-toolbar__btn" @click="mdExec('code', entry.stepId)" title="行内代码" style="font-family:monospace">`·`</button>
+                        <button class="md-toolbar__btn" @click="mdExec('codeblock', entry.stepId)" title="代码块">&lt;/&gt;</button>
+                        <span class="md-toolbar__sep"></span>
+                        <button class="md-toolbar__btn" @click="mdExec('ul', entry.stepId)" title="无序列表">— 列表</button>
+                        <button class="md-toolbar__btn" @click="mdExec('ol', entry.stepId)" title="有序列表">1. 列表</button>
+                        <button class="md-toolbar__btn" @click="mdExec('quote', entry.stepId)" title="引用">&gt; 引用</button>
+                        <button class="md-toolbar__btn" @click="mdExec('hr', entry.stepId)" title="分割线">―――</button>
+                      </div>
+                      <!-- /Component: MdToolbar -->
+                      <textarea class="exec-edit-textarea" :data-exec-edit="entry.stepId" v-model="entry._editContent"></textarea>
+                    </div>
+                  </div>
+                </template>
+                <div class="exec-entry__save-tip">
+                  <span>💾</span>
+                  <span>中间结果已保存至：<code style="font-size:11px">{{ entry.savePath }}</code></span>
+                </div>
+              </template>
+              <div v-else-if="entry.status === 'error'" style="font-size:13px;color:#f56c6c;">
+                {{ entry.errorMsg || '执行失败，请检查脚本内容' }}
+              </div>
+            </div>
+          </div>
+        </template>
+        <div v-else class="exec-empty">
+          <div class="exec-empty__icon">⚡</div>
+          <div>点击「单步执行」或「全部执行」<br>查看运行结果</div>
+        </div>
+      </div>
+    </div>
+    <!-- /Component: ExecPanel -->
+
+  </div>
+
+  <!-- Component: GuideOverlay -->
+  <template v-if="guideVisible">
+    <div class="guide-mask-piece" :style="guideMask.top"    @click.stop></div>
+    <div class="guide-mask-piece" :style="guideMask.bottom" @click.stop></div>
+    <div class="guide-mask-piece" :style="guideMask.left"   @click.stop></div>
+    <div class="guide-mask-piece" :style="guideMask.right"  @click.stop></div>
+    <div class="guide-highlight-ring" :style="guideHighlight"></div>
+    <div v-if="!currentGuideSteps[guideStepIndex]?.allowClick" class="guide-click-blocker" :style="guideHighlight" @click.stop="handleGuideBlockedClick"></div>
+  </template>
+  <Transition name="guide-fade">
+    <div v-if="guideVisible" class="guide-tooltip" :style="guideTooltip">
+      <div class="guide-tooltip__step">{{ guideStepIndex + 1 }} / {{ currentGuideSteps.length }}</div>
+      <div class="guide-tooltip__title">{{ currentGuideSteps[guideStepIndex]?.title }}</div>
+      <div class="guide-tooltip__desc">{{ currentGuideSteps[guideStepIndex]?.desc }}</div>
+      <div class="guide-tooltip__dots">
+        <span
+          v-for="(s, i) in currentGuideSteps" :key="i"
+          :class="['guide-tooltip__dot', i === guideStepIndex ? 'guide-tooltip__dot--active' : '']"
+        ></span>
+      </div>
+      <div class="guide-tooltip__actions">
+        <button class="guide-btn-skip" @click="guideSkip">跳过引导</button>
+        <div style="display:flex;gap:8px;">
+          <button v-if="guideStepIndex > 0" class="guide-btn-prev" @click="guidePrev">上一步</button>
+          <button
+            class="guide-btn-next"
+            :class="{ 'guide-btn-next-flash': guideBtnFlashing }"
+            @click="guideNext"
+          >{{ guideStepIndex < currentGuideSteps.length - 1 ? '下一步' : '完成' }}</button>
+        </div>
+      </div>
+    </div>
+  </Transition>
+  <!-- /Component: GuideOverlay -->
+
+  <!-- Component: ExitDialog -->
+  <el-dialog v-model="showExitDialog" title="退出编辑" width="480px" :close-on-click-modal="false">
+    <div style="font-size:13px;color:#595959;line-height:1.8">
+      保存后将按新配置的 AI 指令执行任务分配分析。
+      <br><br>
+      <el-alert type="info" :closable="false" show-icon style="font-size:12px">
+        返回任务分配页后，重新点击案件即可按新指令生成分配建议。
+      </el-alert>
+    </div>
+    <template #footer>
+      <el-button @click="showExitDialog = false">取消</el-button>
+      <el-button type="primary" :loading="exiting" data-guide="exit-save-btn" @click="confirmExit">保存并退出</el-button>
+    </template>
+  </el-dialog>
+  <!-- /Component: ExitDialog -->
+
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/vue/3.4.21/vue.global.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/element-plus/2.9.1/index.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/element-plus-icons-vue/2.3.1/index.iife.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.0/marked.min.js"></script>
+<script>
+const { createApp, ref, reactive, computed, watch, onMounted, nextTick } = Vue
+
+const app = createApp({
+  setup() {
+    // ── URL 参数 ──
+    const urlParams  = new URLSearchParams(location.search)
+    const caseId     = urlParams.get('caseId')   || 'case-001'
+    const caseName   = ref(urlParams.get('caseName') || '20618-1234CN01')
+    const tabName    = ref('AI 指令调试')
+    const toolType   = 'assign'
+    const backHref   = ref('assign.html')
+
+    const toolTypeLabel = computed(() => '任务分配')
+
+    // ── 平台页面列表（mock）──
+    // API: GET /api/case/pages/:caseId
+    const platformPages = ref([
+      { pid:'pp-qlqy',  name:'权利要求书_20618-1234CN01.pdf',   ptype:'data',   subtype:'qlqy',   url:'/api/files/pp-qlqy/preview'  },
+      { pid:'pp-scyj',  name:'CN第一次审查意见_20240310.pdf',    ptype:'data',   subtype:'scyj',   url:'/api/files/pp-scyj/preview'  },
+      { pid:'pp-sqwj',  name:'申请文件全套_20618-1234CN01.pdf',  ptype:'data',   subtype:'sqwj',   url:'/api/files/pp-sqwj/preview'  },
+      { pid:'pp-dbwj1', name:'对比文件D1_US11234567.pdf',        ptype:'data',   subtype:'dbwj',   url:'/api/files/pp-dbwj1/preview' },
+      { pid:'pp-dbwj2', name:'对比文件D2_EP3456789.pdf',         ptype:'data',   subtype:'dbwj',   url:'/api/files/pp-dbwj2/preview' },
+      { pid:'pp-res1',  name:'任务分配建议',                     ptype:'result', subtype:'result', url:'/api/files/pp-res1/preview'  },
+    ])
+    // 调试临时文件（不属于案件正式文件）
+    const debugFiles = ref([])
+    const debugFileInputRef = ref(null)
+    const dataPages   = computed(() => platformPages.value.filter(p => p.ptype === 'data'))
+    const resultPages = computed(() => platformPages.value.filter(p => p.ptype === 'result'))
+
+    function ptypeLabel(v) {
+      return { jiaodi:'交底书', scyj:'审查意见', dbwj:'对比文件', qlqy:'权要草稿', result:'成果页' }[v] || v
+    }
+
+    // 避免模板中出现 {{ }} 导致 Vue 解析器误判
+    function varRef(name) { return '{{' + (name || '变量名') + '}}' }
+
+    // ── 步骤数据（mock）──
+    // API: GET /api/result/script-config params: { caseId, tabId }
+    let _initSteps = []
+    if (false) {
+      _initSteps = [
+        {
+          id: 's1', name: '权要结构生成', writeToResult: false,
+          model: 'claude-sonnet-4-6', temperature: 0.7,
+          refSteps: [], refPages: ['pp-001'],
+          script: `## 角色设定
+
+你是资深专利撰写专家，擅长从技术方案中提炼可专利化要素并构建权利要求层次结构。
+
+## 输入说明
+
+当前输入为技术理解成果页，包含发明核心构思、技术方案分解及有益效果分析。
+
+## 任务目标
+
+阅读输入内容，生成权利要求书的**结构大纲**，供下一步全文撰写使用。
+
+## 输出要求
+
+### 独立权利要求方向
+- 提炼保护主题（装置/方法/系统）
+- 列出必要技术特征清单（5-8个）
+- 明确功能边界，避免过宽或过窄
+
+### 从属权利要求方向
+- 给出 3-5 条从属权建议
+- 每条说明附加特征及其技术效果
+
+### 现有技术边界提示
+- 列出需要规避的已知现有技术特征
+- 标注检索关键词建议
+
+## 输出格式
+
+使用 Markdown，二级标题分节，语言简洁专业。`,
+        },
+        {
+          id: 's2', name: '权要全文撰写', writeToResult: true, resultPageName: '权利要求书',
+          model: 'claude-sonnet-4-6', temperature: 0.7,
+          refSteps: ['s1'], refPages: [],
+          script: `## 角色设定
+
+你是专利代理师，负责将结构大纲转化为符合专利法规范的权利要求书全文。
+
+## 输入说明
+
+上一步已输出权要结构大纲，包含独立权要方向和从属权要建议。
+
+## 撰写规范
+
+### 独立权利要求
+- 采用"一种……，其特征在于……"句式
+- 必要技术特征逐一列举，使用分号隔开
+- 不得包含有益效果描述，仅描述技术特征
+
+### 从属权利要求
+- 逐条引用上位权利要求："根据权利要求X所述的……"
+- 每条附加一个或一组附加技术特征
+- 编号连续，独立权要排在最前
+
+### 语言要求
+- 使用法律规范用语，避免模糊表述
+- 技术术语与技术交底书保持一致
+- 不使用"最好"、"大约"等不确定表述
+
+## 输出格式
+
+直接输出权利要求书全文，按条编号，无需额外说明。`,
+        },
+      ]
+    } else if (false) {
+      _initSteps = [
+        {
+          id: 's1', name: '拆分技术交底', writeToResult: false,
+          model: 'claude-sonnet-4-6', temperature: 0.7,
+          refSteps: [], refPages: ['pp-001'],
+          script: `## 角色设定
+
+你是专利工程师助手，负责将发明人提供的技术交底书拆解为结构化的专利要素。
+
+## 输入说明
+
+当前输入为原始技术交底书 PDF，可能包含图文混合内容，请以文字内容为主进行分析。
+
+## 拆分维度
+
+### 技术背景
+- 提取现有技术的主要方案和缺陷
+- 明确本发明所解决的核心问题
+
+### 发明核心构思
+- 用 1-2 句话概括发明的核心创新点
+- 区分"发明点"与"实施细节"
+
+### 技术方案详述
+- 列出必要技术特征（系统/装置/方法步骤）
+- 标注各特征间的功能关系
+- 摘录关键参数和边界条件
+
+### 有益效果
+- 对应核心构思逐条列举技术效果
+- 避免罗列商业价值，聚焦技术改进
+
+## 输出格式
+
+使用 Markdown 二级标题分节输出，便于下一步引用。`,
+        },
+        {
+          id: 's2', name: '技术方案总结', writeToResult: true, resultPageName: '访谈前梳理（1）- 拆分技术交底',
+          model: 'claude-sonnet-4-6', temperature: 0.7,
+          refSteps: ['s1'], refPages: [],
+          script: `## 角色设定
+
+你是专利撰写专家，基于结构化拆分结果生成规范的技术方案总结，作为专利撰写的核心依据。
+
+## 输入说明
+
+上一步已完成技术交底书拆分，输出了背景、构思、方案、效果四个维度的结构化内容。
+
+## 任务目标
+
+整合拆分结果，生成一份**可直接用于专利撰写**的技术方案总结。
+
+## 输出结构
+
+### 发明名称建议
+给出 2-3 个候选发明名称，从宽到窄排列。
+
+### 技术问题
+用专利语言描述现有技术存在的技术问题。
+
+### 技术方案
+以条列形式描述完整技术方案，突出必要技术特征。
+
+### 有益效果
+逐条对应技术方案，说明相对现有技术的改进效果。
+
+## 注意事项
+- 语言风格贴近专利说明书，避免口语化
+- 技术方案描述需自洽，可独立理解`,
+        },
+        {
+          id: 's3', name: '保护点梳理', writeToResult: true, resultPageName: '访谈前梳理（4）- 优化技术方案总结',
+          model: 'claude-sonnet-4-6', temperature: 0.7,
+          refSteps: ['s2'], refPages: [],
+          script: `## 角色设定
+
+你是专利战略顾问，负责从技术方案总结中提炼专利保护策略，构建多层次保护体系。
+
+## 输入说明
+
+上一步已生成技术方案总结，包含发明名称、技术问题、技术方案和有益效果。
+
+## 任务目标
+
+梳理完整的**专利保护点清单**，为后续权利要求撰写提供策略指导。
+
+## 输出结构
+
+### 核心保护点（独立权方向）
+- 列出 1-2 个最宽保护范围的独立权方向
+- 每个方向说明保护主题和核心特征组合
+
+### 扩展保护点（从属权方向）
+- 针对核心保护点列出 4-6 个附加特征方向
+- 优先选择具有独立商业价值的特征组合
+
+### 外围布局建议
+- 列出 2-3 个可形成专利围墙的外围方向
+- 说明与核心方案的技术关联
+
+### 风险提示
+- 识别可能与现有专利冲突的特征
+- 建议检索方向和回避设计思路`,
+        },
+      ]
+    } else {
+      _initSteps = [
+        {
+          id: 's1', name: '提取案件基础信息', writeToResult: false,
+          model: 'claude-sonnet-4-6', temperature: 0.3,
+          refSteps: [], refPages: ['pp-sqwj'],
+          script: `## 角色设定
+
+你是专利任务分配系统的数据提取模块，负责从案件文件中提取基础静态信息。
+
+## 提取字段
+
+- 案号
+- 发明名称
+- 申请人/客户
+- 当前法律状态
+- 申请日期
+- 优先权日期
+- 代理人信息
+
+## 输出格式
+
+以 Markdown 表格输出提取结果，每行一个字段，包含字段名、字段值两列。若信息缺失标注"未找到"。`,
+        },
+        {
+          id: 's2', name: '解析权利要求结构', writeToResult: false,
+          model: 'claude-sonnet-4-6', temperature: 0.3,
+          refSteps: [], refPages: ['pp-qlqy'],
+          script: `## 角色设定
+
+你是专利权利要求分析专家，负责解析权利要求书的结构和保护范围。
+
+## 分析维度
+
+### 权利要求统计
+- 独立权利要求：编号、保护主题（方法/装置/系统/介质等）
+- 从属权利要求：各独权下的从属链
+
+### 保护主题分类
+- 列出所有保护主题类型
+- 评估保护范围宽度（宽/中/窄）
+
+### 难度预判
+- 独立权技术特征数量
+- 是否涉及功能性限定
+- 答复难度初步评级（低/中/高）
+
+## 输出格式
+
+使用 Markdown 结构化输出，包含统计数据和分析结论。`,
+        },
+        {
+          id: 's3', name: '分析审查意见', writeToResult: false,
+          model: 'claude-opus-4-8', temperature: 0.5,
+          refSteps: [], refPages: ['pp-scyj'],
+          script: `## 角色设定
+
+你是资深专利代理师，擅长分析审查意见并制定答复策略。
+
+## 分析任务
+
+### 1. 实体问题识别
+- 按权项列出所有实体问题（新颖性/创造性/清楚性/支持性）
+- 对应法条（A22.2/A22.3/A26.4等）
+- 引用的对比文件及公开内容
+
+### 2. 形式问题梳理
+- 附图、摘要、说明书等形式缺陷
+- 对应细则条款
+
+### 3. 可授权性预判
+- 直接可授权权项
+- 修改后可授权权项
+- 争议核心权项
+
+### 4. 答复难度评估
+- 综合难度（低/中/高/极高）
+- 预估工作量（小时数）
+- 关键答辩方向建议
+
+## 输出格式
+
+使用 Markdown，分节输出，数据与分析并重。`,
+        },
+        {
+          id: 's4', name: '分配规则', writeToResult: false,
+          model: 'claude-sonnet-4-6', temperature: 0.2,
+          refSteps: ['s1', 's2', 's3'], refPages: [],
+          script: `## 分配规则配置
+
+本步骤定义人员分配的匹配规则，AI 将基于前序步骤的案件分析结果，按以下规则生成分配建议。
+
+---
+
+### 一、技术领域匹配规则
+
+| 技术领域 | 答复负责人候选 | 优先级说明 |
+|---------|------------|----------|
+| 计算机视觉 / 深度学习 | 王浩、赵岩、孙娟 | 按历史OA经验排序 |
+| 无线通信 / 信号处理 | 陈磊、刘洋 | 按当前产能排序 |
+| 机械结构 / 机器人 | 张晓、王芳 | 按专业背景排序 |
+| 化学 / 材料 / 电池 | 庞鑫、李静 | 按历史同类案经验 |
+| 控制系统 / 嵌入式 | 赵岩、陈磊 | 交叉领域，产能优先 |
+
+---
+
+### 二、QC 分配规则
+
+- **默认 QC**：李芳（高级项目经理）——优先保证连续性
+- **备选 QC**：陈磊（当李芳产能饱和时，满负荷标准：当月在审案件 ≥ 15件）
+
+---
+
+### 三、优先级规则（按序应用）
+
+1. **历史 OA 经手人优先**：曾经手该案或同族案件的答复负责人，在产能允许时优先指派
+2. **技术领域匹配**：从上表候选人中按技术领域匹配度筛选
+3. **当前产能**：月在审 OA 案件数 < 8 件为产能充裕，8-12 件为正常，>12 件为饱和
+4. **历史同类成功率**：同技术领域 OA 答复成功率 > 80% 者优先
+
+---
+
+### 四、特殊情况处理
+
+- 撰写人已离职：降低其在候选列表中的权重（仍可作备选）
+- 紧急案件（剩余天数 ≤ 10）：产能因素权重提高至第一位
+- 创造性问题为主的 OA：优先选择有争辩经验的负责人
+
+---
+
+**修改说明**：直接编辑上方规则表格和文字即可，AI 将在下一步生成建议时读取本步骤内容作为规则依据。`,
+        },
+        {
+          id: 's5', name: '生成分配建议', writeToResult: true, resultPageName: '任务分配建议',
+          model: 'claude-opus-4-8', temperature: 0.7,
+          refSteps: ['s1', 's2', 's3', 's4'], refPages: [],
+          script: `## 角色设定
+
+你是专利任务分配决策系统，基于案件分析结果和分配规则，生成多个人员分配建议方案。
+
+## 输入说明
+
+- 步骤1：案件基础信息（案号、客户、技术领域等）
+- 步骤2：权利要求结构（难度预判）
+- 步骤3：审查意见分析（答复复杂度）
+- 步骤4：分配规则（匹配条件和优先级）
+
+## 输出要求
+
+### 分配摘要
+- 预估总工作量（小时数）
+- 答复难度评级
+- 紧急程度判断
+
+### 候选方案列表
+
+生成 3-4 个候选方案，每个方案包含：
+- 方案编号和推荐优先级
+- 答复负责人：姓名 + 职级 + 推荐理由
+- 答复 QC：姓名 + 职级
+- 匹配依据说明
+
+### 推荐方案
+明确指出首选方案，并说明核心推荐理由。
+
+## 输出格式
+
+使用 Markdown，结构清晰，数据与建议并重，供分配人员直接参考。`,
+        },
+      ]
+    }
+
+    const steps     = ref(_initSteps)
+    const activeStepId = ref(
+      (steps.value.find(s => s.writeToResult) || steps.value[0])?.id || null
+    )
+
+    const activeStep = computed(() => steps.value.find(s => s.id === activeStepId.value) || null)
+    const activeStepIndex = computed(() => steps.value.findIndex(s => s.id === activeStepId.value))
+
+    const isInputCollapsed = ref(false)
+    const inputSummary = computed(() => {
+      if (!activeStep.value) return '暂未选择输入'
+      const parts = []
+      if (activeStep.value.refSteps?.length) {
+        const names = activeStep.value.refSteps.map(id => {
+          const idx = steps.value.findIndex(s => s.id === id)
+          return idx >= 0 ? `步骤${idx + 1}` : id
+        })
+        parts.push('引用：' + names.join('、'))
+      }
+      if (activeStep.value.refPages?.length) {
+        const names = activeStep.value.refPages.map(pid => {
+          const pg = platformPages.value.find(x => x.pid === pid)
+          return pg ? pg.name : pid
+        })
+        parts.push(names.join('、'))
+      }
+      return parts.length ? parts.join(' · ') : '暂未选择输入'
+    })
+
+    function addStep() {
+      const newId = 's' + Date.now()
+      const newStep = {
+        id: newId,
+        name: '新步骤 ' + (steps.value.length + 1),
+        writeToResult: false,
+        resultPageName: '',
+        model: 'claude-sonnet-4-6',
+        temperature: 0.7,
+        refSteps: [],
+        refPages: [],
+        outputVar: 'output_' + (steps.value.length + 1),
+        script: '',
+      }
+      steps.value.push(newStep)
+      activeStepId.value = newId
+    }
+
+    function deleteStep(id) {
+      const idx = steps.value.findIndex(s => s.id === id)
+      if (idx < 0) return
+      steps.value.splice(idx, 1)
+      if (activeStepId.value === id) {
+        activeStepId.value = steps.value[Math.max(0, idx - 1)]?.id || null
+      }
+    }
+
+    function moveStep(idx, dir) {
+      const target = idx + dir
+      if (target < 0 || target >= steps.value.length) return
+      const arr = steps.value
+      ;[arr[idx], arr[target]] = [arr[target], arr[idx]]
+    }
+
+    function handleStepCmd(step, idx, cmd) {
+      if      (cmd === 'up')           moveStep(idx, -1)
+      else if (cmd === 'down')         moveStep(idx, 1)
+      else if (cmd === 'rename')       step._editing = true
+      else if (cmd === 'toggleResult') step.writeToResult = !step.writeToResult
+      else if (cmd === 'delete')       deleteStep(step.id)
+    }
+
+    // ── 执行状态 ──
+    const _modelLabels = { 'claude-sonnet-4-6': 'Sonnet 4.6', 'claude-opus-4-8': 'Opus 4.8', 'claude-haiku-4-5': 'Haiku 4.5' }
+
+
+    const execState   = reactive({})   // stepId -> 'pending'|'running'|'done'|'error'
+    const stepOutputs = reactive({})   // stepId -> { content, isEdited } 当前有效输出
+    const execLog     = ref([])        // 执行日志条目（只读历史记录）
+    const isRunningAll = ref(false)
+
+    // 单步执行结果 mock
+    const _mockResults = {
+      's1': `## 案件基础信息提取结果
+
+| 字段 | 内容 |
+|------|------|
+| 案号 | 20618-1234CN01 |
+| 发明名称 | 一种基于神经网络的图像语义分割方法及系统 |
+| 申请人/客户 | 联影医疗技术股份有限公司 |
+| 当前法律状态 | 等待实审提案 |
+| 申请日期 | 2024-03-15 |
+| 优先权日期 | 2023-09-20（CN202310001234） |
+| 代理人 | 张明（项目经理） |`,
+
+      's2': `## 权利要求结构解析
+
+### 统计数据
+
+| 项目 | 数量 |
+|------|------|
+| 权利要求总数 | 10项 |
+| 独立权利要求 | 3项（权1、权6、权10） |
+| 从属权利要求 | 7项 |
+
+### 独立权利要求详情
+
+- **权1**（方法权）：图像语义分割方法，包含5个步骤特征
+- **权6**（系统权）：对应方法权的装置实现，包含4个功能模块
+- **权10**（介质权）：计算机可读存储介质，功能性限定
+
+### 从属权利要求分组
+
+- 权2-5：引用权1，进一步限定特征提取方式
+- 权7-9：引用权6，进一步限定模块参数
+
+### 难度预判
+
+- 保护范围宽度：**中**（独立权特征数量适中）
+- 答复难度初步评级：**高**（创造性问题为主，涉及D1+D2结合）`,
+
+      's3': `## 审查意见深度分析
+
+### 实体问题清单
+
+| 问题类型 | 涉及权项 | 对比文件 | 简述 |
+|---------|---------|---------|------|
+| 创造性（A22.3） | 权1、权6 | D1+D2 | D1公开基础CNN，D2给出动态卷积启示，结合显而易见 |
+| 不清楚（A26.4） | 权4、权9 | — | "适度调整"表述模糊；尺寸参数无量化定义 |
+| 支持（A26.4） | 权10 | — | 存储介质功能限定未对应方法步骤 |
+| 形式问题 | 权2、摘要 | — | 权2缺引用基础；摘要字数超限 |
+
+### 可授权性预判
+
+- **直接可授权**：权5、权7（审查员未提出异议）
+- **修改后可授权**：权3+权4合并克服不清楚问题
+- **争议核心**：权1、权6（创造性争辩是答复重点）
+
+### 答复难度评估
+
+- 综合难度：**高**
+- 预估工作量：**8小时**
+- 核心答辩方向：证明D1与D2不存在结合启示，强调动态卷积核的技术效果
+
+### 形式问题
+
+- 附图：图2流程图缺少S300步骤标注（细则17条）
+- 摘要：未包含技术效果数据，需补交`,
+
+      's4': `## 分配规则已加载
+
+当前分配规则（步骤4）已就绪，包含：
+- 技术领域匹配规则（5个领域）
+- QC分配规则（默认/备选）
+- 优先级规则（4条按序应用）
+- 特殊情况处理（3种场景）
+
+将基于步骤1-3的分析结果，在步骤5中生成分配建议。`,
+
+      's5': `## 任务分配建议
+
+**案号**：20618-1234CN01｜**客户**：联影｜**预估工时**：8h｜**难度**：高｜**紧急程度**：高（剩余20天）
+
+---
+
+### 候选方案
+
+#### 方案一（优先推荐）
+
+| 角色 | 人员 | 推荐理由 |
+|------|------|---------|
+| 答复负责人 | 王浩（项目经理） | 曾主导本案第1次OA答复，熟悉D1/D2争辩策略 |
+| 答复QC | 李芳（高级项目经理） | 本案历史QC，保证答复连续性 |
+
+**匹配依据**：历史OA经手人优先规则 + 当前产能正常（月在审9件）
+
+#### 方案二
+
+| 角色 | 人员 | 推荐理由 |
+|------|------|---------|
+| 答复负责人 | 赵岩（项目经理） | 计算机视觉领域匹配，创造性争辩经验丰富 |
+| 答复QC | 李芳（高级项目经理） | 默认QC，产能充裕 |
+
+#### 方案三
+
+| 角色 | 人员 | 推荐理由 |
+|------|------|---------|
+| 答复负责人 | 孙娟（项目经理） | 技术领域匹配，OA成功率86% |
+| 答复QC | 李芳（高级项目经理） | 默认QC |
+
+---
+
+### 推荐方案
+
+**首选方案一（王浩 + 李芳）**
+
+核心理由：王浩曾主导本案第1次OA及同族案件（20618-1234CN00）第1、2次OA答复，对D1/D2对比文件的技术内容和审查员观点已有深入了解，可大幅降低重新调研成本，提升答复质量和效率。`,
+    }
+
+    function runStep(step) {
+      if (execState[step.id] === 'running') return
+      execLog.value = []
+      execState[step.id] = 'running'
+      const idx = steps.value.findIndex(s => s.id === step.id)
+      const entry = reactive({
+        stepId: step.id,
+        stepIndex: idx,
+        stepName: step.name,
+        status: 'running',
+        result: '',
+        savePath: '',
+        errorMsg: '',
+        elapsed: '',
+        expanded: true,
+        runAt: Date.now(),
+        inputSnapshot: {
+          refSteps: (step.refSteps || []).map(id => {
+            const _s = steps.value.find(x => x.id === id)
+            const _i = steps.value.findIndex(x => x.id === id)
+            return { id, index: _i + 1, wasEdited: !!stepOutputs[id]?.isEdited }
+          }),
+          refPages: (step.refPages || []).map(pid => {
+            const pg = platformPages.value.find(x => x.pid === pid)
+            return { pid, label: pg ? pg.name : pid }
+          })
+        }
+      })
+      execLog.value.push(entry)
+      const start = Date.now()
+      // API: POST /api/result/script/run body: { caseId, tabId, stepId, script, inputConfig, modelConfig }
+      const delay = 1200 + Math.random() * 800
+      setTimeout(() => {
+        const elapsed = ((Date.now() - start) / 1000).toFixed(1) + 's'
+        const shouldError = false
+        if (shouldError) {
+          entry.status = 'error'
+          entry.errorMsg = '模型返回异常，请检查脚本语法'
+          execState[step.id] = 'error'
+        } else {
+          entry.status  = 'done'
+          entry.result  = _mockResults[step.id] || `步骤「${step.name}」执行完成。\n\n模拟输出内容：基于所选输入，AI 已按脚本指令完成分析，结果已写入变量 {{${step.outputVar}}}，供后续步骤引用。`
+          entry.savePath = `/tmp/debug/${caseId}/${tabId}/${step.id}_${entry.runAt}.md`
+          entry.elapsed = elapsed
+          execState[step.id] = 'done'
+          stepOutputs[step.id] = { content: entry.result, isEdited: false }
+        }
+      }, delay)
+    }
+
+    function runAll() {
+      isRunningAll.value = true
+      execLog.value = []
+      Object.keys(execState).forEach(k => delete execState[k])
+      Object.keys(stepOutputs).forEach(k => delete stepOutputs[k])
+      let promise = Promise.resolve()
+      steps.value.forEach(step => {
+        promise = promise.then(() => new Promise(resolve => {
+          execState[step.id] = 'running'
+          activeStepId.value = step.id
+          const idx = steps.value.findIndex(s => s.id === step.id)
+          const entry = reactive({
+            stepId: step.id,
+            stepIndex: idx,
+            stepName: step.name,
+            status: 'running',
+            result: '',
+            savePath: '',
+            errorMsg: '',
+            elapsed: '',
+            expanded: true,
+            runAt: Date.now(),
+            inputSnapshot: {
+              refSteps: (step.refSteps || []).map(id => {
+                const _s = steps.value.find(x => x.id === id)
+                const _i = steps.value.findIndex(x => x.id === id)
+                return { id, index: _i + 1, wasEdited: !!stepOutputs[id]?.isEdited }
+              }),
+              refPages: (step.refPages || []).map(pid => {
+                const pg = platformPages.value.find(x => x.pid === pid)
+                return { pid, label: pg ? pg.name : pid }
+              })
+            }
+          })
+          execLog.value.forEach(e => { e.expanded = false })
+          execLog.value.push(entry)
+          const start = Date.now()
+          // API: POST /api/result/script/run body: { caseId, tabId, stepId, script, inputConfig, modelConfig }
+          setTimeout(() => {
+            const elapsed = ((Date.now() - start) / 1000).toFixed(1) + 's'
+            entry.status  = 'done'
+            entry.result  = _mockResults[step.id] || `步骤「${step.name}」执行完成（批量运行）。\n\n模拟输出内容已写入变量 {{${step.outputVar}}}。`
+            entry.savePath = `/tmp/debug/${caseId}/${tabId}/${step.id}_${entry.runAt}.md`
+            entry.elapsed = elapsed
+            execState[step.id] = 'done'
+            stepOutputs[step.id] = { content: entry.result, isEdited: false }
+            resolve()
+          }, 1000 + Math.random() * 600)
+        }))
+      })
+      promise.then(() => { isRunningAll.value = false })
+    }
+
+    function clearExecLog() {
+      execLog.value = []
+      Object.keys(execState).forEach(k => delete execState[k])
+      Object.keys(stepOutputs).forEach(k => delete stepOutputs[k])
+    }
+
+    function startEdit(entry) {
+      entry._editMode = true
+      entry._editContent = stepOutputs[entry.stepId]?.content || entry.result
+    }
+    function saveEdit(entry) {
+      stepOutputs[entry.stepId] = { content: entry._editContent, isEdited: true }
+      entry._editMode = false
+    }
+    function cancelEdit(entry) {
+      entry._editMode = false
+    }
+
+    // ── 调试临时文件上传（不写回案件文件列表）──
+    // API: POST /api/debug/temp-upload body: FormData
+    function handleDebugUpload(e) {
+      const file = e.target.files[0]
+      if (!file) return
+      debugFiles.value.push({
+        pid: 'debug-' + Date.now(),
+        name: file.name,
+        ptype: 'debug',
+        subtype: 'debug',
+        url: URL.createObjectURL(file),
+      })
+      e.target.value = ''
+      ElementPlus.ElMessage.success('文件已加入本次调试，不影响案件正式文件列表')
+    }
+
+    function scrollEditHeading(stepId, text) {
+      Vue.nextTick(() => {
+        const ta = document.querySelector(`[data-exec-edit="${stepId}"]`)
+        if (!ta) return
+        const lines = (ta.value || '').split('\n')
+        let lineIndex = -1
+        for (let i = 0; i < lines.length; i++) {
+          const m = lines[i].match(/^#{1,3}\s+(.+)/)
+          if (m && m[1].trim() === text) { lineIndex = i; break }
+        }
+        if (lineIndex < 0) return
+        const lineHeight = parseFloat(getComputedStyle(ta).lineHeight) || 22
+        ta.scrollTop = lineIndex * lineHeight - ta.clientHeight / 4
+        ta.focus()
+      })
+    }
+
+    // ── Markdown 工具栏插入 ──
+    const scriptTaRef = Vue.ref(null)
+
+    function mdInsert(type, ta) {
+      if (!ta) return
+      const start = ta.selectionStart, end = ta.selectionEnd
+      const val = ta.value
+      const sel = val.slice(start, end)
+      const MAP = {
+        h2:        ['\n## ',   '',      '标题'],
+        h3:        ['\n### ',  '',      '标题'],
+        bold:      ['**',      '**',    '粗体'],
+        italic:    ['*',       '*',     '斜体'],
+        code:      ['`',       '`',     '代码'],
+        codeblock: ['\n```\n', '\n```', '代码块'],
+        ul:        ['\n- ',    '',      '列表项'],
+        ol:        ['\n1. ',   '',      '列表项'],
+        quote:     ['\n> ',    '',      '引用内容'],
+        hr:        ['\n\n---\n', '',    ''],
+      }
+      const [before, after, placeholder] = MAP[type] || ['', '', '']
+      const text = sel || placeholder
+      const newVal = val.slice(0, start) + before + text + after + val.slice(end)
+      ta.value = newVal
+      ta.dispatchEvent(new Event('input'))
+      const cursorPos = start + before.length + text.length + after.length
+      Vue.nextTick(() => {
+        ta.setSelectionRange(cursorPos, cursorPos)
+        ta.focus()
+      })
+    }
+
+    function mdScript(type) { mdInsert(type, scriptTaRef.value) }
+    function mdExec(type, stepId) {
+      mdInsert(type, document.querySelector(`[data-exec-edit="${stepId}"]`))
+    }
+
+    // ── 执行结果手风琴：同时只展开一条 ──
+    function toggleExpand(entry) {
+      const wasExpanded = entry.expanded
+      execLog.value.forEach(e => { e.expanded = false })
+      entry.expanded = !wasExpanded
+    }
+
+    // ── Markdown 渲染 ──
+    function markedParse(text) {
+      if (!text) return ''
+      if (typeof marked === 'undefined') return `<pre>${text}</pre>`
+      return marked.parse(text)
+    }
+
+    // ── Outline 提取（指令区和执行结果共用）──
+    function extractOutline(text) {
+      if (!text) return []
+      return text.split('\n')
+        .map((line, idx) => {
+          const m = line.match(/^(#{1,3})\s+(.+)/)
+          if (!m) return null
+          return { level: m[1].length, text: m[2].trim(), idx }
+        })
+        .filter(Boolean)
+    }
+
+    function scrollExecHeading(stepId, text) {
+      Vue.nextTick(() => {
+        const container = document.querySelector(`[data-exec-result="${stepId}"]`)
+        if (!container) return
+        const headings = container.querySelectorAll('h1,h2,h3,h4,h5')
+        for (const h of headings) {
+          if (h.textContent.trim() === text) {
+            h.scrollIntoView({ behavior: 'smooth', block: 'start' })
+            break
+          }
+        }
+      })
+    }
+
+    // ── 指令内容预览/outline ──
+    const isScriptPreview = ref(true)
+    const scriptPreviewEl = ref(null)
+
+    const scriptOutline = Vue.computed(() => extractOutline(activeStep.value?.script || ''))
+
+    Vue.watch(isScriptPreview, val => {
+      if (!val) Vue.nextTick(() => document.querySelector('.script-textarea')?.focus())
+    })
+
+    function scrollToHeading(text) {
+      Vue.nextTick(() => {
+        if (isScriptPreview.value) {
+          // 预览模式：滚动渲染后的 DOM 元素
+          if (!scriptPreviewEl.value) return
+          const headings = scriptPreviewEl.value.querySelectorAll('h1,h2,h3,h4,h5')
+          for (const h of headings) {
+            if (h.textContent.trim() === text) {
+              h.scrollIntoView({ behavior: 'smooth', block: 'start' })
+              break
+            }
+          }
+        } else {
+          // 编辑模式：定位 textarea 到对应行
+          const ta = document.querySelector('.script-textarea')
+          if (!ta || !activeStep.value?.script) return
+          const lines = activeStep.value.script.split('\n')
+          let lineIndex = -1
+          for (let i = 0; i < lines.length; i++) {
+            const m = lines[i].match(/^#{1,3}\s+(.+)/)
+            if (m && m[1].trim() === text) { lineIndex = i; break }
+          }
+          if (lineIndex < 0) return
+          const lineHeight = parseFloat(getComputedStyle(ta).lineHeight) || 22
+          ta.scrollTop = lineIndex * lineHeight - ta.clientHeight / 4
+          ta.focus()
+        }
+      })
+    }
+
+    // ── 成果页步骤列表（供退出对话框展示）──
+    const resultPageSteps = computed(() => steps.value.filter(s => s.writeToResult))
+
+    // ── 退出编辑 ──
+    const showExitDialog = ref(false)
+    const exiting = ref(false)
+
+    function confirmExit() {
+      exiting.value = true
+      const resultPages = resultPageSteps.value.map(s => ({
+        stepId: s.id, name: s.name
+      }))
+      // API: POST /api/result/script/save body: { caseId, tabId, steps }
+      // API (tech only): POST /api/modules/tech/script-config body: { resultPages }
+      //   → 删除全平台所有技术理解案件旧成果页，按 resultPages 新建空白成果页（不自动触发生成）
+      if (toolType === 'tech') {
+        localStorage.setItem('techScriptConfig', JSON.stringify({ resultPages }))
+        localStorage.setItem('techScriptConfigJustUpdated', 'true')
+      }
+      const navUrl = _pendingGuideNav || backHref.value
+      _pendingGuideNav = null
+      setTimeout(() => {
+        exiting.value = false
+        showExitDialog.value = false
+        if (toolType === 'tech') {
+          ElementPlus.ElMessage.success(`指令已保存，全平台技术理解成果页已更新为 ${resultPages.length} 个空白成果页`)
+        } else {
+          ElementPlus.ElMessage.success('指令已保存，成果页已重置为空白，请手动触发生成')
+        }
+        setTimeout(() => { window.location.href = navUrl }, 1200)
+      }, 800)
+    }
+
+    // ── 用户引导 ──
+    // ACTIVE_GUIDE: 'script-debug' | null — 控制页面加载时默认展示哪个引导集合
+    // 跨页跳转时可用 URL 参数覆盖，优先级：?guide=xxx > ACTIVE_GUIDE > null
+    const ACTIVE_GUIDE = 'script-debug'
+
+    // 引导保存跳转时附加的目标 URL（由引导步骤 setup 写入，confirmExit 消费后清空）
+    let _pendingGuideNav = null
+    let _guideCleanupFn = null
+
+    const activeGuideKey  = ref(null)
+    const guideVisible    = ref(false)
+    const guideStepIndex  = ref(0)
+    const guideMask        = reactive({ top: {}, bottom: {}, left: {}, right: {} })
+    const guideHighlight   = ref({})
+    const guideTooltip     = ref({})
+
+    const currentGuideSteps = computed(() =>
+      activeGuideKey.value ? (GUIDE_LIBRARY[activeGuideKey.value]?.steps || []) : []
+    )
+    const guideActive = computed(() => guideVisible.value)
+
+    function _visibleRect(selector) {
+      const els = document.querySelectorAll(selector)
+      for (const el of els) {
+        const r = el.getBoundingClientRect()
+        if (r.width > 0 && r.height > 0) return r
+      }
+      return null
+    }
+
+    function _applyGuideRect(rect) {
+      const pad = 6
+      const t = rect.top - pad, l = rect.left - pad
+      const b = rect.bottom + pad, r = rect.right + pad
+      const maskT = Math.max(0, t), maskL = Math.max(0, l), maskH = b - maskT
+      guideMask.top    = { top: '0', left: '0', right: '0', height: maskT + 'px' }
+      guideMask.bottom = { top: b + 'px', left: '0', right: '0', bottom: '0' }
+      guideMask.left   = { top: maskT + 'px', left: '0', width: maskL + 'px', height: maskH + 'px' }
+      guideMask.right  = { top: maskT + 'px', left: r + 'px', right: '0', height: maskH + 'px' }
+      guideHighlight.value = { top: t + 'px', left: l + 'px', width: (r - l) + 'px', height: (b - t) + 'px' }
+    }
+
+    function _computeGuideLayout(step) {
+      const rect = step.getRect ? step.getRect() : _visibleRect(step.selector)
+      if (!rect) return
+      if (step.noMask) {
+        guideMask.top = {}; guideMask.bottom = {}; guideMask.left = {}; guideMask.right = {}
+        const pad = 6
+        guideHighlight.value = { top: (rect.top - pad) + 'px', left: (rect.left - pad) + 'px', width: (rect.width + pad * 2) + 'px', height: (rect.height + pad * 2) + 'px' }
+      } else {
+        _applyGuideRect(rect)
+      }
+      const tw = 300, th = 260
+      const vw = window.innerWidth, vh = window.innerHeight
+      const placement = step.placement || 'bottom'
+      let tx, ty
+      if (placement === 'right') {
+        tx = rect.right + 14; ty = rect.top + (rect.height - th) / 2
+      } else if (placement === 'left') {
+        tx = rect.left - tw - 14; ty = rect.top + (rect.height - th) / 2
+      } else if (placement === 'top') {
+        tx = rect.left + (rect.width - tw) / 2; ty = rect.top - th - 12 + (step.yOff || 0)
+      } else if (placement === 'center') {
+        tx = rect.left + (rect.width - tw) / 2; ty = rect.top + (rect.height - th) / 2
+      } else {
+        tx = rect.left + (rect.width - tw) / 2; ty = rect.bottom + 12
+        if (ty + th > vh) ty = rect.top - th - 12
+      }
+      tx = Math.max(8, Math.min(tx, vw - tw - 8))
+      ty = Math.max(8, Math.min(ty, vh - th - 8))
+      guideTooltip.value = { top: ty + 'px', left: tx + 'px', width: tw + 'px' }
+    }
+
+    function _runGuideStep(step) {
+      if (_guideCleanupFn) { _guideCleanupFn(); _guideCleanupFn = null }
+      if (step.setup) { step.setup(); setTimeout(() => _computeGuideLayout(step), step.delay || 200) }
+      else nextTick(() => _computeGuideLayout(step))
+    }
+
+    function guideStart(key) {
+      const steps = GUIDE_LIBRARY[key]?.steps
+      if (!steps?.length) return
+      activeGuideKey.value = key
+      guideStepIndex.value = 0
+      guideVisible.value = true
+      _runGuideStep(steps[0])
+    }
+    const guideBtnFlashing = ref(false)
+    function handleGuideBlockedClick() {
+      guideBtnFlashing.value = true
+      setTimeout(() => { guideBtnFlashing.value = false }, 600)
+    }
+    function guideSkip()   { if (_guideCleanupFn) { _guideCleanupFn(); _guideCleanupFn = null } guideVisible.value = false; activeGuideKey.value = null; _pendingGuideNav = null }
+    function guideFinish() { if (_guideCleanupFn) { _guideCleanupFn(); _guideCleanupFn = null } guideVisible.value = false; activeGuideKey.value = null }
+    function guideNext() {
+      const steps = currentGuideSteps.value
+      const cur = steps[guideStepIndex.value]
+      if (cur && cur.action) { cur.action(); return }
+      if (guideStepIndex.value < steps.length - 1) { guideStepIndex.value++; _runGuideStep(steps[guideStepIndex.value]) }
+      else guideFinish()
+    }
+    function guidePrev() {
+      const steps = currentGuideSteps.value
+      if (guideStepIndex.value > 0) { guideStepIndex.value--; _runGuideStep(steps[guideStepIndex.value]) }
+    }
+
+    // ── 引导集合库 ──
+    const GUIDE_LIBRARY = {
+      'script-debug': {
+        name: 'AI 指令调试功能介绍',
+        desc: '22步，覆盖调试页面全部功能',
+        steps: [
+          // 1. 流程步骤列表
+          {
+            getRect() { return _visibleRect('[data-guide="step-list"]') },
+            placement: 'right',
+            title: '流程步骤列表',
+            desc: '左侧列出了当前配置的所有流程步骤，每个步骤对应一次 AI 执行，多个步骤可以串联，后步可以引用前步的输出结果。\n\n点击任意步骤可切换到该步骤的编辑区，中间栏将展示该步骤的输入配置和脚本内容。',
+          },
+          // 2. 更多操作按钮（⋯）
+          {
+            getRect() { return _visibleRect('[data-guide="step-more-btn"]') },
+            placement: 'right',
+            title: '步骤更多操作（⋯）',
+            desc: '鼠标悬停步骤时，右侧出现 ⋯ 按钮，点击可打开操作菜单。\n下一步将展示菜单内容。',
+            setup() {
+              document.querySelectorAll('[data-guide="step-more-btn"]').forEach(el => { el.style.opacity = '1' })
+            },
+          },
+          // 3. 操作菜单内容（弹出下拉）
+          {
+            getRect() {
+              const popper = document.querySelector('.el-dropdown__popper')
+              if (popper && popper.getBoundingClientRect().width > 0) return popper.getBoundingClientRect()
+              return _visibleRect('[data-guide="step-more-btn"]')
+            },
+            placement: 'right',
+            title: '操作菜单',
+            desc: '菜单支持以下操作：\n· 上移 / 下移 — 调整步骤顺序\n· 重命名 — 修改步骤名称\n· 设为 / 取消成果页 — 控制是否输出为成果页\n· 删除 — 移除当前步骤',
+            setup() {
+              const btn = document.querySelector('[data-guide="step-more-btn"]')
+              if (!btn) return
+              btn.style.opacity = '1'
+              btn.click()
+              setTimeout(() => {
+                const p = document.querySelector('.el-dropdown__popper')
+                if (p) { p.style.zIndex = '10001'; p.style.pointerEvents = 'none' }
+              }, 200)
+              // 捕获阶段拦截遮罩上的 pointerdown/mousedown，阻止 El Plus outside-click 关闭气泡
+              const _guard = (e) => {
+                if (e.target && e.target.closest && e.target.closest('.guide-mask-piece')) {
+                  e.stopPropagation()
+                  e.stopImmediatePropagation()
+                }
+              }
+              document.addEventListener('pointerdown', _guard, true)
+              document.addEventListener('mousedown', _guard, true)
+              _guideCleanupFn = () => {
+                document.removeEventListener('pointerdown', _guard, true)
+                document.removeEventListener('mousedown', _guard, true)
+              }
+            },
+            delay: 350,
+          },
+          // 4. 双击修改名称
+          {
+            getRect() { return _visibleRect('[data-guide="step-name"]') },
+            placement: 'right',
+            title: '双击修改步骤名称',
+            desc: '双击步骤名称可直接进入内联编辑状态，输入新名称后按 Enter 确认，或点击其他区域取消。',
+            setup() {
+              // 关闭下拉菜单
+              const popper = document.querySelector('.el-dropdown__popper')
+              if (popper) { popper.style.zIndex = ''; popper.style.pointerEvents = '' }
+              document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+              document.querySelectorAll('[data-guide="step-more-btn"]').forEach(el => { el.style.opacity = '' })
+            },
+          },
+          // 5. 新增步骤
+          {
+            getRect() { return _visibleRect('[data-guide="step-add"]') },
+            placement: 'top',
+            title: '新增步骤',
+            desc: '点击底部的「+ 新增步骤」可在列表末尾追加一个新的流程步骤，可配置输入来源和脚本内容。',
+          },
+          // 6. 设置成果页
+          {
+            getRect() { return _visibleRect('[data-guide="result-toggle"]') },
+            placement: 'bottom',
+            title: '设置为成果页',
+            desc: '通过「设为成果页」开关，可将当前步骤的输出设为最终成果页，关闭则作为中间步骤（输出不展示给用户）。\n只有设为成果页的步骤才会出现在案件详情页的标签栏中。',
+          },
+          // 7. 输入配置 — 引用前序步骤
+          {
+            getRect() {
+              if (activeStepIndex.value > 0) return _visibleRect('[data-guide="input-ref-steps"]')
+              return _visibleRect('[data-guide="input-platform-pages"]')
+            },
+            placement: 'bottom',
+            title: '输入配置 — 引用前序步骤',
+            desc: '当前步骤可引用任意前序步骤的输出结果作为输入。\n勾选后 AI 会将所选步骤的输出拼合送入本步骤处理。\n第一步无前序步骤，此区块不显示。',
+            setup() {
+              if (steps.value.length > 1) activeStepId.value = steps.value[1].id
+            },
+            delay: 150,
+          },
+          // 8. 可以选择任意前序步骤
+          {
+            getRect() { return _visibleRect('[data-guide="input-ref-steps"]') },
+            placement: 'bottom',
+            title: '可以选择任意前序步骤',
+            desc: '前序步骤列表显示当前步骤之前的所有步骤，可多选。\n不限于紧邻的上一步——第 4 步可同时引用第 1、2、3 步的任意组合，适合需要将早期分析和中间总结一起送入处理的场景。',
+            setup() {
+              if (steps.value.length > 2) activeStepId.value = steps.value[2].id
+              else if (steps.value.length > 1) activeStepId.value = steps.value[1].id
+            },
+            delay: 150,
+          },
+          // 9. 输入配置 — 选择平台页面
+          {
+            getRect() { return _visibleRect('[data-guide="input-platform-pages"]') },
+            placement: 'bottom',
+            title: '输入配置 — 选择平台页面',
+            desc: '选择的是系统内的资料页和成果页。\n资料页：技术交底书、审查意见、对比文件等。\n成果页：案件中其他步骤已生成的结果页。',
+            setup() {
+              if (steps.value.length > 1) activeStepId.value = steps.value[1].id
+            },
+            delay: 100,
+          },
+          // 10. 输入配置 — 两者可并行
+          {
+            getRect() { return _visibleRect('[data-guide="input-config"]') },
+            placement: 'right',
+            title: '输入配置 — 两者可并行',
+            desc: '引用前序步骤和选择平台页面可以同时勾选，互不排斥。\nAI 会将两类内容合并后一起处理。',
+          },
+          // 11. 指令脚本
+          {
+            getRect() { return _visibleRect('[data-guide="script-card"]') },
+            placement: 'right',
+            title: '指令脚本',
+            desc: '在脚本区域编写发给 AI 的提示词。\n脚本决定 AI 的行为和输出格式。',
+            setup() {
+              if (steps.value[0]) activeStepId.value = steps.value[0].id
+            },
+            delay: 100,
+          },
+          // 12. 模型配置
+          {
+            getRect() { return _visibleRect('[data-guide="model-temp-row"]') },
+            placement: 'bottom',
+            title: '模型参数',
+            desc: '每个步骤可在指令内容卡片顶部独立设置 AI 模型和参数，不同模型在速度、精度和成本上有差异。',
+          },
+          // 13. 单步执行
+          {
+            getRect() { return _visibleRect('[data-guide="run-step-btn"]') },
+            placement: 'bottom',
+            title: '单步执行',
+            desc: '点击「▶ 单步执行」仅运行当前选中步骤，结果显示在右侧执行结果面板中。\n适合调试单个步骤的指令效果，无需重跑全部流程。',
+          },
+          // 14. 单步执行结果
+          {
+            getRect() { return _visibleRect('[data-guide="exec-result"]') },
+            placement: 'left',
+            title: '查看单步执行结果',
+            desc: '执行完成后，右侧面板显示该步骤的执行状态和输出内容。\n\n点击结果条目可展开查看完整文本，中间结果会自动保存，下一步可引用。',
+            setup() {
+              if (!execLog.value.length) {
+                execLog.value = [{
+                  stepId: steps.value[0]?.id || 's1',
+                  stepIndex: 0,
+                  stepName: steps.value[0]?.name || '拆分技术交底',
+                  status: 'done',
+                  result: '## 技术交底内容梳理\n\n核心技术特征\n1. 神经网络多头注意力机制，用于提升特征提取效率\n2. 动态权重分配策略，根据输入自适应调整各层权重\n3. 多模态融合模块，支持文本与结构化数据的联合编码\n\n主要技术效果\n- 推理速度提升约 30%\n- 专利分类任务准确率达 94.2%\n- 支持增量学习，无需全量重训练',
+                  savePath: '/tmp/results/s1_output.txt',
+                  elapsed: '8.4s',
+                  expanded: true,
+                  runAt: 0
+                }]
+              } else {
+                execLog.value[0].expanded = true
+              }
+              const e0 = execLog.value[0]
+              if (e0) {
+                e0._editMode = false
+                if (!stepOutputs[e0.stepId]) stepOutputs[e0.stepId] = { content: e0.result, isEdited: false }
+              }
+            },
+          },
+          // 15. 编辑执行结果
+          {
+            getRect() { return _visibleRect('.exec-edit-btn') },
+            placement: 'left',
+            title: '编辑执行结果',
+            desc: '上一步 AI 输出不理想但不想重跑时，点「编辑」直接修改结果内容。\n修改后保存，下一步引用时将使用修改后的版本，省去重跑成本。',
+          },
+          // 16. 编辑态左侧大纲导航
+          {
+            getRect() {
+              const layout = document.querySelector('.exec-entry--expanded .exec-result-layout')
+              return layout ? layout.getBoundingClientRect() : _visibleRect('[data-guide="exec-result"]')
+            },
+            placement: 'left',
+            title: '编辑态左侧大纲导航',
+            desc: '进入编辑模式后，左侧同样实时解析 Markdown 标题生成大纲，点击可快速跳转到 textarea 对应位置，方便在长文档中定位局部内容修改。',
+            setup() {
+              if (execLog.value.length) {
+                const entry = execLog.value[0]
+                entry.expanded = true
+                entry._editMode = true
+                entry._editContent = stepOutputs[entry.stepId]?.content || entry.result || ''
+              }
+            },
+            delay: 200,
+          },
+          // 17. 保存 / 取消编辑
+          {
+            getRect() { return _visibleRect('[data-guide="exec-save-btns"]') },
+            placement: 'left',
+            title: '保存 / 取消编辑',
+            desc: '点「保存」后，修改内容写入「已修改」状态，后续步骤引用时使用修改后的版本。\n点「取消」放弃改动，恢复为原始 AI 输出，不影响已有执行历史。',
+          },
+          // 18. 前序步骤「已修改」标记
+          {
+            getRect() {
+              const badge = document.querySelector('.ref-edited-badge')
+              if (badge) return badge.getBoundingClientRect()
+              return _visibleRect('[data-guide="input-ref-steps"]')
+            },
+            placement: 'bottom',
+            title: '前序步骤「已修改」标记',
+            desc: '保存后，后续步骤的输入配置中该步骤旁出现「已修改」角标，说明引用的是手动修正后的内容而非原始 AI 输出。',
+            setup() {
+              if (execLog.value.length) {
+                const entry = execLog.value[0]
+                entry._editMode = false
+                stepOutputs[entry.stepId] = { content: entry._editContent || entry.result || '', isEdited: true }
+              }
+              if (steps.value.length > 1) {
+                activeStepId.value = steps.value[1].id
+                isInputCollapsed.value = false
+              }
+            },
+            delay: 250,
+          },
+          // 19. 全部执行
+          {
+            getRect() { return _visibleRect('[data-guide="run-all-btn"]') },
+            placement: 'bottom',
+            title: '全部执行',
+            desc: '点击「全部执行」将按顺序依次运行所有步骤，每步结果实时展示在右侧面板。\n各步骤使用各自独立配置的模型参数运行，互不影响，无需统一切换。',
+          },
+          // 20. 全部执行结果
+          {
+            getRect() { return _visibleRect('[data-guide="exec-result"]') },
+            placement: 'left',
+            title: '查看完整执行结果',
+            desc: '全部执行完成后，面板中显示每个步骤的执行状态（完成 / 失败）和耗时。\n\n点击任意条目展开详情，确认每步输出符合预期后，再保存配置并返回案件详情页。',
+            setup() {
+              execLog.value = steps.value.map((s, i) => ({
+                stepId: s.id,
+                stepIndex: i,
+                stepName: s.name,
+                status: 'done',
+                result: i === 0
+                  ? '## 技术交底内容梳理\n\n核心技术特征\n1. 神经网络多头注意力机制\n2. 动态权重分配策略\n3. 多模态融合模块\n\n主要技术效果\n- 推理速度提升约 30%\n- 专利分类准确率 94.2%'
+                  : `## ${s.name}\n\n基于前步输出，本步已完成处理。结果已自动保存，可在下一步骤中引用。`,
+                savePath: `/tmp/results/${s.id}_output.txt`,
+                elapsed: (5 + i * 3.7).toFixed(1) + 's',
+                expanded: i === 0,
+                runAt: 0
+              }))
+            },
+          },
+          // 21. 保存并返回
+          {
+            getRect() { return _visibleRect('[data-guide="back-btn"]') },
+            placement: 'right',
+            title: '保存并返回',
+            desc: '调试满意后，点击「← 返回」，系统将弹出确认框。\n\n点击「下一步」将打开保存确认框，确认后跳转到案件详情页继续引导。',
+          },
+          // 22. 保存确认弹窗
+          {
+            getRect() {
+              return _visibleRect('[data-guide="exit-save-btn"]') || _visibleRect('[data-guide="back-btn"]')
+            },
+            placement: 'top',
+            title: '保存确认',
+            desc: '确认弹窗会展示本次将更新的成果页结构。\n\n点击「保存并退出」将保存当前指令配置，并自动跳转到案件详情页，继续查看成果页生成流程。',
+            setup() {
+              showExitDialog.value = true
+              _pendingGuideNav = backHref.value
+            },
+            delay: 300,
+            action() { guideFinish(); confirmExit() },
+          },
+        ]
+      },
+      'assign-rules': {
+        name: '调整分配规则',
+        steps: [
+          // A. 分配规则步骤（左栏已自动定位到步骤4）
+          {
+            getRect() { return _visibleRect('.step-item--active') || _visibleRect('.step-item') },
+            placement: 'right',
+            title: '分配规则步骤',
+            desc: '已自动定位到「分配规则」步骤（步骤4）。这里配置的内容决定 AI 如何根据技术领域、产能、历史经验为每个案件匹配最合适的答复人员。',
+          },
+          // B. 规则内容（中栏）
+          {
+            getRect() { return _visibleRect('.script-layout') },
+            placement: 'right',
+            title: '分配规则内容',
+            desc: '当前显示完整的分配规则，支持修改和保存。',
+          },
+          // C. 双击进入编辑
+          {
+            getRect() {
+              return _visibleRect('.script-preview-wrap') || _visibleRect('.script-editor-wrap')
+            },
+            placement: 'right',
+            allowClick: true,
+            title: '双击进入编辑',
+            desc: '双击规则内容区域进入编辑模式，可直接修改规则具体内容。',
+            setup() {
+              isScriptPreview.value = true
+            },
+          },
+          // D. 保存并返回
+          {
+            getRect() { return _visibleRect('[data-guide="back-btn"]') },
+            placement: 'right',
+            allowClick: true,
+            title: '保存并返回',
+            desc: '规则修改完成后，点击左上角「← 返回」按钮，系统将弹出保存确认弹窗，确认后保存新规则并返回任务分配页。\n\n点击「返回」继续。',
+          },
+          // E. 确认保存弹窗
+          {
+            getRect() {
+              return _visibleRect('[data-guide="exit-save-btn"]') || _visibleRect('.el-dialog')
+            },
+            placement: 'top',
+            allowClick: true,
+            title: '确认保存规则',
+            desc: '点击「保存并退出」将保存新的分配规则配置，并自动返回任务分配页面，继续完成最后的提交操作。',
+            setup() {
+              showExitDialog.value = true
+              _pendingGuideNav = 'assign.html?guideResume=15'
+            },
+            delay: 350,
+            action() { guideFinish(); confirmExit() },
+          },
+        ]
+      }
+    }
+
+    onMounted(() => {
+      // hash 路由：#step4 → 自动选中对应步骤（如分配规则）
+      const hash = location.hash
+      if (hash && hash.startsWith('#step')) {
+        const stepNum = parseInt(hash.replace('#step', ''), 10)
+        if (!isNaN(stepNum) && steps.value[stepNum - 1]) {
+          activeStepId.value = steps.value[stepNum - 1].id
+        }
+      }
+      // 引导逻辑（assign 模式不自动启动）
+      const _urlParams = new URLSearchParams(location.search)
+      const _guideKey = _urlParams.get('guide')
+      if (_guideKey && GUIDE_LIBRARY[_guideKey]) nextTick(() => guideStart(_guideKey))
+    })
+
+    return {
+      caseId, caseName, tabName, toolType, toolTypeLabel, backHref,
+      platformPages, dataPages, resultPages, ptypeLabel,
+      debugFiles, debugFileInputRef, handleDebugUpload,
+      isInputCollapsed, inputSummary,
+      steps, activeStepId, activeStep, activeStepIndex,
+      addStep, deleteStep, moveStep, handleStepCmd,
+      execState, stepOutputs, execLog, isRunningAll,
+      runStep, runAll, clearExecLog,
+      startEdit, saveEdit, cancelEdit, scrollEditHeading, toggleExpand,
+      markedParse,
+      scriptTaRef, mdScript, mdExec,
+      isScriptPreview, scriptOutline, scriptPreviewEl, scrollToHeading,
+      extractOutline, scrollExecHeading,
+      resultPageSteps,
+      showExitDialog, exiting, confirmExit,
+      varRef,
+      guideActive, guideVisible, guideStepIndex, currentGuideSteps,
+      guideMask, guideHighlight, guideTooltip, guideBtnFlashing,
+      guideStart, guideSkip, guideNext, guidePrev, handleGuideBlockedClick,
+    }
+  }
+})
+
+app.directive('focus-on', {
+  updated(el, binding) { if (binding.value) el.focus() }
+})
+app.use(ElementPlus)
+Object.entries(ElementPlusIconsVue).forEach(([n, c]) => app.component(n, c))
+app.mount('#app')
+
+// ── 三栏拖拽分隔条（左右栏固定宽度，中间栏 flex:1 自适应）──
+;(function() {
+  const root = document.documentElement
+  function makeDraggable(dividerId, targetSelector, cssVar, minPx, sign) {
+    const divider = document.getElementById(dividerId)
+    if (!divider) return
+    divider.addEventListener('mousedown', function(e) {
+      e.preventDefault()
+      divider.classList.add('dbg-divider--dragging')
+      document.body.style.cursor = 'col-resize'
+      document.body.style.userSelect = 'none'
+      const startX = e.clientX
+      const startW = document.querySelector(targetSelector).getBoundingClientRect().width
+      function onMove(e) {
+        const w = Math.max(minPx, startW + (e.clientX - startX) * sign)
+        root.style.setProperty(cssVar, w + 'px')
+      }
+      function onUp() {
+        divider.classList.remove('dbg-divider--dragging')
+        document.body.style.cursor = ''
+        document.body.style.userSelect = ''
+        document.removeEventListener('mousemove', onMove)
+        document.removeEventListener('mouseup', onUp)
+      }
+      document.addEventListener('mousemove', onMove)
+      document.addEventListener('mouseup', onUp)
+    })
+  }
+  makeDraggable('divider-left',  '.step-list',   '--col-left',  160, 1)
+  makeDraggable('divider-right', '.exec-panel',  '--col-right', 200, -1)
+})()
+</script>
+</body>
+</html>

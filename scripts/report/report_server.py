@@ -53,7 +53,7 @@ from email.utils import getaddresses
 
 import requests
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form
-from fastapi.responses import FileResponse, PlainTextResponse
+from fastapi.responses import FileResponse, PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import uvicorn
@@ -104,6 +104,10 @@ FILING_HTML = WEB_DIR / "filing.html"
 app = FastAPI(title="汇报信审核服务", version="0.1")
 app.mount("/static", StaticFiles(directory=str(WEB_DIR)), name="static")
 
+# OA 分配工具（第一阶段桩）：REST 接口并入本服务；页面 web/assign.html 走 /static，入口 /oa-assign
+from oa_assign import router as oa_assign_router  # noqa: E402
+app.include_router(oa_assign_router)
+
 # output/ 目录只读挂载，供审核页预览官文 PDF
 _OUTPUT_DIR_FOR_MOUNT = ROOT / "output"
 _OUTPUT_DIR_FOR_MOUNT.mkdir(parents=True, exist_ok=True)
@@ -130,6 +134,12 @@ else:
 @app.get("/")
 def root():
     return {"service": "report-review", "version": "0.1", "status": "ok"}
+
+
+@app.get("/oa-assign")
+def oa_assign_page():
+    """OA 分配三栏页入口 → /static/assign.html（相对资源如 script-debug.html 在 /static 下自动解析）。"""
+    return RedirectResponse("/static/assign.html")
 
 
 # ─── 审核页 ──────────────────────────────────────────────

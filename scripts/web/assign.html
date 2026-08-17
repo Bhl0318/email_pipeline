@@ -1,0 +1,1040 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="data:,">
+  <title>专利任务分配</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/element-plus/2.9.1/index.min.css">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f0f2f5; height: 100vh; overflow: hidden;
+      display: flex; flex-direction: column;
+    }
+
+    /* ── 顶部 Header ── */
+    .pas-header {
+      height: 52px; background: #1a2b4a; flex-shrink: 0;
+      display: flex; align-items: center; padding: 0 16px; gap: 12px;
+      box-shadow: 0 2px 6px rgba(0,0,0,.2);
+    }
+    .pas-header__brand { font-size: 15px; font-weight: 600; color: #fff; }
+    .pas-header__spacer { flex: 1; }
+    .pas-header__user {
+      display: flex; align-items: center; gap: 8px;
+      color: rgba(255,255,255,.85); font-size: 13px;
+      padding: 4px 10px; border-radius: 6px; cursor: pointer; transition: background .2s;
+    }
+    .pas-header__user:hover { background: rgba(255,255,255,.1); }
+    .pas-header__avatar {
+      width: 26px; height: 26px; border-radius: 50%;
+      background: #4a90d9; color: #fff; font-size: 12px; font-weight: 600;
+      display: flex; align-items: center; justify-content: center;
+    }
+
+    /* ── 主体三栏 ── */
+    :root { --col-left: 260px; --col-right: 340px; }
+    .pas-body { flex: 1; display: flex; overflow: hidden; }
+    .pas-divider {
+      width: 4px; flex-shrink: 0; background: #e8e8e8; cursor: col-resize;
+      transition: background .15s; z-index: 10;
+    }
+    .pas-divider:hover, .pas-divider--dragging { background: #4a90d9; }
+
+    /* ── 左栏：案件列表 ── */
+    .case-list {
+      width: var(--col-left); flex-shrink: 0; background: #fff;
+      display: flex; flex-direction: column; overflow: hidden; min-width: 200px;
+    }
+    .case-list__action { padding: 10px 12px 6px; flex-shrink: 0; }
+    .case-list__search {
+      padding: 6px 12px 10px; border-bottom: 1px solid #f0f0f0; flex-shrink: 0;
+    }
+    .case-list__body { flex: 1; overflow-y: auto; }
+    .case-item__check { color: #52c41a; font-size: 13px; font-weight: 700; margin-right: 2px; flex-shrink: 0; align-self: center; }
+    .case-list__empty {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      height: 120px; color: #c0c4cc; font-size: 13px; gap: 8px;
+    }
+
+    .case-item {
+      display: flex; align-items: flex-start; gap: 0;
+      padding: 10px 12px; cursor: pointer; border-left: 3px solid transparent;
+      border-bottom: 1px solid #f5f5f5; transition: background .12s; position: relative;
+    }
+    .case-item:hover { background: #f5f7ff; }
+    .case-item--active { background: #eef4ff; border-left-color: #4a90d9; }
+    .case-item__main { flex: 1; min-width: 0; }
+    .case-item__top { display: flex; align-items: center; gap: 6px; margin-bottom: 3px; }
+    .case-item__no { font-size: 12px; color: #262626; font-weight: 600; flex-shrink: 0; }
+    .case-item__name {
+      font-size: 12px; color: #595959; overflow: hidden; text-overflow: ellipsis;
+      white-space: nowrap; margin-top: 1px;
+    }
+    /* 紧急程度标签 */
+
+    /* ── 中栏：案件情况 ── */
+    .case-detail {
+      flex: 1; display: flex; flex-direction: column; overflow: hidden;
+      background: #f8f9fc; min-width: 0;
+    }
+    .case-detail__toolbar {
+      padding: 10px 16px; background: #fff; border-bottom: 1px solid #f0f0f0;
+      flex-shrink: 0; display: flex; align-items: center; justify-content: space-between;
+    }
+    .case-detail__toolbar-title { font-size: 13px; font-weight: 600; color: #262626; }
+    .case-detail__body { flex: 1; display: flex; overflow: hidden; }
+    .md-outline { width: 116px; flex-shrink: 0; border-right: 1px solid #f0f0f0; background: #fafbfc; overflow-y: auto; padding: 14px 0; }
+    .md-outline__item {
+      display: block; font-size: 12px; color: #8c8c8c; padding: 6px 10px 6px 14px;
+      cursor: pointer; line-height: 1.45; transition: color .15s, background .15s;
+      border-left: 2px solid transparent;
+    }
+    .md-outline__item:hover { color: #4a90d9; background: #f0f4ff; }
+    .md-outline__item--active { color: #4a90d9; font-weight: 600; border-left-color: #4a90d9; background: #eef4ff; }
+    .md-content { flex: 1; overflow-y: auto; padding: 14px 16px; }
+    .case-detail__empty {
+      flex: 1; display: flex; flex-direction: column; align-items: center;
+      justify-content: center; color: #c0c4cc; font-size: 13px; gap: 10px;
+    }
+    .case-detail__empty-icon { font-size: 40px; }
+
+    /* Markdown 渲染 */
+    .md-body { font-size: 13px; color: #303133; line-height: 1.8; }
+    .md-body h2 { font-size: 14px; font-weight: 700; color: #262626; margin: 18px 0 8px; padding-bottom: 6px; border-bottom: 1px solid #f0f0f0; }
+    .md-body h2:first-child { margin-top: 0; }
+    .md-body p { margin: 0 0 8px; }
+    .md-body table { width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 12px; }
+    .md-body th { background: #f7f9fc; padding: 5px 10px; font-weight: 600; color: #595959; border: 1px solid #e4e7ed; text-align: left; }
+    .md-body td { padding: 5px 10px; border: 1px solid #e4e7ed; color: #303133; vertical-align: top; }
+    .md-body tr:nth-child(even) td { background: #fafbfc; }
+    .md-body ul, .md-body ol { padding-left: 20px; margin: 0 0 10px; }
+    .md-body li { margin-bottom: 4px; }
+    .md-body strong { font-weight: 600; color: #262626; }
+
+    /* ── 右栏：人员分配 ── */
+    .assign-panel {
+      width: var(--col-right); flex-shrink: 0; background: #fff;
+      display: flex; flex-direction: column; overflow: hidden; min-width: 280px;
+    }
+    .assign-panel__header {
+      padding: 10px 14px; border-bottom: 1px solid #f0f0f0; flex-shrink: 0;
+    }
+    .assign-panel__header-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+    .assign-panel__title { font-size: 12px; font-weight: 600; color: #8c8c8c; letter-spacing: .5px; }
+
+    .assign-panel__body { flex: 1; overflow-y: auto; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
+
+    /* 方案卡片 */
+    .scheme-card {
+      border: 1.5px solid #e8e8e8; border-radius: 6px; overflow: hidden; cursor: pointer;
+      transition: border-color .15s, box-shadow .15s;
+    }
+    .scheme-card:hover { border-color: #a8c8f0; }
+    .scheme-card--selected { border-color: #4a90d9; box-shadow: 0 0 0 2px rgba(74,144,217,.12); }
+    .scheme-card__head {
+      display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+      background: #fafbfc; border-bottom: 1px solid #f0f0f0;
+    }
+    .scheme-card--selected .scheme-card__head { background: #eef4ff; }
+    .scheme-card__radio { width: 16px; height: 16px; flex-shrink: 0; accent-color: #4a90d9; cursor: pointer; }
+    .scheme-card__label { font-size: 13px; font-weight: 600; color: #262626; flex: 1; }
+    .scheme-card__note-body { padding: 0 12px 10px; font-size: 12px; color: #8c8c8c; line-height: 1.65; }
+    .scheme-card__body { padding: 10px 12px; display: flex; gap: 16px; }
+    .scheme-card__role { flex: 1; }
+    .scheme-card__role-label { font-size: 11px; color: #8c8c8c; margin-bottom: 4px; }
+    .scheme-card__role-val { font-size: 13px; font-weight: 600; color: #303133; }
+    .scheme-card__custom-body { padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+    .scheme-card__custom-row { display: flex; align-items: center; gap: 8px; }
+    .scheme-card__custom-label { font-size: 12px; color: #8c8c8c; min-width: 64px; flex-shrink: 0; }
+
+    /* 滚动条 */
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
+    ::-webkit-scrollbar-thumb { background: #dcdfe6; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #c0c4cc; }
+
+    /* ── 用户引导 ── */
+    .guide-mask-piece {
+      position: fixed; background: rgba(0,0,0,0.55); z-index: 9000; pointer-events: auto;
+      transition: top 0.28s cubic-bezier(0.4,0,0.2,1), left 0.28s cubic-bezier(0.4,0,0.2,1),
+                  width 0.28s cubic-bezier(0.4,0,0.2,1), height 0.28s cubic-bezier(0.4,0,0.2,1);
+    }
+    .guide-highlight-ring {
+      position: fixed; z-index: 9001; border-radius: 6px; pointer-events: none;
+      outline: 2px solid #409eff;
+      box-shadow: 0 0 0 4px rgba(64,158,255,0.22), 0 0 18px 4px rgba(64,158,255,0.15);
+      transition: top 0.28s cubic-bezier(0.4,0,0.2,1), left 0.28s cubic-bezier(0.4,0,0.2,1),
+                  width 0.28s cubic-bezier(0.4,0,0.2,1), height 0.28s cubic-bezier(0.4,0,0.2,1);
+    }
+    .guide-click-blocker {
+      position: fixed; z-index: 9002; background: transparent; cursor: not-allowed; pointer-events: all;
+    }
+    .guide-tooltip {
+      position: fixed; z-index: 9003; background: #fff; border-radius: 10px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.08);
+      padding: 20px 22px 16px; width: 300px; max-width: calc(100vw - 32px); pointer-events: auto;
+    }
+    .guide-tooltip__step  { font-size: 11px; color: #909399; font-weight: 600; letter-spacing: 0.06em; margin-bottom: 6px; }
+    .guide-tooltip__title { font-size: 15px; font-weight: 700; color: #303133; margin-bottom: 8px; line-height: 1.4; }
+    .guide-tooltip__desc  { font-size: 13px; color: #606266; line-height: 1.75; margin-bottom: 16px; white-space: pre-line; }
+    .guide-tooltip__dots  { display: flex; gap: 5px; align-items: center; margin-bottom: 14px; }
+    .guide-tooltip__dot   { width: 6px; height: 6px; border-radius: 50%; background: #dcdfe6; transition: all 0.2s; flex-shrink: 0; }
+    .guide-tooltip__dot--active { background: #409eff; width: 16px; border-radius: 3px; }
+    .guide-tooltip__actions { display: flex; align-items: center; gap: 8px; }
+    .guide-btn-prev { padding: 5px 14px; font-size: 12px; border: 1px solid #dcdfe6; background: #fff; border-radius: 5px; cursor: pointer; color: #606266; transition: all 0.15s; }
+    .guide-btn-prev:hover { background: #f5f7fa; border-color: #c0c4cc; }
+    .guide-btn-next { padding: 5px 18px; font-size: 13px; font-weight: 600; border: none; background: #409eff; color: #fff; border-radius: 5px; cursor: pointer; transition: background 0.15s; }
+    .guide-btn-next:hover { background: #337ecc; }
+    @keyframes guide-next-flash {
+      0%,100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(64,158,255,0); }
+      35%      { transform: scale(1.16); box-shadow: 0 0 0 6px rgba(64,158,255,0.42); }
+      65%      { transform: scale(1.08); box-shadow: 0 0 0 3px rgba(64,158,255,0.22); }
+    }
+    .guide-btn-next-flash { animation: guide-next-flash 0.55s ease forwards; }
+    .guide-btn-skip { margin-left: auto; font-size: 12px; color: #c0c4cc; background: none; border: none; cursor: pointer; padding: 4px 2px; transition: color 0.15s; }
+    .guide-btn-skip:hover { color: #909399; }
+    .guide-fade-enter-active { transition: opacity 0.22s ease, transform 0.22s cubic-bezier(0.34,1.56,0.64,1); }
+    .guide-fade-leave-active { transition: opacity 0.15s ease, transform 0.15s ease; }
+    .guide-fade-enter-from, .guide-fade-leave-to { opacity: 0; transform: scale(0.92); }
+    .guide-trigger-btn {
+      position: fixed; right: 20px; bottom: 20px; z-index: 8999;
+      width: 40px; height: 40px; border-radius: 50%; border: none;
+      background: #409eff; color: #fff; font-size: 18px; font-weight: 700;
+      cursor: pointer; box-shadow: 0 4px 12px rgba(64,158,255,0.4);
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.15s, transform 0.15s;
+    }
+    .guide-trigger-btn:hover { background: #337ecc; transform: scale(1.08); }
+  </style>
+</head>
+<body>
+<div id="app" style="display:flex;flex-direction:column;height:100vh;overflow:hidden">
+
+  <!-- Component: PasHeader -->
+  <div class="pas-header">
+    <span class="pas-header__brand">专利任务分配</span>
+    <div class="pas-header__spacer"></div>
+    <div class="pas-header__user">
+      <div class="pas-header__avatar">张</div>
+      <span>张明</span>
+    </div>
+  </div>
+  <!-- /Component: PasHeader -->
+
+  <div class="pas-body">
+
+    <!-- Component: CaseList -->
+    <div class="case-list" data-guide="case-list">
+      <div class="case-list__action">
+        <!-- API: POST /api/assignment/submit/batch -->
+        <el-button type="primary" style="width:100%" :disabled="assignedCount === 0" @click="batchSubmit">
+          提交全部已分配（{{ assignedCount }} 件）
+        </el-button>
+      </div>
+      <div class="case-list__search" data-guide="case-search">
+        <el-input v-model="searchText" placeholder="搜索案号或发明名称" size="small" clearable>
+          <template #prefix><span style="color:#c0c4cc;font-size:12px">🔍</span></template>
+        </el-input>
+      </div>
+      <div class="case-list__body">
+        <template v-if="filteredCases.length">
+          <div v-for="c in filteredCases" :key="c.id"
+            :class="['case-item', selectedCaseId === c.id && 'case-item--active']"
+            @click="selectCase(c)">
+            <div class="case-item__main">
+              <div class="case-item__top">
+                <span class="case-item__no">{{ c.caseNo }}</span>
+              </div>
+              <div class="case-item__name">{{ c.name }}</div>
+            </div>
+            <span v-if="isCaseAssigned(c.id)" class="case-item__check">✓</span>
+          </div>
+        </template>
+        <div v-else class="case-list__empty">
+          <div style="font-size:28px">📋</div>
+          <div>{{ searchText ? '无匹配案件' : '暂无待分配案件' }}</div>
+        </div>
+      </div>
+    </div>
+    <!-- /Component: CaseList -->
+
+    <div class="pas-divider" id="divider-left"></div>
+
+    <!-- Component: CaseDetail -->
+    <div class="case-detail">
+      <div class="case-detail__toolbar">
+        <span class="case-detail__toolbar-title">
+          {{ selectedCase ? selectedCase.caseNo + ' — 案件情况' : '请从左侧选择案件' }}
+        </span>
+        <div v-if="selectedCase" style="display:flex;align-items:center;gap:8px">
+          <!-- API: POST /api/assignment/analyze body: { caseId } -->
+          <el-button size="small" :loading="reanalyzing" @click="reanalyze" data-guide="reanalyze-btn">重新生成</el-button>
+          <a :href="'script-debug.html?caseId=' + selectedCase.id + '&caseName=' + encodeURIComponent(selectedCase.caseNo)"
+            target="_blank">
+            <el-button size="small" type="primary" data-guide="edit-ai-btn">编辑 AI 指令</el-button>
+          </a>
+        </div>
+      </div>
+
+      <!-- Component: CaseDetailMarkdown -->
+      <div v-if="selectedCase && selectedCase.detail" class="case-detail__body" data-guide="case-detail-body">
+        <!-- Component: MdOutline -->
+        <nav class="md-outline">
+          <div v-for="(label, i) in outlineItems" :key="i"
+            :class="['md-outline__item', activeSectionIdx === i && 'md-outline__item--active']"
+            @click="scrollToSection(i)">{{ label }}</div>
+        </nav>
+        <!-- /Component: MdOutline -->
+        <div class="md-content" @scroll="onMdScroll">
+          <div class="md-body" v-html="renderedMarkdown"></div>
+        </div>
+      </div>
+      <!-- /Component: CaseDetailMarkdown -->
+
+      <div v-else-if="selectedCase && !selectedCase.detail" class="case-detail__body">
+        <div style="padding:20px;text-align:center;color:#8c8c8c;font-size:13px">
+          该案件的 AI 分析尚未生成，请在调试页面执行 AI 指令后查看。
+        </div>
+      </div>
+
+      <div v-else class="case-detail__empty">
+        <div class="case-detail__empty-icon">📂</div>
+        <div>从左侧列表选择案件</div>
+        <div style="font-size:12px;color:#c0c4cc">点击案件行查看详情和分配方案</div>
+      </div>
+
+    </div>
+    <!-- /Component: CaseDetail -->
+
+    <div class="pas-divider" id="divider-right"></div>
+
+    <!-- Component: AssignPanel -->
+    <div class="assign-panel">
+      <div class="assign-panel__header">
+        <div class="assign-panel__header-top">
+          <span class="assign-panel__title">人员分配方案</span>
+          <div style="display:flex;gap:6px;align-items:center">
+            <a v-if="selectedCase"
+              :href="'script-debug.html?caseId=' + selectedCase.id + '&caseName=' + encodeURIComponent(selectedCase.caseNo) + '#step4'"
+              target="_blank">
+              <el-button size="small" data-guide="edit-rules-btn">编辑分配规则</el-button>
+            </a>
+          </div>
+        </div>
+        <div v-if="selectedCase" style="margin-top:8px" data-guide="postscript-input">
+          <el-input
+            :model-value="currentSelection?.postscript || ''"
+            @input="v => setPostscript(v)"
+            type="textarea"
+            :rows="2"
+            resize="none"
+            placeholder="分配附言（选填）"
+            maxlength="100"
+            show-word-limit
+          />
+        </div>
+      </div>
+
+      <div class="assign-panel__body" data-guide="scheme-list">
+        <template v-if="selectedCase">
+          <!-- 方案列表 -->
+          <div v-for="scheme in displayedSchemes" :key="scheme.id">
+            <div :class="['scheme-card', currentSelection?.schemeId === scheme.id && 'scheme-card--selected']"
+              @click="selectScheme(scheme.id)">
+              <div class="scheme-card__head">
+                <input type="radio" class="scheme-card__radio"
+                  :checked="currentSelection?.schemeId === scheme.id"
+                  @change="selectScheme(scheme.id)" @click.stop>
+                <span class="scheme-card__label">{{ scheme.label }}</span>
+              </div>
+              <template v-if="scheme.id !== 'custom'">
+                <div class="scheme-card__body">
+                  <div class="scheme-card__role">
+                    <div class="scheme-card__role-label">答复负责人</div>
+                    <div class="scheme-card__role-val">{{ scheme.responder }}</div>
+                  </div>
+                  <div class="scheme-card__role">
+                    <div class="scheme-card__role-label">答复 QC</div>
+                    <div class="scheme-card__role-val">{{ scheme.qc }}</div>
+                  </div>
+                </div>
+                <div v-if="scheme.note" class="scheme-card__note-body">{{ scheme.note }}</div>
+              </template>
+              <template v-else>
+                <div class="scheme-card__custom-body" @click.stop>
+                  <div class="scheme-card__custom-row">
+                    <span class="scheme-card__custom-label">答复负责人</span>
+                    <!-- API: GET /api/staff/list params: { role: 'responder' } -->
+                    <el-autocomplete
+                      :model-value="currentSelection?.customResponder || ''"
+                      :fetch-suggestions="queryStaff"
+                      placeholder="输入姓名搜索"
+                      size="small" style="flex:1"
+                      @select="v => { setCustomResponder(v.value); selectScheme('custom') }"
+                      @input="v => { setCustomResponder(v); if(v) selectScheme('custom') }"
+                    />
+                  </div>
+                  <div class="scheme-card__custom-row">
+                    <span class="scheme-card__custom-label">答复 QC</span>
+                    <!-- API: GET /api/staff/list params: { role: 'qc' } -->
+                    <el-autocomplete
+                      :model-value="currentSelection?.customQc || ''"
+                      :fetch-suggestions="queryStaff"
+                      placeholder="输入姓名搜索"
+                      size="small" style="flex:1"
+                      @select="v => { setCustomQc(v.value); selectScheme('custom') }"
+                      @input="v => { setCustomQc(v); if(v) selectScheme('custom') }"
+                    />
+                  </div>
+                  <div class="scheme-card__custom-row" data-guide="custom-note-input" style="align-items:flex-start">
+                    <span class="scheme-card__custom-label" style="padding-top:6px">说明</span>
+                    <el-input
+                      :model-value="currentSelection?.customNote || ''"
+                      @input="v => setCustomNote(v)"
+                      type="textarea"
+                      :rows="2"
+                      resize="none"
+                      placeholder="分配原因（选填）"
+                      maxlength="100"
+                      show-word-limit
+                      style="flex:1"
+                    />
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+        </template>
+        <div v-else style="flex:1;display:flex;align-items:center;justify-content:center;color:#c0c4cc;font-size:13px">
+          请先从左侧选择案件
+        </div>
+      </div>
+
+    </div>
+    <!-- /Component: AssignPanel -->
+
+  </div>
+
+  <!-- Component: GuideOverlay -->
+  <template v-if="guideVisible">
+    <div class="guide-mask-piece" :style="guideMask.top"    @click.stop></div>
+    <div class="guide-mask-piece" :style="guideMask.bottom" @click.stop></div>
+    <div class="guide-mask-piece" :style="guideMask.left"   @click.stop></div>
+    <div class="guide-mask-piece" :style="guideMask.right"  @click.stop></div>
+    <div class="guide-highlight-ring" :style="guideHighlight"></div>
+    <div v-if="!currentGuideStep.allowClick" class="guide-click-blocker" :style="guideHighlight" @click.stop="handleGuideBlockedClick"></div>
+  </template>
+  <Transition name="guide-fade">
+    <div v-if="guideVisible" class="guide-tooltip" :style="guideTooltip">
+      <div class="guide-tooltip__step">{{ guideStepIndex + 1 }} / {{ GUIDE_STEPS.length }}</div>
+      <div class="guide-tooltip__title">{{ currentGuideStep.title }}</div>
+      <div class="guide-tooltip__desc">{{ currentGuideStep.desc }}</div>
+      <div class="guide-tooltip__dots">
+        <span v-for="(s, i) in GUIDE_STEPS" :key="i"
+          :class="['guide-tooltip__dot', i === guideStepIndex ? 'guide-tooltip__dot--active' : '']"></span>
+      </div>
+      <div class="guide-tooltip__actions">
+        <button class="guide-btn-skip" @click="guideSkip">跳过引导</button>
+        <div style="display:flex;gap:8px;">
+          <button v-if="guideStepIndex > 0" class="guide-btn-prev" @click="guidePrev">上一步</button>
+          <button class="guide-btn-next"
+            :class="{ 'guide-btn-next-flash': guideBtnFlashing }"
+            @click="guideNext">
+            {{ currentGuideStep && currentGuideStep.action ? '前往调试页' : guideStepIndex < GUIDE_STEPS.length - 1 ? '下一步' : '完成' }}
+          </button>
+        </div>
+      </div>
+    </div>
+  </Transition>
+  <!-- /Component: GuideOverlay -->
+
+
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/vue/3.4.21/vue.global.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/element-plus/2.9.1/index.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/element-plus-icons-vue/2.3.1/index.iife.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
+<script>
+const { createApp, ref, computed, reactive, nextTick, onMounted, watch } = Vue
+
+const app = createApp({
+  setup() {
+
+    // ── 人员列表（由后端 /api/staff/list 填充）──
+    const staffList = ref([])
+
+    // ── 后端接口封装（第一阶段：桩数据）──
+    const API_BASE = ''   // 与页面同源，report_server/桩服务托管
+    async function apiGet(path) {
+      const r = await fetch(API_BASE + path)
+      if (!r.ok) throw new Error(`GET ${path} 失败: HTTP ${r.status}`)
+      return r.json()
+    }
+    async function apiPost(path, body) {
+      const r = await fetch(API_BASE + path, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body || {}),
+      })
+      if (!r.ok) throw new Error(`POST ${path} 失败: HTTP ${r.status}`)
+      return r.json()
+    }
+    const loadError = ref('')
+
+    // ── Mock 案件数据 ──
+    // API: GET /api/cases/pending params: { page, pageSize }
+    const allCases = ref([])   // 由后端 /api/cases/pending 填充
+
+    const searchText = ref('')
+    const selectedCaseId = ref('case-001')
+    const caseSelections = ref({}) // { caseId: { schemeId, customResponder, customQc } }
+    const reanalyzing = ref(false)
+
+    const expandedCards = reactive({
+      basic: true, claims: true, tech: true, oa: true, personnel: true
+    })
+
+    const filteredCases = computed(() =>
+      allCases.value.filter(c => {
+        if (c.submitted) return false
+        if (!searchText.value) return true
+        const q = searchText.value.toLowerCase()
+        return c.caseNo.toLowerCase().includes(q) || c.name.toLowerCase().includes(q)
+      })
+    )
+
+    const selectedCase = computed(() =>
+      allCases.value.find(c => c.id === selectedCaseId.value) || null
+    )
+
+    const displayedSchemes = computed(() => selectedCase.value?.schemes || [])
+
+    function detailToMarkdown(d) {
+      const { basicInfo: bi, claimsInfo: ci, techInfo: ti, oaInfo: oi, personnelInfo: pi } = d
+      const L = []
+      L.push('## 案件基础信息\n')
+      L.push('| | |')
+      L.push('|---|---|')
+      L.push(`| 案号 | ${bi.caseNo} |`)
+      L.push(`| 客户名称 | ${bi.client} |`)
+      L.push(`| 发明名称 | ${bi.name} |`)
+      L.push(`| 当前法律状态 | ${bi.legalStatus} |`)
+      L.push('')
+      L.push('## 权利要求结构解析\n')
+      L.push(`共 **${ci.total} 项**权利要求，独立权 **${ci.independent.length}** 项，从属权 **${ci.total - ci.independent.length}** 项。\n`)
+      L.push('| 权项 | 保护主题 |')
+      L.push('|---|---|')
+      ci.independent.forEach(c => L.push(`| 权${c.no} | ${c.type} |`))
+      L.push('')
+      L.push('从属权分组：' + ci.dependentGroups.map(g => `${g.range} → 权${g.ref}`).join(' · ') + '。保护主题：' + ci.protectionTypes.join(' · ') + '\n')
+      L.push('## 技术方案速览\n')
+      L.push(`**领域**：${ti.field}\n`)
+      L.push(ti.summary + '\n')
+      L.push('## 审查意见深度解析\n')
+      L.push('| 问题类型 | 涉及权项 | 简述 |')
+      L.push('|---|---|---|')
+      oi.substantiveIssues.forEach(i => L.push(`| ${i.type} | ${i.claims} | ${i.detail} |`))
+      L.push('')
+      L.push('**可授权性预判**')
+      L.push('- 直接可授权：' + oi.patentability.directGrantable.join('、'))
+      L.push('- 间接可授权：' + oi.patentability.indirectGrantable.join('、'))
+      L.push('- 争议权项：' + oi.patentability.keyDispute.join('、'))
+      if (oi.otherIssues?.length) {
+        L.push('')
+        L.push('**其他问题**：' + oi.otherIssues.map(i => `${i.type}：${i.detail}`).join('；'))
+      }
+      L.push('\n## 内部人员档案\n')
+      const cc = pi.currentCase
+      L.push(`**本案**：撰写 ${cc.writer} · QC ${cc.qc}\n`)
+      if (cc.oaHistory.length) {
+        L.push('| OA | 日期 | 答复负责人 | 答复QC |')
+        L.push('|---|---|---|---|')
+        cc.oaHistory.forEach(h => L.push(`| 第${h.round}次 | ${h.date} | ${h.responder} | ${h.qc} |`))
+      } else {
+        L.push('本次 OA 为首次，暂无历史答复记录。')
+      }
+      L.push('')
+      const rc = pi.relatedCase
+      L.push(`**同族案件（${rc.caseNo}）**：撰写 ${rc.writer} · QC ${rc.qc}\n`)
+      if (rc.oaHistory.length) {
+        L.push('| OA | 日期 | 答复负责人 | 答复QC |')
+        L.push('|---|---|---|---|')
+        rc.oaHistory.forEach(h => L.push(`| 第${h.round}次 | ${h.date} | ${h.responder} | ${h.qc} |`))
+      } else {
+        L.push('同族案暂无历史答复记录。')
+      }
+      return L.join('\n')
+    }
+
+    const renderedMarkdown = computed(() => {
+      if (!selectedCase.value?.detail) return ''
+      return marked.parse(detailToMarkdown(selectedCase.value.detail))
+    })
+
+    const OUTLINE_LABELS = ['案件基础信息', '权利要求结构解析', '技术方案速览', '审查意见深度解析', '内部人员档案']
+    const outlineItems = computed(() => selectedCase.value?.detail ? OUTLINE_LABELS : [])
+    const activeSectionIdx = ref(0)
+
+    watch(renderedMarkdown, () => {
+      activeSectionIdx.value = 0
+      nextTick(() => {
+        document.querySelectorAll('.md-body h2').forEach((el, i) => { el.id = 'md-sec-' + i })
+      })
+    })
+
+    function scrollToSection(idx) {
+      const container = document.querySelector('.md-content')
+      const el = document.getElementById('md-sec-' + idx)
+      if (!container || !el) return
+      container.scrollTop = el.offsetTop - 8
+      activeSectionIdx.value = idx
+    }
+
+    function onMdScroll(e) {
+      const top = e.target.scrollTop + 20
+      let cur = 0
+      OUTLINE_LABELS.forEach((_, i) => {
+        const el = document.getElementById('md-sec-' + i)
+        if (el && el.offsetTop <= top) cur = i
+      })
+      activeSectionIdx.value = cur
+    }
+
+    function isCaseAssigned(caseId) {
+      const sel = caseSelections.value[caseId]
+      if (!sel?.schemeId) return false
+      return sel.schemeId === 'custom' ? !!(sel.customResponder && sel.customQc) : true
+    }
+
+    function getOrInitSel(caseId) {
+      if (!caseSelections.value[caseId]) {
+        caseSelections.value[caseId] = { schemeId: null, customResponder: '', customQc: '', customNote: '', postscript: '' }
+      }
+      return caseSelections.value[caseId]
+    }
+    const currentSelection = computed(() => caseSelections.value[selectedCaseId.value] || null)
+    const assignedCount = computed(() =>
+      filteredCases.value.filter(c => {
+        const sel = caseSelections.value[c.id]
+        if (!sel?.schemeId) return false
+        return sel.schemeId === 'custom' ? !!(sel.customResponder && sel.customQc) : true
+      }).length
+    )
+
+    function reanalyze() {
+      if (!selectedCase.value || reanalyzing.value) return
+      reanalyzing.value = true
+      setTimeout(() => {
+        reanalyzing.value = false
+        ElementPlus.ElMessage.success('分析已重新生成')
+      }, 1500)
+    }
+
+    const analyzing = ref(false)
+
+    // 首次打开该案时向后端取 AI 报告(detail)+分配建议(schemes)；已取过则复用(缓存)
+    async function ensureAnalyzed(c) {
+      if (!c || c._analyzed) return
+      analyzing.value = true
+      loadError.value = ''
+      try {
+        const d = await apiPost('/api/assignment/analyze', { caseId: c.id })
+        c.detail = d.detail
+        c.schemes = d.schemes || []
+        c._analyzed = true
+      } catch (e) {
+        loadError.value = String(e.message || e)
+        ElementPlus.ElMessage.error('生成案件报告失败：' + loadError.value)
+      } finally {
+        analyzing.value = false
+      }
+    }
+
+    function selectCase(c) {
+      selectedCaseId.value = c.id
+      ensureAnalyzed(c)
+    }
+
+    function selectScheme(id) {
+      if (!selectedCaseId.value) return
+      getOrInitSel(selectedCaseId.value).schemeId = id
+    }
+
+    function queryStaff(query, cb) {
+      const q = (query || '').trim()
+      const list = staffList.value
+      const res = (q ? list.filter(s => s.includes(q)) : list).map(s => ({ value: s }))
+      cb(res)
+    }
+
+    function setCustomResponder(val) {
+      if (!selectedCaseId.value) return
+      getOrInitSel(selectedCaseId.value).customResponder = val
+    }
+
+    function setCustomQc(val) {
+      if (!selectedCaseId.value) return
+      getOrInitSel(selectedCaseId.value).customQc = val
+    }
+
+    function setPostscript(val) {
+      if (!selectedCaseId.value) return
+      getOrInitSel(selectedCaseId.value).postscript = val
+    }
+
+    function setCustomNote(val) {
+      if (!selectedCaseId.value) return
+      getOrInitSel(selectedCaseId.value).customNote = val
+    }
+
+    function toggleCard(key) {
+      expandedCards[key] = !expandedCards[key]
+    }
+
+    const canSubmit = computed(() => {
+      if (!selectedCase.value) return false
+      const sel = currentSelection.value
+      if (!sel?.schemeId) return false
+      if (sel.schemeId === 'custom') return !!(sel.customResponder && sel.customQc)
+      return true
+    })
+
+    // API: POST /api/assignment/submit body: { caseId, schemeId, responder, qc, postscript, customNote }
+    function _doSubmitCase(c) {
+      const sel = caseSelections.value[c.id]
+      if (!sel?.schemeId) return
+      c.submitted = true
+      delete caseSelections.value[c.id]
+    }
+
+    // 把某案的当前选择拼成提交载荷（解析出实际 responder/qc）
+    function _assignmentOf(c) {
+      const sel = caseSelections.value[c.id] || {}
+      const sch = (c.schemes || []).find(s => s.id === sel.schemeId)
+      const responder = sel.schemeId === 'custom' ? sel.customResponder : (sch?.responder || '')
+      const qc = sel.schemeId === 'custom' ? sel.customQc : (sch?.qc || '')
+      return { caseId: c.id, caseNo: c.caseNo, schemeId: sel.schemeId,
+               responder, qc, postscript: sel.postscript || '', customNote: sel.customNote || '' }
+    }
+
+    // API: POST /api/assignment/submit/batch body: { assignments: [{ caseId, schemeId, responder, qc }] }
+    async function batchSubmit() {
+      const toSubmit = filteredCases.value.filter(c => {
+        const sel = caseSelections.value[c.id]
+        if (!sel?.schemeId) return false
+        return sel.schemeId === 'custom' ? !!(sel.customResponder && sel.customQc) : true
+      })
+      if (!toSubmit.length) return
+      try {
+        const r = await apiPost('/api/assignment/submit/batch',
+          { assignments: toSubmit.map(_assignmentOf) })
+        toSubmit.forEach(c => _doSubmitCase(c))
+        const next = filteredCases.value[0]
+        selectedCaseId.value = next ? next.id : null
+        ElementPlus.ElMessage.success(`已提交 ${r.count ?? toSubmit.length} 件分配`)
+      } catch (e) {
+        ElementPlus.ElMessage.error('提交失败：' + (e.message || e))
+      }
+    }
+
+
+    // ── 用户引导 ──
+    const guideVisible    = ref(false)
+    const guideStepIndex  = ref(0)
+    const guideBtnFlashing = ref(false)
+    const guideMask       = reactive({ top: {}, bottom: {}, left: {}, right: {} })
+    const guideHighlight  = ref({})
+    const guideTooltip    = ref({})
+    let _guideCleanupFn   = null
+
+    const GUIDE_STEPS = [
+      // 1. 待分配案件列表
+      {
+        selector: '[data-guide="case-list"]',
+        placement: 'right',
+        title: '待分配案件列表',
+        desc: '左侧列出所有待分配的 OA 案件。点击任意案件行，中栏会展示 AI 分析结果，右栏显示候选分配方案。顶部按钮用于批量提交已完成分配的案件。',
+      },
+      // 2. 案件编号
+      {
+        getRect() { return _gVisibleRect('.case-item__no') },
+        placement: 'right',
+        title: '案件编号',
+        desc: '每条案件显示案号和发明名称，完成分配后左侧会出现绿色 ✓ 标记，便于快速确认哪些案件已选好方案、尚未提交。',
+      },
+      // 3. 搜索案件
+      {
+        selector: '[data-guide="case-search"]',
+        placement: 'right',
+        title: '搜索案件',
+        desc: '在搜索框输入案号或发明名称关键词，可快速过滤列表，定位目标案件。',
+      },
+      // 4. 选择案件
+      {
+        getRect() { return _gVisibleRect('.case-item') },
+        placement: 'right',
+        allowClick: true,
+        title: '选择案件',
+        desc: '点击案件行，中栏展示该案件的 AI 分析报告，右栏显示 AI 推荐的分配方案。',
+      },
+      // 5. AI 案件情况分析
+      {
+        selector: '[data-guide="case-detail-body"]',
+        placement: 'right',
+        title: 'AI 案件情况分析',
+        desc: 'AI 已自动分析本案，以文档形式展示各个维度内容，作为人员分配的重要参考。',
+      },
+      // 6. 章节大纲
+      {
+        getRect() { return _gVisibleRect('.md-outline') },
+        placement: 'right',
+        title: '章节大纲',
+        desc: '中栏左侧是章节大纲，列出分析报告的章节。点击章节名可快速跳转到对应内容；滚动正文时，大纲会自动高亮当前所在章节。',
+      },
+      // 7. 重新生成分析
+      {
+        selector: '[data-guide="reanalyze-btn"]',
+        placement: 'bottom',
+        title: '重新生成分析',
+        desc: '若分析内容不准确或案件材料有更新，点击「重新生成」可让 AI 重新执行全部分析步骤，刷新报告内容。',
+      },
+      // 8. 选择分配方案
+      {
+        selector: '[data-guide="scheme-list"]',
+        placement: 'left',
+        title: '选择分配方案',
+        desc: 'AI 按分配规则生成多个候选方案，每张卡片显示答复负责人、答复 QC 及推荐理由。\n\n点击卡片即可选中，边框变蓝表示已选中。切换到其他案件后，本案选择状态会保留，方便批量处理多个案件后统一提交。',
+      },
+      // 9. 分配附言
+      {
+        selector: '[data-guide="postscript-input"]',
+        placement: 'left',
+        title: '分配附言',
+        desc: '在方案列表上方可填写分配附言，用于补充说明本次整体分配的背景或特殊情况，例如协调说明、客户要求等。\n\n非必填，最多 100 字，提交时随分配结果一并发送。',
+      },
+      // 10. 自定义方案
+      {
+        getRect() {
+          const cards = document.querySelectorAll('.scheme-card')
+          const last = cards[cards.length - 1]
+          return last ? last.getBoundingClientRect() : null
+        },
+        placement: 'left',
+        title: '自定义方案',
+        desc: '若预设方案均不满足需求，可选择「自定义方案」，在输入框中输入姓名进行模糊匹配，分别指定答复负责人和 QC，两项均填写后方可提交。',
+        setup() {
+          const body = document.querySelector('.assign-panel__body')
+          if (body) body.scrollTop = body.scrollHeight
+        },
+        delay: 200,
+      },
+      // 11. 自定义方案说明
+      {
+        getRect() { return _gVisibleRect('[data-guide="custom-note-input"]') },
+        placement: 'left',
+        title: '自定义方案说明',
+        desc: '选择自定义方案时，可在「说明」框填写选择该人员的具体原因，便于后续追溯分配依据。\n\n非必填，最多 100 字。',
+        setup() {
+          const body = document.querySelector('.assign-panel__body')
+          if (body) body.scrollTop = body.scrollHeight
+        },
+        delay: 200,
+      },
+      // 12. 编辑 AI 指令
+      {
+        getRect() { return _gVisibleRect('[data-guide="edit-ai-btn"]') },
+        placement: 'bottom',
+        title: '编辑 AI 指令',
+        desc: '点击将在新标签页打开 AI 调试页，可查看和修改各步骤的分析指令脚本。修改保存后，回到本页点击「重新生成」即可用新指令刷新分析报告。',
+      },
+      // 13. 调整分配规则（跳转到调试页）
+      {
+        getRect() { return _gVisibleRect('[data-guide="edit-rules-btn"]') },
+        placement: 'left',
+        allowClick: false,
+        title: '调整分配规则',
+        desc: '点击「前往调试页」将跳转至 AI 调试页的分配规则步骤，可直接修改技术领域匹配表和人员优先级规则。完成修改后返回本页，引导将在此继续。',
+        action() {
+          const c = selectedCase.value
+          const url = 'script-debug.html?caseId=' + (c?.id || '') + '&caseName=' + encodeURIComponent(c?.caseNo || '') + '&guide=assign-rules#step4'
+          window.location.href = url
+        },
+      },
+      // 14. 批量提交（从调试页返回后）
+      {
+        getRect() { return _gVisibleRect('.case-list__action') },
+        placement: 'right',
+        title: '批量提交已分配案件',
+        desc: '分配规则已更新。对所有待分配案件逐一选好方案后，点击左栏顶部的「提交全部已分配」按钮，可一次性提交全部已完成选择的案件。\n\n未选方案的案件不受影响，留在列表中等待后续处理。',
+      },
+    ]
+
+    const currentGuideStep = computed(() => GUIDE_STEPS[guideStepIndex.value] || {})
+
+    function _gVisibleRect(selector) {
+      const els = document.querySelectorAll(selector)
+      for (const el of els) {
+        const r = el.getBoundingClientRect()
+        if (r.width > 0 && r.height > 0) return r
+      }
+      return null
+    }
+
+    function _applyGuideRect(rect) {
+      const pad = 6
+      const t = rect.top - pad, l = rect.left - pad
+      const b = rect.bottom + pad, r = rect.right + pad
+      const maskT = Math.max(0, t), maskL = Math.max(0, l), maskH = b - maskT
+      guideMask.top    = { top: '0', left: '0', right: '0', height: maskT + 'px' }
+      guideMask.bottom = { top: b + 'px', left: '0', right: '0', bottom: '0' }
+      guideMask.left   = { top: maskT + 'px', left: '0', width: maskL + 'px', height: maskH + 'px' }
+      guideMask.right  = { top: maskT + 'px', left: r + 'px', right: '0', height: maskH + 'px' }
+      guideHighlight.value = { top: t + 'px', left: l + 'px', width: (r - l) + 'px', height: (b - t) + 'px' }
+    }
+
+    function _computeGuideLayout(step) {
+      const rect = step.getRect ? step.getRect() : _gVisibleRect(step.selector)
+      if (!rect) return
+      _applyGuideRect(rect)
+      const tw = 300, th = 280
+      const vw = window.innerWidth, vh = window.innerHeight
+      const placement = step.placement || 'bottom'
+      let tx, ty
+      if (placement === 'right') { tx = rect.right + 14; ty = rect.top + (rect.height - th) / 2 }
+      else if (placement === 'left') { tx = rect.left - tw - 14; ty = rect.top + (rect.height - th) / 2 }
+      else if (placement === 'top') { tx = rect.left + (rect.width - tw) / 2; ty = rect.top - th - 12 }
+      else { tx = rect.left + (rect.width - tw) / 2; ty = rect.bottom + 12; if (ty + th > vh) ty = rect.top - th - 12 }
+      tx = Math.max(8, Math.min(tx, vw - tw - 8))
+      ty = Math.max(8, Math.min(ty, vh - th - 8))
+      guideTooltip.value = { top: ty + 'px', left: tx + 'px', width: tw + 'px' }
+    }
+
+    function _runGuideStep(step) {
+      if (_guideCleanupFn) { _guideCleanupFn(); _guideCleanupFn = null }
+      if (step.setup) { step.setup(); setTimeout(() => _computeGuideLayout(step), step.delay || 200) }
+      else nextTick(() => _computeGuideLayout(step))
+    }
+
+    function guideStart(startIdx) {
+      guideStepIndex.value = startIdx || 0
+      guideVisible.value = true
+      _runGuideStep(GUIDE_STEPS[guideStepIndex.value])
+    }
+
+    function handleGuideBlockedClick() {
+      guideBtnFlashing.value = true
+      setTimeout(() => { guideBtnFlashing.value = false }, 600)
+    }
+
+    function guideSkip() {
+      if (_guideCleanupFn) { _guideCleanupFn(); _guideCleanupFn = null }
+      guideVisible.value = false
+    }
+
+    function guideFinish() {
+      if (_guideCleanupFn) { _guideCleanupFn(); _guideCleanupFn = null }
+      guideVisible.value = false
+    }
+
+    function guideNext() {
+      const cur = GUIDE_STEPS[guideStepIndex.value]
+      if (cur && cur.action) { cur.action(); return }
+      if (guideStepIndex.value < GUIDE_STEPS.length - 1) {
+        guideStepIndex.value++
+        _runGuideStep(GUIDE_STEPS[guideStepIndex.value])
+      } else {
+        guideFinish()
+      }
+    }
+
+    function guidePrev() {
+      if (guideStepIndex.value > 0) {
+        guideStepIndex.value--
+        _runGuideStep(GUIDE_STEPS[guideStepIndex.value])
+      }
+    }
+
+    // 拉取待分配案件列表 + 人员库（后端桩数据）
+    async function loadData() {
+      loadError.value = ''
+      try {
+        const [cs, st] = await Promise.all([
+          apiGet('/api/cases/pending'),
+          apiGet('/api/staff/list'),
+        ])
+        allCases.value = cs.items || cs || []
+        staffList.value = st.staff || []
+      } catch (e) {
+        loadError.value = String(e.message || e)
+        ElementPlus.ElMessage.error('加载待分配案件失败：' + loadError.value)
+      }
+    }
+
+    onMounted(() => {
+      loadData()
+      const _p = new URLSearchParams(location.search)
+      const resume = _p.get('guideResume')
+      if (resume) {
+        const idx = parseInt(resume, 10) - 1
+        if (!isNaN(idx) && idx >= 0 && idx < GUIDE_STEPS.length) {
+          nextTick(() => guideStart(idx))
+        }
+      } else {
+        nextTick(() => guideStart(0))
+      }
+    })
+
+    return {
+      staffList, allCases, searchText, selectedCaseId,
+      caseSelections, currentSelection, assignedCount, isCaseAssigned,
+      expandedCards, reanalyzing,
+      filteredCases, selectedCase, displayedSchemes, renderedMarkdown,
+      outlineItems, activeSectionIdx, scrollToSection, onMdScroll,
+      selectCase, selectScheme, setCustomResponder, setCustomQc, setPostscript, setCustomNote, queryStaff,
+      toggleCard, canSubmit, batchSubmit, reanalyze,
+      guideVisible, guideStepIndex, guideBtnFlashing, guideMask, guideHighlight, guideTooltip,
+      GUIDE_STEPS, currentGuideStep,
+      guideStart, guideSkip, guideNext, guidePrev, handleGuideBlockedClick,
+    }
+  }
+})
+
+app.use(ElementPlus)
+Object.entries(ElementPlusIconsVue).forEach(([n, c]) => app.component(n, c))
+app.mount('#app')
+
+// ── 三栏拖拽分隔条 ──
+;(function() {
+  const root = document.documentElement
+  function makeDraggable(dividerId, targetSelector, cssVar, minPx, sign) {
+    const divider = document.getElementById(dividerId)
+    if (!divider) return
+    divider.addEventListener('mousedown', function(e) {
+      e.preventDefault()
+      divider.classList.add('pas-divider--dragging')
+      document.body.style.cursor = 'col-resize'
+      document.body.style.userSelect = 'none'
+      const startX = e.clientX
+      const startW = document.querySelector(targetSelector).getBoundingClientRect().width
+      function onMove(e) {
+        const w = Math.max(minPx, startW + (e.clientX - startX) * sign)
+        root.style.setProperty(cssVar, w + 'px')
+      }
+      function onUp() {
+        divider.classList.remove('pas-divider--dragging')
+        document.body.style.cursor = ''
+        document.body.style.userSelect = ''
+        document.removeEventListener('mousemove', onMove)
+        document.removeEventListener('mouseup', onUp)
+      }
+      document.addEventListener('mousemove', onMove)
+      document.addEventListener('mouseup', onUp)
+    })
+  }
+  makeDraggable('divider-left',  '.case-list',    '--col-left',  200, 1)
+  makeDraggable('divider-right', '.assign-panel', '--col-right', 280, -1)
+})()
+</script>
+</body>
+</html>

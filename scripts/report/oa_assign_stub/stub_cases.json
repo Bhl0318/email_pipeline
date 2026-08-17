@@ -1,0 +1,807 @@
+[
+  {
+    "id": "case-001",
+    "caseNo": "20618-1234CN01",
+    "name": "一种基于神经网络的图像语义分割方法及系统",
+    "urgency": "high",
+    "client": "联影",
+    "legalStatus": "等待实审提案",
+    "daysLeft": 20,
+    "estimate": "8h",
+    "submitted": false,
+    "files": [
+      {
+        "id": "f-qlqy-001",
+        "name": "权利要求书_20618-1234CN01.pdf",
+        "type": "qlqy"
+      },
+      {
+        "id": "f-scyj-001",
+        "name": "CN第一次审查意见_20240310.pdf",
+        "type": "scyj"
+      },
+      {
+        "id": "f-sqwj-001",
+        "name": "申请文件全套_20618-1234CN01.pdf",
+        "type": "sqwj"
+      },
+      {
+        "id": "f-dbwj-001",
+        "name": "对比文件D1_US11234567.pdf",
+        "type": "dbwj"
+      },
+      {
+        "id": "f-dbwj-002",
+        "name": "对比文件D2_EP3456789.pdf",
+        "type": "dbwj"
+      }
+    ],
+    "schemes": [
+      {
+        "id": "s1",
+        "label": "方案一（优先）",
+        "note": "曾担任本案第1次OA答复负责人，熟悉本案技术背景及与审查员的沟通路径，对D1/D2结合启示的争辩思路已有积累，可直接复用前次答辩框架，预计能高效推进。",
+        "responder": "王浩",
+        "qc": "李芳"
+      },
+      {
+        "id": "s2",
+        "label": "方案二",
+        "note": "近半年处理过3件计算机视觉领域OA，对深度学习方向的创造性争辩有丰富经验，技术理解能力与本案匹配，可作为备选。",
+        "responder": "赵岩",
+        "qc": "李芳"
+      },
+      {
+        "id": "s3",
+        "label": "方案三",
+        "note": "承接能力充足，本月工时有余量；曾处理联影同类图像处理案件，对客户答复偏好有一定了解。",
+        "responder": "孙娟",
+        "qc": "李芳"
+      },
+      {
+        "id": "s4",
+        "label": "方案四",
+        "note": "技术方向覆盖AI/视觉领域，当前工作负载较低，能保障按期提交，适合作为兜底备选。",
+        "responder": "庞鑫",
+        "qc": "李芳"
+      },
+      {
+        "id": "custom",
+        "label": "自定义方案",
+        "note": "",
+        "responder": "",
+        "qc": ""
+      }
+    ],
+    "detail": {
+      "basicInfo": {
+        "caseNo": "20618-1234CN01",
+        "name": "一种基于神经网络的图像语义分割方法及系统",
+        "legalStatus": "等待实审提案",
+        "client": "联影"
+      },
+      "claimsInfo": {
+        "total": 10,
+        "independent": [
+          {
+            "no": 1,
+            "type": "方法"
+          },
+          {
+            "no": 6,
+            "type": "系统"
+          },
+          {
+            "no": 10,
+            "type": "存储介质"
+          }
+        ],
+        "dependentGroups": [
+          {
+            "range": "权2-5",
+            "ref": 1
+          },
+          {
+            "range": "权7-9",
+            "ref": 6
+          }
+        ],
+        "protectionTypes": [
+          "方法",
+          "装置",
+          "介质"
+        ]
+      },
+      "techInfo": {
+        "field": "计算机视觉 / 深度学习",
+        "summary": "通过多尺度特征融合与注意力机制，解决低光照条件下语义分割边界模糊的问题，引入动态卷积核权重调整策略。"
+      },
+      "oaInfo": {
+        "substantiveIssues": [
+          {
+            "type": "创造性（A22.3）",
+            "claims": "权1、权6",
+            "detail": "D1公开基础CNN，区别在于动态卷积，但D2给出启示，结合显而易见"
+          },
+          {
+            "type": "新颖性（A22.2）",
+            "claims": "无",
+            "detail": "—"
+          },
+          {
+            "type": "不清楚（A26.4）",
+            "claims": "权4、权9",
+            "detail": "权4\"适度调整\"模糊；权9尺寸参数缺乏量化定义"
+          },
+          {
+            "type": "支持（A26.4）",
+            "claims": "权10",
+            "detail": "存储介质功能限定未对应方法步骤"
+          },
+          {
+            "type": "形式问题（细则）",
+            "claims": "权2、说明书摘要",
+            "detail": "权2缺引用基础；摘要字数超限"
+          }
+        ],
+        "patentability": {
+          "directGrantable": [
+            "权5",
+            "权7"
+          ],
+          "indirectGrantable": [
+            "权3+权4合并（克服不清楚问题后可授权）"
+          ],
+          "keyDispute": [
+            "权1",
+            "权6（需争辩D1/D2无结合启示）"
+          ]
+        },
+        "otherIssues": [
+          {
+            "type": "附图问题",
+            "detail": "图2流程图缺少S300步骤标注，不符合细则17条"
+          },
+          {
+            "type": "摘要问题",
+            "detail": "摘要未包含技术效果数据，需补交"
+          }
+        ]
+      },
+      "personnelInfo": {
+        "currentCase": {
+          "writer": "张明（项目经理）",
+          "qc": "李芳（高级项目经理）",
+          "oaHistory": [
+            {
+              "round": 1,
+              "date": "2025.03",
+              "responder": "王浩（项目经理）",
+              "qc": "李芳"
+            }
+          ]
+        },
+        "relatedCase": {
+          "caseNo": "20618-1234CN00",
+          "writer": "孙飞（分析师，已离职）",
+          "qc": "李芳（高级项目经理）",
+          "oaHistory": [
+            {
+              "round": 1,
+              "date": "2025.03",
+              "responder": "王浩",
+              "qc": "李芳"
+            },
+            {
+              "round": 2,
+              "date": "2026.02",
+              "responder": "王浩",
+              "qc": "李芳"
+            }
+          ]
+        }
+      }
+    }
+  },
+  {
+    "id": "case-002",
+    "caseNo": "20618-5678CN01",
+    "name": "一种毫米波信道估计与波束赋形联合优化方法",
+    "urgency": "medium",
+    "client": "华为",
+    "legalStatus": "实质审查中",
+    "daysLeft": 15,
+    "estimate": "6h",
+    "submitted": false,
+    "files": [
+      {
+        "id": "f2-qlqy",
+        "name": "权利要求书_20618-5678CN01.pdf",
+        "type": "qlqy"
+      },
+      {
+        "id": "f2-scyj",
+        "name": "CN第一次审查意见_20260510.pdf",
+        "type": "scyj"
+      },
+      {
+        "id": "f2-sqwj",
+        "name": "申请文件全套_20618-5678CN01.pdf",
+        "type": "sqwj"
+      }
+    ],
+    "schemes": [
+      {
+        "id": "s1",
+        "label": "方案一（优先）",
+        "note": "本案撰写人，对权利要求布局和技术方案最为熟悉，能快速切入审查意见争辩要点，减少交接成本，首选推荐。",
+        "responder": "陈磊",
+        "qc": "李芳"
+      },
+      {
+        "id": "s2",
+        "label": "方案二",
+        "note": "曾参与同族案（20618-5678CN00）第1次OA答复，了解本案技术背景及华为对答复质量的要求，可作为备选。",
+        "responder": "刘洋",
+        "qc": "李芳"
+      },
+      {
+        "id": "custom",
+        "label": "自定义方案",
+        "note": "",
+        "responder": "",
+        "qc": ""
+      }
+    ],
+    "detail": {
+      "basicInfo": {
+        "caseNo": "20618-5678CN01",
+        "name": "一种毫米波信道估计与波束赋形联合优化方法",
+        "legalStatus": "实质审查中",
+        "client": "华为"
+      },
+      "claimsInfo": {
+        "total": 8,
+        "independent": [
+          {
+            "no": 1,
+            "type": "方法"
+          },
+          {
+            "no": 5,
+            "type": "装置"
+          }
+        ],
+        "dependentGroups": [
+          {
+            "range": "权2-4",
+            "ref": 1
+          },
+          {
+            "range": "权6-8",
+            "ref": 5
+          }
+        ],
+        "protectionTypes": [
+          "方法",
+          "装置"
+        ]
+      },
+      "techInfo": {
+        "field": "无线通信 / 毫米波",
+        "summary": "提出联合信道估计与波束赋形优化框架，利用稀疏信道特性降低导频开销，显著提升毫米波大规模MIMO系统频谱效率。"
+      },
+      "oaInfo": {
+        "substantiveIssues": [
+          {
+            "type": "创造性（A22.3）",
+            "claims": "权1",
+            "detail": "D1公开稀疏信道估计方案，D2给出波束赋形优化启示，审查员认为结合显而易见"
+          },
+          {
+            "type": "不清楚（A26.4）",
+            "claims": "权3",
+            "detail": "\"自适应阈值\"缺乏量化定义，技术边界不清"
+          },
+          {
+            "type": "支持（A26.4）",
+            "claims": "权5",
+            "detail": "装置权利要求的功能模块未对应方法步骤"
+          }
+        ],
+        "patentability": {
+          "directGrantable": [
+            "权2",
+            "权4"
+          ],
+          "indirectGrantable": [
+            "权1（限定联合优化目标函数后可授权）"
+          ],
+          "keyDispute": [
+            "权1（需争辩联合优化的协同效果非显而易见）"
+          ]
+        },
+        "otherIssues": [
+          {
+            "type": "摘要问题",
+            "detail": "摘要未反映技术效果，需补充频谱效率提升数据"
+          }
+        ]
+      },
+      "personnelInfo": {
+        "currentCase": {
+          "writer": "陈磊（项目经理）",
+          "qc": "李芳（高级项目经理）",
+          "oaHistory": []
+        },
+        "relatedCase": {
+          "caseNo": "20618-5678CN00",
+          "writer": "陈磊（项目经理）",
+          "qc": "李芳（高级项目经理）",
+          "oaHistory": [
+            {
+              "round": 1,
+              "date": "2025.08",
+              "responder": "刘洋",
+              "qc": "李芳"
+            }
+          ]
+        }
+      }
+    }
+  },
+  {
+    "id": "case-003",
+    "caseNo": "20618-9012EP01",
+    "name": "一种柔性机器人关节力矩控制系统及方法",
+    "urgency": "low",
+    "client": "西门子",
+    "legalStatus": "等待实审提案",
+    "daysLeft": 42,
+    "estimate": "5h",
+    "submitted": false,
+    "files": [
+      {
+        "id": "f3-qlqy",
+        "name": "权利要求书_20618-9012EP01.pdf",
+        "type": "qlqy"
+      },
+      {
+        "id": "f3-scyj",
+        "name": "EP第一次审查意见_20260315.pdf",
+        "type": "scyj"
+      },
+      {
+        "id": "f3-dbwj",
+        "name": "对比文件_EP2134567.pdf",
+        "type": "dbwj"
+      }
+    ],
+    "schemes": [
+      {
+        "id": "s1",
+        "label": "方案一（优先）",
+        "note": "本案撰写人，对关节力矩控制系统技术方案理解最深；EP答复格式要求严格，撰写人直接参与答复有助于降低沟通成本，优先推荐。",
+        "responder": "张晓",
+        "qc": "李芳"
+      },
+      {
+        "id": "s2",
+        "label": "方案二",
+        "note": "参与过同族德国案（20618-9012DE01）的答复，对EP系审查流程和西门子客户风格有一定了解，可作为备选。",
+        "responder": "王芳",
+        "qc": "李芳"
+      },
+      {
+        "id": "custom",
+        "label": "自定义方案",
+        "note": "",
+        "responder": "",
+        "qc": ""
+      }
+    ],
+    "detail": {
+      "basicInfo": {
+        "caseNo": "20618-9012EP01",
+        "name": "一种柔性机器人关节力矩控制系统及方法",
+        "legalStatus": "等待实审提案",
+        "client": "西门子"
+      },
+      "claimsInfo": {
+        "total": 12,
+        "independent": [
+          {
+            "no": 1,
+            "type": "系统"
+          },
+          {
+            "no": 7,
+            "type": "方法"
+          },
+          {
+            "no": 12,
+            "type": "控制器"
+          }
+        ],
+        "dependentGroups": [
+          {
+            "range": "权2-6",
+            "ref": 1
+          },
+          {
+            "range": "权8-11",
+            "ref": 7
+          }
+        ],
+        "protectionTypes": [
+          "系统",
+          "方法",
+          "控制器"
+        ]
+      },
+      "techInfo": {
+        "field": "机械结构 / 机器人",
+        "summary": "提出基于阻抗控制的柔性关节力矩自适应补偿方法，通过实时力矩观测器消除关节弹性引起的定位误差，适用于人机协作场景。"
+      },
+      "oaInfo": {
+        "substantiveIssues": [
+          {
+            "type": "创造性（A22.3）",
+            "claims": "权1、权7",
+            "detail": "EP对比文件D1公开阻抗控制框架，D2给出力矩观测器实现方案，结合后区别特征不显著"
+          },
+          {
+            "type": "不清楚（A26.4）",
+            "claims": "权4",
+            "detail": "\"柔顺系数\"未定义测量方式，数值范围不清晰"
+          }
+        ],
+        "patentability": {
+          "directGrantable": [
+            "权5",
+            "权6",
+            "权9"
+          ],
+          "indirectGrantable": [
+            "权1（补充区别技术效果数据后可授权）",
+            "权7（限定适用场景后可授权）"
+          ],
+          "keyDispute": [
+            "权1（需证明自适应补偿相较D1+D2具有协同效果）"
+          ]
+        },
+        "otherIssues": [
+          {
+            "type": "附图问题",
+            "detail": "图3控制框图缺少力矩反馈回路标注，与说明书描述不符"
+          }
+        ]
+      },
+      "personnelInfo": {
+        "currentCase": {
+          "writer": "张晓（项目经理）",
+          "qc": "李芳（高级项目经理）",
+          "oaHistory": []
+        },
+        "relatedCase": {
+          "caseNo": "20618-9012DE01",
+          "writer": "张晓（项目经理）",
+          "qc": "李芳（高级项目经理）",
+          "oaHistory": [
+            {
+              "round": 1,
+              "date": "2025.11",
+              "responder": "王芳",
+              "qc": "李芳"
+            }
+          ]
+        }
+      }
+    }
+  },
+  {
+    "id": "case-004",
+    "caseNo": "20618-3456CN01",
+    "name": "一种锂电池极片涂布均匀性控制装置",
+    "urgency": "high",
+    "client": "宁德时代",
+    "legalStatus": "等待实审提案",
+    "daysLeft": 8,
+    "estimate": "7h",
+    "submitted": false,
+    "files": [
+      {
+        "id": "f4-qlqy",
+        "name": "权利要求书_20618-3456CN01.pdf",
+        "type": "qlqy"
+      },
+      {
+        "id": "f4-scyj",
+        "name": "CN第一次审查意见_20260618.pdf",
+        "type": "scyj"
+      },
+      {
+        "id": "f4-sqwj",
+        "name": "申请文件全套_20618-3456CN01.pdf",
+        "type": "sqwj"
+      },
+      {
+        "id": "f4-dbwj",
+        "name": "对比文件_CN112345678A.pdf",
+        "type": "dbwj"
+      }
+    ],
+    "schemes": [
+      {
+        "id": "s1",
+        "label": "方案一（优先）",
+        "note": "本案撰写人，同时主导了同族案两次OA答复，已积累±1.5μm精度数据作为区别特征的完整论证材料，可直接复用，效率最高。",
+        "responder": "庞鑫",
+        "qc": "李芳"
+      },
+      {
+        "id": "s2",
+        "label": "方案二",
+        "note": "擅长化学/材料方向案件，曾处理多件电池材料类OA，对视觉检测+闭环控制类创造性答辩策略熟悉，可作为备选。",
+        "responder": "王芳",
+        "qc": "李芳"
+      },
+      {
+        "id": "custom",
+        "label": "自定义方案",
+        "note": "",
+        "responder": "",
+        "qc": ""
+      }
+    ],
+    "detail": {
+      "basicInfo": {
+        "caseNo": "20618-3456CN01",
+        "name": "一种锂电池极片涂布均匀性控制装置",
+        "legalStatus": "等待实审提案",
+        "client": "宁德时代"
+      },
+      "claimsInfo": {
+        "total": 9,
+        "independent": [
+          {
+            "no": 1,
+            "type": "装置"
+          },
+          {
+            "no": 6,
+            "type": "方法"
+          }
+        ],
+        "dependentGroups": [
+          {
+            "range": "权2-5",
+            "ref": 1
+          },
+          {
+            "range": "权7-9",
+            "ref": 6
+          }
+        ],
+        "protectionTypes": [
+          "装置",
+          "方法"
+        ]
+      },
+      "techInfo": {
+        "field": "化学 / 材料 / 电池",
+        "summary": "针对极片涂布厚度不均匀问题，提出基于视觉检测与闭环反馈的实时涂布量调节装置，将涂布均匀性偏差控制在±1.5μm以内。"
+      },
+      "oaInfo": {
+        "substantiveIssues": [
+          {
+            "type": "创造性（A22.3）",
+            "claims": "权1",
+            "detail": "D1公开视觉检测涂布系统，D2公开闭环厚度控制方法，审查员认为二者结合得到本案方案"
+          },
+          {
+            "type": "不清楚（A26.4）",
+            "claims": "权3、权8",
+            "detail": "\"实时调节\"频率未界定；权8\"高精度\"缺乏量化标准"
+          },
+          {
+            "type": "新颖性（A22.2）",
+            "claims": "无",
+            "detail": "—"
+          }
+        ],
+        "patentability": {
+          "directGrantable": [
+            "权4",
+            "权5"
+          ],
+          "indirectGrantable": [
+            "权1（补充±1.5μm精度数据作为区别特征后可授权）"
+          ],
+          "keyDispute": [
+            "权1（需证明视觉+闭环联合控制具有协同技术效果，D1+D2结合存在技术障碍）"
+          ]
+        },
+        "otherIssues": [
+          {
+            "type": "说明书问题",
+            "detail": "实施例2缺少对应附图，第23页描述与图5不对应"
+          },
+          {
+            "type": "摘要问题",
+            "detail": "摘要超过300字，需压缩"
+          }
+        ]
+      },
+      "personnelInfo": {
+        "currentCase": {
+          "writer": "庞鑫（项目经理）",
+          "qc": "李芳（高级项目经理）",
+          "oaHistory": []
+        },
+        "relatedCase": {
+          "caseNo": "20618-3456CN00",
+          "writer": "庞鑫（项目经理）",
+          "qc": "李芳（高级项目经理）",
+          "oaHistory": [
+            {
+              "round": 1,
+              "date": "2025.06",
+              "responder": "庞鑫",
+              "qc": "李芳"
+            },
+            {
+              "round": 2,
+              "date": "2026.01",
+              "responder": "庞鑫",
+              "qc": "李芳"
+            }
+          ]
+        }
+      }
+    }
+  },
+  {
+    "id": "case-005",
+    "caseNo": "20618-7890CN01",
+    "name": "一种无人机集群协同避障路径规划方法",
+    "urgency": "low",
+    "client": "大疆",
+    "legalStatus": "实质审查中",
+    "daysLeft": 50,
+    "estimate": "5h",
+    "submitted": false,
+    "files": [
+      {
+        "id": "f5-qlqy",
+        "name": "权利要求书_20618-7890CN01.pdf",
+        "type": "qlqy"
+      },
+      {
+        "id": "f5-scyj",
+        "name": "CN第一次审查意见_20260701.pdf",
+        "type": "scyj"
+      },
+      {
+        "id": "f5-sqwj",
+        "name": "申请文件全套_20618-7890CN01.pdf",
+        "type": "sqwj"
+      }
+    ],
+    "schemes": [
+      {
+        "id": "s1",
+        "label": "方案一（优先）",
+        "note": "本案撰写人，对势场+强化学习融合方案的核心创新点理解充分，有助于针对审查员\"简单叠加\"质疑给出有力反驳，优先推荐。",
+        "responder": "赵岩",
+        "qc": "李芳"
+      },
+      {
+        "id": "s2",
+        "label": "方案二",
+        "note": "近期处理过控制系统/自动化方向OA，技术积累与本案匹配；有大疆项目合作经历，了解客户答复风格偏好。",
+        "responder": "陈磊",
+        "qc": "李芳"
+      },
+      {
+        "id": "custom",
+        "label": "自定义方案",
+        "note": "",
+        "responder": "",
+        "qc": ""
+      }
+    ],
+    "detail": {
+      "basicInfo": {
+        "caseNo": "20618-7890CN01",
+        "name": "一种无人机集群协同避障路径规划方法",
+        "legalStatus": "实质审查中",
+        "client": "大疆"
+      },
+      "claimsInfo": {
+        "total": 10,
+        "independent": [
+          {
+            "no": 1,
+            "type": "方法"
+          },
+          {
+            "no": 6,
+            "type": "系统"
+          }
+        ],
+        "dependentGroups": [
+          {
+            "range": "权2-5",
+            "ref": 1
+          },
+          {
+            "range": "权7-10",
+            "ref": 6
+          }
+        ],
+        "protectionTypes": [
+          "方法",
+          "系统"
+        ]
+      },
+      "techInfo": {
+        "field": "控制系统 / 无人机",
+        "summary": "提出基于分布式势场与强化学习融合的多无人机动态避障路径规划方法，支持百架量级集群实时协同，碰撞率降低至0.3%以下。"
+      },
+      "oaInfo": {
+        "substantiveIssues": [
+          {
+            "type": "创造性（A22.3）",
+            "claims": "权1、权6",
+            "detail": "D1公开势场法避障，D2公开强化学习路径规划，审查员认为融合方案容易想到"
+          },
+          {
+            "type": "不清楚（A26.4）",
+            "claims": "权4",
+            "detail": "\"实时性\"未界定响应时延阈值，技术边界不明确"
+          }
+        ],
+        "patentability": {
+          "directGrantable": [
+            "权3",
+            "权5",
+            "权8"
+          ],
+          "indirectGrantable": [
+            "权1（补充百架集群规模及碰撞率数据作为区别特征）"
+          ],
+          "keyDispute": [
+            "权1（需证明势场+强化学习融合的协同效果，非简单叠加）"
+          ]
+        },
+        "otherIssues": [
+          {
+            "type": "附图问题",
+            "detail": "图4仿真示意图分辨率不足，无人机轨迹线条不清晰，需重新提交"
+          }
+        ]
+      },
+      "personnelInfo": {
+        "currentCase": {
+          "writer": "赵岩（项目经理）",
+          "qc": "李芳（高级项目经理）",
+          "oaHistory": []
+        },
+        "relatedCase": {
+          "caseNo": "20618-7890CN00",
+          "writer": "赵岩（项目经理）",
+          "qc": "李芳（高级项目经理）",
+          "oaHistory": [
+            {
+              "round": 1,
+              "date": "2025.09",
+              "responder": "赵岩",
+              "qc": "李芳"
+            }
+          ]
+        }
+      }
+    }
+  }
+]
