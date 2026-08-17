@@ -53,23 +53,109 @@ def _write_back(case_id, responder, qc):
         return {"code": 1, "msg": f"回写调用失败: {e}"}
 
 
+def _mark(case_id, responder, qc):
+    """待分配表回填分配结果并置已分配。best-effort，不抛。"""
+    st = _store()
+    if st is None or not case_id:
+        return
+    try:
+        st.mark_submitted(case_id, responder or "", qc or "")
+    except Exception as e:
+        _log("待分配表回填失败：", e)
+
+
+def _store():
+    """取待分配库(oa 侧)模块；不可用返回 None，调用方回退桩数据。"""
+    try:
+        oa_dir = os.path.join(_DIR, "..", "oa")
+        if oa_dir not in sys.path:
+            sys.path.insert(0, oa_dir)
+        import oa_assign_store
+        return oa_assign_store
+    except Exception as e:
+        _log("待分配库不可用：", e)
+        return None
+
+
+def _row_to_summary(r):
+    """待分配表行 → 前端摘要。"""
+    return {
+        "id": r.get("id", ""),
+        "caseNo": r.get("case_volume", ""),
+        "name": r.get("project_name", ""),
+        "client": r.get("customer", ""),
+        "region": r.get("region", ""),
+        "legalStatus": "",
+        "urgency": "",
+        "daysLeft": None,
+        "estimate": "",
+        "deadline": r.get("project_deadline", ""),
+        "submitted": bool(r.get("submitted")),
+        "files": [],
+    }
+
+
+# 真实待分配案件暂无 AI 报告：给结构完整的占位报告(前端不崩) + 仅"自定义方案"供人工选人
+_CUSTOM_SCHEME = {"id": "custom", "label": "自定义方案", "note": "", "responder": "", "qc": ""}
+
+
+def _placeholder_detail(summary):
+    return {
+        "basicInfo": {"caseNo": summary.get("caseNo", ""), "name": summary.get("name", ""),
+                      "legalStatus": summary.get("legalStatus", ""), "client": summary.get("client", "")},
+        "claimsInfo": {"total": 0, "independent": [], "dependentGroups": [], "protectionTypes": []},
+        "techInfo": {"field": "", "summary": "（AI 案件报告待接入，当前为占位）"},
+        "oaInfo": {"substantiveIssues": [],
+                   "patentability": {"directGrantable": [], "indirectGrantable": [], "keyDispute": []},
+                   "otherIssues": []},
+        "personnelInfo": {"currentCase": {"writer": "", "qc": "", "oaHistory": []},
+                          "relatedCase": {"caseNo": "", "writer": "", "qc": "", "oaHistory": []}},
+    }
+
+
 @router.get("/api/cases/pending")
 def cases_pending(page: int = 1, pageSize: int = 100):
-    items = [{k: c.get(k) for k in _SUMMARY_KEYS} for c in STUB_CASES]
-    _log(f"GET  /api/cases/pending page={page} → {len(items)} 件(测试数据)")
-    return {"total": len(items), "items": items}
+    # 默认读真实待分配表；OA_ASSIGN_STUB=1 时用桩数据(仅 demo)。
+    if os.environ.get("OA_ASSIGN_STUB"):
+        items = [{k: c.get(k) for k in _SUMMARY_KEYS} for c in STUB_CASES]
+        _log(f"GET  /api/cases/pending → {len(items)} 件(OA_ASSIGN_STUB 桩数据)")
+        return {"total": len(items), "items": items, "source": "stub"}
+    st = _store()
+    if st is None:
+        return {"total": 0, "items": [], "error": "待分配库模块不可用"}
+    try:
+        rows = st.list_pending()
+        items = [_row_to_summary(r) for r in rows]
+        _log(f"GET  /api/cases/pending → {len(items)} 件(待分配表)")
+        return {"total": len(items), "items": items}
+    except Exception as e:
+        _log("读待分配表失败：", e)
+        return {"total": 0, "items": [], "error": f"读待分配表失败: {e}"}
 
 
 @router.post("/api/assignment/analyze")
 async def assignment_analyze(req: Request):
     body = await req.json()
     cid = body.get("caseId")
+    # 桩案件：有完整报告+多组建议
     c = next((x for x in STUB_CASES if x.get("id") == cid), None)
-    if not c:
-        _log(f"POST /api/assignment/analyze caseId={cid} → 未找到")
-        return JSONResponse({"error": f"案件不存在: {cid}"}, status_code=404)
-    _log(f"POST /api/assignment/analyze caseId={cid} → 报告(测试数据)+{len(c.get('schemes', []))}组建议")
-    return {"caseId": cid, "detail": c.get("detail"), "schemes": c.get("schemes", [])}
+    if c:
+        _log(f"POST /api/assignment/analyze caseId={cid} → 报告(测试数据)+{len(c.get('schemes', []))}组建议")
+        return {"caseId": cid, "detail": c.get("detail"), "schemes": c.get("schemes", [])}
+    # 真实待分配案件：占位报告 + 仅自定义方案（AI 待接入）
+    st = _store()
+    row = None
+    if st is not None:
+        try:
+            row = next((r for r in st.list_pending() if r.get("id") == cid), None)
+        except Exception as e:
+            _log("analyze 读待分配表失败：", e)
+    if row:
+        summary = _row_to_summary(row)
+        _log(f"POST /api/assignment/analyze caseId={cid} → 占位报告(AI待接入)")
+        return {"caseId": cid, "detail": _placeholder_detail(summary), "schemes": [dict(_CUSTOM_SCHEME)]}
+    _log(f"POST /api/assignment/analyze caseId={cid} → 未找到")
+    return JSONResponse({"error": f"案件不存在: {cid}"}, status_code=404)
 
 
 @router.get("/api/staff/list")
@@ -82,9 +168,11 @@ def staff_list(role: str = ""):
 async def assignment_submit(req: Request):
     body = await req.json()
     _log("POST /api/assignment/submit 收到：", json.dumps(body, ensure_ascii=False))
-    wb = _write_back(body.get("caseId"), body.get("responder"), body.get("qc"))
+    cid, responder, qc = body.get("caseId"), body.get("responder"), body.get("qc")
+    wb = _write_back(cid, responder, qc)                 # 回写 Wiki 人员分配格
+    _mark(cid, responder, qc)                            # 待分配表回填结果+置已分配
     _log("    回写 Wiki 人员分配：", wb.get("msg"))
-    return {"ok": True, "caseId": body.get("caseId"), "writeback": wb}
+    return {"ok": True, "caseId": cid, "writeback": wb}
 
 
 @router.post("/api/assignment/submit/batch")
@@ -96,6 +184,7 @@ async def assignment_submit_batch(req: Request):
     for a in assignments:
         _log("    -", json.dumps(a, ensure_ascii=False))
         wb = _write_back(a.get("caseId"), a.get("responder"), a.get("qc"))
+        _mark(a.get("caseId"), a.get("responder"), a.get("qc"))
         _log("      回写：", wb.get("msg"))
         results.append({"caseId": a.get("caseId"), "writeback": wb})
     return {"ok": True, "count": len(assignments),

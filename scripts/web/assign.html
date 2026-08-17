@@ -965,6 +965,7 @@ const app = createApp({
         ])
         allCases.value = cs.items || cs || []
         staffList.value = st.staff || []
+        if (cs.error) { loadError.value = cs.error; ElementPlus.ElMessage.error('待分配列表：' + cs.error) }
       } catch (e) {
         loadError.value = String(e.message || e)
         ElementPlus.ElMessage.error('加载待分配案件失败：' + loadError.value)

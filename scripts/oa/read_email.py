@@ -1269,6 +1269,15 @@ def dispatch_oa(all_results, all_emails=None, dry_run=False, test_project_prefix
 
         print(f"TIP 写入完成: {inserted} 条", file=sys.stderr)
 
+    # 落"待分配案件库"：每件立项(含 oa_id)进入 OA 分配页 /api/cases/pending 数据源。
+    if all_results and not dry_run:
+        try:
+            from oa_assign_store import add_pending
+            n = add_pending(all_results)
+            print(f"[待分配] 新增 {n} 件到 OA 分配待分配库", file=sys.stderr)
+        except Exception as e:
+            print(f"[待分配] 写入失败: {e}", file=sys.stderr)
+
     # 转OA：逐案转发给 OA 处理团队（替换原 send_notification 总表→qin.zhang；dry_run 内部处理）
     # 返回本次转OA立项动作 [{message_id, project, action, reason}]，供 main.py 汇总写邮件动作页
     return send_forward_oa(all_results, all_emails, dry_run=dry_run) or []
