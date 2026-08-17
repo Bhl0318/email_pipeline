@@ -982,16 +982,7 @@ const app = createApp({
           else ElementPlus.ElMessage.warning(`未找到待分配案件：${openId}`)
         }
       })
-      const _p = new URLSearchParams(location.search)
-      const resume = _p.get('guideResume')
-      if (resume) {
-        const idx = parseInt(resume, 10) - 1
-        if (!isNaN(idx) && idx >= 0 && idx < GUIDE_STEPS.length) {
-          nextTick(() => guideStart(idx))
-        }
-      } else {
-        nextTick(() => guideStart(0))
-      }
+      // 新手引导已关闭：不自动弹引导
     })
 
     return {
