@@ -1216,6 +1216,7 @@ def dispatch_oa(all_results, all_emails=None, dry_run=False, test_project_prefix
             print(f"[Wiki 新增OA] 写入失败: {e}", file=sys.stderr)
 
     # 写入 TIP 系统（projects 表）
+    inserted_items = []   # 成功 INSERT 进 projects 的案件；只有它们才进待分配库
     if all_results and dry_run:
         print(f"  [dry-run] 跳过写 projects 表（{len(all_results)} 条）", file=sys.stderr)
     elif all_results:
@@ -1267,17 +1268,18 @@ def dispatch_oa(all_results, all_emails=None, dry_run=False, test_project_prefix
             try:
                 db_execute(insert_sql)
                 inserted += 1
+                inserted_items.append(item)   # 仅成功写库的才进待分配
                 print(f"[TIP] {project} {project_name} 写入成功", file=sys.stderr)
             except Exception as e:
                 print(f"[TIP] {project} {project_name} 写入失败: {e}", file=sys.stderr)
 
         print(f"TIP 写入完成: {inserted} 条", file=sys.stderr)
 
-    # 落"待分配案件库"：每件立项(含 oa_id)进入 OA 分配页 /api/cases/pending 数据源。
-    if all_results and not dry_run:
+    # 落"待分配案件库"：只写成功进 projects 的案件(未写 projects 的——如已存在被跳过——不写)。
+    if inserted_items and not dry_run:
         try:
             from oa_assign_store import add_pending
-            n = add_pending(all_results)
+            n = add_pending(inserted_items)
             print(f"[待分配] 新增 {n} 件到 OA 分配待分配库", file=sys.stderr)
         except Exception as e:
             print(f"[待分配] 写入失败: {e}", file=sys.stderr)
