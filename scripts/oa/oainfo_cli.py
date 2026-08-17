@@ -674,7 +674,8 @@ def _build_table_row(item, followup=""):
     project_deadline = item.get("project_deadline", "")
     project_name = item.get("project_name", "")
     oa_id = item.get("oa_id", "")          # 立项唯一 id(=projects.row_id)，供 OA 分配按 id 回写人员分配
-    tr_open = f'<tr data-oa-id="{oa_id}">' if oa_id else "<tr>"
+    # 埋进 class(Confluence 会清洗 data-* 属性；class 比 data-* 易保留，若也被清则改按可见内容定位)
+    tr_open = f'<tr class="oaid-{oa_id}">' if oa_id else "<tr>"
 
     return (
         tr_open
@@ -809,9 +810,9 @@ def format_oa_person(responder, qc):
 
 
 def _set_oa_person_cell(body, oa_id, person_text):
-    """在 <tr data-oa-id="{oa_id}"> 行里把第9格「人员分配」设为 person_text。
+    """在 <tr class="oaid-{oa_id}"> 行里把第9格「人员分配」设为 person_text。
     纯字符串处理，便于测试。返回 (new_body, found)。"""
-    a = body.find(f'data-oa-id="{oa_id}"')
+    a = body.find(f'oaid-{oa_id}')
     if a == -1:
         return body, False
     tr_start = body.rfind("<tr", 0, a)
