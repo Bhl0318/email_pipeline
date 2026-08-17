@@ -1193,6 +1193,13 @@ def dispatch_oa(all_results, all_emails=None, dry_run=False, test_project_prefix
             item["oa_remark"] = f"{item.get('oa_remark', '')} {note}".strip()
             print(f"[预审] {item.get('project')} 备注加注：{note}", file=sys.stderr)
 
+    # 为每条立项分配唯一 id（= projects.row_id）：埋进 Wiki 新增OA 行(data-oa-id) + TIP INSERT 复用，
+    # 供 OA 分配按 id 打开/回写人员分配。必须在写 Wiki 与写 projects 之前生成。
+    import uuid as _uuid
+    for _it in (all_results or []):
+        if not _it.get("oa_id"):
+            _it["oa_id"] = str(_uuid.uuid4())
+
     # 写入 Wiki 新增 OA 页面
     if all_results and dry_run:
         print(f"  [dry-run] 跳过写 Wiki 新增OA（{len(all_results)} 条）", file=sys.stderr)
@@ -1230,9 +1237,9 @@ def dispatch_oa(all_results, all_emails=None, dry_run=False, test_project_prefix
             except Exception:
                 pass
 
-            # 构建 INSERT
+            # 构建 INSERT；id 复用上面生成的 oa_id（与 Wiki 行 data-oa-id 一致）
             import uuid
-            row_id = str(uuid.uuid4())
+            row_id = item.get("oa_id") or str(uuid.uuid4())
             fields = ["id", "project", "project_name", "project_type", "customer", "oa_doc_date", "entrust_date",
                        "oaNum", "applytype", "project_deadline", "dueDate",
                        "now_status", "project_phase", "submitby", "oa_remark", "wikiurl"]

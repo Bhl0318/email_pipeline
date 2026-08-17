@@ -972,7 +972,15 @@ const app = createApp({
     }
 
     onMounted(() => {
-      loadData()
+      // 加载完成后，若 URL 带 openId(=oa_id) 则自动定位到该案
+      loadData().then(() => {
+        const openId = new URLSearchParams(location.search).get('openId')
+        if (openId) {
+          const c = allCases.value.find(x => x.id === openId)
+          if (c) selectCase(c)
+          else ElementPlus.ElMessage.warning(`未找到待分配案件：${openId}`)
+        }
+      })
       const _p = new URLSearchParams(location.search)
       const resume = _p.get('guideResume')
       if (resume) {

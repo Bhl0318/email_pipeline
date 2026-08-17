@@ -41,6 +41,18 @@ def _log(*a):
     print(f"[{datetime.now():%H:%M:%S}][oa-assign]", *a, file=sys.stderr, flush=True)
 
 
+def _write_back(case_id, responder, qc):
+    """按 case_id(=oa_id) 回写 Wiki 新增OA 人员分配格。best-effort：桩数据/无 Wiki 时返回失败也不抛。"""
+    try:
+        oa_dir = os.path.join(_DIR, "..", "oa")
+        if oa_dir not in sys.path:
+            sys.path.insert(0, oa_dir)
+        from oainfo_cli import write_oa_assignment
+        return write_oa_assignment(case_id, responder, qc)
+    except Exception as e:
+        return {"code": 1, "msg": f"回写调用失败: {e}"}
+
+
 @router.get("/api/cases/pending")
 def cases_pending(page: int = 1, pageSize: int = 100):
     items = [{k: c.get(k) for k in _SUMMARY_KEYS} for c in STUB_CASES]
@@ -69,16 +81,22 @@ def staff_list(role: str = ""):
 @router.post("/api/assignment/submit")
 async def assignment_submit(req: Request):
     body = await req.json()
-    _log("POST /api/assignment/submit 收到(桩，不回写)：", json.dumps(body, ensure_ascii=False))
-    return {"ok": True, "caseId": body.get("caseId")}
+    _log("POST /api/assignment/submit 收到：", json.dumps(body, ensure_ascii=False))
+    wb = _write_back(body.get("caseId"), body.get("responder"), body.get("qc"))
+    _log("    回写 Wiki 人员分配：", wb.get("msg"))
+    return {"ok": True, "caseId": body.get("caseId"), "writeback": wb}
 
 
 @router.post("/api/assignment/submit/batch")
 async def assignment_submit_batch(req: Request):
     body = await req.json()
     assignments = body.get("assignments", []) or []
-    _log(f"POST /api/assignment/submit/batch 收到 {len(assignments)} 件(桩，不回写)：")
+    _log(f"POST /api/assignment/submit/batch 收到 {len(assignments)} 件：")
+    results = []
     for a in assignments:
         _log("    -", json.dumps(a, ensure_ascii=False))
+        wb = _write_back(a.get("caseId"), a.get("responder"), a.get("qc"))
+        _log("      回写：", wb.get("msg"))
+        results.append({"caseId": a.get("caseId"), "writeback": wb})
     return {"ok": True, "count": len(assignments),
-            "caseIds": [a.get("caseId") for a in assignments]}
+            "caseIds": [a.get("caseId") for a in assignments], "results": results}

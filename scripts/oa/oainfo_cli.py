@@ -673,10 +673,12 @@ def _build_table_row(item, followup=""):
     oa_doc_date = item.get("oa_doc_date", "")
     project_deadline = item.get("project_deadline", "")
     project_name = item.get("project_name", "")
+    oa_id = item.get("oa_id", "")          # 立项唯一 id(=projects.row_id)，供 OA 分配按 id 回写人员分配
+    tr_open = f'<tr data-oa-id="{oa_id}">' if oa_id else "<tr>"
 
     return (
-        f"<tr>"
-        f"<td>{project}</td>"              # 案号
+        tr_open
+        + f"<td>{project}</td>"            # 案号
         f"<td>{oa_remark}</td>"            # 备注
         f"<td>{entrust_date}</td>"         # OA收到日
         f"<td>{oa_doc_date}</td>"          # OA发文日
@@ -791,6 +793,69 @@ def append_oa_to_wiki(results):
         return {"code": 0, "msg": f"写入成功 {count} 条", "count": count}
     else:
         return {"code": 1, "msg": f"页面更新失败 (HTTP {status})", "count": 0}
+
+
+# ============================================================
+# OA 分配：按 oa_id 回写「测试页面-写入新增OA」人员分配格
+# ============================================================
+def format_oa_person(responder, qc):
+    """人员分配格文案：一行『负责人：X；QC：Y』（缺哪个省哪个）。"""
+    parts = []
+    if (responder or "").strip():
+        parts.append(f"负责人：{responder.strip()}")
+    if (qc or "").strip():
+        parts.append(f"QC：{qc.strip()}")
+    return "；".join(parts)
+
+
+def _set_oa_person_cell(body, oa_id, person_text):
+    """在 <tr data-oa-id="{oa_id}"> 行里把第9格「人员分配」设为 person_text。
+    纯字符串处理，便于测试。返回 (new_body, found)。"""
+    a = body.find(f'data-oa-id="{oa_id}"')
+    if a == -1:
+        return body, False
+    tr_start = body.rfind("<tr", 0, a)
+    tr_end = body.find("</tr>", a)
+    if tr_start == -1 or tr_end == -1:
+        return body, False
+    tr_end += len("</tr>")
+    row = body[tr_start:tr_end]
+    # 用 finditer 按位置替换第9格(0基索引8)；不能用 replace——空格 <td></td> 彼此相同会替错
+    matches = list(re.finditer(r'<td\b[^>]*>.*?</td>', row, re.DOTALL))
+    if len(matches) < 9:
+        return body, False
+    m = matches[8]
+    new_cell = re.sub(r'(<td\b[^>]*>).*?(</td>)',
+                      lambda x: x.group(1) + person_text + x.group(2),
+                      m.group(0), count=1, flags=re.DOTALL)
+    new_row = row[:m.start()] + new_cell + row[m.end():]
+    return body[:tr_start] + new_row + body[tr_end:], True
+
+
+def write_oa_assignment(oa_id, responder, qc):
+    """按 oa_id 找「测试页面-写入新增OA」里 data-oa-id 匹配的行，写入人员分配格。
+    返回 {code, msg}。找不到行/异常不抛。"""
+    if not oa_id:
+        return {"code": 1, "msg": "缺 oa_id"}
+    text = format_oa_person(responder, qc)
+    if not text:
+        return {"code": 1, "msg": "负责人/QC 均为空，不写入"}
+    try:
+        wiki = WikiClient()
+        page = wiki.get_page(OA_LIST_PAGE_TITLE)
+        if not page:
+            return {"code": 1, "msg": f"未找到页面: {OA_LIST_PAGE_TITLE}"}
+        body, found = _set_oa_person_cell(page["body"], oa_id, text)
+        if not found:
+            return {"code": 1, "msg": f"未找到 data-oa-id={oa_id} 的行"}
+        status = wiki.update_page(page["id"], OA_LIST_PAGE_TITLE, body, page["version"])
+        if status == 200:
+            logger.info(f"人员分配写入成功 oa_id={oa_id}: {text}")
+            return {"code": 0, "msg": f"写入成功: {text}"}
+        return {"code": 1, "msg": f"页面更新失败 HTTP {status}"}
+    except Exception as e:
+        logger.warning(f"人员分配写入失败 oa_id={oa_id}: {e}")
+        return {"code": 1, "msg": f"异常: {e}"}
 
 
 # ============================================================

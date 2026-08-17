@@ -142,6 +142,12 @@ def oa_assign_page():
     return RedirectResponse("/static/assign.html")
 
 
+@app.get("/oa-assign/{oa_id}")
+def oa_assign_page_by_id(oa_id: str):
+    """按 oa_id 打开分配页：加载完整待分配列表并自动定位到该案（?openId= 由前端读取）。"""
+    return RedirectResponse(f"/static/assign.html?openId={oa_id}")
+
+
 # ─── 审核页 ──────────────────────────────────────────────
 
 @app.get("/review/{task_id}")
