@@ -8,5 +8,6 @@
     "oa": true,
     "report": true
   },
-  "oa_test_project_prefix": null
+  "oa_test_project_prefix": null,
+  "send_email": true
 }

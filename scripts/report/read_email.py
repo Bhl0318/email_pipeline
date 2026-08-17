@@ -818,6 +818,9 @@ def _resolve_forward_targets(addrs, project):
 
 def _forward_official_email(pa_cfg, raw_bytes, orig_subject, to_list, cc_list):
     """把原始官文邮件作为 .eml 附件，从 pa 账号 Fwd 给接口人。best-effort。"""
+    if os.environ.get("PIPELINE_NO_EMAIL"):
+        print(f"  [测试] PIPELINE_NO_EMAIL 已设，跳过转发原始官文：{orig_subject}", file=sys.stderr)
+        return
     if not raw_bytes or not to_list:
         if not raw_bytes:
             print(f"  [转发跳过] {orig_subject} 无原始邮件，无法原样转发", file=sys.stderr)
@@ -849,6 +852,9 @@ def _forward_official_email(pa_cfg, raw_bytes, orig_subject, to_list, cc_list):
 
 def send_review_links_email(links):
     """按准备人分组，把各自名下的审核链接分别发给对应准备人。"""
+    if os.environ.get("PIPELINE_NO_EMAIL"):
+        print(f"  [测试] PIPELINE_NO_EMAIL 已设，跳过发送 {len(links or [])} 条审核链接通知", file=sys.stderr)
+        return
     if not links:
         print("[审核通知] 无待审核任务，跳过发送", file=sys.stderr)
         return

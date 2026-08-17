@@ -643,6 +643,10 @@ def send_forward_oa(all_results, all_emails=None, dry_run=False):
         print(f"  [dry-run][转OA] 共 {len(plans)} 封待发（未实际发送）", file=sys.stderr)
         return fwd_actions
 
+    if os.environ.get("PIPELINE_NO_EMAIL"):
+        print(f"  [测试] PIPELINE_NO_EMAIL 已设，跳过发送 {len(plans)} 封转OA邮件（Wiki/库照常）", file=sys.stderr)
+        return fwd_actions
+
     # 打开一次 SMTP，逐案发送
     try:
         smtp = smtplib.SMTP(pa_cfg["smtp_host"], pa_cfg["smtp_port"])

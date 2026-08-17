@@ -39,6 +39,11 @@ def main(dry_run=False):
     report_on = bool(sinks.get("report", True))
     oa_test_prefix = cfg.get("oa_test_project_prefix") or None
 
+    # send_email=false（测试用）：照常写 Wiki/库，但不发任何邮件通知(转OA/审核链接/转发官文)。
+    if cfg.get("send_email", True) is False:
+        os.environ["PIPELINE_NO_EMAIL"] = "1"
+        print("[email_pipeline] send_email=false → 本轮不发送任何邮件通知（Wiki/库照常）", file=sys.stderr)
+
     if dry_run:
         print("[email_pipeline] ★ DRY-RUN：照常读邮件+分类，但不写库/不发邮件/不移邮件"
               "（注：读取阶段仍会把官文 PDF 暂存到 output/_inbox/）", file=sys.stderr)
