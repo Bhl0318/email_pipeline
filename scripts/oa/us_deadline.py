@@ -91,7 +91,7 @@ def download_us_ref_doc(application_no, document_code, official_date, project):
     print(f"[US-ref] 下载文献: app={application_no} doc={document_code} date={mailing_date} project={project}", file=sys.stderr)
     try:
         uspto = USPTOApplication(download_dir=DOWNLOAD_DIR, project=project)
-        doc_list = uspto.downLoad_Documents_ByAPI(application_no, document_code, mailing_date, project, "")
+        doc_list = uspto.downLoad_Documents_ByAPI(application_no, document_code, mailing_date, project, "", kind="ref")
         return [f for f in doc_list.get(project, []) if f and os.path.exists(f)]
     except Exception as e:
         print(f"[US-ref] {project} {document_code} 下载失败: {e}", file=sys.stderr)
