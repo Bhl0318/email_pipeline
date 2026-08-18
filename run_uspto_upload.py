@@ -169,27 +169,47 @@ def _practitioner(case_volume):
     return (ai.get("Registration Number") or "").strip() or None
 
 
+def _list_dir(root, sub):
+    d = os.path.join(root, sub)
+    if not os.path.isdir(d):
+        return []
+    return sorted(os.path.join(d, n) for n in os.listdir(d) if os.path.isfile(os.path.join(d, n)))
+
+
+def _is_ads(fp):
+    return "ADS" in os.path.basename(fp).upper()
+
+
 def _build_upload_data(case):
     """从 Z 盘归档目录取上传件：{base}\\{码}\\{组内号}\\{案号}\\ 下的
-    「仅存档」(不签的定稿：说明书/权要/附图等) + 「签署版」(环节6 回收的签署版)。
-    「发美代理」是未签发出版，不上传。名字含 ADS 的作 ads_path，其余 other_paths。"""
+    「仅存档」(不签定稿) + 「签署版」(环节6 回收) +（仅 ADS 用）「发美代理」原始版。
+
+    ⚠️ ADS 特殊：ADS 是动态 XFA，代理人签字/另存(Acrobat)会破坏 XFA(多出 form 包、
+    Patent Center 读不到 application_type)导致"类型不符"报错 → **ADS 只用原始生成版**
+    （仅存档 优先，其次 发美代理），**绝不用签署版**。其余件仍签署版优先。"""
     root = _zcase_root(case["case_volume"])
-    # 先读「签署版」、再读「仅存档」；按文件名去重，同名以签署版为准，不重复上传。
+    archive = _list_dir(root, "仅存档")   # 不签定稿(XFA 完好的 ADS 若在这)
+    signed  = _list_dir(root, "签署版")   # 代理签署回邮版(ADS 在此已被拍坏，不用)
+    sent    = _list_dir(root, "发美代理") # 未签发出版(ADS 原始 XFA 版可能在此)
+
+    # ADS：原始 XFA 版——仅存档 优先，其次 发美代理；绝不取签署版
+    ads_cands = [f for f in archive if _is_ads(f)] or [f for f in sent if _is_ads(f)]
+    ads_path = ads_cands[0] if ads_cands else None
+
+    # 其余(非 ADS)：签署版优先 + 仅存档，同名去重；发美代理(未签发出版)与所有 ADS 都排除
     by_name = {}
-    for sub in ("签署版", "仅存档"):
-        d = os.path.join(root, sub)
-        if os.path.isdir(d):
-            for n in sorted(os.listdir(d)):
-                fp = os.path.join(d, n)
-                if os.path.isfile(fp) and n not in by_name:   # 先到先得＝签署版优先
-                    by_name[n] = fp
-    files = list(by_name.values())
-    ads = [f for f in files if "ADS" in os.path.basename(f).upper()]   # 签署版先入，ADS 亦优先签署版
-    others = [f for f in files if f not in ads]
+    for f in signed + archive:
+        n = os.path.basename(f)
+        if _is_ads(f) or n in by_name:
+            continue
+        by_name[n] = f
+    others = list(by_name.values())
+
+    files = ([ads_path] if ads_path else []) + others
     return {
         "submission_type": _submission_type(case["case_volume"]),
         "practitioner": _practitioner(case["case_volume"]),   # 该案签字代理人执业号（on behalf of）
-        "ads_path": ads[0] if ads else None,
+        "ads_path": ads_path,
         "other_paths": others,
     }, files
 
