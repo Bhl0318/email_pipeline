@@ -133,11 +133,13 @@ def _deepseek_report(basic, claims_text, spec_text, oa_text):
         return None
 
 
-def build_case_report(item, oa_pdf_path=None, app_dir=None):
-    """立项时生成一件的 AI 案件报告（markdown 正文）。绝不抛异常。
+def build_case_report(item, oa_pdf_path=None, app_dir=None, with_personnel=True, execute=None):
+    """生成一件的 AI 案件报告（markdown 正文）。绝不抛异常。
 
-    item: 立项分类结果（需 project/project_name/customer 等）。
+    item: 立项/待分配基础信息（需 project/project_name/customer/region 等）。
     oa_pdf_path: 该件审意官文 PDF 路径（US 下载 / CN·EP 邮件附件）；空则第四大类标注待补。
+    with_personnel: 是否追加第五类「内部人员档案」（查 atw 库；DB 不可达时该段标注、不影响前四大类）。
+    execute: 人员档案查询用的注入 execute（默认走 db_query.execute）。
     返回: markdown 字符串（失败时也返回一段带说明的 markdown）。
     """
     project = _original_project(item)
@@ -155,13 +157,21 @@ def build_case_report(item, oa_pdf_path=None, app_dir=None):
     oa_text = _pdf_text(oa_pdf_path)
 
     md = _deepseek_report(basic, claims_text, spec_text, oa_text)
-    if md:
-        return md
-    # 生成失败兜底：给最基础的可读 markdown，不留空
-    lines = ["## 一、案件基础信息", ""]
-    lines += [f"- {k}：{v or '资料缺失'}" for k, v in basic.items()]
-    lines += ["", "> ⚠️ AI 报告生成失败（DeepSeek 不可达或材料不足），以上为基础信息占位。"]
-    return "\n".join(lines)
+    if not md:
+        # DeepSeek 失败兜底：前四大类给最基础的可读 markdown，不留空
+        lines = ["## 一、案件基础信息", ""]
+        lines += [f"- {k}：{v or '资料缺失'}" for k, v in basic.items()]
+        lines += ["", "> ⚠️ 前四大类 AI 生成失败（DeepSeek 不可达或材料不足），以上为基础信息占位。"]
+        md = "\n".join(lines)
+
+    # 追加第五类「内部人员档案」（查库拼装，非 AI；DB 不可达时该段自带说明）
+    if with_personnel:
+        try:
+            from oa_personnel import build_personnel_md
+            md = md.rstrip() + "\n\n" + build_personnel_md(project, execute=execute)
+        except Exception as e:
+            print(f"[oa_report_ai] 人员档案追加失败: {e}", file=sys.stderr)
+    return md
 
 
 if __name__ == "__main__":

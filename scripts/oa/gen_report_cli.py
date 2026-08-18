@@ -36,6 +36,8 @@ def main():
     ap.add_argument("--oa-pdf", dest="oa_pdf", default="", help="审意官文 PDF 路径（做第四大类；可给多个用逗号分隔）")
     ap.add_argument("--app-dir", dest="app_dir", default=None, help="申请文件目录（默认 申请文件/）")
     ap.add_argument("-o", "--out", default="", help="输出 markdown 文件路径（不给则只打印）")
+    ap.add_argument("--no-personnel", dest="no_personnel", action="store_true",
+                    help="不追加第五类内部人员档案（dev 机连不到 atw 库时用，只测前四大类）")
     args = ap.parse_args()
 
     app_dir = args.app_dir or DEFAULT_APP_DIR
@@ -55,7 +57,9 @@ def main():
         "region": args.region,
         "deadline": args.deadline,
     }
-    md = build_case_report(item, oa_pdf_path=oa_pdf, app_dir=app_dir)
+    print(f"[第五类人员档案] {'跳过(--no-personnel)' if args.no_personnel else '查 atw 库拼装'}", file=sys.stderr)
+    md = build_case_report(item, oa_pdf_path=oa_pdf, app_dir=app_dir,
+                           with_personnel=not args.no_personnel)
 
     print(md)
     if args.out:
