@@ -20,6 +20,10 @@ _DIR = os.path.dirname(os.path.abspath(__file__))
 # 申请文件目录：scripts/oa/ 上两级即 DS/email_pipeline/，再进 申请文件/
 DEFAULT_APP_DIR = os.path.normpath(os.path.join(_DIR, "..", "..", "申请文件"))
 
+# 测试期开关：False → 不按案号匹配，任何案号都用目录里现有的那份 SPEC / Amendment 当测试文档；
+# True → 按文件名含案号匹配（接真实 NAS/多案号时切回 True）。
+MATCH_BY_CASE_NO = False
+
 
 def _original_project(item):
     """取真实案号（测试前缀替换时 item 里存了原客户码，用它还原前 5 位）。"""
@@ -34,10 +38,13 @@ def find_application_files(project, base_dir=None):
     """在申请文件目录里按案号匹配说明书 / 权利要求书。返回 {'spec': path|None, 'claims': path|None}。"""
     base = base_dir or DEFAULT_APP_DIR
     out = {"spec": None, "claims": None}
-    if not project or not os.path.isdir(base):
+    if not os.path.isdir(base):
         return out
-    for fn in os.listdir(base):
-        if project not in fn or not fn.lower().endswith(".docx"):
+    for fn in sorted(os.listdir(base)):
+        if not fn.lower().endswith(".docx"):
+            continue
+        # 测试期：MATCH_BY_CASE_NO=False 时忽略案号，直接取目录里的 SPEC / Amendment 当测试文档
+        if MATCH_BY_CASE_NO and (not project or project not in fn):
             continue
         low = fn.lower()
         path = os.path.join(base, fn)
