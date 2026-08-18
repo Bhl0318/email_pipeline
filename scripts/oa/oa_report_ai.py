@@ -35,23 +35,20 @@ def _original_project(item):
 
 
 def find_application_files(project, base_dir=None):
-    """在申请文件目录里按案号匹配说明书 / 权利要求书。返回 {'spec': path|None, 'claims': path|None}。"""
+    """在申请文件目录里找说明书(SPEC)。返回 {'spec': path|None}。
+    权利要求直接从 SPEC 内切出（见 _split_spec），不再单独找第二份文件。"""
     base = base_dir or DEFAULT_APP_DIR
-    out = {"spec": None, "claims": None}
+    out = {"spec": None}
     if not os.path.isdir(base):
         return out
     for fn in sorted(os.listdir(base)):
         if not fn.lower().endswith(".docx"):
             continue
-        # 测试期：MATCH_BY_CASE_NO=False 时忽略案号，直接取目录里的 SPEC / Amendment 当测试文档
+        # 测试期：MATCH_BY_CASE_NO=False 时忽略案号，直接取目录里的 SPEC 当测试文档
         if MATCH_BY_CASE_NO and (not project or project not in fn):
             continue
-        low = fn.lower()
-        path = os.path.join(base, fn)
-        if "spec" in low and not out["spec"]:
-            out["spec"] = path
-        elif ("amendment" in low or "claim" in low) and not out["claims"]:
-            out["claims"] = path
+        if "spec" in fn.lower() and not out["spec"]:
+            out["spec"] = os.path.join(base, fn)
     return out
 
 
@@ -74,6 +71,27 @@ def _docx_text(path):
             return ""
 
 
+_CLAIMS_START_RE = re.compile(r"(WHAT\s+IS\s+CLAIMED\s+IS|^\s*CLAIMS\s*$|We\s+claim|I\s+claim|权\s*利\s*要\s*求\s*书?)",
+                              re.IGNORECASE | re.MULTILINE)
+_CLAIMS_END_RE = re.compile(r"(^\s*ABSTRACT\s*$|说\s*明\s*书\s*摘\s*要|^\s*摘\s*要\s*$)",
+                            re.IGNORECASE | re.MULTILINE)
+
+
+def _split_spec(spec_text):
+    """把说明书全文切成 (说明部分, 权利要求部分)。
+    权要以「WHAT IS CLAIMED IS / CLAIMS / 权利要求」起，到「ABSTRACT / 摘要」止。
+    切不出权要时 claims 返回空串、description 返回全文。"""
+    text = spec_text or ""
+    ms = _CLAIMS_START_RE.search(text)
+    if not ms:
+        return text, ""
+    desc = text[:ms.start()].strip()
+    rest = text[ms.start():]
+    me = _CLAIMS_END_RE.search(rest, 1)     # 从权要标题之后再找摘要，避免匹配到标题自身
+    claims = (rest[:me.start()] if me else rest).strip()
+    return desc, claims
+
+
 def _pdf_text(path_or_list, max_pages=8):
     """审意 PDF → 文本（复用 parse_us_pdf._pdf_to_text）。
     入参可为单个路径或路径列表（CN/EP 邮件可能带多份官文附件，逐份抽取拼接）。
@@ -93,8 +111,9 @@ def _pdf_text(path_or_list, max_pages=8):
     return "\n\n".join(out)
 
 
-def _deepseek_report(basic, claims_text, spec_text, oa_text):
-    """把三份材料喂给 DeepSeek，产出前四大类的中文 markdown 报告。失败返回 None。"""
+def _deepseek_report(basic, application_text, oa_text):
+    """把申请文件全文(含说明书+权利要求)与审意材料喂给 DeepSeek，由其自行识别权要/说明，
+    产出前四大类的中文 markdown 报告。失败返回 None。"""
     from openai import OpenAI
     from filter_oa_email import _DEEPSEEK_API_KEY, _DEEPSEEK_BASE_URL, _DEEPSEEK_MODEL
 
@@ -106,6 +125,9 @@ def _deepseek_report(basic, claims_text, spec_text, oa_text):
     prompt = (
         "你是资深专利 OA 任务分配分析官。请根据下面提供的案件材料，生成一份**中文 markdown** 案件分析报告，"
         "仅用于辅助分配 OA 答复任务。\n"
+        "【申请文件】是一篇专利申请文件全文，**其中同时包含说明书与权利要求书**——权利要求通常以"
+        "“WHAT IS CLAIMED IS / We claim / I claim / 权利要求”起头。请你**自行从中识别**权利要求部分与说明书部分，"
+        "分别用于第二、第三大类。\n"
         "严格要求：\n"
         "1. 只输出以下【前四大类】，不要输出人员档案、人员安排建议等内容：\n"
         "   一、案件基础信息（案号/发明名称/当前法律状态/客户名称/官方答复期限；结合剩余天数给出高/中/低紧急程度与建议分配时间）\n"
@@ -116,8 +138,7 @@ def _deepseek_report(basic, claims_text, spec_text, oa_text):
         "2. **只依据材料，缺料的项写「资料缺失」，严禁编造**。审意材料为空时，第四大类整体标注「未获取到审查意见，待补」。\n"
         "3. 用二级标题（## 一、…）分节，条目用列表；简洁专业。\n"
         + _blk("案件基础信息", basic_lines, 2000)
-        + _blk("权利要求书（用于第二大类）", claims_text, 12000)
-        + _blk("说明书（用于第三大类）", spec_text, 8000)
+        + _blk("申请文件全文（含说明书与权利要求，请自行识别）", application_text, 130000)
         + _blk("审查意见通知书（用于第四大类）", oa_text, 12000)
     )
     try:
@@ -152,11 +173,19 @@ def build_case_report(item, oa_pdf_path=None, app_dir=None, with_personnel=True,
         "官方答复期限": item.get("deadline", "") or item.get("project_deadline", ""),
     }
     files = find_application_files(project, base_dir=app_dir)
-    claims_text = _docx_text(files.get("claims"))
-    spec_text = _docx_text(files.get("spec"))
+    spec_full = _docx_text(files.get("spec"))
+    # 申请文件全文直接交给 DeepSeek 自行识别权要/说明；仅当超大(超上下文风险)才切分保头尾权要。
+    APP_CAP = 120000
+    if len(spec_full) <= APP_CAP:
+        application_text = spec_full
+    else:
+        desc_text, claims_text = _split_spec(spec_full)
+        application_text = ((desc_text[:70000] + "\n\n……（说明书中段略）……\n\n" + claims_text)
+                            if claims_text else spec_full[:APP_CAP])
+        print(f"[oa_report_ai] 申请文件超 {APP_CAP} 字，已切分保头尾权要", file=sys.stderr)
     oa_text = _pdf_text(oa_pdf_path)
 
-    md = _deepseek_report(basic, claims_text, spec_text, oa_text)
+    md = _deepseek_report(basic, application_text, oa_text)
     if not md:
         # DeepSeek 失败兜底：前四大类给最基础的可读 markdown，不留空
         lines = ["## 一、案件基础信息", ""]

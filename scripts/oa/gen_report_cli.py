@@ -43,8 +43,7 @@ def main():
     app_dir = args.app_dir or DEFAULT_APP_DIR
     files = find_application_files(args.case, base_dir=app_dir)
     print(f"[申请文件目录] {app_dir}", file=sys.stderr)
-    print(f"[匹配到] 说明书: {files.get('spec') or '（无）'}", file=sys.stderr)
-    print(f"[匹配到] 权利要求书: {files.get('claims') or '（无）'}", file=sys.stderr)
+    print(f"[匹配到] 说明书(含权要): {files.get('spec') or '（无）'}", file=sys.stderr)
 
     oa_pdf = [p.strip() for p in args.oa_pdf.split(",") if p.strip()] if args.oa_pdf else None
     print(f"[审意 PDF] {oa_pdf or '（无，第四大类将标待补）'}", file=sys.stderr)
