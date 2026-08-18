@@ -129,14 +129,17 @@ def _deepseek_report(basic, application_text, oa_text):
         "“WHAT IS CLAIMED IS / We claim / I claim / 权利要求”起头。请你**自行从中识别**权利要求部分与说明书部分，"
         "分别用于第二、第三大类。\n"
         "严格要求：\n"
-        "1. 只输出以下【前四大类】，不要输出人员档案、人员安排建议等内容：\n"
+        "1. 先输出以下【前四大类】，不要输出人员档案、人员安排建议：\n"
         "   一、案件基础信息（案号/发明名称/当前法律状态/客户名称/官方答复期限；结合剩余天数给出高/中/低紧急程度与建议分配时间）\n"
         "   二、权利要求结构解析（权项总数；独立权利要求列编号+主题名称+数量；从属权利要求列编号+引用关系+数量；保护主题类型）\n"
         "   三、技术方案速览（技术领域；方案要点，用 50 字以内概括核心手段与所解决的技术问题）\n"
         "   四、审查意见深度解析（(1)实体问题清单，按 创造性A22.3/新颖性A22.2/不清楚A26.4/支持A26.4/形式问题(细则) 归类并注明涉及权项；"
         "(2)可授权性预判：直接可授权权项 / 间接或合并可授权权项 / 需重点答复的争议权项；(3)附图问题、摘要问题）\n"
-        "2. **只依据材料，缺料的项写「资料缺失」，严禁编造**。审意材料为空时，第四大类整体标注「未获取到审查意见，待补」。\n"
-        "3. 用二级标题（## 一、…）分节，条目用列表；简洁专业。\n"
+        "2. 前四大类之后，**另起一行原样输出一行标记 `===预估工作量===`**，再输出「预估工作量」：给出预估答复工时"
+        "（按小时，可给区间，如 8~12 小时）并简要说明依据（结合权项数量与复杂度、审查意见问题的数量与类型、OA 轮次等）。"
+        "这部分只写工时与依据的列表条目，**不要再加二级标题**。审意缺失时按权项与申请文件复杂度给区间并注明依据不足。\n"
+        "3. **只依据材料，缺料的项写「资料缺失」，严禁编造**。审意材料为空时，第四大类整体标注「未获取到审查意见，待补」。\n"
+        "4. 用二级标题（## 一、…）分节，条目用列表；简洁专业。\n"
         + _blk("案件基础信息", basic_lines, 2000)
         + _blk("申请文件全文（含说明书与权利要求，请自行识别）", application_text, 130000)
         + _blk("审查意见通知书（用于第四大类）", oa_text, 12000)
@@ -186,7 +189,13 @@ def build_case_report(item, oa_pdf_path=None, app_dir=None, with_personnel=True,
     oa_text = _pdf_text(oa_pdf_path)
 
     md = _deepseek_report(basic, application_text, oa_text)
-    if not md:
+    workload_md = ""
+    if md:
+        # 拆出 DeepSeek 附带的「预估工作量」(标记后的内容)，放到第六节
+        main_md, sep, tail = md.partition("===预估工作量===")
+        md = main_md.rstrip()
+        workload_md = tail.strip()
+    else:
         # DeepSeek 失败兜底：前四大类给最基础的可读 markdown，不留空
         lines = ["## 一、案件基础信息", ""]
         lines += [f"- {k}：{v or '资料缺失'}" for k, v in basic.items()]
@@ -200,6 +209,10 @@ def build_case_report(item, oa_pdf_path=None, app_dir=None, with_personnel=True,
             md = md.rstrip() + "\n\n" + build_personnel_md(project, execute=execute)
         except Exception as e:
             print(f"[oa_report_ai] 人员档案追加失败: {e}", file=sys.stderr)
+
+    # 第六节：预估工作量（附加分配辅助信息，AI 依据报告内容判断）
+    if workload_md:
+        md = md.rstrip() + "\n\n## 六、预估工作量（附加分配辅助信息）\n\n" + workload_md
     return md
 
 
