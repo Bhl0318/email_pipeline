@@ -6,7 +6,7 @@
 接口（与 web/assign.html 约定一致）：
   GET  /api/cases/pending            待分配案件列表(摘要)——读 oa_assign_task JOIN projects
   POST /api/assignment/analyze       {caseId} → 该案 AI 报告(reportMd)+分配建议(schemes)——读 oa_assign_report
-  GET  /api/staff/list?role=         人员库(下拉搜索用)——暂用桩数据 stub_staff，下一步接 DB
+  GET  /api/staff/list?q=&role=      人员库(下拉搜索)——查真实 users(status<>'离职')，支持 q 搜索
   POST /api/assignment/submit        单案提交——回写 Wiki 人员分配 + projects + 待分配表置已分配
   POST /api/assignment/submit/batch  批量提交（同上，逐案）
 
@@ -21,11 +21,6 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
 _DIR = os.path.dirname(os.path.abspath(__file__))
-_STUB_DIR = os.path.join(_DIR, "oa_assign_stub")
-
-# 人员库暂用桩数据（选人下拉），下一步接 DB 后替换。案件/报告已走真实数据，不再用桩。
-with open(os.path.join(_STUB_DIR, "stub_staff.json"), encoding="utf-8") as _f:
-    STUB_STAFF = json.load(_f)
 
 router = APIRouter(tags=["oa-assign"])
 
@@ -228,9 +223,26 @@ async def assignment_analyze(req: Request):
 
 
 @router.get("/api/staff/list")
-def staff_list(role: str = ""):
-    _log(f"GET  /api/staff/list role={role or '(全部)'} → {len(STUB_STAFF)} 人")
-    return {"role": role, "staff": STUB_STAFF}
+def staff_list(q: str = "", role: str = ""):
+    """人员下拉：查真实 users（status<>'离职'），返回姓名(username_zn)数组；支持 q 关键字搜索。
+    DB 异常直接返回空（前端空栏），不回退桩数据。"""
+    kw = (q or "").strip()
+    try:
+        oa_dir = os.path.join(_DIR, "..", "oa")
+        if oa_dir not in sys.path:
+            sys.path.insert(0, oa_dir)
+        from db_query import execute
+        where = "status <> '离职' AND username_zn IS NOT NULL AND username_zn <> ''"
+        if kw:
+            where += f" AND username_zn LIKE '%{kw.replace(chr(39), chr(92)+chr(39))}%'"
+        rows = execute(f"SELECT DISTINCT username_zn FROM users WHERE {where} "
+                       f"ORDER BY username_zn LIMIT 50")
+        names = [r.get("username_zn") for r in (rows or []) if r.get("username_zn")]
+        _log(f"GET  /api/staff/list q='{kw}' → {len(names)} 人(users)")
+        return {"role": role, "staff": names}
+    except Exception as e:
+        _log("查 users 失败，返回空：", e)
+        return {"role": role, "staff": []}     # DB 异常直接空栏，不回退桩
 
 
 @router.post("/api/assignment/submit")

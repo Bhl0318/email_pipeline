@@ -595,11 +595,15 @@ const app = createApp({
       getOrInitSel(selectedCaseId.value).schemeId = id
     }
 
-    function queryStaff(query, cb) {
+    // 远程查 users（status<>'离职'），支持关键字搜索；接口/DB 异常直接空栏
+    async function queryStaff(query, cb) {
       const q = (query || '').trim()
-      const list = staffList.value
-      const res = (q ? list.filter(s => s.includes(q)) : list).map(s => ({ value: s }))
-      cb(res)
+      try {
+        const st = await apiGet('/api/staff/list?q=' + encodeURIComponent(q))
+        cb((st.staff || []).map(s => ({ value: s })))
+      } catch (e) {
+        cb([])
+      }
     }
 
     function setCustomResponder(val) {
