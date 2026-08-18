@@ -308,7 +308,9 @@ def fields_to_case_info(fields: dict, agent_info: dict = None) -> dict:
         "Is 371": subject_is_371,
         "Application Information": {
             "Application Type": "REGULAR",
-            "Subject Matter": subject,
+            # ADS us_submission_type 要模板枚举代码(UTL/DES/PLT)，不能是全称"Utility"，
+            # 否则 Patent Center 判"subject matter 不符"拒收(371 国家阶段的 utility 也是 UTL)。
+            "Subject Matter": {"Utility": "UTL", "Design": "DES", "Plant": "PLT"}.get(subject, "UTL"),
             "Small Entity Status Claimed": small_entity,       # 由递交清单实体派生
             "Total Number of Drawing Sheets": drawing_sheets,  # 复用递交清单附图页数
             "Suggested Figure for Publication": "",            # ADS 生成器暂不消费
