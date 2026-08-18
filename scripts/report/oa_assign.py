@@ -1,18 +1,16 @@
 #!/usr/bin/env python3
 """OA 分配工具 —— 后端路由（并入汇报信服务 report_server）。
 
-第一阶段：全部返回 oa_assign_stub/ 下的测试数据并打印，不接真库/真 AI、不回写。
 在 report_server.py 里 `app.include_router(oa_assign.router)` 挂载，页面走 /static/assign.html。
 
-接口（与原型 web/assign.html 约定一致）：
-  GET  /api/cases/pending            待分配案件列表(摘要)
-  POST /api/assignment/analyze       {caseId} → 该案 AI 报告(detail)+分配建议(schemes)
-  GET  /api/staff/list?role=         人员库(下拉搜索用)
-  POST /api/assignment/submit        单案提交(打印，暂不回写)
-  POST /api/assignment/submit/batch  批量提交(打印，暂不回写)
+接口（与 web/assign.html 约定一致）：
+  GET  /api/cases/pending            待分配案件列表(摘要)——读 oa_assign_task JOIN projects
+  POST /api/assignment/analyze       {caseId} → 该案 AI 报告(reportMd)+分配建议(schemes)——读 oa_assign_report
+  GET  /api/staff/list?role=         人员库(下拉搜索用)——暂用桩数据 stub_staff，下一步接 DB
+  POST /api/assignment/submit        单案提交——回写 Wiki 人员分配 + projects + 待分配表置已分配
+  POST /api/assignment/submit/batch  批量提交（同上，逐案）
 
-后续：submit 接 oainfo_cli 回写 Wiki「测试页面-写入新增OA」人员分配字段 + 立项分配表；
-      analyze/cases 换真数据(邮件/NAS/TIP)+真 AI。
+数据现状：案件列表/AI 报告已走真实库；仅人员下拉(staff)仍为桩，待接 DB 历史承办。
 """
 import json
 import os
@@ -25,14 +23,9 @@ from fastapi.responses import JSONResponse
 _DIR = os.path.dirname(os.path.abspath(__file__))
 _STUB_DIR = os.path.join(_DIR, "oa_assign_stub")
 
-with open(os.path.join(_STUB_DIR, "stub_cases.json"), encoding="utf-8") as _f:
-    STUB_CASES = json.load(_f)
+# 人员库暂用桩数据（选人下拉），下一步接 DB 后替换。案件/报告已走真实数据，不再用桩。
 with open(os.path.join(_STUB_DIR, "stub_staff.json"), encoding="utf-8") as _f:
     STUB_STAFF = json.load(_f)
-
-# 左栏列表摘要字段（detail/schemes 打开案件时经 analyze 再取）
-_SUMMARY_KEYS = ("id", "caseNo", "name", "urgency", "client",
-                 "legalStatus", "daysLeft", "estimate", "submitted", "files")
 
 router = APIRouter(tags=["oa-assign"])
 
@@ -127,11 +120,7 @@ def _placeholder_detail(summary):
 
 @router.get("/api/cases/pending")
 def cases_pending(page: int = 1, pageSize: int = 100):
-    # 默认读真实待分配表；OA_ASSIGN_STUB=1 时用桩数据(仅 demo)。
-    if os.environ.get("OA_ASSIGN_STUB"):
-        items = [{k: c.get(k) for k in _SUMMARY_KEYS} for c in STUB_CASES]
-        _log(f"GET  /api/cases/pending → {len(items)} 件(OA_ASSIGN_STUB 桩数据)")
-        return {"total": len(items), "items": items, "source": "stub"}
+    # 读真实待分配表（oa_assign_task JOIN projects）。
     st = _store()
     if st is None:
         return {"total": 0, "items": [], "error": "待分配库模块不可用"}
@@ -149,11 +138,6 @@ def cases_pending(page: int = 1, pageSize: int = 100):
 async def assignment_analyze(req: Request):
     body = await req.json()
     cid = body.get("caseId")
-    # 桩案件：有完整报告+多组建议
-    c = next((x for x in STUB_CASES if x.get("id") == cid), None)
-    if c:
-        _log(f"POST /api/assignment/analyze caseId={cid} → 报告(测试数据)+{len(c.get('schemes', []))}组建议")
-        return {"caseId": cid, "detail": c.get("detail"), "schemes": c.get("schemes", [])}
     # 真实待分配案件：读立项时生成的 AI 案件报告(markdown)；无则给占位 md。
     st = _store()
     row = None
