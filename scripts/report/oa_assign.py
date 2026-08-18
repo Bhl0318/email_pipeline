@@ -165,13 +165,20 @@ def _generate_report(cid, row):
     from oa_report_ai import build_case_report
     item = _row_to_item(row)
     md = build_case_report(item, oa_pdf_path=None)
+    # 本次 OA 人员安排建议（≥3 组，AI 从候选人库选人）；无候选/失败返回 []
+    schemes = []
+    try:
+        from oa_schemes import build_assignment_schemes
+        schemes = build_assignment_schemes(item.get("project", ""))
+    except Exception as e:
+        _log("方案生成失败：", e)
     try:
         st = _store()
         if st is not None:
-            st.save_report(cid, md, [])
+            st.save_report(cid, md, schemes)
     except Exception as e:
         _log("生成后落库失败：", e)
-    return md, []
+    return md, schemes
 
 
 @router.post("/api/assignment/analyze")
@@ -212,9 +219,10 @@ async def assignment_analyze(req: Request):
             _log("现场生成失败：", e)
             report_md = _placeholder_md(summary)
             source = "占位(生成失败)"
-    if not schemes:
-        schemes = [dict(_CUSTOM_SCHEME)]     # 人员方案下一步接 DB 再补，先给自定义
-    _log(f"POST /api/assignment/analyze caseId={cid} → {source}")
+    # AI 方案后始终追加「自定义方案」，供操作人手工选人
+    if not any((s or {}).get("id") == "custom" for s in schemes):
+        schemes = list(schemes) + [dict(_CUSTOM_SCHEME)]
+    _log(f"POST /api/assignment/analyze caseId={cid} → {source}，方案 {len(schemes)} 组")
     return {"caseId": cid, "reportMd": report_md, "schemes": schemes,
             "detail": _placeholder_detail(summary)}
 

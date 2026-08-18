@@ -103,6 +103,72 @@ def _oa_rounds(rows, ex, cache):
     return [t for _, t in items]
 
 
+def _user_attrs(name, ex, cache):
+    """姓名 → {name, duty(职务), level(职级), status(在职/离职)}；查不到属性留空。"""
+    name = (name or "").strip()
+    if not name:
+        return None
+    if name in cache:
+        return cache[name]
+    a = {"name": name, "duty": "", "level": "", "status": ""}
+    try:
+        rows = ex(f"SELECT usertype, position, status FROM users WHERE username_zn='{_q(name)}' LIMIT 1")
+        if rows:
+            a["duty"] = (rows[0].get("usertype") or "").strip()
+            a["level"] = (rows[0].get("position") or "").strip()
+            a["status"] = (rows[0].get("status") or "").strip()
+    except Exception:
+        pass
+    cache[name] = a
+    return a
+
+
+def collect_candidates(project, execute=None):
+    """收集候选人库供人员安排建议用：本案撰写/历史OA承办人 + 同族OA参与者，带职务/职级/在职/来源。
+    返回 [{name, duty, level, status, sources:[本案撰写|本案历史OA|同族OA...]}]，去重。"""
+    try:
+        ex = _get_execute(execute)
+    except Exception:
+        return []
+    project = project or ""
+    zu = project[:10]
+    cache = {}
+    cands = {}
+
+    def _add(names, source):
+        for p in re.split(r"[、,，/]+", names or ""):
+            p = p.strip()
+            if not p:
+                continue
+            a = _user_attrs(p, ex, cache)
+            if not a:
+                continue
+            c = cands.setdefault(p, {**a, "sources": set()})
+            c["sources"].add(source)
+
+    try:
+        own = ex(f"SELECT project_name, project_leader, project_qc FROM projects "
+                 f"WHERE project='{_q(project)}'") or []
+        for r in own:
+            src = "本案历史OA" if _is_oa_name(r.get("project_name", "")) else "本案撰写"
+            _add(r.get("project_leader", ""), src)
+            _add(r.get("project_qc", ""), src)
+        fam = ex(f"SELECT project_name, project_leader, project_qc FROM projects "
+                 f"WHERE project LIKE '{_q(zu)}%' AND project <> '{_q(project)}'") or []
+        for r in fam:
+            if _is_oa_name(r.get("project_name", "")):
+                _add(r.get("project_leader", ""), "同族OA")
+                _add(r.get("project_qc", ""), "同族OA")
+    except Exception as e:
+        print(f"[oa_personnel] 候选池收集出错: {e}", file=sys.stderr)
+
+    out = []
+    for c in cands.values():
+        c["sources"] = sorted(c["sources"])
+        out.append(c)
+    return out
+
+
 def build_personnel_md(project, execute=None):
     """拼「## 五、内部人员档案」markdown。DB 不可达/无数据时返回带说明的段落，绝不抛。"""
     try:
