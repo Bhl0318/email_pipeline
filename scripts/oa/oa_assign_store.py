@@ -13,6 +13,7 @@ Wiki 人员分配格另由 oainfo_cli.write_oa_assignment 写。
 execute 可注入(测试用)，默认 db_query.execute（atw）。
 """
 TABLE = "oa_assign_task"
+REPORT_TABLE = "oa_assign_report"
 
 
 def _q(v):
@@ -63,3 +64,46 @@ def mark_submitted(oa_id, responder="", qc="", execute=None):
     ex(f"UPDATE projects SET project_qc='{_q(qc)}', project_leader='{_q(responder)}', "
        f"project_participant='{_q(responder)}' WHERE id='{_q(oa_id)}'")
     return bool(ex(f"SELECT id FROM {TABLE} WHERE id='{_q(oa_id)}'"))
+
+
+def save_report(oa_id, report_md="", schemes=None, execute=None):
+    """立项时按 id 存 AI 案件报告(markdown)+方案 JSON。存在则覆盖(UPSERT)。返回是否写入。
+    schemes 为 list/dict 时序列化为 JSON 文本；None/空则存空串。"""
+    ex = _get_execute(execute)
+    if not oa_id:
+        return False
+    if schemes is None:
+        schemes_json = ""
+    elif isinstance(schemes, str):
+        schemes_json = schemes
+    else:
+        import json
+        schemes_json = json.dumps(schemes, ensure_ascii=False)
+    if ex(f"SELECT id FROM {REPORT_TABLE} WHERE id='{_q(oa_id)}'"):
+        ex(f"UPDATE {REPORT_TABLE} SET report_md='{_q(report_md)}', "
+           f"schemes_json='{_q(schemes_json)}' WHERE id='{_q(oa_id)}'")
+    else:
+        ex(f"INSERT INTO {REPORT_TABLE} (id, report_md, schemes_json) "
+           f"VALUES ('{_q(oa_id)}', '{_q(report_md)}', '{_q(schemes_json)}')")
+    return True
+
+
+def get_report(oa_id, execute=None):
+    """按 id 取 AI 案件报告。返回 {'report_md':..., 'schemes': [...]}；无记录返回 None。"""
+    ex = _get_execute(execute)
+    if not oa_id:
+        return None
+    rows = ex(f"SELECT report_md, schemes_json FROM {REPORT_TABLE} WHERE id='{_q(oa_id)}'")
+    if not rows:
+        return None
+    r = rows[0]
+    md = r.get("report_md") or ""
+    raw = r.get("schemes_json") or ""
+    schemes = []
+    if raw:
+        import json
+        try:
+            schemes = json.loads(raw)
+        except Exception:
+            schemes = []
+    return {"report_md": md, "schemes": schemes}

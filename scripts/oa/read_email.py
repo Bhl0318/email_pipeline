@@ -1284,6 +1284,33 @@ def dispatch_oa(all_results, all_emails=None, dry_run=False, test_project_prefix
         except Exception as e:
             print(f"[待分配] 写入失败: {e}", file=sys.stderr)
 
+    # 生成 AI 案件报告并按 oa_id 落库（供分配页中栏渲染）。审意 PDF：US 用下载件，
+    # CN/EP 用邮件保存到 _inbox 的官文附件。只对成功进 projects 的案件生成；单件失败不影响其它。
+    if inserted_items and not dry_run:
+        try:
+            from oa_report_ai import build_case_report
+            from oa_assign_store import save_report
+            rpt_msgid_to_pdfs = {}
+            for _acc, _em in (all_emails or []):
+                _mid = _em.get("message_id", "")
+                if _mid and _em.get("saved_pdfs"):
+                    rpt_msgid_to_pdfs[_mid] = _em.get("saved_pdfs", [])
+            done = 0
+            for item in inserted_items:
+                if item.get("region") == "US":
+                    oa_pdf = item.get("us_pdf_path", "")
+                else:  # CN/EP：邮件官文附件（可能多份）
+                    oa_pdf = rpt_msgid_to_pdfs.get(item.get("message_id", ""), [])
+                try:
+                    md = build_case_report(item, oa_pdf_path=oa_pdf)
+                    save_report(item.get("oa_id", ""), md)
+                    done += 1
+                except Exception as e:
+                    print(f"[AI报告] {item.get('project','')} 生成/落库失败: {e}", file=sys.stderr)
+            print(f"[AI报告] 生成并落库 {done} 件", file=sys.stderr)
+        except Exception as e:
+            print(f"[AI报告] 模块不可用，跳过: {e}", file=sys.stderr)
+
     # 转OA：逐案转发给 OA 处理团队（替换原 send_notification 总表→qin.zhang；dry_run 内部处理）
     # 返回本次转OA立项动作 [{message_id, project, action, reason}]，供 main.py 汇总写邮件动作页
     return send_forward_oa(all_results, all_emails, dry_run=dry_run) or []

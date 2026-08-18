@@ -99,6 +99,18 @@ def _row_to_summary(r):
 _CUSTOM_SCHEME = {"id": "custom", "label": "自定义方案", "note": "", "responder": "", "qc": ""}
 
 
+def _placeholder_md(summary):
+    """报告库暂无该案报告时的占位 markdown（立项报告未生成/失败时兜底）。"""
+    return (
+        "## 一、案件基础信息\n\n"
+        f"- 案号：{summary.get('caseNo','') or '—'}\n"
+        f"- 发明名称：{summary.get('name','') or '—'}\n"
+        f"- 客户名称：{summary.get('client','') or '—'}\n"
+        f"- 官方答复期限：{summary.get('deadline','') or '—'}\n\n"
+        "> ⚠️ 该案 AI 报告尚未生成（立项时未生成或生成失败）。"
+    )
+
+
 def _placeholder_detail(summary):
     return {
         "basicInfo": {"caseNo": summary.get("caseNo", ""), "name": summary.get("name", ""),
@@ -142,7 +154,7 @@ async def assignment_analyze(req: Request):
     if c:
         _log(f"POST /api/assignment/analyze caseId={cid} → 报告(测试数据)+{len(c.get('schemes', []))}组建议")
         return {"caseId": cid, "detail": c.get("detail"), "schemes": c.get("schemes", [])}
-    # 真实待分配案件：占位报告 + 仅自定义方案（AI 待接入）
+    # 真实待分配案件：读立项时生成的 AI 案件报告(markdown)；无则给占位 md。
     st = _store()
     row = None
     if st is not None:
@@ -152,8 +164,22 @@ async def assignment_analyze(req: Request):
             _log("analyze 读待分配表失败：", e)
     if row:
         summary = _row_to_summary(row)
-        _log(f"POST /api/assignment/analyze caseId={cid} → 占位报告(AI待接入)")
-        return {"caseId": cid, "detail": _placeholder_detail(summary), "schemes": [dict(_CUSTOM_SCHEME)]}
+        report_md, schemes, has_report = "", [], False
+        try:
+            rep = st.get_report(cid) if st is not None else None
+            if rep and (rep.get("report_md") or "").strip():
+                report_md = rep.get("report_md")
+                schemes = rep.get("schemes") or []
+                has_report = True
+        except Exception as e:
+            _log("analyze 读报告库失败：", e)
+        if not report_md:
+            report_md = _placeholder_md(summary)
+        if not schemes:
+            schemes = [dict(_CUSTOM_SCHEME)]     # 人员方案下一步接 DB 再补，先给自定义
+        _log(f"POST /api/assignment/analyze caseId={cid} → {'AI报告' if has_report else '占位md(报告未生成)'}")
+        return {"caseId": cid, "reportMd": report_md, "schemes": schemes,
+                "detail": _placeholder_detail(summary)}
     _log(f"POST /api/assignment/analyze caseId={cid} → 未找到")
     return JSONResponse({"error": f"案件不存在: {cid}"}, status_code=404)
 

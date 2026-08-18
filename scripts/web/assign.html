@@ -226,7 +226,7 @@
       </div>
 
       <!-- Component: CaseDetailMarkdown -->
-      <div v-if="selectedCase && selectedCase.detail" class="case-detail__body" data-guide="case-detail-body">
+      <div v-if="selectedCase && (selectedCase.reportMd || selectedCase.detail)" class="case-detail__body" data-guide="case-detail-body">
         <!-- Component: MdOutline -->
         <nav class="md-outline">
           <div v-for="(label, i) in outlineItems" :key="i"
@@ -240,7 +240,7 @@
       </div>
       <!-- /Component: CaseDetailMarkdown -->
 
-      <div v-else-if="selectedCase && !selectedCase.detail" class="case-detail__body">
+      <div v-else-if="selectedCase && !selectedCase.reportMd && !selectedCase.detail" class="case-detail__body">
         <div style="padding:20px;text-align:center;color:#8c8c8c;font-size:13px">
           该案件的 AI 分析尚未生成，请在调试页面执行 AI 指令后查看。
         </div>
@@ -484,12 +484,17 @@ const app = createApp({
     }
 
     const renderedMarkdown = computed(() => {
-      if (!selectedCase.value?.detail) return ''
-      return marked.parse(detailToMarkdown(selectedCase.value.detail))
+      const c = selectedCase.value
+      if (!c) return ''
+      // 真实案件：优先渲染立项时生成的 AI markdown 报告；stub：由结构化 detail 转 md
+      if (c.reportMd) return marked.parse(c.reportMd)
+      if (c.detail) return marked.parse(detailToMarkdown(c.detail))
+      return ''
     })
 
     const OUTLINE_LABELS = ['案件基础信息', '权利要求结构解析', '技术方案速览', '审查意见深度解析', '内部人员档案']
-    const outlineItems = computed(() => selectedCase.value?.detail ? OUTLINE_LABELS : [])
+    const outlineItems = computed(() =>
+      (selectedCase.value?.reportMd || selectedCase.value?.detail) ? OUTLINE_LABELS : [])
     const activeSectionIdx = ref(0)
 
     watch(renderedMarkdown, () => {
@@ -556,7 +561,8 @@ const app = createApp({
       loadError.value = ''
       try {
         const d = await apiPost('/api/assignment/analyze', { caseId: c.id })
-        c.detail = d.detail
+        c.reportMd = d.reportMd || ''          // 真实案件：立项时生成的 AI markdown 报告
+        c.detail = d.detail                    // 兼容 stub：结构化报告（无 reportMd 时用）
         c.schemes = d.schemes || []
         c._analyzed = true
       } catch (e) {
