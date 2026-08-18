@@ -543,25 +543,37 @@ const app = createApp({
       }).length
     )
 
-    function reanalyze() {
-      if (!selectedCase.value || reanalyzing.value) return
+    // 重新生成：带 force=true 让后端无视缓存现场重出报告
+    async function reanalyze() {
+      const c = selectedCase.value
+      if (!c || reanalyzing.value) return
       reanalyzing.value = true
-      setTimeout(() => {
+      loadError.value = ''
+      try {
+        const d = await apiPost('/api/assignment/analyze', { caseId: c.id, force: true })
+        c.reportMd = d.reportMd || ''
+        c.schemes = d.schemes || []
+        c.detail = d.detail
+        c._analyzed = true
+        ElementPlus.ElMessage.success('报告已重新生成')
+      } catch (e) {
+        loadError.value = String(e.message || e)
+        ElementPlus.ElMessage.error('重新生成失败：' + loadError.value)
+      } finally {
         reanalyzing.value = false
-        ElementPlus.ElMessage.success('分析已重新生成')
-      }, 1500)
+      }
     }
 
     const analyzing = ref(false)
 
-    // 首次打开该案时向后端取 AI 报告(detail)+分配建议(schemes)；已取过则复用(缓存)
+    // 首次打开该案 → 后端懒生成报告(无缓存则现场 DeepSeek 生成并落库)；已取过则复用(前端缓存)
     async function ensureAnalyzed(c) {
       if (!c || c._analyzed) return
       analyzing.value = true
       loadError.value = ''
       try {
         const d = await apiPost('/api/assignment/analyze', { caseId: c.id })
-        c.reportMd = d.reportMd || ''          // 真实案件：立项时生成的 AI markdown 报告
+        c.reportMd = d.reportMd || ''          // AI markdown 报告（首次会现场生成）
         c.detail = d.detail                    // 兼容 stub：结构化报告（无 reportMd 时用）
         c.schemes = d.schemes || []
         c._analyzed = true

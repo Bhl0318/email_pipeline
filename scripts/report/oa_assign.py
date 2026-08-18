@@ -134,11 +134,52 @@ def cases_pending(page: int = 1, pageSize: int = 100):
         return {"total": 0, "items": [], "error": f"读待分配表失败: {e}"}
 
 
+def _derive_region(project):
+    """从案号推地区（20618-0424US00 → US）。取不到返回空串。"""
+    p = (project or "").upper()
+    for r in ("US", "EP", "CN", "WO", "JP", "KR"):
+        if r in p:
+            return r
+    return ""
+
+
+def _row_to_item(row):
+    """待分配行 → build_case_report 需要的 item（基础信息）。"""
+    proj = row.get("case_volume", "") or ""
+    return {
+        "project": proj,
+        "project_name": row.get("project_name", ""),
+        "customer": row.get("customer", ""),
+        "region": _derive_region(proj),
+        "deadline": row.get("project_deadline", ""),
+    }
+
+
+def _generate_report(cid, row):
+    """现场生成 AI 报告并落库（阻塞：读文档 + DeepSeek）。返回 (report_md, schemes)。
+    审意 PDF 在分配页这一刻不在手边（邮件已归档），第四大类会标待补，
+    待后续在立项时按 oa_id 持久化审意 PDF 再补。"""
+    oa_dir = os.path.join(_DIR, "..", "oa")
+    if oa_dir not in sys.path:
+        sys.path.insert(0, oa_dir)
+    from oa_report_ai import build_case_report
+    item = _row_to_item(row)
+    md = build_case_report(item, oa_pdf_path=None)
+    try:
+        st = _store()
+        if st is not None:
+            st.save_report(cid, md, [])
+    except Exception as e:
+        _log("生成后落库失败：", e)
+    return md, []
+
+
 @router.post("/api/assignment/analyze")
 async def assignment_analyze(req: Request):
+    from starlette.concurrency import run_in_threadpool
     body = await req.json()
     cid = body.get("caseId")
-    # 真实待分配案件：读立项时生成的 AI 案件报告(markdown)；无则给占位 md。
+    force = bool(body.get("force"))        # 「重新生成」按钮传 true：无视缓存强制重出
     st = _store()
     row = None
     if st is not None:
@@ -146,26 +187,36 @@ async def assignment_analyze(req: Request):
             row = next((r for r in st.list_pending() if r.get("id") == cid), None)
         except Exception as e:
             _log("analyze 读待分配表失败：", e)
-    if row:
-        summary = _row_to_summary(row)
-        report_md, schemes, has_report = "", [], False
+    if not row:
+        _log(f"POST /api/assignment/analyze caseId={cid} → 未找到")
+        return JSONResponse({"error": f"案件不存在: {cid}"}, status_code=404)
+
+    summary = _row_to_summary(row)
+    report_md, schemes, source = "", [], ""
+    # 非强制时先读缓存（oa_assign_report）
+    if not force:
         try:
             rep = st.get_report(cid) if st is not None else None
             if rep and (rep.get("report_md") or "").strip():
                 report_md = rep.get("report_md")
                 schemes = rep.get("schemes") or []
-                has_report = True
+                source = "缓存"
         except Exception as e:
             _log("analyze 读报告库失败：", e)
-        if not report_md:
+    # 首次打开(无缓存) 或 强制重新生成 → 现场生成并落库
+    if not report_md:
+        try:
+            report_md, schemes = await run_in_threadpool(_generate_report, cid, row)
+            source = "重新生成" if force else "首次生成"
+        except Exception as e:
+            _log("现场生成失败：", e)
             report_md = _placeholder_md(summary)
-        if not schemes:
-            schemes = [dict(_CUSTOM_SCHEME)]     # 人员方案下一步接 DB 再补，先给自定义
-        _log(f"POST /api/assignment/analyze caseId={cid} → {'AI报告' if has_report else '占位md(报告未生成)'}")
-        return {"caseId": cid, "reportMd": report_md, "schemes": schemes,
-                "detail": _placeholder_detail(summary)}
-    _log(f"POST /api/assignment/analyze caseId={cid} → 未找到")
-    return JSONResponse({"error": f"案件不存在: {cid}"}, status_code=404)
+            source = "占位(生成失败)"
+    if not schemes:
+        schemes = [dict(_CUSTOM_SCHEME)]     # 人员方案下一步接 DB 再补，先给自定义
+    _log(f"POST /api/assignment/analyze caseId={cid} → {source}")
+    return {"caseId": cid, "reportMd": report_md, "schemes": schemes,
+            "detail": _placeholder_detail(summary)}
 
 
 @router.get("/api/staff/list")
