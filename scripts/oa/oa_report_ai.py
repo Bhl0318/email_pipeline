@@ -52,6 +52,21 @@ def find_application_files(project, base_dir=None):
     return out
 
 
+def find_oa_pdf(project, base_dir=None):
+    """在申请文件目录里找审查意见 PDF（.pdf）。测试期(MATCH_BY_CASE_NO=False)取目录里任一 PDF；
+    案号匹配期取文件名含案号的 PDF。找不到返回 None。"""
+    base = base_dir or DEFAULT_APP_DIR
+    if not os.path.isdir(base):
+        return None
+    for fn in sorted(os.listdir(base)):
+        if not fn.lower().endswith(".pdf"):
+            continue
+        if MATCH_BY_CASE_NO and (not project or project not in fn):
+            continue
+        return os.path.join(base, fn)
+    return None
+
+
 def _docx_text(path):
     """docx → 纯文本。优先 python-docx，失败退回裸解压 document.xml。"""
     if not path or not os.path.isfile(path):
@@ -92,10 +107,39 @@ def _split_spec(spec_text):
     return desc, claims
 
 
+def _ocr_pdf(path, max_pages=6):
+    """扫描件（无文本层）→ 用 qwen-vl 逐页 OCR 成纯文本。失败返回空串。"""
+    try:
+        import base64
+        import fitz
+        from openai import OpenAI
+        from parse_us_pdf import QWEN_API_KEY, QWEN_BASE_URL, QWEN_VL_MODEL
+    except Exception as e:
+        print(f"[oa_report_ai] OCR 依赖缺失: {e}", file=sys.stderr)
+        return ""
+    try:
+        doc = fitz.open(path)
+        content = [{"type": "text", "text":
+                    "这些是专利审查意见通知书/官方文件的扫描页。请逐字识别其中全部文字，"
+                    "按阅读顺序输出为纯文本，保留条目/编号；不要总结、不要翻译、不要加任何解释。"}]
+        for i in range(min(max_pages, len(doc))):
+            pix = doc[i].get_pixmap(dpi=150)
+            b64 = base64.b64encode(pix.tobytes("png")).decode("utf-8")
+            content.append({"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b64}"}})
+        doc.close()
+        client = OpenAI(api_key=QWEN_API_KEY, base_url=QWEN_BASE_URL)
+        resp = client.chat.completions.create(
+            model=QWEN_VL_MODEL, max_tokens=4000,
+            messages=[{"role": "user", "content": content}])
+        return (resp.choices[0].message.content or "").strip()
+    except Exception as e:
+        print(f"[oa_report_ai] qwen-vl OCR 失败 {path}: {e}", file=sys.stderr)
+        return ""
+
+
 def _pdf_text(path_or_list, max_pages=8):
-    """审意 PDF → 文本（复用 parse_us_pdf._pdf_to_text）。
-    入参可为单个路径或路径列表（CN/EP 邮件可能带多份官文附件，逐份抽取拼接）。
-    扫描件无文本时返回空串。"""
+    """审意 PDF → 文本。先用文本层（parse_us_pdf._pdf_to_text）；扫描件无文本层则 qwen-vl OCR 兜底。
+    入参可为单个路径或路径列表（CN/EP 邮件可能带多份官文附件，逐份抽取拼接）。"""
     paths = path_or_list if isinstance(path_or_list, (list, tuple)) else [path_or_list]
     out = []
     for path in paths:
@@ -103,9 +147,14 @@ def _pdf_text(path_or_list, max_pages=8):
             continue
         try:
             from parse_us_pdf import _pdf_to_text
-            text, _scanned = _pdf_to_text(path, max_pages=max_pages)
+            text, scanned = _pdf_to_text(path, max_pages=max_pages)
             if text and text.strip():
                 out.append(text)
+            else:  # 扫描件（无文本层）→ OCR
+                print(f"[oa_report_ai] {os.path.basename(path)} 无文本层，转 qwen-vl OCR", file=sys.stderr)
+                ocr = _ocr_pdf(path, max_pages=min(max_pages, 6))
+                if ocr:
+                    out.append(ocr)
         except Exception as e:
             print(f"[oa_report_ai] PDF 读取失败 {path}: {e}", file=sys.stderr)
     return "\n\n".join(out)
@@ -186,6 +235,11 @@ def build_case_report(item, oa_pdf_path=None, app_dir=None, with_personnel=True,
         application_text = ((desc_text[:70000] + "\n\n……（说明书中段略）……\n\n" + claims_text)
                             if claims_text else spec_full[:APP_CAP])
         print(f"[oa_report_ai] 申请文件超 {APP_CAP} 字，已切分保头尾权要", file=sys.stderr)
+    # 审意 PDF：未显式传入时，从申请文件目录自动找一份（扫描件会走 OCR）
+    if not oa_pdf_path:
+        oa_pdf_path = find_oa_pdf(project, base_dir=app_dir)
+        if oa_pdf_path:
+            print(f"[oa_report_ai] 审意 PDF 自动匹配：{os.path.basename(oa_pdf_path)}", file=sys.stderr)
     oa_text = _pdf_text(oa_pdf_path)
 
     md = _deepseek_report(basic, application_text, oa_text)
