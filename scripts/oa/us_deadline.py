@@ -60,6 +60,10 @@ def get_us_deadline(application_no, document_code, oa_doc_date, project):
             break
 
     if not pdf_path or not os.path.exists(pdf_path):
+        # 403：该申请文件在公开 API 不可访问（未公开/受限申请）→ 回标给上层，供转OA正文标注
+        if getattr(uspto, "last_http_status", None) == 403:
+            print(f"[US] {application_no} 403：未公开/受限申请，公开API无法下载", file=sys.stderr)
+            return {"months": None, "deadline": None, "pdf_path": None, "unpublished": True}
         print(f"[US] 未找到 PDF 文件: {files}", file=sys.stderr)
         return None
 

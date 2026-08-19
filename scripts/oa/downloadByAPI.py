@@ -37,6 +37,7 @@ class USPTOApplication:
         self.project = project
         self.l = mail_id
         self.apikey = "oarxhcottmeqhpgausxoghscnjhllr"
+        self.last_http_status = None   # 最近一次 API 请求的 HTTP 状态；403=未公开/受限申请，供调用方标注
         # 日志路径不写死：优先入参 → 环境变量 → 下载基目录下
         self.log_path = (log_path or os.environ.get("USPTO_DOWNLOAD_LOG")
                          or os.path.join(download_dir, LOG_FILENAME))
@@ -74,6 +75,7 @@ class USPTOApplication:
             return doc_list
 
         print(response.status_code)
+        self.last_http_status = response.status_code   # 暴露给调用方（403=未公开/受限）
         entry["http_status"] = response.status_code
         if response.status_code != 200:
             entry["reason"] = f"API返回{response.status_code}: {response.text[:200]}"

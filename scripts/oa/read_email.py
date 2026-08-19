@@ -1031,6 +1031,8 @@ def dispatch_oa(all_results, all_emails=None, dry_run=False, test_project_prefix
                     item.get("oa_doc_date", ""),
                     item.get("project", ""),
                 )
+                if dl and dl.get("unpublished"):
+                    item["us_unpublished"] = True   # 403：未公开/受限申请，转OA正文标注、官文无附件
                 if dl and dl.get("deadline"):
                     item["project_deadline"] = dl["deadline"]
                     # 用新的 deadline 重算 dueDate
