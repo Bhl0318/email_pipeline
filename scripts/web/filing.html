@@ -180,6 +180,27 @@
 const LIST_API = "/api/submission/tasks";   // 复用环节2 列表（按 type 过滤）
 const API = "/api/submission/filing";
 let taskId = null, taskList = [], data = null, fields = {}, opts = {}, mailState = {subject:"", body:""};
+// QA 操作留痕：打开时初始快照 + 打开时刻
+let qaInitialFields = {}, qaOpenedAt = 0;
+function qaDiff(a, b, path, out) {
+  out = out || []; path = path || "";
+  const leaf = v => v === null || typeof v !== "object";
+  if (leaf(a) || leaf(b)) {
+    if (JSON.stringify(a) !== JSON.stringify(b))
+      out.push({ path, old: a == null ? "" : String(a), new: b == null ? "" : String(b) });
+    return out;
+  }
+  const keys = new Set([...Object.keys(a || {}), ...Object.keys(b || {})]);
+  keys.forEach(k => qaDiff((a || {})[k], (b || {})[k], path ? `${path}.${k}` : k, out));
+  return out;
+}
+function qaCollect() {
+  return {
+    opened_at: qaOpenedAt ? new Date(qaOpenedAt).toLocaleString("sv") : "",
+    duration_sec: qaOpenedAt ? Math.round((Date.now() - qaOpenedAt) / 1000) : null,
+    changed: qaDiff(qaInitialFields, fields),
+  };
+}
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;" }[c]));
 function toast(m, ms=2600){ const t=$("toast"); t.textContent=m; t.style.display="block"; clearTimeout(t._h); t._h=setTimeout(()=>t.style.display="none", ms); }
@@ -261,6 +282,7 @@ async function openTask(id){
   try { data = await api("GET", `${API}/${id}`); }
   catch(e){ toast("加载失败: "+e.message); return; }
   fields = data.fields_json || {};
+  qaInitialFields = JSON.parse(JSON.stringify(fields)); qaOpenedAt = Date.now();   // QA 留痕：快照初始值+打开时刻
   opts = data.transmittal_options || {};
   initMail();
   $("caseTitle").textContent = data.case_volume || "—";
@@ -925,6 +947,7 @@ async function doConfirm(){
       fields_json: fields, transmittal_options: opts, recipients, cc,
       recipient_name: "", subject: mailState.subject, body: mailState.body,
       file_channels, signer_name,
+      qa: qaCollect(),   // 操作留痕：修改痕迹 + 时长
     });
     toast("已发送，任务完成");
     closeSendModal(); await loadTaskList(); await openTask(taskId);

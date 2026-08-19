@@ -215,6 +215,28 @@
 "use strict";
 const API = "/api/submission";
 let taskId = null, task = null, fields = {}, taskList = [];
+// QA 操作留痕：打开时的初始快照 + 打开时刻
+let qaInitialFields = {}, qaOpenedAt = 0;
+// 深比较初始 vs 当前，产出叶子级修改痕迹 [{path,old,new}]
+function qaDiff(a, b, path, out) {
+  out = out || []; path = path || "";
+  const leaf = v => v === null || typeof v !== "object";
+  if (leaf(a) || leaf(b)) {
+    if (JSON.stringify(a) !== JSON.stringify(b))
+      out.push({ path, old: a == null ? "" : String(a), new: b == null ? "" : String(b) });
+    return out;
+  }
+  const keys = new Set([...Object.keys(a || {}), ...Object.keys(b || {})]);
+  keys.forEach(k => qaDiff((a || {})[k], (b || {})[k], path ? `${path}.${k}` : k, out));
+  return out;
+}
+function qaCollect() {   // 组装留痕 payload（随确认发送发给后端）
+  return {
+    opened_at: qaOpenedAt ? new Date(qaOpenedAt).toLocaleString("sv") : "",
+    duration_sec: qaOpenedAt ? Math.round((Date.now() - qaOpenedAt) / 1000) : null,
+    changed: qaDiff(qaInitialFields, fields),
+  };
+}
 let emailModules = [], moduleChecked = {}, moduleParams = {};
 let customSlots = {};   // {模块id: {title,body}}——插在该模块之后；key 存在即"已打开槽"
 let openModules = {};   // {模块id: true}——记住展开状态，重建后恢复（否则每次刷新塌回收起）
@@ -316,6 +338,7 @@ async function openTask(id) {
   try { task = await api("GET", `${API}/tasks/${id}`); }
   catch (e) { $("formSections").innerHTML = `<div class="banner error">任务加载失败：${esc(problemsOf(e).join("；"))}</div>`; return; }
   fields = task.fields_json || {};
+  qaInitialFields = JSON.parse(JSON.stringify(fields)); qaOpenedAt = Date.now();   // QA 留痕：快照初始值+打开时刻
   // 恢复「勾选」状态 + 非空自定义槽（自定义内容需持久化）；参数/称呼仍不持久化，每次现填避免带出旧值。
   const _ems = fields.email_module_state || {};
   emailModules = [];
@@ -991,6 +1014,7 @@ async function doConfirm() {
       cc: $("mCc").value.split(/[,，;；]/).map(s => s.trim()).filter(Boolean),
       subject: $("mSubject").value.trim(), body_html: $("mBody").value,
       attachments: chosen,
+      qa: qaCollect(),   // 操作留痕：修改痕迹 + 时长
     });
     closeSendModal();
     $("missingBanner").innerHTML = `<div class="banner ok">✅ 已发送给 ${esc(d.sent_to.join(", "))}，共 ${d.files.length} 个附件；任务完成（followup: ${esc(d.followup_task_id.slice(0, 8))}…）</div>`;

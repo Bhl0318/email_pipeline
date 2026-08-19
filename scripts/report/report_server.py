@@ -1211,6 +1211,7 @@ class SubmissionConfirmReq(BaseModel):
     subject: str = ""
     body_html: str = ""
     attachments: list = None      # 勾选要发送的附件文件名；缺省=合并集全发（manual 覆盖 final）
+    qa: dict = None               # 操作留痕：{opened_at, duration_sec, changed:[{path,old,new}]}（前端采集）
 
 
 @app.post("/api/submission/tasks/{task_id}/confirm")
@@ -1316,6 +1317,13 @@ def confirm_submission_task(task_id: str, req: SubmissionConfirmReq):
                 (new_fields, now, p["id"]),
             )
             refreshed_prep.append(p["id"])
+
+    # QA 操作留痕（修改痕迹+时长）：best-effort，不影响发送
+    try:
+        from submission.qa_log import append as _qa_append, build_op_record as _qa_build
+        _qa_append(_qa_build("confirmation", case_volume, row.get("contact_email"), req.qa))
+    except Exception:
+        pass
 
     return {
         "ok": True,
@@ -1893,6 +1901,7 @@ class FilingConfirmReq(BaseModel):
     body: str = ""
     file_channels: dict = {}       # {文件key: "docusign"|"email"}；key=POA/Transmittal/ADS 或定稿文件名
     signer_name: str = ""          # DocuSign 签字人姓名（缺省用收件人邮箱）
+    qa: dict = None                # 操作留痕：{opened_at, duration_sec, changed:[{path,old,new}]}（前端采集）
 
 
 class SendReviewerReq(BaseModel):
@@ -2107,6 +2116,13 @@ def confirm_filing_task(task_id: str, req: FilingConfirmReq):
             "INSERT INTO submission_tasks (id, task_type, case_volume, fields_json, contact_email, status, created_at) "
             "VALUES (%s, 'agent_followup', %s, %s, %s, 'pending', %s)",
             (followup_id, case_volume, followup_fields, row.get("contact_email"), now))
+
+    # QA 操作留痕（修改痕迹+时长）：best-effort，不影响发送。env5 责任人=递交人 filer_email
+    try:
+        from submission.qa_log import append as _qa_append, build_op_record as _qa_build
+        _qa_append(_qa_build("filing", case_volume, row.get("filer_email"), req.qa))
+    except Exception:
+        pass
 
     return {"ok": True, "task_id": task_id, "status": "done", "sent_to": recipients,
             "files": [p.name for p in attach_paths], "followup_task_id": followup_id, "warnings": warnings}
