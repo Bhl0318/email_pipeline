@@ -131,9 +131,15 @@ def build_forward_body(item):
                        else "该官文的答复期限待确认。")
     # 预审案件加注一行（第一/二次审查意见 + 邮件含预审案件时由分类器置 prescreen_note）
     prescreen_line = "注：该案件为预审案件\n\n" if item.get("prescreen_note") else ""
-    # 未公开/受限申请：公开 API 403，官文未能自动下载/无附件 → 正文明确标注
-    unpublished_line = ("注：该官文对应【未公开/受限申请】，系统无法自动下载官文，请手动从 Patent Center 获取官文。\n\n"
-                        if item.get("us_unpublished") else "")
+    # 未公开/受限申请：公开 API 403，官文未能自动下载/无附件 → 正文明确标注 + 明细，便于人工去 Patent Center 取
+    if item.get("us_unpublished"):
+        _app = item.get("application_no", "") or item.get("application", "") or ""
+        _doc = item.get("notification_type", "") or item.get("document_code", "") or ""
+        unpublished_line = (
+            "注：该官文对应【未公开/受限申请】，系统无法自动下载官文，请手动从 Patent Center 获取官文。\n"
+            f"    案号：{project}    申请号：{_app}    官文代码：{_doc}    发文日：{issue_date}\n\n")
+    else:
+        unpublished_line = ""
     return FORWARD_BODY_TEMPLATE.format(
         oa_type=oa_type, period_sentence=period_sentence,
         project=project, issue_date=issue_date, deadline=deadline,
