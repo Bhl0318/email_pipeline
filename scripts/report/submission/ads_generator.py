@@ -42,6 +42,15 @@ def safe_escape_xml(text):
     return (temp.replace('&', '&amp;').replace('"', '&quot;').replace("'", '&apos;'))
 
 
+def _ads_appnum(raw):
+    """ADS 母案(Domestic Benefit)申请号规范：美国申请号要纯数字(如 18/649,137 → 18649137)。
+    仅当值只由数字+分隔符(/ . , 空格 -)组成时去分隔留数字；含字母的(如 PCT/CN2024/...)原样保留。"""
+    s = str(raw or "").strip()
+    if s and re.fullmatch(r"[\d\s/.,\-]+", s):
+        return re.sub(r"\D", "", s)
+    return s
+
+
 def build_ads_datasets_xml(case_info: dict) -> str:
     """把 case_info 拼成 ADS 的 XFA datasets 数据包 XML（移植自旧 _generate_ads_xml）。
     返回完整的 <xfa:datasets>…</xfa:datasets> 字符串。"""
@@ -171,7 +180,7 @@ def build_ads_datasets_xml(case_info: dict) -> str:
       <sfDomesContInfo>
         <domappNumber>{app.get("Application No", '')}</domappNumber>
         <domesContList>{app.get('Continuity Type', '')}</domesContList>
-        <domPriorAppNum>{app.get("Prior Application Number", '')}</domPriorAppNum>
+        <domPriorAppNum>{_ads_appnum(app.get("Prior Application Number", ''))}</domPriorAppNum>
         <DateTimeField1>{app.get("Filing Date", '')}</DateTimeField1>
       </sfDomesContInfo>
       <sfDomesContinfoPatent>
