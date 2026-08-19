@@ -6,9 +6,12 @@
 
 本模块只负责：抽样决定 / 选字段 / 造错值 / 判定，不落库、不改流程。
 """
+import os
+import json
 import random
 
-SEED_RATE = 0.20   # 抽样比例（配置项，后台可调）
+SEED_RATE = 0.20     # (机械版遗留，AI 版不用)
+SEED_MAX = 3         # 每案最多埋点数；实际 0~min(SEED_MAX, 可埋字段数) 随机
 
 # 可播种字段池：路径（点号 + 数字下标定位 fields_json）+ 人可读标签。
 # 只选"可审、改了不影响生成、还原无副作用、且为拉丁/数字（错一位/一字母仍是可信错值）"的字段；
@@ -102,3 +105,76 @@ def check_outcome(fields, seed):
     """出口判定：当前值仍等于 B → 'missed'（漏检）；否则 'caught'（已捕获/已改）。"""
     cur = get_by_path(fields, seed.get("path"))
     return "missed" if (cur is not None and str(cur) == str(seed.get("value_b"))) else "caught"
+
+
+# ─────────────── AI（DeepSeek）造错版 ───────────────
+_REPORT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def _ai_cfg():
+    """DeepSeek 配置：email_config.submission.qa_ai 优先，退环境变量/默认。"""
+    key = os.environ.get("DEEPSEEK_API_KEY") or "REDACTED_API_KEY"
+    base, model = "https://api.deepseek.com", "deepseek-chat"
+    try:
+        with open(os.path.join(_REPORT_DIR, "email_config.json"), encoding="utf-8") as f:
+            ai = (json.load(f).get("submission") or {}).get("qa_ai") or {}
+        key = ai.get("api_key") or key
+        base = ai.get("base_url") or base
+        model = ai.get("model") or model
+    except Exception:
+        pass
+    return key, base, model
+
+
+def _candidates(fields):
+    """白名单里"存在且非空文本"的可埋字段。"""
+    out = []
+    for item in POOL:
+        v = get_by_path(fields, item["path"])
+        if isinstance(v, str) and v.strip():
+            out.append({"path": item["path"], "label": item["label"], "value": v})
+    return out
+
+
+def ai_make_seeds(fields, n_max=SEED_MAX, rng=random):
+    """AI(DeepSeek) 造错版：本地随机定"埋几个/埋哪些"(0~min(n_max,可埋数))，
+    让 AI 为选中字段各造一处"貌似合理、不太明显"的错值；就地把 fields 改成错值 B，
+    返回 [{path,label,value_a,value_b}]。best-effort：无候选/AI失败/无合格产出 → []（不改 fields）。"""
+    cands = _candidates(fields)
+    if not cands:
+        return []
+    n = rng.randint(0, min(n_max, len(cands)))
+    if n == 0:
+        return []
+    picks = rng.sample(cands, n)
+    payload = [{"path": p["path"], "label": p["label"], "value": p["value"]} for p in picks]
+    prompt = (
+        "你在做专利递交著录数据的质量抽检：给下面每个字段各造一个「貌似合理、不太明显」的错误值，"
+        "用于检验人工是否认真核对。要求：\n"
+        "1) 错误要细微可信(如姓名拼写差一两个字母、号码/邮编差一位数字、城市换成邻近城市、名称个别单词改动)，不要明显缺失或乱码；\n"
+        "2) 保持与原值同类型同格式(数字仍是数字、日期仍是合法日期)；\n"
+        "3) 每个错值必须与原值不同；\n"
+        "4) 只输出 JSON 对象，键=path，值=错误值字符串，不要多余解释。\n\n"
+        f"字段：\n{json.dumps(payload, ensure_ascii=False)}"
+    )
+    try:
+        from openai import OpenAI
+        key, base, model = _ai_cfg()
+        client = OpenAI(api_key=key, base_url=base)
+        resp = client.chat.completions.create(
+            model=model, temperature=1.0, timeout=40,
+            messages=[{"role": "user", "content": prompt}],
+            response_format={"type": "json_object"})
+        data = json.loads(resp.choices[0].message.content or "{}")
+    except Exception as e:  # noqa: BLE001
+        import sys
+        print(f"[qa_seed] AI 造错失败(不播): {e}", file=sys.stderr)
+        return []
+    seeds = []
+    for p in picks:
+        wrong = data.get(p["path"])
+        if isinstance(wrong, str) and wrong.strip() and wrong.strip() != p["value"]:
+            set_by_path(fields, p["path"], wrong.strip())
+            seeds.append({"path": p["path"], "label": p["label"],
+                          "value_a": p["value"], "value_b": wrong.strip()})
+    return seeds

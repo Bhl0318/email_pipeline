@@ -1019,7 +1019,11 @@ async function doConfirm() {
     closeSendModal();
     $("missingBanner").innerHTML = `<div class="banner ok">✅ 已发送给 ${esc(d.sent_to.join(", "))}，共 ${d.files.length} 个附件；任务完成（followup: ${esc(d.followup_task_id.slice(0, 8))}…）</div>`;
     await loadTaskList(); openTask(taskId);
-  } catch (e) { toast("发送失败：" + problemsOf(e).join("；"), 6000); }
+  } catch (e) {
+    const msg = problemsOf(e).join("；");
+    if (e.status === 409 && /未核对|未修改/.test(msg)) alert("⚠ " + msg);   // QA 拦截：阻塞弹窗、保持弹窗不关，逼核对
+    else toast("发送失败：" + msg, 6000);
+  }
   finally { btn.disabled = false; btn.textContent = "确认并发送"; }
 }
 

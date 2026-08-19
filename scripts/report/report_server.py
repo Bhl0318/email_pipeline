@@ -828,6 +828,9 @@ def get_submission_task(task_id: str):
     except Exception:
         missing = []
 
+    # QA 埋点：首次打开确认函页时播种（AI 造 0~3 处错、就地改 fields 为 B、B 落库+种子入表）。best-effort
+    _qa_seed_on_open(task_id, row, fields)
+
     # server 侧推断 subject_matter（来源3，审核页可改；save 后以 fields_json 为准）
     fields["subject_matter"] = infer_subject_matter(fields)
     normalize_parents(fields)  # 兼容存量任务的小写母案键
@@ -1214,6 +1217,71 @@ class SubmissionConfirmReq(BaseModel):
     qa: dict = None               # 操作留痕：{opened_at, duration_sec, changed:[{path,old,new}]}（前端采集）
 
 
+# ─── QA 埋点（seeded error）：播种 / 判定（种子存 submission_qa_seeds，value_a 绝不返前端）───
+def _qa_seed_label(path):
+    try:
+        from submission.qa_seed import POOL
+        for it in POOL:
+            if it["path"] == path:
+                return it["label"]
+    except Exception:
+        pass
+    return path
+
+
+def _qa_seed_on_open(task_id, row, fields):
+    """env2 确认函页首次打开：pending 且未播过 → AI 造 0~3 错、就地改 fields 为 B、
+    B 落库 fields_json + 种子插 submission_qa_seeds(A 只进表)。best-effort，失败不影响页面。"""
+    try:
+        if row.get("task_type") != "filing_confirmation" or row.get("status") != "pending":
+            return
+        seen = execute_params("SELECT COUNT(*) AS n FROM submission_qa_seeds WHERE task_id=%s", (task_id,))
+        if seen and int(seen[0].get("n") or 0) > 0:
+            return   # 已播过，不重复
+        from submission.qa_seed import ai_make_seeds
+        seeds = ai_make_seeds(fields)   # 就地把 fields 改成 B
+        if not seeds:
+            return
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        for s in seeds:
+            execute_params(
+                "INSERT INTO submission_qa_seeds "
+                "(id, case_volume, task_id, stage, field_path, value_a, value_b, resolved, seeded_at) "
+                "VALUES (%s,%s,%s,'confirmation',%s,%s,%s,0,%s)",
+                (str(uuid.uuid4()), row["case_volume"], task_id, s["path"], s["value_a"], s["value_b"], now))
+        execute_params("UPDATE submission_tasks SET fields_json=%s, updated_at=%s WHERE id=%s",
+                       (json.dumps(fields, ensure_ascii=False), now, task_id))
+    except Exception as e:  # noqa: BLE001
+        print(f"[qa_seed] 播种失败(忽略): {e}", file=sys.stderr)
+
+
+def _qa_judge_seeds(case_volume, fields):
+    """出口判定：读该案未 resolved 种子，逐个判当前值。
+    仍==B→漏检(收进 blocked 标签)；已改→捕获(标 resolved)。返回 (blocked_labels, results)。"""
+    try:
+        seeds = execute_params(
+            "SELECT id, field_path, value_b FROM submission_qa_seeds WHERE case_volume=%s AND resolved=0",
+            (case_volume,)) or []
+        if not seeds:
+            return [], []
+        from submission.qa_seed import get_by_path
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        blocked, results = [], []
+        for s in seeds:
+            cur = get_by_path(fields, s["field_path"])
+            if cur is not None and str(cur) == str(s["value_b"]):
+                blocked.append(_qa_seed_label(s["field_path"]))
+                results.append({"field": s["field_path"], "outcome": "missed"})
+            else:
+                execute_params("UPDATE submission_qa_seeds SET resolved=1, resolved_at=%s WHERE id=%s",
+                               (now, s["id"]))
+                results.append({"field": s["field_path"], "outcome": "caught"})
+        return blocked, results
+    except Exception as e:  # noqa: BLE001
+        print(f"[qa_seed] 判定失败(忽略，不拦截): {e}", file=sys.stderr)
+        return [], []
+
+
 @app.post("/api/submission/tasks/{task_id}/confirm")
 def confirm_submission_task(task_id: str, req: SubmissionConfirmReq):
     """发送成品邮件（复用 preview-send 生成的 final/ 文件）→ done + 插 signature_followup。"""
@@ -1232,6 +1300,20 @@ def confirm_submission_task(task_id: str, req: SubmissionConfirmReq):
             "UPDATE submission_tasks SET fields_json = %s, updated_at = %s WHERE id = %s",
             (json.dumps(req.fields_json, ensure_ascii=False), now, task_id),
         )
+
+    # 1.5) QA 埋点出口判定（发送前）：仍==B 的种子→漏检+拦截(不发送、逼改)；已改→捕获+标 resolved
+    _qa_cur = req.fields_json if req.fields_json is not None else (json.loads(row["fields_json"]) if row["fields_json"] else {})
+    _qa_blocked, _qa_results = _qa_judge_seeds(row["case_volume"], _qa_cur)
+    if _qa_blocked:
+        try:
+            from submission.qa_log import append as _qa_append
+            _qa_append({"stage": "confirmation", "case": row["case_volume"],
+                        "reviewer": row.get("contact_email"), "event": "blocked", "seeds": _qa_results})
+        except Exception:
+            pass
+        raise HTTPException(status_code=409,
+                            detail="以下字段疑似未核对（与初始值一致）：【" + "、".join(_qa_blocked) +
+                                   "】。请对照原始资料核对、修正后再发送。")
 
     # 2) 取附件：合并 final/(生成) + manual/(手动上传)，manual 同名覆盖；
     #    req.attachments 给定则只发勾选的，缺省全发。
@@ -1318,10 +1400,11 @@ def confirm_submission_task(task_id: str, req: SubmissionConfirmReq):
             )
             refreshed_prep.append(p["id"])
 
-    # QA 操作留痕（修改痕迹+时长）：best-effort，不影响发送
+    # QA 操作留痕（修改痕迹+时长+埋点结果）：best-effort，不影响发送
     try:
         from submission.qa_log import append as _qa_append, build_op_record as _qa_build
-        _qa_append(_qa_build("confirmation", case_volume, row.get("contact_email"), req.qa))
+        _qa_append(_qa_build("confirmation", case_volume, row.get("contact_email"), req.qa,
+                             seeds=(_qa_results or None)))
     except Exception:
         pass
 
