@@ -92,17 +92,26 @@ def _resolve_app_dir(project, region):
 
 
 def _pick_latest_docx(dirpath, keywords=None):
-    """dir 下 .docx，(可选)文件名含任一关键词(大小写不敏感)，按 mtime 取最新。返回路径或 None。"""
+    """dir 下 .docx，(可选)文件名含任一关键词(大小写不敏感)，按 mtime 取最新。返回路径或 None。
+    先在本层找；本层无匹配时，再递归子目录找。"""
     import glob
     if not dirpath or not os.path.isdir(dirpath):
         return None
-    files = [f for f in glob.glob(os.path.join(dirpath, "*.docx")) if os.path.isfile(f)]
-    if keywords:
-        kws = [k.lower() for k in keywords]
-        files = [f for f in files if any(k in os.path.basename(f).lower() for k in kws)]
+    kws = [k.lower() for k in keywords] if keywords else None
+
+    def _match(pattern):
+        fs = [f for f in glob.glob(pattern, recursive=True)
+              if os.path.isfile(f) and f.lower().endswith(".docx")]
+        if kws:
+            fs = [f for f in fs if any(k in os.path.basename(f).lower() for k in kws)]
+        return fs
+
+    files = _match(os.path.join(dirpath, "*.docx"))
+    if not files:                                            # 本层没有 → 递归子目录
+        files = _match(os.path.join(dirpath, "**", "*.docx"))
     if not files:
         return None
-    return max(files, key=os.path.getmtime)
+    return max(set(files), key=os.path.getmtime)
 
 
 def find_application_files(project, region="", base_dir=None):
@@ -164,6 +173,21 @@ def find_case_official_pdfs(project):
         return []
     import glob
     hits = glob.glob(os.path.join(d, "*.pdf")) + glob.glob(os.path.join(d, "*.PDF"))
+    return sorted(set(hits))
+
+
+# 邮件官文附件暂存目录（report 读取层 _save_pdf_attachments_to_inbox 落这里，按 message_id 分子目录）
+INBOX_DIR = os.path.normpath(os.path.join(_DIR, "..", "output", "_inbox"))
+
+
+def find_inbox_official_pdfs(project):
+    """兜底：attachment/{案号}/ 没有官文时，去 _inbox 里按「文件名含案号」找。返回路径列表。
+    _inbox 按 message_id 分子目录，故只能靠附件文件名含案号来匹配该案。"""
+    if not project or not os.path.isdir(INBOX_DIR):
+        return []
+    import glob
+    hits = [f for f in glob.glob(os.path.join(INBOX_DIR, "*", "*.pdf")) + glob.glob(os.path.join(INBOX_DIR, "*", "*.PDF"))
+            if project in os.path.basename(f)]
     return sorted(set(hits))
 
 
@@ -350,16 +374,20 @@ def build_case_report(item, oa_pdf_path=None, app_dir=None, with_personnel=True,
         application_text = ((desc_text[:70000] + "\n\n……（说明书中段略）……\n\n" + claims_text)
                             if claims_text else spec_full[:APP_CAP])
         print(f"[oa_report_ai] 申请文件超 {APP_CAP} 字，已切分保头尾权要", file=sys.stderr)
-    # 审意 PDF：未显式传入时，优先按案号读 attachment/{案号}/ 下的官文（US 下载件/CN·EP 已复制进来），
-    # 取不到再回退申请文件目录（测试期）。扫描件会走 OCR。
+    # 审意 PDF：未显式传入时，① attachment/{案号}/（US 下载件/CN·EP 已复制进来）→
+    # ② _inbox 里文件名含案号的附件（兜底，attachment 缺件时）→ ③ 申请文件目录（测试期）。扫描件走 OCR。
     if not oa_pdf_path:
         oa_pdf_path = find_case_official_pdfs(project)
         if oa_pdf_path:
             print(f"[oa_report_ai] 审意 PDF 按案号取自 attachment/{project}/：{len(oa_pdf_path)} 份", file=sys.stderr)
         else:
-            oa_pdf_path = find_oa_pdf(project, base_dir=app_dir)
+            oa_pdf_path = find_inbox_official_pdfs(project)
             if oa_pdf_path:
-                print(f"[oa_report_ai] 审意 PDF 回退申请文件目录：{os.path.basename(oa_pdf_path)}", file=sys.stderr)
+                print(f"[oa_report_ai] 审意 PDF attachment 无，回退 _inbox 按案号：{len(oa_pdf_path)} 份", file=sys.stderr)
+            else:
+                oa_pdf_path = find_oa_pdf(project, base_dir=app_dir)
+                if oa_pdf_path:
+                    print(f"[oa_report_ai] 审意 PDF 回退申请文件目录：{os.path.basename(oa_pdf_path)}", file=sys.stderr)
     oa_text = _pdf_text(oa_pdf_path)
 
     md = _deepseek_report(basic, application_text, oa_text)
