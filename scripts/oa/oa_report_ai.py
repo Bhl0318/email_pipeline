@@ -20,9 +20,16 @@ _DIR = os.path.dirname(os.path.abspath(__file__))
 # 申请文件目录：scripts/oa/ 上两级即 DS/email_pipeline/，再进 申请文件/
 DEFAULT_APP_DIR = os.path.normpath(os.path.join(_DIR, "..", "..", "申请文件"))
 
-# 测试期开关：False → 不按案号匹配，任何案号都用目录里现有的那份 SPEC / Amendment 当测试文档；
-# True → 按文件名含案号匹配（接真实 NAS/多案号时切回 True）。
+# 测试期开关：False → 读扁平测试目录 DEFAULT_APP_DIR（任意案号取现有样例）；
+# True → 走真实 NAS（Z:\）按案号+客户+地区定位（见 _resolve_app_dir）。
 MATCH_BY_CASE_NO = False
+
+# 申请文件 NAS 根（生产，仅能挂到 Z 盘的机器可读）
+NAS_BASE_DIR = "Z:\\"                       # 普通案号：Z:\{码}-{简称}\{组内号}\{案号}\*递交文件*\
+NAS_ZHUOHUI_DIR = "Z:\\众慧优创知识产权"      # 含 -H 案号：\{名字含码的目录}\{案号}\*递交文件*\
+NAS_TOPLEVEL_CUSTOMERS = {"20608", "20615", "20618", "20633", "20735", "20849"}
+# 各地区在「递交文件」目录里挑说明书文件的文件名关键词（取最新 .docx；EP 无关键词=取最新 .docx）
+APP_FILE_KEYWORDS = {"US": ["spec"], "CN": ["说明书", "申请文件"], "EP": None}
 
 
 def _original_project(item):
@@ -34,21 +41,87 @@ def _original_project(item):
     return project
 
 
-def find_application_files(project, base_dir=None):
-    """在申请文件目录里找说明书(SPEC)。返回 {'spec': path|None}。
-    权利要求直接从 SPEC 内切出（见 _split_spec），不再单独找第二份文件。"""
-    base = base_dir or DEFAULT_APP_DIR
+def _customer_shortname(code):
+    """atw customer 表：案号前5位 → 客户简称。查不到/连不上返回空串。"""
+    code = (code or "")[:5]
+    if not code:
+        return ""
+    try:
+        from db_query import execute
+        rows = execute(f"SELECT customer_shortname FROM customer WHERE customer_code = '{code.replace(chr(39), chr(92)+chr(39))}'")
+        if rows and rows[0].get("customer_shortname"):
+            return rows[0]["customer_shortname"]
+    except Exception as e:
+        print(f"[oa_report_ai] 查客户简称失败 {code}: {e}", file=sys.stderr)
+    return ""
+
+
+def _resolve_app_dir(project, region):
+    """定位申请文件所在目录（NAS，生产）。找不到返回 None。
+      含 -H： Z:\\众慧优创知识产权\\{名字含 project[:5] 的目录}\\{案号}\\*递交文件*\\
+      普通：  Z:\\{码}-{简称}\\{组内号}\\{案号}\\*递交文件*\\   （EP 再进一层 *新申请*\\；
+              列出客户在根，其余在 其他客户\\ 下）"""
+    import glob
+    if not project or len(project) < 10:
+        return None
+    if "-H" in project:
+        parents = sorted(glob.glob(os.path.join(NAS_ZHUOHUI_DIR, f"*{project[:5]}*")))
+        for parent in parents:
+            case_dir = os.path.join(parent, project)
+            if os.path.isdir(case_dir):
+                submit = sorted(glob.glob(os.path.join(case_dir, "*递交文件*")))
+                if submit:
+                    return submit[0]
+        return None
+    # 普通案号
+    code, zu = project[:5], project[:10]
+    shortname = _customer_shortname(code)
+    if not shortname:
+        return None
+    cust_dir = f"{code}-{shortname}"
+    root = os.path.join(NAS_BASE_DIR, cust_dir) if code in NAS_TOPLEVEL_CUSTOMERS \
+        else os.path.join(NAS_BASE_DIR, "其他客户", cust_dir)
+    submit = sorted(glob.glob(os.path.join(root, zu, project, "*递交文件*")))
+    if not submit:
+        return None
+    d = submit[0]
+    if region == "EP":
+        xin = sorted(glob.glob(os.path.join(d, "*新申请*")))
+        return xin[0] if xin else None
+    return d
+
+
+def _pick_latest_docx(dirpath, keywords=None):
+    """dir 下 .docx，(可选)文件名含任一关键词(大小写不敏感)，按 mtime 取最新。返回路径或 None。"""
+    import glob
+    if not dirpath or not os.path.isdir(dirpath):
+        return None
+    files = [f for f in glob.glob(os.path.join(dirpath, "*.docx")) if os.path.isfile(f)]
+    if keywords:
+        kws = [k.lower() for k in keywords]
+        files = [f for f in files if any(k in os.path.basename(f).lower() for k in kws)]
+    if not files:
+        return None
+    return max(files, key=os.path.getmtime)
+
+
+def find_application_files(project, region="", base_dir=None):
+    """定位说明书文件。返回 {'spec': path|None}（权要由 _split_spec 从中切出）。
+    测试期(MATCH_BY_CASE_NO=False)：读扁平 DEFAULT_APP_DIR 里含 spec 的 docx；
+    生产(True)：走 NAS，按地区在「递交文件」目录取最新 .docx（US 含 spec / CN 含 说明书|申请文件 / EP 最新）。"""
     out = {"spec": None}
-    if not os.path.isdir(base):
+    if not MATCH_BY_CASE_NO:
+        base = base_dir or DEFAULT_APP_DIR
+        if os.path.isdir(base):
+            for fn in sorted(os.listdir(base)):
+                if fn.lower().endswith(".docx") and "spec" in fn.lower():
+                    out["spec"] = os.path.join(base, fn)
+                    break
         return out
-    for fn in sorted(os.listdir(base)):
-        if not fn.lower().endswith(".docx"):
-            continue
-        # 测试期：MATCH_BY_CASE_NO=False 时忽略案号，直接取目录里的 SPEC 当测试文档
-        if MATCH_BY_CASE_NO and (not project or project not in fn):
-            continue
-        if "spec" in fn.lower() and not out["spec"]:
-            out["spec"] = os.path.join(base, fn)
+    # 生产：NAS
+    d = _resolve_app_dir(project, region)
+    if d:
+        out["spec"] = _pick_latest_docx(d, APP_FILE_KEYWORDS.get(region))
     return out
 
 
@@ -266,7 +339,7 @@ def build_case_report(item, oa_pdf_path=None, app_dir=None, with_personnel=True,
         "当前法律状态": item.get("legal_status", ""),
         "官方答复期限": item.get("deadline", "") or item.get("project_deadline", ""),
     }
-    files = find_application_files(project, base_dir=app_dir)
+    files = find_application_files(project, region=item.get("region", ""), base_dir=app_dir)
     spec_full = _docx_text(files.get("spec"))
     # 申请文件全文直接交给 DeepSeek 自行识别权要/说明；仅当超大(超上下文风险)才切分保头尾权要。
     APP_CAP = 120000
