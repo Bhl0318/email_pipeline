@@ -52,6 +52,40 @@ def find_application_files(project, base_dir=None):
     return out
 
 
+# 审意 PDF 持久化目录：立项时把邮件官文 PDF 按 oa_id 存这里，供分配页事后按 id 取（邮件已归档）。
+PERSISTED_OA_DIR = os.path.normpath(os.path.join(_DIR, "..", "output", "oa_审意"))
+
+
+def persist_oa_pdf(oa_id, src_paths):
+    """立项时把该件审意官文 PDF 按 oa_id 存到 PERSISTED_OA_DIR/{oa_id}{ext}。
+    src_paths 为单路径或路径列表（取第一个存在的）。成功返回目标路径，否则 None。绝不抛。"""
+    if not oa_id:
+        return None
+    paths = src_paths if isinstance(src_paths, (list, tuple)) else [src_paths]
+    src = next((p for p in paths if p and os.path.isfile(p)), None)
+    if not src:
+        return None
+    try:
+        import shutil
+        os.makedirs(PERSISTED_OA_DIR, exist_ok=True)
+        ext = os.path.splitext(src)[1] or ".pdf"
+        dest = os.path.join(PERSISTED_OA_DIR, f"{oa_id}{ext}")
+        shutil.copyfile(src, dest)
+        return dest
+    except Exception as e:
+        print(f"[oa_report_ai] 审意 PDF 持久化失败 {oa_id}: {e}", file=sys.stderr)
+        return None
+
+
+def find_persisted_oa_pdf(oa_id):
+    """按 oa_id 找已持久化的审意 PDF（PERSISTED_OA_DIR/{oa_id}.*）。找不到返回 None。"""
+    if not oa_id or not os.path.isdir(PERSISTED_OA_DIR):
+        return None
+    import glob
+    hits = sorted(glob.glob(os.path.join(PERSISTED_OA_DIR, f"{oa_id}.*")))
+    return hits[0] if hits else None
+
+
 def find_oa_pdf(project, base_dir=None):
     """在申请文件目录里找审查意见 PDF（.pdf）。测试期(MATCH_BY_CASE_NO=False)取目录里任一 PDF；
     案号匹配期取文件名含案号的 PDF。找不到返回 None。"""

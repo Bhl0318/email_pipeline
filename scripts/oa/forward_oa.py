@@ -32,6 +32,7 @@ FORWARD_FIXED_CC = [
     "juanjuan.yao@metis-ip.com", # 姚涓涓
     "qin.zhang@metis-ip.com",    # 张琴
     "ling.ding@metis-ip.com",    # 丁玲
+    "yuan.wang@metis-ip.com",    # 王圆
 ]
 
 
