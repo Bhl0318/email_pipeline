@@ -105,7 +105,7 @@ REPORT_TYPE_TO_TEMPLATE = {
 REVIEW_BASE_URL = "http://10.10.70.88:8501"
 
 # 每封审核链接通知固定抄送
-REVIEW_NOTIFY_CC  = ["hailing.bi@metis-ip.com", "dandan.cheng@metis-ip.com", "qin.zhang@metis-ip.com"]
+REVIEW_NOTIFY_CC  = ["hailing.bi@metis-ip.com", "dandan.cheng@metis-ip.com", "qin.zhang@metis-ip.com", "yuan.wang@metis-ip.com"]
 
 # 汇报信准备人（收审核链接的人）路由：按国别
 # 规则：CN 全部→任惠；US/EP→王晶；未命中→不分配（None，不发）。
