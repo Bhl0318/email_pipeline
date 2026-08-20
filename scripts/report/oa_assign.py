@@ -157,12 +157,11 @@ def _generate_report(cid, row):
     oa_dir = os.path.join(_DIR, "..", "oa")
     if oa_dir not in sys.path:
         sys.path.insert(0, oa_dir)
-    from oa_report_ai import build_case_report, find_persisted_oa_pdf
+    from oa_report_ai import build_case_report
     item = _row_to_item(row)
-    # 审意 PDF：优先取立项时按 oa_id 持久化的那份（生产）；取不到则 None，
-    # 由 build_case_report 回退到申请文件目录自动匹配（测试期）。
-    oa_pdf = find_persisted_oa_pdf(cid)
-    md = build_case_report(item, oa_pdf_path=oa_pdf)
+    # 审意 PDF 不显式传：build_case_report 会按案号读 attachment/{案号}/（生产），
+    # 取不到再回退申请文件目录（测试期）。
+    md = build_case_report(item, oa_pdf_path=None)
     # 本次 OA 人员安排建议（≥3 组，AI 从候选人库选人）；无候选/失败返回 []
     schemes = []
     try:

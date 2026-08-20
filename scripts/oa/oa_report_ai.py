@@ -52,38 +52,46 @@ def find_application_files(project, base_dir=None):
     return out
 
 
-# 审意 PDF 持久化目录：立项时把邮件官文 PDF 按 oa_id 存这里，供分配页事后按 id 取（邮件已归档）。
-PERSISTED_OA_DIR = os.path.normpath(os.path.join(_DIR, "..", "output", "oa_审意"))
+# 官文统一目录：US 下载件本就落这里(us_deadline.DOWNLOAD_DIR)；CN/EP 邮件附件也复制进来，
+# 使各地区官文都在 attachment/{案号}/ 下，OA 分配按案号直接读。
+ATTACHMENT_DIR = os.path.normpath(os.path.join(_DIR, "..", "..", "attachment"))
 
 
-def persist_oa_pdf(oa_id, src_paths):
-    """立项时把该件审意官文 PDF 按 oa_id 存到 PERSISTED_OA_DIR/{oa_id}{ext}。
-    src_paths 为单路径或路径列表（取第一个存在的）。成功返回目标路径，否则 None。绝不抛。"""
-    if not oa_id:
-        return None
+def case_docs_dir(project):
+    return os.path.join(ATTACHMENT_DIR, project) if project else None
+
+
+def persist_email_official_docs(project, src_paths):
+    """把 CN/EP 邮件官文附件(_inbox)复制到 attachment/{案号}/，与 US 下载件同目录。
+    已在目标目录内的文件跳过。返回复制数量。绝不抛。"""
+    dest_dir = case_docs_dir(project)
+    if not dest_dir:
+        return 0
     paths = src_paths if isinstance(src_paths, (list, tuple)) else [src_paths]
-    src = next((p for p in paths if p and os.path.isfile(p)), None)
-    if not src:
-        return None
+    cnt = 0
     try:
         import shutil
-        os.makedirs(PERSISTED_OA_DIR, exist_ok=True)
-        ext = os.path.splitext(src)[1] or ".pdf"
-        dest = os.path.join(PERSISTED_OA_DIR, f"{oa_id}{ext}")
-        shutil.copyfile(src, dest)
-        return dest
+        for src in paths:
+            if not src or not os.path.isfile(src):
+                continue
+            if os.path.normpath(os.path.dirname(src)) == os.path.normpath(dest_dir):
+                continue  # 已在目标目录
+            os.makedirs(dest_dir, exist_ok=True)
+            shutil.copyfile(src, os.path.join(dest_dir, os.path.basename(src)))
+            cnt += 1
     except Exception as e:
-        print(f"[oa_report_ai] 审意 PDF 持久化失败 {oa_id}: {e}", file=sys.stderr)
-        return None
+        print(f"[oa_report_ai] 官文复制到 attachment 失败 {project}: {e}", file=sys.stderr)
+    return cnt
 
 
-def find_persisted_oa_pdf(oa_id):
-    """按 oa_id 找已持久化的审意 PDF（PERSISTED_OA_DIR/{oa_id}.*）。找不到返回 None。"""
-    if not oa_id or not os.path.isdir(PERSISTED_OA_DIR):
-        return None
+def find_case_official_pdfs(project):
+    """读 attachment/{案号}/ 下的官文 PDF（顶层，跳过 _stamped 盖章副本子目录）。返回路径列表。"""
+    d = case_docs_dir(project)
+    if not d or not os.path.isdir(d):
+        return []
     import glob
-    hits = sorted(glob.glob(os.path.join(PERSISTED_OA_DIR, f"{oa_id}.*")))
-    return hits[0] if hits else None
+    hits = glob.glob(os.path.join(d, "*.pdf")) + glob.glob(os.path.join(d, "*.PDF"))
+    return sorted(set(hits))
 
 
 def find_oa_pdf(project, base_dir=None):
@@ -269,11 +277,16 @@ def build_case_report(item, oa_pdf_path=None, app_dir=None, with_personnel=True,
         application_text = ((desc_text[:70000] + "\n\n……（说明书中段略）……\n\n" + claims_text)
                             if claims_text else spec_full[:APP_CAP])
         print(f"[oa_report_ai] 申请文件超 {APP_CAP} 字，已切分保头尾权要", file=sys.stderr)
-    # 审意 PDF：未显式传入时，从申请文件目录自动找一份（扫描件会走 OCR）
+    # 审意 PDF：未显式传入时，优先按案号读 attachment/{案号}/ 下的官文（US 下载件/CN·EP 已复制进来），
+    # 取不到再回退申请文件目录（测试期）。扫描件会走 OCR。
     if not oa_pdf_path:
-        oa_pdf_path = find_oa_pdf(project, base_dir=app_dir)
+        oa_pdf_path = find_case_official_pdfs(project)
         if oa_pdf_path:
-            print(f"[oa_report_ai] 审意 PDF 自动匹配：{os.path.basename(oa_pdf_path)}", file=sys.stderr)
+            print(f"[oa_report_ai] 审意 PDF 按案号取自 attachment/{project}/：{len(oa_pdf_path)} 份", file=sys.stderr)
+        else:
+            oa_pdf_path = find_oa_pdf(project, base_dir=app_dir)
+            if oa_pdf_path:
+                print(f"[oa_report_ai] 审意 PDF 回退申请文件目录：{os.path.basename(oa_pdf_path)}", file=sys.stderr)
     oa_text = _pdf_text(oa_pdf_path)
 
     md = _deepseek_report(basic, application_text, oa_text)

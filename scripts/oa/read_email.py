@@ -1288,10 +1288,11 @@ def dispatch_oa(all_results, all_emails=None, dry_run=False, test_project_prefix
 
     # 注：AI 案件报告不在立项时生成，改为「第一次打开分配页时懒生成 + 重新生成按钮」，
     #     由 report/oa_assign.py analyze 现场调 oa_report_ai.build_case_report 落 oa_assign_report。
-    # 但审意 PDF（邮件官文附件）事后会随邮件归档消失，故立项此刻按 oa_id 持久化一份，供分配页第四类使用。
+    # 但 CN/EP 审意官文是邮件附件（存在 _inbox，事后随邮件归档消失），故立项此刻复制到
+    # attachment/{案号}/，与 US 下载件同目录，供 OA 分配按案号直接读。US 官文本就在该目录，无需复制。
     if inserted_items and not dry_run:
         try:
-            from oa_report_ai import persist_oa_pdf
+            from oa_report_ai import persist_email_official_docs
             _mid2pdfs = {}
             for _acc, _em in (all_emails or []):
                 _mid = _em.get("message_id", "")
@@ -1300,14 +1301,12 @@ def dispatch_oa(all_results, all_emails=None, dry_run=False, test_project_prefix
             _saved = 0
             for item in inserted_items:
                 if item.get("region") == "US":
-                    _srcs = [item.get("us_pdf_path", "")]
-                else:  # CN/EP：邮件官文附件
-                    _srcs = _mid2pdfs.get(item.get("message_id", ""), [])
-                if persist_oa_pdf(item.get("oa_id", ""), _srcs):
-                    _saved += 1
-            print(f"[审意持久化] 按 oa_id 存审意 PDF {_saved} 件", file=sys.stderr)
+                    continue  # US 官文已在 attachment/{案号}/
+                _srcs = _mid2pdfs.get(item.get("message_id", ""), [])
+                _saved += persist_email_official_docs(item.get("project", ""), _srcs)
+            print(f"[官文归集] CN/EP 审意 PDF 复制到 attachment/案号/ 共 {_saved} 个", file=sys.stderr)
         except Exception as e:
-            print(f"[审意持久化] 失败: {e}", file=sys.stderr)
+            print(f"[官文归集] 失败: {e}", file=sys.stderr)
 
     # 转OA：逐案转发给 OA 处理团队（替换原 send_notification 总表→qin.zhang；dry_run 内部处理）
     # 返回本次转OA立项动作 [{message_id, project, action, reason}]，供 main.py 汇总写邮件动作页
