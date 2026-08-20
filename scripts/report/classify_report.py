@@ -585,12 +585,11 @@ US_TYPES_NEED_PROJECT = {
     "EXIN": ("Examiner Interview Summary Record答复", False),
     "NT.CR.APP.PA": ("Notice to file corrected application papers补正答复", False),
     "NTC.MISS.PRT": ("NOTICE TO FILE MISSING PARTS OF NONPROVISIONAL APPLICATION补正答复", False),
-    "PETDEC": ("Petition Decision Dismissed补正答复", False),
     "CTEQ": ("Ex Parte Quayle Action答复", False),
 }
 
 # 不需要立项的 US Document Type
-US_TYPES_SKIP = {"ISSUE.NTF", "892", "1449", "COCX","ABN","APP.FILE.REC","NTC.PUB","NTC.PUB.DATE","OA.APPENDIX","WELCOME.LET","M327","PREDOCK.NTF","EGRANT.NTF","TRACK1.GRANT","NOA","PPH.DECISION"}
+US_TYPES_SKIP = {"ISSUE.NTF", "892", "1449", "COCX","ABN","APP.FILE.REC","NTC.PUB","NTC.PUB.DATE","OA.APPENDIX","WELCOME.LET","M327","PREDOCK.NTF","EGRANT.NTF","TRACK1.GRANT","NOA","PPH.DECISION","PETDEC","M903"}
 
 
 
