@@ -344,6 +344,48 @@
         "action": "assign",
         "preparer": "hui.ren@metis-ip.com"
       }
+    },
+    "办理登记手续通知书": {
+      "20618": {
+        "action": "skip",
+        "forward": {
+          "to": ["report@metis-ip.com"],
+          "cc": ["ui_pa@metis-ip.com"]
+        }
+      },
+      "20615": {
+        "action": "assign",
+        "preparer": "mei.hu@metis-ip.com"
+      },
+      "20608": {
+        "action": "assign",
+        "preparer": "hui.ren@metis-ip.com"
+      },
+      "20753": {
+        "action": "skip",
+        "forward": {
+          "to": ["xin.han@metis-ip.com"],
+          "cc": ["patents_pa@metis-ip.com"]
+        }
+      },
+      "20735": {
+        "action": "ignore"
+      },
+      "20963": {
+        "action": "ignore"
+      },
+      "5开头": {
+        "action": "skip",
+        "forward": {
+          "to": ["yanqing.li@metis-ip.com"],
+          "cc": ["patents_pa@metis-ip.com"]
+        }
+      },
+      "其他": {
+        "action": "assign",
+        "preparer": "hui.ren@metis-ip.com",
+        "_备注": "办理登记手续通知书(CN-其他官文表);分类器已产出此类型,规则原缺失默认错分任惠,按矩阵补齐"
+      }
     }
   },
   "US": {
