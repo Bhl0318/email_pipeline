@@ -199,19 +199,43 @@ def _mark_uploaded(upload_id, now):
              (now, now, upload_id))
 
 
+# 递交人邮箱为空时的兜底收件人 + 固定抄送（业务确认 2026-08-21）
+_NOTIFY_FALLBACK_TO = "ping.cheng@metis-ip.com"   # filer_email 为空时兜底发给成萍
+_NOTIFY_CC = ["hailing.bi@metis-ip.com"]          # 固定抄送
+
+
+def _case_filer_email(case_volume):
+    """取该案递交人邮箱（submission_tasks.filer_email）：跨该案所有任务行挑最新一条非空值。
+    查不到 / DB 异常 → 返回 ''（由调用方走兜底收件人）。"""
+    try:
+        rows = _db_exec(
+            "SELECT filer_email FROM submission_tasks "
+            "WHERE case_volume=%s AND filer_email IS NOT NULL AND filer_email<>'' "
+            "ORDER BY updated_at DESC LIMIT 1",
+            (case_volume,))
+        return (rows[0].get("filer_email") or "").strip() if rows else ""
+    except Exception as exc:  # noqa: BLE001
+        print(f"  ⚠️ 取 filer_email 失败（走兜底收件人）：{exc}", file=sys.stderr)
+        return ""
+
+
 def _notify_review(case_volume):
-    """环节8：上传成功后发预览链接邮件给指定人（best-effort，失败只记日志、不影响 done）。
-    链接指向 report_server 预览页；收件人/base 从 email_config.json 取（缺省 hailing.bi + 8501）。"""
+    """环节8：上传成功后发预览链接邮件（best-effort，失败只记日志、不影响 done）。
+    收件人 = submission_tasks.filer_email（递交人）；为空则兜底 ping.cheng@metis-ip.com。
+    固定抄送 hailing.bi@metis-ip.com。链接指向 report_server 预览页（base 来自 email_config.json）。"""
     try:
         import submission_mailer as _mailer   # scripts/report 已在 sys.path（db_query 同目录）
         link = f"{_mailer.review_base_url()}/submission/uspto-review/{case_volume}"
-        recipients = _mailer.uspto_review_recipients()
+        filer = _case_filer_email(case_volume)
+        recipients = [filer] if filer else [_NOTIFY_FALLBACK_TO]
+        cc = list(_NOTIFY_CC)
         html = (f"<p>案号 <b>{case_volume}</b> 已上传至 USPTO Patent Center（存草稿，未递交）。</p>"
                 f"<p>请点击以下链接预览本案实际上传的全套文件，核对后在 Patent Center 正式递交：</p>"
                 f"<p><a href='{link}'>{link}</a></p>"
                 f"<p>本邮件由系统自动发送。</p>")
-        _mailer.send_html(f"【US递交-已上传待复审】{case_volume}", html, recipients)
-        print(f"  ✉️ 已发预览链接邮件给 {', '.join(recipients)}")
+        _mailer.send_html(f"【US递交-已上传待复审】{case_volume}", html, recipients, cc_addrs=cc)
+        _tag = "递交人" if filer else "兜底(递交人邮箱为空)"
+        print(f"  ✉️ 已发预览链接邮件给 {', '.join(recipients)}（{_tag}），抄送 {', '.join(cc)}")
     except Exception as exc:  # noqa: BLE001
         print(f"  ⚠️ 预览链接邮件发送失败（不影响上传/销账）：{exc}", file=sys.stderr)
 
