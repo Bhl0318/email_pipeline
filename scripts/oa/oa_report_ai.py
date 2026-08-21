@@ -22,7 +22,8 @@ DEFAULT_APP_DIR = os.path.normpath(os.path.join(_DIR, "..", "..", "申请文件"
 
 # 测试期开关：False → 读扁平测试目录 DEFAULT_APP_DIR（任意案号取现有样例）；
 # True → 走真实 NAS（Z:\）按案号+客户+地区定位（见 _resolve_app_dir）。
-MATCH_BY_CASE_NO = False
+# 上线：report_server 所在机器需能挂 Z 盘 + 连 atw，置 True 走真实 NAS。
+MATCH_BY_CASE_NO = True
 
 # 申请文件 NAS 根（生产，仅能挂到 Z 盘的机器可读）
 NAS_BASE_DIR = "Z:\\"                       # 普通案号：Z:\{码}-{简称}\{组内号}\{案号}\*递交文件*\
