@@ -12,6 +12,10 @@ rem    start_fetch_attachments.bat                    (single run, no loop)
 rem ============================================================
 setlocal
 
+rem --- UTF-8 console so the Chinese window title / python output render correctly ---
+chcp 65001 >nul
+title 保存代理人回邮附件
+
 rem --- clear proxy: empty proxy vars + NO_PROXY=* so python/requests go direct ---
 set HTTP_PROXY=
 set HTTPS_PROXY=
