@@ -973,6 +973,12 @@ def dispatch_oa(all_results, all_emails=None, dry_run=False, test_project_prefix
     all_results = [it for it in (all_results or [])
                    if not (it.get("region") == "EP" and it.get("standalone_project") is False)]
 
+    # 原始邮件主题含「结案报告」的不立项（仅 OA 侧过滤，不影响汇报信/分类器）。
+    _before = len(all_results)
+    all_results = [it for it in all_results if "结案报告" not in (it.get("email_subject", "") or "")]
+    if len(all_results) < _before:
+        print(f"  [结案报告] 主题含「结案报告」，跳过立项 {_before - len(all_results)} 条", file=sys.stderr)
+
     # 已结案案件不立项：查 IPEasy 状态（终止/维持/结案）→ 剔除。用真实案号,故先于测试前缀替换。
     from oainfo_cli import is_case_closed
     all_results = _drop_closed_cases(all_results, is_case_closed)
