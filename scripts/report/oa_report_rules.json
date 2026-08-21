@@ -723,10 +723,18 @@
       }
     },
     "Decision to Grant": {
-      "*": {
+      "20618": {
+        "action": "skip",
+        "forward": {
+          "to": ["report@metis-ip.com"],
+          "cc": ["ui_pa@metis-ip.com"]
+        },
+        "_备注": "授权决定书 A.97(1) 20618(联影)不分配→转report邮箱+抄联影公邮ui_pa"
+      },
+      "其他": {
         "action": "assign",
         "preparer": "jing.wang@metis-ip.com",
-        "_备注": "授权决定书 A.97(1)/Decision to Grant，所有客户→王晶，只发汇报信不立项"
+        "_备注": "授权决定书 A.97(1)/Decision to Grant，除20618外其余客户→王晶，只发汇报信不立项"
       }
     },
     "Intention to grant@R71(3)": {
