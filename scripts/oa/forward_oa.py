@@ -118,7 +118,6 @@ FORWARD_BODY_TEMPLATE = (
     "案号：{project}\n"
     "发文日：{issue_date}\n"
     "截止日期：{deadline}\n\n"
-    "{assign_line}"
     "@OA 分析师值班人，请重启项目，生产管理安排人员处理。\n\n"
     "{unpublished_line}"
     "{prescreen_line}"
@@ -146,17 +145,39 @@ def build_forward_body(item):
             f"    案号：{project}    申请号：{_app}    官文代码：{_doc}    发文日：{issue_date}\n\n")
     else:
         unpublished_line = ""
-    # OA 分配链接：基址由 pipeline_config→env 提供，且该案已有 oa_id 才带
-    base = os.environ.get("OA_ASSIGN_BASE_URL", "").rstrip("/")
-    oa_id = item.get("oa_id", "") or ""
-    assign_line = f"OA 分配链接：{base}/oa-assign/{oa_id}\n\n" if (base and oa_id) else ""
     return FORWARD_BODY_TEMPLATE.format(
         oa_type=oa_type, period_sentence=period_sentence,
         project=project, issue_date=issue_date, deadline=deadline,
         unpublished_line=unpublished_line,
         prescreen_line=prescreen_line,
-        assign_line=assign_line,
     )
+
+
+# OA 分配链接不进转OA邮件（不发流程人员），单独发给薛虹，抄送海灵
+OA_ASSIGN_NOTIFY_TO = "hxue@metis-ip.com"        # 薛虹
+OA_ASSIGN_NOTIFY_CC = ["hailing.bi@metis-ip.com"]  # 海灵
+
+
+def build_assign_notify(plans):
+    """汇总本轮各立项案件的 OA 分配链接，生成发给薛虹的 (subject, body)。
+    基址(env OA_ASSIGN_BASE_URL)为空或无带 oa_id 的案件时返回 None（不发）。"""
+    base = os.environ.get("OA_ASSIGN_BASE_URL", "").rstrip("/")
+    if not base:
+        return None
+    rows = []
+    for p in plans:
+        it = p.get("item", {})
+        oa_id = it.get("oa_id", "") or ""
+        if not oa_id:
+            continue
+        proj = it.get("project", "")
+        name = it.get("project_name", "") or it.get("notification_type", "")
+        rows.append(f"{proj} {name}\n  {base}/oa-assign/{oa_id}")
+    if not rows:
+        return None
+    subject = f"【OA分配链接】本轮 {len(rows)} 件待分配"
+    body = "薛虹：\n\n以下为本轮新立项、待人员分配的案件及分配页链接：\n\n" + "\n\n".join(rows) + "\n\n--\n发送人：系统\n"
+    return subject, body
 
 
 # 转OA 主题前缀
