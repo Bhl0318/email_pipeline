@@ -10,8 +10,10 @@
 （明文口令，走 partner.outlook.cn 密码认证）；其它账号可退回 scripts/email_config.json。
 
 用法（默认读 agent@metis-ip.com 的 FilingSignatures 文件夹）：
-  python3 fetch_uspto_upload_attachments.py                          # 用默认
+  python3 fetch_uspto_upload_attachments.py                          # 单次，用默认
   python3 fetch_uspto_upload_attachments.py FilingSignatures agent uspto_upload
+  python3 fetch_uspto_upload_attachments.py --loop                   # 常驻，每 5min 抓一次
+  python3 fetch_uspto_upload_attachments.py --loop 300               # 常驻，显式 300s
 
 处理完把邮件归位：成功（有附件入库）-> FilingSignatures-done，未落任何附件
 -> FilingSignatures-skipped（两个文件夹自动创建）。传 move=False 可只抓不移。
@@ -31,6 +33,7 @@ import sys
 import os
 import re
 import json
+import time
 import base64
 import imaplib
 import email
@@ -466,9 +469,65 @@ def fetch(folder, account_key="agent", output_root="uspto_upload", move=True, se
             pass
 
 
+def fetch_loop(interval, folder, account_key="agent", output_root="uspto_upload",
+               move=True, settle=True):
+    """常驻轮询：每 interval 秒抓一轮回邮附件。单轮内异常不退整体，continue 下一轮
+    （连不上邮箱/库、单封解析失败都留待下轮重试）。Ctrl+C / SIGTERM 退出。
+    与 run_uspto_upload.py 的 run_loop 对称。"""
+    print(f"[fetch-attach] 轮询启动：每 {interval}s 抓一次「{folder}」回邮附件（Ctrl+C 退出）")
+    while True:
+        try:
+            fetch(folder, account_key, output_root, move=move, settle=settle)
+        except KeyboardInterrupt:
+            print("\n[fetch-attach] 收到中断，退出轮询。")
+            return
+        except Exception as exc:  # noqa: BLE001
+            print(f"[fetch-attach] 本轮异常（忽略，继续下一轮）：{exc}")
+        try:
+            time.sleep(interval)
+        except KeyboardInterrupt:
+            print("\n[fetch-attach] 收到中断，退出轮询。")
+            return
+
+
+def _parse_interval(argv, default=300):
+    """从 argv 取 --loop 后紧跟的秒数（默认 300=5min，下限 5s）；无 --loop 返回 (False, default)。"""
+    if "--loop" not in argv:
+        return False, default
+    i = argv.index("--loop")
+    if i + 1 < len(argv):
+        try:
+            return True, max(5, int(argv[i + 1]))
+        except ValueError:
+            pass
+    return True, default
+
+
 if __name__ == "__main__":
     # 默认：agent@metis-ip.com 的 FilingSignatures 文件夹 → uspto_upload/{案号}/
-    folder_arg = sys.argv[1] if len(sys.argv) > 1 else "FilingSignatures"
-    account_arg = sys.argv[2] if len(sys.argv) > 2 else "agent"
-    output_arg = sys.argv[3] if len(sys.argv) > 3 else "uspto_upload"
-    fetch(folder_arg, account_arg, output_arg)
+    # 用法：fetch_uspto_upload_attachments.py [文件夹] [账号] [输出目录] [--loop [秒数]]
+    #   单次：  python3 fetch_uspto_upload_attachments.py
+    #   常驻：  python3 fetch_uspto_upload_attachments.py --loop         # 每 5min
+    #          python3 fetch_uspto_upload_attachments.py --loop 300     # 显式 300s
+    _loop, _interval = _parse_interval(sys.argv)
+    # 位置参数解析：剔除 --loop 及其紧随的秒数，其余按 [文件夹 账号 输出目录] 取
+    _pos = []
+    _argv = sys.argv[1:]
+    _skip = False
+    for _idx, _a in enumerate(_argv):
+        if _skip:
+            _skip = False
+            continue
+        if _a == "--loop":
+            # 若后面紧跟数字，作为间隔一并跳过
+            if _idx + 1 < len(_argv) and _argv[_idx + 1].isdigit():
+                _skip = True
+            continue
+        _pos.append(_a)
+    folder_arg = _pos[0] if len(_pos) > 0 else "FilingSignatures"
+    account_arg = _pos[1] if len(_pos) > 1 else "agent"
+    output_arg = _pos[2] if len(_pos) > 2 else "uspto_upload"
+    if _loop:
+        fetch_loop(_interval, folder_arg, account_arg, output_arg)
+    else:
+        fetch(folder_arg, account_arg, output_arg)
