@@ -6,6 +6,10 @@
   - 客户公共邮箱匹配（customer_public_email）
   - 收件人组装（forward_recipients）= 固定人员 + 客户公共邮箱
 """
+import os
+
+# OA 分配页对外基址（如 http://10.10.70.88:8501）：由 pipeline_config.json 的 oa_assign_base_url
+# 经 main.py 注入环境变量 OA_ASSIGN_BASE_URL；为空则转OA邮件不带分配链接。运行时读取（避免导入时机问题）。
 
 # 客户案号前缀（案号第一段）→ 客户公共邮箱；未列出的客户用兜底邮箱
 CUSTOMER_PUBLIC_EMAIL = {
@@ -114,6 +118,7 @@ FORWARD_BODY_TEMPLATE = (
     "案号：{project}\n"
     "发文日：{issue_date}\n"
     "截止日期：{deadline}\n\n"
+    "{assign_line}"
     "@OA 分析师值班人，请重启项目，生产管理安排人员处理。\n\n"
     "{unpublished_line}"
     "{prescreen_line}"
@@ -141,11 +146,16 @@ def build_forward_body(item):
             f"    案号：{project}    申请号：{_app}    官文代码：{_doc}    发文日：{issue_date}\n\n")
     else:
         unpublished_line = ""
+    # OA 分配链接：基址由 pipeline_config→env 提供，且该案已有 oa_id 才带
+    base = os.environ.get("OA_ASSIGN_BASE_URL", "").rstrip("/")
+    oa_id = item.get("oa_id", "") or ""
+    assign_line = f"OA 分配链接：{base}/oa-assign/{oa_id}\n\n" if (base and oa_id) else ""
     return FORWARD_BODY_TEMPLATE.format(
         oa_type=oa_type, period_sentence=period_sentence,
         project=project, issue_date=issue_date, deadline=deadline,
         unpublished_line=unpublished_line,
         prescreen_line=prescreen_line,
+        assign_line=assign_line,
     )
 
 

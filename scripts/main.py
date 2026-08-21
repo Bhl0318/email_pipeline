@@ -44,6 +44,11 @@ def main(dry_run=False):
         os.environ["PIPELINE_NO_EMAIL"] = "1"
         print("[email_pipeline] send_email=false → 本轮不发送任何邮件通知（Wiki/库照常）", file=sys.stderr)
 
+    # OA 分配页对外基址（转OA邮件带分配链接用）：注入环境变量供 forward_oa 读取；空则不带链接。
+    _assign_base = (cfg.get("oa_assign_base_url") or "").strip()
+    if _assign_base:
+        os.environ["OA_ASSIGN_BASE_URL"] = _assign_base
+
     if dry_run:
         print("[email_pipeline] ★ DRY-RUN：照常读邮件+分类，但不写库/不发邮件/不移邮件"
               "（注：读取阶段仍会把官文 PDF 暂存到 output/_inbox/）", file=sys.stderr)
