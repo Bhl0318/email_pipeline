@@ -11,6 +11,10 @@ rem    start_uspto_upload.bat --loop 3600        (dry-run, no --live)
 rem ============================================================
 setlocal
 
+rem --- UTF-8 console so the Chinese window title / python output render correctly ---
+chcp 65001 >nul
+title 递交文件自动上传USPTO
+
 rem --- clear proxy: empty proxy vars + NO_PROXY=* so python/pip/requests go direct ---
 set HTTP_PROXY=
 set HTTPS_PROXY=
