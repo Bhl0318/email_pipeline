@@ -5,9 +5,9 @@ rem  Clears proxy (bypass VPN/system proxy) for THIS window only,
 rem  then starts the polling uploader. Does NOT change system settings.
 rem
 rem  Usage:
-rem    double-click            -> default: --loop 30 --live
+rem    double-click            -> default: --loop 3600 --live
 rem    start_uspto_upload.bat --loop 60 --live
-rem    start_uspto_upload.bat --loop 30          (dry-run, no --live)
+rem    start_uspto_upload.bat --loop 3600        (dry-run, no --live)
 rem ============================================================
 setlocal
 
@@ -24,8 +24,8 @@ echo [proxy] HTTP_PROXY/HTTPS_PROXY cleared, NO_PROXY=*
 echo [cwd]   %CD%
 
 if "%~1"=="" (
-    echo [run]   python run_uspto_upload.py --loop 30 --live
-    python run_uspto_upload.py --loop 30 --live
+    echo [run]   python run_uspto_upload.py --loop 3600 --live
+    python run_uspto_upload.py --loop 3600 --live
 ) else (
     echo [run]   python run_uspto_upload.py %*
     python run_uspto_upload.py %*
