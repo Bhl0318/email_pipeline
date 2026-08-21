@@ -60,8 +60,9 @@ def main():
         code = project[:5]
         sn = m._customer_shortname(code)
         toplevel = code in m.NAS_TOPLEVEL_CUSTOMERS
+        loc = "列出客户，在根目录" if toplevel else "其他客户，在「其他客户」目录下"
         print(f"客户简称（atw customer_code={code}）：{sn or '(查不到→跳过)'}")
-        print(f"客户位置：{'列出客户，在根目录' if toplevel else '其他客户，在 其他客户\\ 下'}")
+        print(f"客户位置：{loc}")
         print(f"组内号：{project[:10]}")
     print(f"NAS 根：base={m.NAS_BASE_DIR}  zhuohui={m.NAS_ZHUOHUI_DIR}")
 
