@@ -337,6 +337,25 @@ class WikiClient:
             logger.error(f"Wiki 获取页面失败 [{title}]: {e}")
         return None
 
+    def get_page_by_id(self, page_id):
+        """按 pageId 获取页面（storage 格式），返回 {id, title, version, body, space_key} 或 None。"""
+        url = f"{WIKI_BASE}/rest/api/content/{page_id}"
+        try:
+            resp = requests.get(url, params={'expand': 'body.storage,version,space'},
+                                auth=self.auth, headers=self.headers, timeout=15)
+            resp.raise_for_status()
+            page = resp.json()
+            return {
+                "id": page['id'],
+                "title": page['title'],
+                "version": page['version']['number'],
+                "body": page['body']['storage']['value'],
+                "space_key": page['space']['key'],
+            }
+        except requests.RequestException as e:
+            logger.error(f"Wiki 按ID获取页面失败 [{page_id}]: {e}")
+            return None
+
     def update_page(self, page_id, title, content, version):
         """更新页面内容"""
         data = {

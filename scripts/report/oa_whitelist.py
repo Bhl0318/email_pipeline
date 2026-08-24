@@ -78,6 +78,22 @@ async def whitelist_delete(req: Request):
         return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
 
 
+@router.post("/api/whitelist/sync-wiki")
+def whitelist_sync_wiki():
+    """把当前 atw 白名单全量回渲染，写回 Confluence 白名单页（按钮触发）。"""
+    try:
+        oa_dir = os.path.join(_DIR, "..", "oa")
+        if oa_dir not in sys.path:
+            sys.path.insert(0, oa_dir)
+        from oa_whitelist_wiki import sync_to_wiki
+        r = sync_to_wiki()
+        _log(f"POST /api/whitelist/sync-wiki → {r.get('msg')}")
+        return {"ok": bool(r.get("ok")), "msg": r.get("msg", "")}
+    except Exception as e:
+        _log("同步 Wiki 失败：", e)
+        return JSONResponse({"ok": False, "msg": f"同步失败: {e}"}, status_code=500)
+
+
 @router.post("/api/whitelist/update")
 async def whitelist_update(req: Request):
     body = await req.json()

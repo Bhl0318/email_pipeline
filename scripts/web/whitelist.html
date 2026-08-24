@@ -57,6 +57,7 @@
   <span style="flex:1"></span>
   <button onclick="exportJSON()">导出 JSON</button>
   <button onclick="exportSQL()">导出 SQL</button>
+  <button class="pri" onclick="syncWiki()">同步到 Wiki</button>
 </div>
 
 <table id="tbl"><thead><tr>
@@ -137,6 +138,11 @@ function render(){
 function clearFilter(){["f_biz","f_tier","f_grade","f_field","f_name"].forEach(id=>document.getElementById(id).value="");render();}
 
 function download(name,text){const b=new Blob([text],{type:"text/plain;charset=utf-8"});const a=document.createElement("a");a.href=URL.createObjectURL(b);a.download=name;a.click();}
+async function syncWiki(){
+  if(!confirm("将当前白名单全量回渲染并写回 Confluence 白名单页（整页重生成）。继续？"))return;
+  try{ const d=await api("/api/whitelist/sync-wiki",{}); showErr(""); alert("同步完成："+(d.msg||"")); }
+  catch(e){ showErr("同步 Wiki 失败："+e.message); }
+}
 function exportJSON(){download("oa_whitelist.json",JSON.stringify(ROWS,null,2));}
 function sqlEsc(v){return String(v==null?"":v).replace(/'/g,"\\'");}
 function exportSQL(){
