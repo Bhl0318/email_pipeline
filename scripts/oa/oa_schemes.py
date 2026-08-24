@@ -194,7 +194,7 @@ def render_schemes_md(schemes):
     real = [s for s in (schemes or []) if s and s.get("id") != "custom"]
     if not real:
         return ""
-    lines = ["## 六、本次OA人员安排建议", ""]
+    lines = ["## 七、本次OA人员安排建议", ""]
     for s in real:
         lines.append(f"**{s.get('label', '方案')}**")
         lines.append(f"- 答复负责人：{s.get('responder') or '—'}")
