@@ -1,0 +1,136 @@
+<!-- OA 分配白名单 · 维护（实时写 atw；由 report_server /static 提供，同源调 /api/whitelist/*） -->
+<meta charset="utf-8">
+<title>OA 白名单维护</title>
+<style>
+  :root{--bd:#d0d7de;--th:#eef2f7;--muted:#6b7280;--blue:#1d4ed8;--red:#dc2626;--pri:#2563eb;}
+  body{font-family:-apple-system,"Microsoft YaHei",sans-serif;color:#1f2328;margin:20px;font-size:13px;line-height:1.5;}
+  h1{font-size:19px;margin:0 0 4px;}
+  .sub{color:var(--muted);margin:0 0 12px;font-size:12px;}
+  .bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:10px 0;padding:10px;background:#f6f8fa;border:1px solid var(--bd);border-radius:6px;}
+  .grp{display:flex;gap:6px;align-items:center;} label{color:var(--muted);font-size:12px;}
+  input,select{font:inherit;padding:4px 6px;border:1px solid var(--bd);border-radius:4px;background:#fff;}
+  input[type=text]{min-width:96px;}
+  button{font:inherit;padding:5px 10px;border:1px solid var(--bd);border-radius:5px;background:#fff;cursor:pointer;}
+  button.pri{background:var(--pri);color:#fff;border-color:var(--pri);}
+  button.danger{color:var(--red);}
+  table{border-collapse:collapse;width:100%;margin-top:10px;}
+  th,td{border:1px solid var(--bd);padding:5px 8px;text-align:left;}
+  th{background:var(--th);position:sticky;top:0;cursor:pointer;white-space:nowrap;}
+  tr:hover td{background:#fbfcfe;}
+  .n-blue{color:var(--blue);} .n-red{color:var(--red);}
+  .note{color:var(--muted);font-size:11px;}
+  .x{color:var(--red);cursor:pointer;border:none;background:none;font-size:14px;padding:0 4px;}
+  .count{color:var(--muted);font-size:12px;margin-left:6px;}
+  .flag-blue{background:#dbeafe;} .flag-red{background:#fee2e2;}
+  #err{display:none;margin:8px 0;padding:8px 10px;background:#fef2f2;border:1px solid #fecaca;color:#991b1b;border-radius:6px;font-size:12px;}
+</style>
+
+<h1>OA 分配白名单 · 维护</h1>
+<p class="sub">增删改<b>实时写 atw</b>（oa_assign_whitelist）。tier_level 按 tier 自动推（QC=0/梯队1=1/梯队2=2/梯队3=3，其他=99）。下拉可填新值以外拓新类型/档位/领域。</p>
+<div id="err"></div>
+
+<div class="bar">
+  <b>新增：</b>
+  <div class="grp"><label>业务类型</label><input id="a_biz" list="dl_biz" value="OA实质"></div>
+  <div class="grp"><label>梯队</label><input id="a_tier" list="dl_tier" value="梯队1"></div>
+  <div class="grp"><label>档位</label><input id="a_grade" list="dl_grade" value="普及"></div>
+  <div class="grp"><label>领域</label><input id="a_field" list="dl_field" value="通用"></div>
+  <div class="grp"><label>姓名</label><input id="a_name" type="text" placeholder="name_raw"></div>
+  <div class="grp"><label>备注</label><input id="a_note" type="text" placeholder="note(可空)"></div>
+  <div class="grp"><label>标记</label><select id="a_flag"><option value="">无</option><option value="blue">蓝</option><option value="red">红</option></select></div>
+  <button class="pri" onclick="addRow()">＋ 添加</button>
+</div>
+<datalist id="dl_biz"><option>OA实质</option><option>OA形式</option></datalist>
+<datalist id="dl_tier"><option>QC</option><option>梯队1</option><option>梯队2</option><option>梯队3</option></datalist>
+<datalist id="dl_grade"><option>普及</option><option>标准</option><option>海外</option><option>CN</option></datalist>
+<datalist id="dl_field"><option>通用</option><option>结构</option><option>生化</option><option>通用/结构</option><option>通用/结构/生化</option></datalist>
+
+<div class="bar">
+  <div class="grp"><label>筛选</label>
+    <input id="f_biz" list="dl_biz" placeholder="业务类型"><input id="f_tier" list="dl_tier" placeholder="梯队">
+    <input id="f_grade" list="dl_grade" placeholder="档位"><input id="f_field" list="dl_field" placeholder="领域">
+    <input id="f_name" type="text" placeholder="姓名含…"></div>
+  <button onclick="clearFilter()">清筛选</button>
+  <button onclick="reload()">刷新</button>
+  <span class="count" id="cnt"></span>
+  <span style="flex:1"></span>
+  <button onclick="exportJSON()">导出 JSON</button>
+  <button onclick="exportSQL()">导出 SQL</button>
+</div>
+
+<table id="tbl"><thead><tr>
+  <th data-k="biz_type">业务类型</th><th data-k="tier">梯队</th><th data-k="grade">档位</th>
+  <th data-k="field">领域</th><th data-k="name_raw">姓名</th><th data-k="note">备注</th>
+  <th data-k="flag">标记</th><th style="width:44px">删</th>
+</tr></thead><tbody id="tb"></tbody></table>
+
+<script>
+const TIER_LV={"QC":0,"梯队1":1,"梯队2":2,"梯队3":3};
+const lv=t=>TIER_LV[t]!==undefined?TIER_LV[t]:99;
+let ROWS=[];
+
+function showErr(m){const e=document.getElementById("err");if(m){e.textContent=m;e.style.display="block";}else{e.style.display="none";}}
+async function api(path,body){
+  const opt=body?{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}:{};
+  const r=await fetch(path,opt); const d=await r.json();
+  if(d && d.error) throw new Error(d.error);
+  if(d && d.ok===false) throw new Error(d.error||"操作失败");
+  return d;
+}
+async function reload(){
+  try{ showErr(""); const d=await api("/api/whitelist/list"); ROWS=d.items||[]; render(); }
+  catch(e){ showErr("读取失败："+e.message); }
+}
+async function addRow(){
+  const g=id=>document.getElementById(id).value.trim();
+  const name=g("a_name"); if(!name){alert("请填姓名");return;}
+  try{
+    await api("/api/whitelist/add",{biz_type:g("a_biz"),tier:g("a_tier"),grade:g("a_grade"),field:g("a_field"),name_raw:name,note:g("a_note"),flag:document.getElementById("a_flag").value});
+    document.getElementById("a_name").value=""; document.getElementById("a_note").value="";
+    await reload();
+  }catch(e){ showErr("新增失败："+e.message); }
+}
+async function del(row){
+  if(!confirm(`删除：${row.name_raw}（${row.biz_type}/${row.tier}/${row.grade}/${row.field}）?`))return;
+  try{ await api("/api/whitelist/delete",{id:row.id}); await reload(); }
+  catch(e){ showErr("删除失败："+e.message); }
+}
+
+function filtered(){
+  const f=id=>document.getElementById(id).value.trim();
+  const fb=f("f_biz"),ft=f("f_tier"),fg=f("f_grade"),ff=f("f_field"),fn=f("f_name");
+  return ROWS.filter(r=>(!fb||(r.biz_type||"").includes(fb))&&(!ft||(r.tier||"").includes(ft))&&
+    (!fg||(r.grade||"").includes(fg))&&(!ff||(r.field||"").includes(ff))&&(!fn||(r.name_raw||"").includes(fn)));
+}
+function render(){
+  const list=filtered(); const tb=document.getElementById("tb"); tb.innerHTML="";
+  for(const r of list){
+    const tr=document.createElement("tr");
+    const cls=r.flag==="blue"?"n-blue":r.flag==="red"?"n-red":"";
+    const fl=r.flag==="blue"?"<span class='flag-blue'>蓝</span>":r.flag==="red"?"<span class='flag-red'>红</span>":"";
+    tr.innerHTML=`<td>${r.biz_type||""}</td><td>${r.tier||""}</td><td>${r.grade||""}</td><td>${r.field||""}</td>`+
+      `<td class="${cls}">${r.name_raw||""}</td><td class="note">${r.note||""}</td><td>${fl}</td>`+
+      `<td><button class="x" title="删除">✕</button></td>`;
+    tr.querySelector(".x").onclick=()=>del(r);
+    tb.appendChild(tr);
+  }
+  document.getElementById("cnt").textContent=`显示 ${list.length} / 共 ${ROWS.length} 条`;
+}
+["f_biz","f_tier","f_grade","f_field","f_name"].forEach(id=>document.getElementById(id).addEventListener("input",render));
+function clearFilter(){["f_biz","f_tier","f_grade","f_field","f_name"].forEach(id=>document.getElementById(id).value="");render();}
+
+function download(name,text){const b=new Blob([text],{type:"text/plain;charset=utf-8"});const a=document.createElement("a");a.href=URL.createObjectURL(b);a.download=name;a.click();}
+function exportJSON(){download("oa_whitelist.json",JSON.stringify(ROWS,null,2));}
+function sqlEsc(v){return String(v==null?"":v).replace(/'/g,"\\'");}
+function exportSQL(){
+  const head="-- oa_assign_whitelist 全量重灌\nDELETE FROM oa_assign_whitelist;\n";
+  const vals=ROWS.map(r=>`('${sqlEsc(r.biz_type)}','${sqlEsc(r.tier)}',${lv(r.tier)},'${sqlEsc(r.grade)}','${sqlEsc(r.field)}','${sqlEsc(r.name_raw)}',`+
+    (r.note?`'${sqlEsc(r.note)}'`:"NULL")+","+(r.flag?`'${sqlEsc(r.flag)}'`:"NULL")+",NOW())");
+  download("oa_whitelist.sql",head+"INSERT INTO oa_assign_whitelist\n(biz_type,tier,tier_level,grade,field,name_raw,note,flag,synced_at) VALUES\n"+vals.join(",\n")+";\n");
+}
+let sortK="",sortAsc=true;
+document.querySelectorAll("th[data-k]").forEach(th=>th.onclick=()=>{const k=th.dataset.k;sortAsc=sortK===k?!sortAsc:true;sortK=k;
+  ROWS.sort((a,b)=>{if(k==="tier")return((a.tier_level||99)-(b.tier_level||99))*(sortAsc?1:-1);return String(a[k]||"").localeCompare(String(b[k]||""),"zh")*(sortAsc?1:-1);});render();});
+
+reload();
+</script>

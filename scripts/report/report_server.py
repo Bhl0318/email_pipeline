@@ -108,6 +108,10 @@ app.mount("/static", StaticFiles(directory=str(WEB_DIR)), name="static")
 from oa_assign import router as oa_assign_router  # noqa: E402
 app.include_router(oa_assign_router)
 
+# OA 白名单维护：REST 接口并入本服务；页面 web/whitelist.html 走 /static，入口 /oa-whitelist
+from oa_whitelist import router as oa_whitelist_router  # noqa: E402
+app.include_router(oa_whitelist_router)
+
 # output/ 目录只读挂载，供审核页预览官文 PDF
 _OUTPUT_DIR_FOR_MOUNT = ROOT / "output"
 _OUTPUT_DIR_FOR_MOUNT.mkdir(parents=True, exist_ok=True)
@@ -146,6 +150,12 @@ def oa_assign_page():
 def oa_assign_page_by_id(oa_id: str):
     """按 oa_id 打开分配页：加载完整待分配列表并自动定位到该案（?openId= 由前端读取）。"""
     return RedirectResponse(f"/static/assign.html?openId={oa_id}")
+
+
+@app.get("/oa-whitelist")
+def oa_whitelist_page():
+    """OA 白名单维护页入口 → /static/whitelist.html（同源调 /api/whitelist/*，实时写 atw）。"""
+    return RedirectResponse("/static/whitelist.html")
 
 
 # ─── 审核页 ──────────────────────────────────────────────
