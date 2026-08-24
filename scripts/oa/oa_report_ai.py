@@ -438,7 +438,7 @@ def build_case_report(item, oa_pdf_path=None, app_dir=None, with_personnel=True,
 
     # 第六节：预估工作量（附加分配辅助信息，AI 依据报告内容判断）
     if workload_md:
-        md = md.rstrip() + "\n\n## 六、预估工作量（附加分配辅助信息）\n\n" + workload_md
+        md = md.rstrip() + "\n\n## 预估工作量（附加分配辅助信息）\n\n" + workload_md
     return md
 
 

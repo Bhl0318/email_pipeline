@@ -170,15 +170,15 @@ def collect_candidates(project, execute=None):
 
 
 def build_personnel_md(project, execute=None):
-    """拼「## 五、内部人员档案」markdown。DB 不可达/无数据时返回带说明的段落，绝不抛。"""
+    """拼「## 内部人员档案」markdown。DB 不可达/无数据时返回带说明的段落，绝不抛。"""
     try:
         ex = _get_execute(execute)
     except Exception as e:
-        return f"## 五、内部人员档案\n\n> 人员档案未生成（数据库不可达：{e}）。"
+        return f"## 内部人员档案\n\n> 人员档案未生成（数据库不可达：{e}）。"
     project = project or ""
     zu = project[:10]
     cache = {}
-    L = ["## 五、内部人员档案", ""]
+    L = ["## 内部人员档案", ""]
     try:
         # (1) 本案信息 —— 新立项本身无承办，撰写负责人/原QC 取同案号(projects.project=案号)已有的 leader/qc
         L.append("### (1) 本案信息")
