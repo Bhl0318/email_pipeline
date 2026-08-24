@@ -385,6 +385,10 @@ def build_case_report(item, oa_pdf_path=None, app_dir=None, with_personnel=True,
     }
     files = find_application_files(project, region=item.get("region", ""), base_dir=app_dir)
     spec_full = _docx_text(files.get("spec"))
+    if files.get("spec"):
+        print(f"[oa_report_ai] 申请文件(SPEC) {project}：{files['spec']}（{len(spec_full)} 字）", file=sys.stderr)
+    else:
+        print(f"[oa_report_ai] 申请文件(SPEC) {project}：未找到", file=sys.stderr)
     # 申请文件全文直接交给 DeepSeek 自行识别权要/说明；仅当超大(超上下文风险)才切分保头尾权要。
     APP_CAP = 120000
     if len(spec_full) <= APP_CAP:
