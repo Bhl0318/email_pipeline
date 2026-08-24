@@ -162,11 +162,14 @@ def _generate_report(cid, row):
     # 审意 PDF 不显式传：build_case_report 会按案号读 attachment/{案号}/（生产），
     # 取不到再回退申请文件目录（测试期）。
     md = build_case_report(item, oa_pdf_path=None)
-    # 本次 OA 人员安排建议（≥3 组，AI 从候选人库选人）；无候选/失败返回 []
+    # 先生成真实人员安排方案（白名单+负荷），再把方案渲染成「六、本次OA人员安排建议」追加进报告
     schemes = []
     try:
-        from oa_schemes import build_assignment_schemes
+        from oa_schemes import build_assignment_schemes, render_schemes_md
         schemes = build_assignment_schemes(item.get("project", ""), region=item.get("region", ""), report_md=md)
+        sec = render_schemes_md(schemes)
+        if sec:
+            md = md.rstrip() + "\n\n" + sec
     except Exception as e:
         _log("方案生成失败：", e)
     try:

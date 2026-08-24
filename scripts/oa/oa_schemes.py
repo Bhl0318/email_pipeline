@@ -189,6 +189,22 @@ def build_assignment_schemes(project, region="", report_md="", execute=None):
     return schemes
 
 
+def render_schemes_md(schemes):
+    """把人员安排方案渲染成报告「六、本次OA人员安排建议」markdown。跳过「自定义方案」；空则返回空串。"""
+    real = [s for s in (schemes or []) if s and s.get("id") != "custom"]
+    if not real:
+        return ""
+    lines = ["## 六、本次OA人员安排建议", ""]
+    for s in real:
+        lines.append(f"**{s.get('label', '方案')}**")
+        lines.append(f"- 答复负责人：{s.get('responder') or '—'}")
+        lines.append(f"- 答复 QC：{s.get('qc') or '—'}")
+        if s.get("note"):
+            lines.append(f"- 理由：{s['note']}")
+        lines.append("")
+    return "\n".join(lines).rstrip()
+
+
 if __name__ == "__main__":
     _proj = sys.argv[1] if len(sys.argv) > 1 else "20618-0424US00"
     print(json.dumps(build_assignment_schemes(_proj), ensure_ascii=False, indent=2))

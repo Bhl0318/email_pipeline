@@ -38,9 +38,10 @@ def prewarm_once(force=False, limit=0):
     import oa_assign_store as store
     from oa_report_ai import build_case_report
     try:
-        from oa_schemes import build_assignment_schemes
+        from oa_schemes import build_assignment_schemes, render_schemes_md
     except Exception:
         build_assignment_schemes = None
+        render_schemes_md = None
 
     rows = store.list_pending()
     todo = []
@@ -69,6 +70,10 @@ def prewarm_once(force=False, limit=0):
             if build_assignment_schemes:
                 try:
                     schemes = build_assignment_schemes(proj, region=item["region"], report_md=md)
+                    if render_schemes_md:
+                        sec = render_schemes_md(schemes)
+                        if sec:
+                            md = md.rstrip() + "\n\n" + sec
                 except Exception as e:
                     print(f"[预热] {proj} 方案生成失败: {e}", file=sys.stderr)
             store.save_report(cid, md, schemes)
