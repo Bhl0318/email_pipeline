@@ -44,9 +44,12 @@ def add(row, execute=None):
     vals = {c: row.get(c, "") for c in COLS}
     def _v(c):
         return f"'{_q(vals[c])}'" if vals[c] != "" else "NULL"
-    ex(f"INSERT INTO {TABLE} (biz_type, tier, tier_level, grade, field, name_raw, note, flag, synced_at) "
+    # username_zn：姓名从 users 表选出时同名回填（口径与 name_raw 一致）；未提供则 NULL
+    uzn = (row.get("username_zn") or "").strip()
+    uzn_sql = f"'{_q(uzn)}'" if uzn else "NULL"
+    ex(f"INSERT INTO {TABLE} (biz_type, tier, tier_level, grade, field, name_raw, username_zn, note, flag, synced_at) "
        f"VALUES ('{_q(vals['biz_type'])}', '{_q(vals['tier'])}', {_lv(tier)}, "
-       f"{_v('grade')}, {_v('field')}, '{_q(vals['name_raw'])}', {_v('note')}, {_v('flag')}, NOW())")
+       f"{_v('grade')}, {_v('field')}, '{_q(vals['name_raw'])}', {uzn_sql}, {_v('note')}, {_v('flag')}, NOW())")
     return True
 
 

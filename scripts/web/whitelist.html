@@ -35,7 +35,7 @@
   <div class="grp"><label>梯队</label><input id="a_tier" list="dl_tier" value="梯队1"></div>
   <div class="grp"><label>档位</label><input id="a_grade" list="dl_grade" value="普及"></div>
   <div class="grp"><label>领域</label><input id="a_field" list="dl_field" value="通用"></div>
-  <div class="grp"><label>姓名</label><input id="a_name" type="text" placeholder="name_raw"></div>
+  <div class="grp"><label>姓名</label><input id="a_name" list="dl_users" type="text" placeholder="输入以搜索 users…" autocomplete="off"></div>
   <div class="grp"><label>备注</label><input id="a_note" type="text" placeholder="note(可空)"></div>
   <div class="grp"><label>标记</label><select id="a_flag"><option value="">无</option><option value="blue">蓝</option><option value="red">红</option></select></div>
   <button class="pri" onclick="addRow()">＋ 添加</button>
@@ -44,6 +44,7 @@
 <datalist id="dl_tier"><option>QC</option><option>梯队1</option><option>梯队2</option><option>梯队3</option></datalist>
 <datalist id="dl_grade"><option>普及</option><option>标准</option><option>海外</option><option>CN</option></datalist>
 <datalist id="dl_field"><option>通用</option><option>结构</option><option>生化</option><option>通用/结构</option><option>通用/结构/生化</option></datalist>
+<datalist id="dl_users"></datalist>
 
 <div class="bar">
   <div class="grp"><label>筛选</label>
@@ -81,11 +82,27 @@ async function reload(){
   try{ showErr(""); const d=await api("/api/whitelist/list"); ROWS=d.items||[]; render(); }
   catch(e){ showErr("读取失败："+e.message); }
 }
+// 姓名从 users 表搜索：输入即拉 /api/staff/list?q=，填进 datalist 供选
+let userSet=new Set();
+async function searchUsers(q){
+  try{ const d=await api("/api/staff/list?q="+encodeURIComponent(q)); const list=d.staff||[];
+    userSet=new Set(list);
+    document.getElementById("dl_users").innerHTML=list.map(n=>`<option value="${n}">`).join("");
+  }catch(e){/* 忽略搜索失败，不打断 */}
+}
+let userTimer=null;
+document.getElementById("a_name").addEventListener("input",e=>{
+  clearTimeout(userTimer); const q=e.target.value.trim();
+  userTimer=setTimeout(()=>searchUsers(q),200);
+});
+
 async function addRow(){
   const g=id=>document.getElementById(id).value.trim();
   const name=g("a_name"); if(!name){alert("请填姓名");return;}
+  if(userSet.size && !userSet.has(name)){ if(!confirm(`「${name}」不在 users 搜索结果里，仍要添加吗？`)) return; }
   try{
-    await api("/api/whitelist/add",{biz_type:g("a_biz"),tier:g("a_tier"),grade:g("a_grade"),field:g("a_field"),name_raw:name,note:g("a_note"),flag:document.getElementById("a_flag").value});
+    // 姓名选自 users → name_raw 与 username_zn 同为该全名
+    await api("/api/whitelist/add",{biz_type:g("a_biz"),tier:g("a_tier"),grade:g("a_grade"),field:g("a_field"),name_raw:name,username_zn:name,note:g("a_note"),flag:document.getElementById("a_flag").value});
     document.getElementById("a_name").value=""; document.getElementById("a_note").value="";
     await reload();
   }catch(e){ showErr("新增失败："+e.message); }
