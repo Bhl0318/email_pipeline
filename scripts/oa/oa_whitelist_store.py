@@ -35,6 +35,23 @@ def list_all(execute=None):
     return rows or []
 
 
+def list_for(biz_type, grade, execute=None):
+    """取某(业务类型×档位)下全部行(三个领域/各梯队)，供人员安排建议按领域选人。
+    返回 [{name, tier, tier_level, field, note, flag}]，name 优先 username_zn(全名)否则 name_raw。"""
+    ex = _get_execute(execute)
+    rows = ex(f"SELECT tier, tier_level, grade, field, name_raw, username_zn, note, flag "
+              f"FROM {TABLE} WHERE biz_type='{_q(biz_type)}' AND grade='{_q(grade)}' "
+              f"ORDER BY field, tier_level, name_raw") or []
+    out = []
+    for r in rows:
+        name = (r.get("username_zn") or "").strip() or (r.get("name_raw") or "").strip()
+        if not name:
+            continue
+        out.append({"name": name, "tier": r.get("tier", ""), "tier_level": r.get("tier_level", 99),
+                    "field": r.get("field", ""), "note": r.get("note", ""), "flag": r.get("flag", "")})
+    return out
+
+
 def add(row, execute=None):
     """新增一行。row 为 dict(COLS 子集)；name_raw/biz_type/tier 必填。返回是否成功。"""
     ex = _get_execute(execute)

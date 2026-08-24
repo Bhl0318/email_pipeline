@@ -166,7 +166,7 @@ def _generate_report(cid, row):
     schemes = []
     try:
         from oa_schemes import build_assignment_schemes
-        schemes = build_assignment_schemes(item.get("project", ""))
+        schemes = build_assignment_schemes(item.get("project", ""), region=item.get("region", ""), report_md=md)
     except Exception as e:
         _log("方案生成失败：", e)
     try:

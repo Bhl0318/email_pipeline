@@ -47,26 +47,38 @@ def _schemes_instruction():
     return DEFAULT_SCHEMES_INSTRUCTION
 
 
-def _deepseek_schemes(candidates, tech_field=""):
-    """候选人 + 规则 → DeepSeek 出 JSON 方案数组。失败返回 None。指令取自 _schemes_instruction()。"""
-    from openai import OpenAI
-    from filter_oa_email import _DEEPSEEK_API_KEY, _DEEPSEEK_BASE_URL, _DEEPSEEK_MODEL
+def _grade(project, region):
+    """案号+地区 → 白名单档位。5/6 开头→普及；否则 US/EP→海外、CN→标准。取不到返回空。"""
+    p = (project or "").strip()
+    if p[:1] in ("5", "6"):
+        return "普及"
+    reg = (region or "").upper()
+    if not reg:
+        pu = p.upper()
+        reg = "US" if "US" in pu else "EP" if "EP" in pu else "CN" if "CN" in pu else ""
+    if reg in ("US", "EP"):
+        return "海外"
+    if reg == "CN":
+        return "标准"
+    return ""
 
+
+def _cand_block(candidates):
     lines = []
     for c in candidates:
         attr = "/".join([x for x in (c.get("duty"), c.get("level")) if x])
         lines.append(f"- {c['name']}（{attr or '职务职级未知'}，{c.get('status') or '在职状态未知'}；"
                      f"来源：{'、'.join(c.get('sources', [])) or '—'}）")
-    cand_block = "\n".join(lines)
-    prompt = (
-        _schemes_instruction().rstrip() + "\n\n"
-        f"【本案技术领域】\n{tech_field or '（未提供）'}\n\n"
-        "【候选人库（只能从这里选，禁止编造库外姓名）】\n" + cand_block
-    )
+    return "\n".join(lines)
+
+
+def _deepseek(prompt):
+    from openai import OpenAI
+    from filter_oa_email import _DEEPSEEK_API_KEY, _DEEPSEEK_BASE_URL, _DEEPSEEK_MODEL
     try:
         client = OpenAI(api_key=_DEEPSEEK_API_KEY, base_url=_DEEPSEEK_BASE_URL)
         resp = client.chat.completions.create(
-            model=_DEEPSEEK_MODEL, max_tokens=1200,
+            model=_DEEPSEEK_MODEL, max_tokens=1400,
             messages=[{"role": "user", "content": prompt}])
         content = (resp.choices[0].message.content or "").strip()
         m = re.search(r"\[.*\]", content, re.DOTALL)
@@ -77,24 +89,75 @@ def _deepseek_schemes(candidates, tech_field=""):
     return None
 
 
-def build_assignment_schemes(project, tech_field="", execute=None):
-    """生成本次 OA 人员安排建议（≥3 组）。无候选人或 DeepSeek 失败返回 []。绝不抛异常。
+def _deepseek_schemes(candidates, tech_field=""):
+    """无白名单时的兜底：仅候选池 + 规则。"""
+    prompt = (_schemes_instruction().rstrip() + "\n\n"
+              f"【本案技术领域】\n{tech_field or '（未提供）'}\n\n"
+              "【候选人库（只能从这里选，禁止编造库外姓名）】\n" + _cand_block(candidates))
+    return _deepseek(prompt)
+
+
+def _deepseek_schemes_wl(candidates, whitelist, grade, report_md):
+    """有白名单：先判领域→从该领域白名单选人；连续性候选(本案/同族承办)优先、梯队1优先。"""
+    cont = {c["name"] for c in candidates}
+    by_field = {}
+    for w in whitelist:
+        by_field.setdefault(w.get("field") or "(未分领域)", []).append(w)
+    wl_lines = []
+    for fld, ws in by_field.items():
+        wl_lines.append(f"◆ 领域【{fld}】")
+        for w in sorted(ws, key=lambda x: x.get("tier_level", 99)):
+            mark = "，本案/同族承办" if w["name"] in cont else ""
+            note = f"，{w['note']}" if w.get("note") else ""
+            wl_lines.append(f"  - {w['name']}（{w.get('tier','')}{mark}{note}）")
+    wl_block = "\n".join(wl_lines)
+    prompt = (
+        _schemes_instruction().rstrip() + "\n\n"
+        "【本案档位】" + (grade or "未知") + "（白名单已按此档位给出）\n\n"
+        "【判定要求】先据下方报告判断本案技术领域属 通用/结构/生化 中的哪一个，"
+        "再仅从该领域的白名单里选人；答复负责人优先取标注「本案/同族承办」的（连续性），"
+        "其次梯队1，可下探梯队2/3；QC 取该领域白名单中的 QC 档；**推荐人必须在白名单内，禁止编造**。\n\n"
+        "【案件报告（判领域用，节选）】\n" + (report_md or "")[:4000] + "\n\n"
+        "【本档位白名单（按领域/梯队；只能从这里选）】\n" + wl_block
+    )
+    return _deepseek(prompt)
+
+
+def build_assignment_schemes(project, region="", report_md="", execute=None):
+    """生成本次 OA 人员安排建议（≥3 组）。绝不抛异常，失败返回 []。
+    白名单可用时按 档位(案号/地区)×领域(DeepSeek判) 选人；否则退回候选池逻辑。
     返回 [{id, label, responder, qc, note}]（不含「自定义方案」，由上层补）。"""
     try:
         from oa_personnel import collect_candidates
         candidates = collect_candidates(project, execute=execute)
     except Exception as e:
         print(f"[oa_schemes] 候选池不可用: {e}", file=sys.stderr)
-        return []
-    if not candidates:
-        print(f"[oa_schemes] {project} 无候选人（本案/同族无在库承办人），跳过方案生成", file=sys.stderr)
-        return []
+        candidates = []
 
-    raw = _deepseek_schemes(candidates, tech_field=tech_field)
+    # 白名单（OA实质 × 本案档位）
+    grade = _grade(project, region)
+    whitelist = []
+    if grade:
+        try:
+            from oa_whitelist_store import list_for
+            whitelist = list_for("OA实质", grade, execute=execute)
+        except Exception as e:
+            print(f"[oa_schemes] 读白名单失败: {e}", file=sys.stderr)
+
+    if whitelist:
+        raw = _deepseek_schemes_wl(candidates, whitelist, grade, report_md)
+        valid_names = {w["name"] for w in whitelist}
+        print(f"[oa_schemes] {project} 档位={grade} 白名单{len(whitelist)}人 → 按白名单选人", file=sys.stderr)
+    else:
+        if not candidates:
+            print(f"[oa_schemes] {project} 无白名单且无候选人，跳过", file=sys.stderr)
+            return []
+        raw = _deepseek_schemes(candidates)   # 兜底：候选池
+        valid_names = {c["name"] for c in candidates}
+        print(f"[oa_schemes] {project} 无白名单(档位={grade or '未知'})，退回候选池", file=sys.stderr)
+
     if not raw:
         return []
-
-    valid_names = {c["name"] for c in candidates}
     labels = ["方案一", "方案二", "方案三", "方案四", "方案五", "方案六"]
     schemes = []
     for i, s in enumerate(raw):
