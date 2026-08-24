@@ -1313,9 +1313,9 @@ def dispatch_oa(all_results, all_emails=None, dry_run=False, test_project_prefix
         except Exception as e:
             print(f"[待分配] 写入失败: {e}", file=sys.stderr)
 
-    # 注：AI 案件报告不在立项时生成，改为「第一次打开分配页时懒生成 + 重新生成按钮」，
-    #     由 report/oa_assign.py analyze 现场调 oa_report_ai.build_case_report 落 oa_assign_report。
-    # 但 CN/EP 审意官文是邮件附件（存在 _inbox，事后随邮件归档消失），故立项此刻复制到
+    # AI 案件报告：立项即生成（见下方「分配报告」块）；分配页打开时先读 oa_assign_report 缓存，
+    #     没有才现场懒生成（report/oa_assign.py analyze）。两处 save_report 为 UPSERT，不冲突。
+    # CN/EP 审意官文是邮件附件（存在 _inbox，事后随邮件归档消失），故立项此刻复制到
     # attachment/{案号}/，与 US 下载件同目录，供 OA 分配按案号直接读。US 官文本就在该目录，无需复制。
     if inserted_items and not dry_run:
         try:
@@ -1334,6 +1334,33 @@ def dispatch_oa(all_results, all_emails=None, dry_run=False, test_project_prefix
             print(f"[官文归集] CN/EP 审意 PDF 复制到 attachment/案号/ 共 {_saved} 个", file=sys.stderr)
         except Exception as e:
             print(f"[官文归集] 失败: {e}", file=sys.stderr)
+
+    # 立项即生成 AI 分配报告(报告+方案)落 oa_assign_report：这样发出分配链接后，薛虹点开即秒读缓存。
+    # 官文已在上一步归集到 attachment/案号/，此刻生成能读到审意。单件失败不影响其它/主流程。
+    if inserted_items and not dry_run:
+        try:
+            from oa_report_ai import build_case_report
+            from oa_schemes import build_assignment_schemes, render_schemes_md
+            from oa_assign_store import save_report
+            _gen = 0
+            for item in inserted_items:
+                oa_id = item.get("oa_id", "")
+                if not oa_id:
+                    continue
+                try:
+                    _md = build_case_report(item)
+                    _sch = build_assignment_schemes(item.get("project", ""),
+                                                    region=item.get("region", ""), report_md=_md)
+                    _sec = render_schemes_md(_sch)
+                    if _sec:
+                        _md = _md.rstrip() + "\n\n" + _sec
+                    save_report(oa_id, _md, _sch)
+                    _gen += 1
+                except Exception as e:
+                    print(f"[分配报告] {item.get('project','')} 生成失败: {e}", file=sys.stderr)
+            print(f"[分配报告] 立项即生成 {_gen} 件 → oa_assign_report", file=sys.stderr)
+        except Exception as e:
+            print(f"[分配报告] 模块不可用，跳过: {e}", file=sys.stderr)
 
     # 转OA：逐案转发给 OA 处理团队（替换原 send_notification 总表→qin.zhang；dry_run 内部处理）
     # 返回本次转OA立项动作 [{message_id, project, action, reason}]，供 main.py 汇总写邮件动作页
