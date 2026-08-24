@@ -335,27 +335,6 @@ def _report_instruction():
     return DEFAULT_REPORT_INSTRUCTION
 
 
-_PERSONNEL_CUT_RE = re.compile(
-    r'(?:#{1,4}\s*)?(?:[一二三四五六七八九十0-9]+[、.．]\s*)?'
-    r'(预估工作量|内部人员档案|本次\s*OA\s*人员安排建议|人员安排建议|报告编制完毕)')
-
-
-def _strip_after_personnel(md):
-    """砍掉 DeepSeek 输出里「预估工作量/内部人员档案/人员安排建议/报告编制完毕」及其之后的内容。
-    （工作量另抽出重贴为六、真五=查库、真方案=schemes 由代码补，防 DeepSeek 编假人）"""
-    m = _PERSONNEL_CUT_RE.search(md or "")
-    return (md[:m.start()] if m else (md or "")).rstrip()
-
-
-def _extract_workload(md):
-    """从正文抽「预估工作量」段（标题下的内容，到下一编号标题/人员段/结尾止）。无则空串。"""
-    m = re.search(
-        r'(?:#{1,4}\s*)?(?:[一二三四五六七八九十0-9]+[、.．]\s*)?预估工作量[^\n]*\n'
-        r'([\s\S]*?)(?=\n(?:#{1,4}\s*)?(?:[一二三四五六七八九十0-9]+[、.．])|内部人员档案|人员安排建议|报告编制完毕|\Z)',
-        md or "")
-    return m.group(1).strip() if m else ""
-
-
 def _deepseek_report(basic, application_text, oa_text):
     """把申请文件全文(含说明书+权利要求)与审意材料喂给 DeepSeek，由其自行识别权要/说明，
     产出前四大类的中文 markdown 报告。失败返回 None。指令取自 _report_instruction()。"""
@@ -438,12 +417,10 @@ def build_case_report(item, oa_pdf_path=None, app_dir=None, with_personnel=True,
     md = _deepseek_report(basic, application_text, oa_text)
     workload_md = ""
     if md:
-        # 拆出「预估工作量」(优先 ===标记，其次正文里的‘预估工作量’段)
+        # 拆出 DeepSeek 附带的「预估工作量」(标记后的内容)，放到第六节
         main_md, sep, tail = md.partition("===预估工作量===")
-        workload_md = tail.strip() or _extract_workload(main_md)
-        # 砍掉 DeepSeek 可能编造的「内部人员档案/人员安排建议/报告编制完毕」及其后
-        # （真五=查库、真人员方案=schemes 由代码补，防 DeepSeek 编假人）
-        md = _strip_after_personnel(main_md)
+        md = main_md.rstrip()
+        workload_md = tail.strip()
     else:
         # DeepSeek 失败兜底：前四大类给最基础的可读 markdown，不留空
         lines = ["## 一、案件基础信息", ""]
