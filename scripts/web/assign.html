@@ -310,27 +310,26 @@
                 <div class="scheme-card__custom-body" @click.stop>
                   <div class="scheme-card__custom-row">
                     <span class="scheme-card__custom-label">答复负责人</span>
-                    <!-- API: GET /api/staff/list params: { role: 'responder' } -->
-                    <el-autocomplete
+                    <!-- 只能从 users 搜索结果选，不能自由输入 -->
+                    <el-select
                       :model-value="currentSelection?.customResponder || ''"
-                      :fetch-suggestions="queryStaff"
-                      placeholder="输入姓名搜索"
-                      size="small" style="flex:1"
-                      @select="v => { setCustomResponder(v.value); selectScheme('custom') }"
-                      @input="v => { setCustomResponder(v); if(v) selectScheme('custom') }"
-                    />
+                      filterable remote :remote-method="remoteStaff" :loading="staffLoading"
+                      clearable placeholder="搜索选择姓名" size="small" style="flex:1"
+                      @change="v => { setCustomResponder(v); selectScheme('custom') }"
+                    >
+                      <el-option v-for="n in staffOptions" :key="n" :label="n" :value="n" />
+                    </el-select>
                   </div>
                   <div class="scheme-card__custom-row">
                     <span class="scheme-card__custom-label">答复 QC</span>
-                    <!-- API: GET /api/staff/list params: { role: 'qc' } -->
-                    <el-autocomplete
+                    <el-select
                       :model-value="currentSelection?.customQc || ''"
-                      :fetch-suggestions="queryStaff"
-                      placeholder="输入姓名搜索"
-                      size="small" style="flex:1"
-                      @select="v => { setCustomQc(v.value); selectScheme('custom') }"
-                      @input="v => { setCustomQc(v); if(v) selectScheme('custom') }"
-                    />
+                      filterable remote :remote-method="remoteStaff" :loading="staffLoading"
+                      clearable placeholder="搜索选择姓名" size="small" style="flex:1"
+                      @change="v => { setCustomQc(v); selectScheme('custom') }"
+                    >
+                      <el-option v-for="n in staffOptions" :key="n" :label="n" :value="n" />
+                    </el-select>
                   </div>
                   <div class="scheme-card__custom-row" data-guide="custom-note-input" style="align-items:flex-start">
                     <span class="scheme-card__custom-label" style="padding-top:6px">说明</span>
@@ -603,6 +602,22 @@ const app = createApp({
       }
     }
 
+    // el-select 远程搜索：只能从 users 结果里选，不能自由输入
+    const staffOptions = ref([])
+    const staffLoading = ref(false)
+    async function remoteStaff(query) {
+      const q = (query || '').trim()
+      staffLoading.value = true
+      try {
+        const st = await apiGet('/api/staff/list?q=' + encodeURIComponent(q))
+        staffOptions.value = st.staff || []
+      } catch (e) {
+        staffOptions.value = []
+      } finally {
+        staffLoading.value = false
+      }
+    }
+
     function setCustomResponder(val) {
       if (!selectedCaseId.value) return
       getOrInitSel(selectedCaseId.value).customResponder = val
@@ -712,6 +727,7 @@ const app = createApp({
       filteredCases, selectedCase, displayedSchemes, renderedMarkdown,
       outlineItems, activeSectionIdx, scrollToSection, onMdScroll,
       selectCase, selectScheme, setCustomResponder, setCustomQc, setPostscript, setCustomNote, queryStaff,
+      staffOptions, staffLoading, remoteStaff,
       toggleCard, canSubmit, batchSubmit, reanalyze,
     }
   }
