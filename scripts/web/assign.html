@@ -237,9 +237,15 @@
       </div>
       <!-- /Component: CaseDetailMarkdown -->
 
-      <div v-else-if="selectedCase && !selectedCase.reportMd && !selectedCase.detail" class="case-detail__body">
+      <div v-else-if="selectedCase && analyzing" class="case-detail__body">
         <div style="padding:20px;text-align:center;color:#8c8c8c;font-size:13px">
-          该案件的 AI 分析尚未生成，请在调试页面执行 AI 指令后查看。
+          正在生成 AI 分析报告，首次生成约需数十秒，请稍候…
+        </div>
+      </div>
+
+      <div v-else-if="selectedCase" class="case-detail__body">
+        <div style="padding:20px;text-align:center;color:#8c8c8c;font-size:13px">
+          AI 分析暂未生成或生成失败，请点右上「重新生成」重试。
         </div>
       </div>
 
@@ -723,7 +729,7 @@ const app = createApp({
     return {
       staffList, allCases, searchText, selectedCaseId,
       caseSelections, currentSelection, assignedCount, isCaseAssigned,
-      expandedCards, reanalyzing,
+      expandedCards, reanalyzing, analyzing,
       filteredCases, selectedCase, displayedSchemes, renderedMarkdown,
       outlineItems, activeSectionIdx, scrollToSection, onMdScroll,
       selectCase, selectScheme, setCustomResponder, setCustomQc, setPostscript, setCustomNote, queryStaff,
