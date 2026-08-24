@@ -111,6 +111,14 @@ def _deepseek_schemes_wl(candidates, whitelist, grade, report_md):
             note = f"，{w['note']}" if w.get("note") else ""
             wl_lines.append(f"  - {w['name']}（{w.get('tier','')}{mark}{note}）")
     wl_block = "\n".join(wl_lines)
+    # 人员负荷（读 Confluence 负荷页；连不上则空，不阻断）
+    try:
+        from oa_workload import workload_block
+        wl_load = workload_block()
+    except Exception:
+        wl_load = ""
+    load_part = ("\n\n" + wl_load + "\n\n【负荷要求】同等条件下优先负荷低(饱和度%小)的人；"
+                 "避开请假/培训人员；在 note 里注明所选人的负荷情况。") if wl_load else ""
     prompt = (
         _schemes_instruction().rstrip() + "\n\n"
         "【本案档位】" + (grade or "未知") + "（白名单已按此档位给出）\n\n"
@@ -119,6 +127,7 @@ def _deepseek_schemes_wl(candidates, whitelist, grade, report_md):
         "其次梯队1，可下探梯队2/3；QC 取该领域白名单中的 QC 档；**推荐人必须在白名单内，禁止编造**。\n\n"
         "【案件报告（判领域用，节选）】\n" + (report_md or "")[:4000] + "\n\n"
         "【本档位白名单（按领域/梯队；只能从这里选）】\n" + wl_block
+        + load_part
     )
     return _deepseek(prompt)
 
