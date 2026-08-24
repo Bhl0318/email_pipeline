@@ -124,7 +124,8 @@ def _deepseek_schemes_wl(candidates, whitelist, grade, report_md):
         "【本案档位】" + (grade or "未知") + "（白名单已按此档位给出）\n\n"
         "【判定要求】先据下方报告判断本案技术领域属 通用/结构/生化 中的哪一个，"
         "再仅从该领域的白名单里选人；答复负责人优先取标注「本案/同族承办」的（连续性），"
-        "其次梯队1，可下探梯队2/3；QC 取该领域白名单中的 QC 档；**推荐人必须在白名单内，禁止编造**。\n\n"
+        "其次梯队1，可下探梯队2/3；QC 取该领域白名单中的 QC 档；**推荐人必须在白名单内，禁止编造**。"
+        "每组方案的 JSON 里额外带一个字段 \"field\"，值为你判定的技术领域（通用/结构/生化）。\n\n"
         "【案件报告（判领域用，节选）】\n" + (report_md or "")[:4000] + "\n\n"
         "【本档位白名单（按领域/梯队；只能从这里选）】\n" + wl_block
         + load_part
@@ -155,7 +156,9 @@ def build_assignment_schemes(project, region="", report_md="", execute=None):
 
     if whitelist:
         raw = _deepseek_schemes_wl(candidates, whitelist, grade, report_md)
-        valid_names = {w["name"] for w in whitelist}
+        # 合法名单 = 白名单 ∪ 连续性候选(本案/同族承办人)：后者是 projects 查出的真人，
+        # 虽未必在白名单该格内，但连续性规则允许选，故不清空（只清真正编造的库外名）。
+        valid_names = {w["name"] for w in whitelist} | {c["name"] for c in candidates}
         print(f"[oa_schemes] {project} 档位={grade} 白名单{len(whitelist)}人 → 按白名单选人", file=sys.stderr)
     else:
         if not candidates:
@@ -177,6 +180,10 @@ def build_assignment_schemes(project, region="", report_md="", execute=None):
         # 只保留候选库内的姓名，杜绝编造（库外名清空）
         responder = responder if responder in valid_names else ""
         qc = qc if qc in valid_names else ""
+        field = (s.get("field") or "").strip()   # DeepSeek 判定的技术领域，供兜底补人
+        # 兜底(规则⑤)：角色空 → 从同技术领域白名单补人；同领域补不到再跨领域
+        if whitelist and (not responder or not qc):
+            responder, qc = _fallback_fill(whitelist, field, responder, qc)
         if not responder and not qc:
             continue
         schemes.append({
@@ -187,6 +194,25 @@ def build_assignment_schemes(project, region="", report_md="", execute=None):
             "note": (s.get("note") or "").strip(),
         })
     return schemes
+
+
+def _fallback_fill(whitelist, field, responder, qc):
+    """角色空时从白名单补：负责人取梯队1→2→3，QC 取 QC 档；优先同 field，补不到跨 field；避开同人。"""
+    def pool(is_qc, fld):
+        rows = [w for w in whitelist
+                if (w.get("tier") == "QC") == is_qc and (not fld or w.get("field") == fld)]
+        return [w["name"] for w in sorted(rows, key=lambda x: x.get("tier_level", 99))]
+    if not responder:
+        for n in pool(False, field) + (pool(False, "") if field else []):
+            if n and n != qc:
+                responder = n
+                break
+    if not qc:
+        for n in pool(True, field) + (pool(True, "") if field else []):
+            if n and n != responder:
+                qc = n
+                break
+    return responder, qc
 
 
 def render_schemes_md(schemes):
