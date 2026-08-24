@@ -35,7 +35,7 @@
   <div class="grp"><label>梯队</label><input id="a_tier" list="dl_tier" value="梯队1"></div>
   <div class="grp"><label>档位</label><input id="a_grade" list="dl_grade" value="普及"></div>
   <div class="grp"><label>领域</label><input id="a_field" list="dl_field" value="通用"></div>
-  <div class="grp"><label>姓名</label><input id="a_name" list="dl_users" type="text" placeholder="输入以搜索 users…" autocomplete="off"></div>
+  <div class="grp"><label>姓名</label><input id="a_name" list="dl_users" type="text" placeholder="输入搜索并从下拉选择 users" autocomplete="off"></div>
   <div class="grp"><label>备注</label><input id="a_note" type="text" placeholder="note(可空)"></div>
   <div class="grp"><label>标记</label><select id="a_flag"><option value="">无</option><option value="blue">蓝</option><option value="red">红</option></select></div>
   <button class="pri" onclick="addRow()">＋ 添加</button>
@@ -97,10 +97,15 @@ document.getElementById("a_name").addEventListener("input",e=>{
   userTimer=setTimeout(()=>searchUsers(q),200);
 });
 
+// 校验姓名必须是 users(在职)里的精确项
+async function isUser(name){
+  try{ const d=await api("/api/staff/list?q="+encodeURIComponent(name)); return (d.staff||[]).includes(name); }
+  catch(e){ return false; }
+}
 async function addRow(){
   const g=id=>document.getElementById(id).value.trim();
   const name=g("a_name"); if(!name){alert("请填姓名");return;}
-  if(userSet.size && !userSet.has(name)){ if(!confirm(`「${name}」不在 users 搜索结果里，仍要添加吗？`)) return; }
+  if(!(await isUser(name))){ showErr(`「${name}」不在 users 表(在职)中——姓名只能从下拉搜索里选择，不能手填`); return; }
   try{
     // 姓名选自 users → name_raw 与 username_zn 同为该全名
     await api("/api/whitelist/add",{biz_type:g("a_biz"),tier:g("a_tier"),grade:g("a_grade"),field:g("a_field"),name_raw:name,username_zn:name,note:g("a_note"),flag:document.getElementById("a_flag").value});
