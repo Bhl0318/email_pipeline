@@ -828,8 +828,19 @@ def format_oa_person(responder, qc):
     return "；".join(parts)
 
 
+def _append_person_inner(inner, person_text):
+    """人员分配格：在原内容后追加一行（不覆盖）。原为空则直接写；新文案已存在则不重复。"""
+    cur = (inner or "").strip()
+    # 空格子（含仅 <br/> / 空段落）→ 直接写
+    if not cur or re.fullmatch(r'(?:<br\s*/?>|<p>\s*(?:<br\s*/?>)?\s*</p>|\s)*', cur, re.IGNORECASE):
+        return person_text
+    if person_text in inner:            # 已有相同文案，不重复追加
+        return inner
+    return inner.rstrip() + "<br/>" + person_text
+
+
 def _set_oa_person_cell(body, oa_id, person_text):
-    """在 <tr class="oaid-{oa_id}"> 行里把第9格「人员分配」设为 person_text。
+    """在 <tr class="oaid-{oa_id}"> 行里把第9格「人员分配」**追加** person_text（不覆盖）。
     纯字符串处理，便于测试。返回 (new_body, found)。"""
     a = body.find(f'oaid-{oa_id}')
     if a == -1:
@@ -845,8 +856,8 @@ def _set_oa_person_cell(body, oa_id, person_text):
     if len(matches) < 9:
         return body, False
     m = matches[8]
-    new_cell = re.sub(r'(<td\b[^>]*>).*?(</td>)',
-                      lambda x: x.group(1) + person_text + x.group(2),
+    new_cell = re.sub(r'(<td\b[^>]*>)(.*?)(</td>)',
+                      lambda x: x.group(1) + _append_person_inner(x.group(2), person_text) + x.group(3),
                       m.group(0), count=1, flags=re.DOTALL)
     new_row = row[:m.start()] + new_cell + row[m.end():]
     return body[:tr_start] + new_row + body[tr_end:], True
