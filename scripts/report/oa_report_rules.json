@@ -37,8 +37,11 @@
         }
       },
       "20615": {
-        "action": "assign",
-        "preparer": "mei.hu@metis-ip.com"
+        "action": "skip",
+        "forward": {
+          "to": ["jing.hu@metis-ip.com", "mei.hu@metis-ip.com"],
+          "cc": ["didi_pa@metis-ip.com"]
+        }
       },
       "20608": {
         "action": "skip",
@@ -105,8 +108,11 @@
         }
       },
       "20615": {
-        "action": "assign",
-        "preparer": "mei.hu@metis-ip.com"
+        "action": "skip",
+        "forward": {
+          "to": ["jing.hu@metis-ip.com", "mei.hu@metis-ip.com"],
+          "cc": ["didi_pa@metis-ip.com"]
+        }
       },
       "20608": {
         "action": "assign",
@@ -354,8 +360,11 @@
         }
       },
       "20615": {
-        "action": "assign",
-        "preparer": "mei.hu@metis-ip.com"
+        "action": "skip",
+        "forward": {
+          "to": ["jing.hu@metis-ip.com", "mei.hu@metis-ip.com"],
+          "cc": ["didi_pa@metis-ip.com"]
+        }
       },
       "20608": {
         "action": "assign",
