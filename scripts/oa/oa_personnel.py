@@ -53,12 +53,14 @@ def _person_label(name, ex, cache):
             continue
         label = p
         try:
-            rows = ex(f"SELECT usertype, position, status FROM users WHERE username_zn='{_q(p)}' LIMIT 1")
+            rows = ex(f"SELECT usertype, position, status, usermail FROM users WHERE username_zn='{_q(p)}' LIMIT 1")
             if rows:
                 r = rows[0]
                 duty = (r.get("usertype") or "").strip()
                 level = (r.get("position") or "").strip()
                 status = (r.get("status") or "").strip()
+                if not (r.get("usermail") or "").strip():   # 无 usermail 视同离职
+                    status = "离职"
                 attr = "/".join([x for x in (duty, level) if x])
                 inservice = status or "在职状态未知"
                 label = f"{p}（{attr}，{inservice}）" if attr else f"{p}（{inservice}）"
@@ -112,11 +114,13 @@ def _user_attrs(name, ex, cache):
         return cache[name]
     a = {"name": name, "duty": "", "level": "", "status": ""}
     try:
-        rows = ex(f"SELECT usertype, position, status FROM users WHERE username_zn='{_q(name)}' LIMIT 1")
+        rows = ex(f"SELECT usertype, position, status, usermail FROM users WHERE username_zn='{_q(name)}' LIMIT 1")
         if rows:
             a["duty"] = (rows[0].get("usertype") or "").strip()
             a["level"] = (rows[0].get("position") or "").strip()
             a["status"] = (rows[0].get("status") or "").strip()
+            if not (rows[0].get("usermail") or "").strip():   # 无 usermail 视同离职
+                a["status"] = "离职"
     except Exception:
         pass
     cache[name] = a

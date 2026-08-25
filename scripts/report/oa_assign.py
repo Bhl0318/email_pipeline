@@ -237,7 +237,9 @@ def staff_list(q: str = "", role: str = ""):
         if oa_dir not in sys.path:
             sys.path.insert(0, oa_dir)
         from db_query import execute
-        where = "status <> '离职' AND username_zn IS NOT NULL AND username_zn <> ''"
+        # 在职判定：status<>'离职' 且 usermail 有值（无 usermail 视同离职）
+        where = ("status <> '离职' AND username_zn IS NOT NULL AND username_zn <> '' "
+                 "AND usermail IS NOT NULL AND usermail <> ''")
         if kw:
             where += f" AND username_zn LIKE '%{kw.replace(chr(39), chr(92)+chr(39))}%'"
         rows = execute(f"SELECT DISTINCT username_zn FROM users WHERE {where} "
