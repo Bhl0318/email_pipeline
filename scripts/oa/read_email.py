@@ -1075,6 +1075,9 @@ def dispatch_oa(all_results, all_emails=None, dry_run=False, test_project_prefix
                         print(f"[US] {item['project']} 官文解析失败，按标准表兜底 {_m}月 → {item['project_deadline']}", file=sys.stderr)
                     else:
                         print(f"[US] {item['project']} 答复期限获取失败，留空", file=sys.stderr)
+                # 记下本次下载的全部官文文件（含 Word），供转OA附件/Wiki 上传
+                if dl and dl.get("doc_paths"):
+                    item["us_doc_paths"] = dl["doc_paths"]
                 # 记下下载的官文 PDF 路径，供上传到 OA 信息表页
                 if dl and dl.get("pdf_path"):
                     item["us_pdf_path"] = dl["pdf_path"]
@@ -1143,6 +1146,9 @@ def dispatch_oa(all_results, all_emails=None, dry_run=False, test_project_prefix
             files = list(msgid_to_pdfs.get(item.get("message_id", ""), []))
             if item.get("us_pdf_path"):
                 files.append(item["us_pdf_path"])
+            # 主官文其它格式（Word 版等）：官文可能只有 Word，一并上传 Wiki
+            _pdf = item.get("us_pdf_path", "")
+            files.extend([d for d in (item.get("us_doc_paths") or []) if d and d != _pdf])
             files.extend(item.get("us_ref_pdf_paths") or [])   # 同案号 892/1449 文献
             # 公布/公告文件：客户目录名用 atw 客户简称拼；查不到简称/文件则跳过
             pub = find_publication_file(

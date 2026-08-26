@@ -51,31 +51,33 @@ def get_us_deadline(application_no, document_code, oa_doc_date, project):
         print(f"[US] 下载失败: {e}", file=sys.stderr)
         return None
 
-    # 2. 找到 PDF 文件
-    files = doc_list.get(project, [])
-    pdf_path = None
-    for f in files:
-        if f.lower().endswith(".pdf"):
-            pdf_path = f
-            break
+    # 2. 全部下载文件（doc_paths，含 PDF/Word，都作为转OA附件）；PDF 单独挑出用于解析期限/盖章
+    files = [f for f in doc_list.get(project, []) if f and os.path.exists(f)]
+    pdf_path = next((f for f in files if f.lower().endswith(".pdf")), None)
 
-    if not pdf_path or not os.path.exists(pdf_path):
+    if not files:
         # 403：该申请文件在公开 API 不可访问（未公开/受限申请）→ 回标给上层，供转OA正文标注
         if getattr(uspto, "last_http_status", None) == 403:
             print(f"[US] {application_no} 403：未公开/受限申请，公开API无法下载", file=sys.stderr)
-            return {"months": None, "deadline": None, "pdf_path": None, "unpublished": True}
-        print(f"[US] 未找到 PDF 文件: {files}", file=sys.stderr)
+            return {"months": None, "deadline": None, "pdf_path": None, "doc_paths": [], "unpublished": True}
+        print(f"[US] 未下载到任何官文文件", file=sys.stderr)
         return None
 
-    # 3. 解析答复期限
+    if not pdf_path:
+        # 官文只有 Word 版（无 PDF）：无法解析期限/盖章，但仍作为附件带上；期限走上层标准表兜底
+        print(f"[US] 无 PDF、仅 Word 版官文，作附件不解析: {files}", file=sys.stderr)
+        return {"months": None, "deadline": None, "pdf_path": None, "doc_paths": files}
+
+    # 3. 解析答复期限（用 PDF）
     print(f"[US] 解析 PDF: {pdf_path}", file=sys.stderr)
     result = extract_us_deadline(pdf_path, mailing_date=mailing_date)
     if not result:
-        # 解析不到期限（EXIN/NOA/补正等）也要保留已下载的 pdf_path，供盖章/转OA附件/Wiki/EXIN判定
-        print(f"[US] PDF 期限解析失败，保留 pdf_path", file=sys.stderr)
-        return {"months": None, "deadline": None, "pdf_path": pdf_path}
+        # 解析不到期限（EXIN/NOA/补正等）也要保留已下载文件，供盖章/转OA附件/Wiki/EXIN判定
+        print(f"[US] PDF 期限解析失败，保留下载文件", file=sys.stderr)
+        return {"months": None, "deadline": None, "pdf_path": pdf_path, "doc_paths": files}
 
     result["pdf_path"] = pdf_path
+    result["doc_paths"] = files
     print(f"[US] 结果: months={result['months']}, deadline={result['deadline']}", file=sys.stderr)
     return result
 
@@ -96,6 +98,7 @@ def download_us_ref_doc(application_no, document_code, official_date, project):
     try:
         uspto = USPTOApplication(download_dir=DOWNLOAD_DIR, project=project)
         doc_list = uspto.downLoad_Documents_ByAPI(application_no, document_code, mailing_date, project, "", kind="ref")
+        # 不过滤格式：USPTO 下载的 PDF/Word 都作为附件
         return [f for f in doc_list.get(project, []) if f and os.path.exists(f)]
     except Exception as e:
         print(f"[US-ref] {project} {document_code} 下载失败: {e}", file=sys.stderr)

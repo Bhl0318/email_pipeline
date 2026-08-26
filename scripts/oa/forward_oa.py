@@ -230,12 +230,18 @@ def forward_attachments(item, msgid_to_pdfs=None, check_exists=True):
     paths = []
     if msgid_to_pdfs:
         paths.extend(msgid_to_pdfs.get(item.get("message_id", ""), []) or [])
-    # US：优先附盖章副本（DOCKETED 邮戳），无盖章版则附原官文
+    # US：优先附盖章副本（DOCKETED 邮戳），无盖章版则附原 PDF
     if item.get("us_stamped_pdf_path"):
         paths.append(item["us_stamped_pdf_path"])
     elif item.get("us_pdf_path"):
         paths.append(item["us_pdf_path"])
-    # 同案号 892/1449 文献（原文件，不盖章）
+    # 主官文的其它格式（如 Word 版）：官文可能只有 Word 或 PDF+Word，都作附件；
+    # 已盖章/已附的那份 PDF 除外（避免与盖章副本重复）
+    _pdf = item.get("us_pdf_path", "")
+    for _d in (item.get("us_doc_paths") or []):
+        if _d and _d != _pdf:
+            paths.append(_d)
+    # 同案号 892/1449 文献（原文件，不盖章；PDF/Word 都带）
     paths.extend(item.get("us_ref_pdf_paths") or [])
     seen, out = set(), []
     for p in paths:
