@@ -158,9 +158,16 @@ OA_ASSIGN_NOTIFY_TO = "hxue@metis-ip.com"        # 薛虹
 OA_ASSIGN_NOTIFY_CC = ["hailing.bi@metis-ip.com"]  # 海灵
 
 
+# 这些案号不发 OA 分配链接：20849 / 20608 开头，或 6 / 8 开头
+def _skip_assign_link(project):
+    p = (project or "").strip()
+    return p.startswith(("20849", "20608")) or p[:1] in ("6", "8")
+
+
 def build_assign_notify(plans):
     """汇总本轮各立项案件的 OA 分配链接，生成发给薛虹的 (subject, body)。
-    基址(env OA_ASSIGN_BASE_URL)为空或无带 oa_id 的案件时返回 None（不发）。"""
+    基址(env OA_ASSIGN_BASE_URL)为空或无可发案件时返回 None（不发）。
+    20849/20608/6*/8* 开头的案号不发分配链接。"""
     base = os.environ.get("OA_ASSIGN_BASE_URL", "").rstrip("/")
     if not base:
         return None
@@ -171,6 +178,8 @@ def build_assign_notify(plans):
         if not oa_id:
             continue
         proj = it.get("project", "")
+        if _skip_assign_link(proj):
+            continue
         name = it.get("project_name", "") or it.get("notification_type", "")
         rows.append(f"{proj} {name}\n  {base}/oa-assign/{oa_id}")
     if not rows:
