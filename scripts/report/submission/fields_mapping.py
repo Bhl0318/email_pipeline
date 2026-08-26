@@ -153,8 +153,11 @@ def fields_to_case_info(fields: dict, agent_info: dict = None) -> dict:
         def pick(mk, ak):
             return (manual.get(mk) or "").strip() or (app.get(ak) or "").strip()
         res_ctry = _country_code(pick("residence_country", "country_en_us"))
-        # ResidencyRadio：参照旧实现——非美国居住地→"non-us-residency"（美国/留空则不选）
-        residency = "non-us-residency" if res_ctry and res_ctry.upper() not in ("US", "USA", "UNITED STATES") else ""
+        _is_us = res_ctry.upper() in ("US", "USA", "UNITED STATES")
+        # ResidencyRadio（对齐 ADS 排他组两取值 us-residency / non-us-residency）：
+        # 美国居住地→"us-residency"，其他国家→"non-us-residency"，居住国留空则不选。
+        residency = "us-residency" if _is_us else ("non-us-residency" if res_ctry else "")
+        _res_city = pick("residence_city", "city_en")            # Residence：纯城市
         # 通信地址 City 放「城市, 省份」；State/Province 外国地址留空（该栏是美国州下拉）
         _prov = (app.get("province_city_en_us") or "").strip()
         _mail_city = (manual.get("mail_city") or "").strip() or ", ".join(
@@ -163,8 +166,13 @@ def fields_to_case_info(fields: dict, agent_info: dict = None) -> dict:
         inventors.append({
             "name": full, "firstName": first, "middleName": "", "lastName": last,
             "Residence Information": residency,
-            "City": pick("residence_city", "city_en"),           # Residence：纯城市
-            "Country of Residence": res_ctry,
+            # 非美国居住块（sfNonUSRes）：仅非美国居住时填，美国居住时留空
+            "City": "" if _is_us else _res_city,
+            "Country of Residence": "" if _is_us else res_ctry,
+            # 美国居住块（sfUSres）：美国居住时填 城市/州/国家（rsCtryTxt 在模板中必填）
+            "US Residence City": _res_city if _is_us else "",
+            "US Residence State": (_mail_state or _prov) if _is_us else "",
+            "US Residence Country": res_ctry if _is_us else "",
             "Mailing Address of Inventor address_1": pick("mail_address1", "address1"),
             "Mailing Address of Inventor address_2": pick("mail_address2", "address2"),
             "Mailing Address of Inventor Country": _country_code(pick("mail_country", "country_en_us")),

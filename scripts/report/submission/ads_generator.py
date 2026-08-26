@@ -74,9 +74,9 @@ def build_ads_datasets_xml(case_info: dict) -> str:
           <ResidencyRadio>{inventor.get("Residence Information", '')}</ResidencyRadio>
         </resCheck>
         <sfUSres>
-          <rsCityTxt/>
-          <rsStTxt/>
-          <rsCtryTxt/>
+          <rsCityTxt>{inventor.get("US Residence City", '')}</rsCityTxt>
+          <rsStTxt>{inventor.get("US Residence State", '')}</rsStTxt>
+          <rsCtryTxt>{inventor.get("US Residence Country", '')}</rsCtryTxt>
         </sfUSres>
         <sfNonUSRes>
           <nonresCity>{inventor.get("City", '')}</nonresCity>
