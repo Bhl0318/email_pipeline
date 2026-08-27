@@ -1055,6 +1055,10 @@ async function refreshPreview() {
   if (_tid !== taskId) return;   // 期间切了任务
   // 展示当前 tab（email/source 不在文档列 → 落确认函）
   const showT = PREVIEW_DOC_TARGETS.includes(previewTarget) ? previewTarget : "confirmation";
+  if (warns.length) toast("⚠ " + warns.join(" ｜ "), 6000);
+  loadHighlightRows();   // 重生成后按最新 fields 刷新「标黄设置」可勾选行
+  // 确认函：优先展示 manual/ 替换件（所见即所发），无替换件才显示刚重生成的生成版
+  if (showT === "confirmation") { autoPreview("confirmation"); return; }
   const files = results[showT];
   if (files && files.length) {
     previewFileList = files;
@@ -1067,8 +1071,6 @@ async function refreshPreview() {
     $("previewPlaceholder").style.display = "flex";
     $("previewPlaceholder").textContent = (results[showT] === null) ? "该文档生成失败" : "无产物";
   }
-  if (warns.length) toast("⚠ " + warns.join(" ｜ "), 6000);
-  loadHighlightRows();   // 重生成后按最新 fields 刷新「标黄设置」可勾选行
 }
 
 /* ───────── 确认发送 ───────── */

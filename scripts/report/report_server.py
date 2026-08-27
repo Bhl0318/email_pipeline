@@ -1042,15 +1042,47 @@ def confirmation_rows(task_id: str, req: SubmissionPreviewReq):
     return {"rows": rows, "highlights": fields.get("confirmation_highlights") or []}
 
 
+def _confirmation_override(task_id: str):
+    """确认函替换件：manual/ 里名字含「Application Information Sheet」的上传件(与发送口径一致)。
+    是 PDF 直接用；是 docx 则转 PDF 缓存到 preview/_ov/（不污染 preview/ 顶层扫描、也不进发送集）。
+    :return: (pdf_path, docx_path) 或 (None, None)。"""
+    manual_dir = _submission_manual_dir(task_id)
+    if not manual_dir.is_dir():
+        return None, None
+    tk = "application information sheet"
+    pdfs = sorted((p for p in manual_dir.glob("*.pdf") if tk in p.name.lower()),
+                  key=lambda p: p.stat().st_mtime, reverse=True)
+    docxs = sorted((p for p in manual_dir.glob("*.docx") if tk in p.name.lower()),
+                   key=lambda p: p.stat().st_mtime, reverse=True)
+    if pdfs:
+        return pdfs[0], (docxs[0] if docxs else None)
+    if docxs:
+        src = docxs[0]
+        ov_dir = SUBMISSION_OUTPUT_DIR / task_id / "preview" / "_ov"
+        ov_dir.mkdir(parents=True, exist_ok=True)
+        out_pdf = ov_dir / (src.stem + ".pdf")
+        if (not out_pdf.exists()) or out_pdf.stat().st_mtime < src.stat().st_mtime:
+            docx_to_pdf(str(src), ov_dir)   # 上传的是 docx → 转 PDF 供预览
+        return (out_pdf if out_pdf.exists() else None), src
+    return None, None
+
+
 @app.get("/api/submission/tasks/{task_id}/preview-existing")
 def preview_existing_submission(task_id: str, target: str = "confirmation"):
-    """只查不生成：返回 preview/ 目录里已存在的该 target 成品(PDF，附同名 docx)。
-    供页面打开时「有则直接展示、无则再 POST /preview 生成」。无匹配则 files 为空。"""
+    """展示已存在成品(不重生成)。确认函优先展示 manual/ 里的替换件(与发送一致)，
+    无替换件再看 preview/；供页面打开时「有则直接展示、无则再 POST /preview 生成」。"""
     _load_submission_task(task_id)
     preview_dir = SUBMISSION_OUTPUT_DIR / task_id / "preview"
     token = {"confirmation": "Application Information Sheet",
              "assignment": "Assignment", "declaration": "Declaration"}.get(target, target)
     files = []
+    # 确认函：优先替换件（manual 覆盖），让「所见即所发」
+    if target == "confirmation":
+        ov_pdf, ov_docx = _confirmation_override(task_id)
+        if ov_pdf:
+            return {"target": target, "override": True,
+                    "files": [{"name": ov_pdf.stem, "pdf_url": _output_url(ov_pdf),
+                               "docx_url": _output_url(ov_docx) if ov_docx else None}]}
     if preview_dir.is_dir():
         pdfs = sorted((p for p in preview_dir.glob("*.pdf") if token.lower() in p.name.lower()),
                       key=lambda p: p.stat().st_mtime, reverse=True)
