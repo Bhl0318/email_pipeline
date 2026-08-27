@@ -1097,16 +1097,22 @@ def dispatch_oa(all_results, all_emails=None, dry_run=False, test_project_prefix
                 if ref_docs:
                     from us_deadline import download_us_ref_doc
                     ref_paths = []
+                    paths_892 = []      # 单独留下 892(Notice of References Cited)，供对比文件抽取
                     for rd in ref_docs:
-                        ref_paths.extend(download_us_ref_doc(
+                        _p = download_us_ref_doc(
                             rd.get("application_no", "") or item.get("application_no", ""),
                             rd.get("document_code", ""),
                             rd.get("oa_doc_date", "") or item.get("oa_doc_date", ""),
-                            item.get("project", "")))
+                            item.get("project", ""))
+                        ref_paths.extend(_p)
+                        if (rd.get("document_code") or "") == "892":
+                            paths_892.extend(_p)
                     if ref_paths:
                         item["us_ref_pdf_paths"] = ref_paths
                         print(f"[US-ref] {item['project']} 文献 {len(ref_paths)} 份: "
                               f"{[os.path.basename(p) for p in ref_paths]}", file=sys.stderr)
+                    if paths_892:
+                        item["us_892_pdf_paths"] = paths_892
             except Exception as e:
                 print(f"[US] {item['project']} 异常: {e}", file=sys.stderr)
 
@@ -1221,6 +1227,38 @@ def dispatch_oa(all_results, all_emails=None, dry_run=False, test_project_prefix
                 )
             except Exception as e:
                 print(f"[对比文件] {item.get('project','')} 写回失败: {e}", file=sys.stderr)
+
+    # 对比文件（US）：从 PTO-892(优先) 或主官文正文抽审查员引用的对比文件，归一化成 Google Patents 号，
+    # 与 CN 同样填该案 OA信息记录表页「OA过程」表 OA{N} 行「对比文件链接」列（复用 fill_ref_docs_in_oa_row）。
+    us_ref_items = [r for r in all_results if r.get("region") == "US"]
+    if us_ref_items and not dry_run:
+        from parse_us_refs import extract_us_ref_docs
+        from oainfo_cli import fill_ref_docs_in_oa_row
+        for item in us_ref_items:
+            # 优先用 892（审查员正式引用清单），没有则退回主官文 PDF 正文
+            src = (item.get("us_892_pdf_paths") or [None])[0] or item.get("us_pdf_path")
+            if not src:
+                continue
+            try:
+                parsed = extract_us_ref_docs(src)
+            except Exception as e:
+                print(f"[US-ref] {item.get('project','')} 解析失败: {e}", file=sys.stderr)
+                continue
+            docs = parsed.get("ref_docs") or []
+            if not docs:
+                continue
+            oa_seq = item.get("oaNum") or 1     # US 用已有的 OA 序号机制
+            print(f"[US-ref] {item.get('project','')} OA{oa_seq}: "
+                  f"{[d['doc_no'] for d in docs]}", file=sys.stderr)
+            try:
+                fill_ref_docs_in_oa_row(
+                    f"{item.get('project','')}-OA信息记录表", oa_seq, docs,
+                    oa_doc_date=item.get("oa_doc_date", ""),
+                    project_deadline=item.get("project_deadline", ""),
+                    dry_run=dry_run,
+                )
+            except Exception as e:
+                print(f"[US-ref] {item.get('project','')} 写回失败: {e}", file=sys.stderr)
 
     print(f"\n{'='*40}", file=sys.stderr)
     print(f"汇总: {len(all_results)} 条立项结果", file=sys.stderr)
