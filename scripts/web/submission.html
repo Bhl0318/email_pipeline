@@ -1057,8 +1057,8 @@ async function refreshPreview() {
   const showT = PREVIEW_DOC_TARGETS.includes(previewTarget) ? previewTarget : "confirmation";
   if (warns.length) toast("⚠ " + warns.join(" ｜ "), 6000);
   loadHighlightRows();   // 重生成后按最新 fields 刷新「标黄设置」可勾选行
-  // 确认函：优先展示 manual/ 替换件（所见即所发），无替换件才显示刚重生成的生成版
-  if (showT === "confirmation") { autoPreview("confirmation"); return; }
+  // 「刷新预览」= 按数据重新生成并显示生成版（即使有 manual 替换件也显示生成版；
+  //  打开页面时才优先替换件，见 autoPreview→preview-existing）
   const files = results[showT];
   if (files && files.length) {
     previewFileList = files;
