@@ -355,7 +355,7 @@ async function openTask(id) {
   openModules = {};
   customSlots = {};
   for (const [sid, sv] of Object.entries(_ems.slots || {}))
-    customSlots[sid] = { title: (sv || {}).title || "", body: (sv || {}).body || "" };
+    customSlots[sid] = { title: (sv || {}).title || "", body: (sv || {}).body || "", hl: !!(sv || {}).hl };
   $("caseTitle").textContent = task.case_volume || id;
   const b = $("statusBadge"); b.textContent = task.status; b.className = "badge " + task.status;
   renderMissing(); renderForm(); renderSidebar();
@@ -457,7 +457,7 @@ function snapshotModules() {
   const slots = {};
   for (const [sid, sv] of Object.entries(customSlots)) {
     const t = ((sv || {}).title || "").trim(), b = ((sv || {}).body || "").trim();
-    if (t || b) slots[sid] = { title: (sv || {}).title || "", body: (sv || {}).body || "" };
+    if (t || b) slots[sid] = { title: (sv || {}).title || "", body: (sv || {}).body || "", hl: !!(sv || {}).hl };
   }
   collectModuleParams();   // 先把 DOM 当前值读进 moduleParams，再挑出下拉决策项落库
   const params = {};
@@ -520,13 +520,15 @@ function slotHtml(id) {
           oninput="customSlots['${esc(id)}'].title=this.value;if(previewTarget==='email')renderEmailPreview()" value="${esc(s.title || "")}">
         <textarea placeholder="正文内容，每行一段，自动套正文样式"
           oninput="customSlots['${esc(id)}'].body=this.value;if(previewTarget==='email')renderEmailPreview()">${esc(s.body || "")}</textarea>
+        <label class="mod-hl" title="在邮件正文中整块标黄"><input type="checkbox" ${s.hl ? "checked" : ""}
+          onchange="customSlots['${esc(id)}'].hl=this.checked;if(previewTarget==='email')renderEmailPreview()">🟡 整块标黄</label>
       </div>
       <button class="slot-del" title="删除此段" onclick="removeSlot('${esc(id)}')">✕</button>
     </div></div>`;
   }
   return `<div class="slot"><button class="slot-add" onclick="addSlot('${esc(id)}')">＋ 在此插入自定义内容</button></div>`;
 }
-function addSlot(id) { customSlots[id] = { title: "", body: "" }; renderEmailModules(); }
+function addSlot(id) { customSlots[id] = { title: "", body: "", hl: false }; renderEmailModules(); }
 function removeSlot(id) {
   delete customSlots[id]; renderEmailModules();
   if (previewTarget === "email") renderEmailPreview();
@@ -555,7 +557,10 @@ function assembleEmailBody() {
       parts.push(moduleHighlight[m.id] ? `<div style="background:#FFFF00;">${m.html}</div>` : m.html);
     }
     const s = customSlots[m.id];
-    if (s && ((s.title || "").trim() || (s.body || "").trim())) parts.push(customToHtml(s));
+    if (s && ((s.title || "").trim() || (s.body || "").trim())) {
+      const chtml = customToHtml(s);
+      parts.push(s.hl ? `<div style="background:#FFFF00;">${chtml}</div>` : chtml);
+    }
   }
   return parts.join("\n");
 }
