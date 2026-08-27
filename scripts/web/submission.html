@@ -360,7 +360,7 @@ async function openTask(id) {
   loadEmailModules();
 }
 
-// 文档类预览（确认函/Assignment/Declaration）：优先展示 preview/ 里已存在的成品；没有再 refreshPreview() 生成
+// 文档类预览（确认函/Assignment/Declaration）：优先展示 preview/ 里已存在的成品；没有再 generateAndShow 只生成这一个
 async function autoPreview(target) {
   if (!taskId) return;
   const _tid = taskId, _tgt = target;
@@ -376,7 +376,7 @@ async function autoPreview(target) {
       return;
     }
   } catch (e) { /* 查不到/出错就走生成 */ }
-  if (_tid === taskId && _tgt === previewTarget) refreshPreview();   // 无已存在文件 → 自动生成
+  if (_tid === taskId && _tgt === previewTarget) generateAndShow(target);   // 无已存在文件 → 只生成这一个
 }
 
 /* ───────── 确认邮件正文模块 ───────── */
@@ -937,22 +937,71 @@ function resetPreview() {
   $("previewPlaceholder").style.display = "flex";
   $("previewPlaceholder").innerHTML = "编辑字段后点击「刷新预览」<br>生成 PDF 在此显示";
 }
-async function refreshPreview() {
+const PREVIEW_DOC_TARGETS = ["confirmation", "assignment", "declaration"];
+
+// 生成单个 target 的预览（POST /preview），返回 {files, warnings}；失败抛错交调用方处理。
+async function _genPreview(target) {
+  const d = await api("POST", `${API}/tasks/${taskId}/preview`, { fields_json: fields, target });
+  return { files: d.files || [], warnings: d.warnings || [] };
+}
+
+// 生成单个 target 并展示（切 tab 时无已存在成品的「无则生成」走这条，只生成那一个）
+async function generateAndShow(target) {
   if (!taskId) return;
+  const _tid = taskId, _tgt = target;
   $("previewPlaceholder").style.display = "flex"; $("previewPlaceholder").textContent = "生成中…";
   $("previewFrame").style.display = "none";
   try {
-    const d = await api("POST", `${API}/tasks/${taskId}/preview`, { fields_json: fields, target: previewTarget });
-    const files = d.files || [];
-    if (!files.length) { $("previewPlaceholder").textContent = "无产物"; return; }
+    const r = await _genPreview(target);
+    if (_tid !== taskId || _tgt !== previewTarget) return;   // 期间切了任务/tab
+    if (!r.files.length) { $("previewPlaceholder").textContent = "无产物"; return; }
+    previewFileList = r.files;
+    $("previewFiles").style.display = "block";
+    renderPreviewFileChips(0);
+    showPreviewFile(0);
+    if (r.warnings.length) toast("⚠ " + r.warnings.join("；"), 5000);
+  } catch (e) {
+    if (_tid !== taskId || _tgt !== previewTarget) return;
+    $("previewPlaceholder").innerHTML = `<div>预览失败：<br>${problemsOf(e).map(esc).join("<br>")}</div>`;
+  }
+}
+
+// 「刷新预览」按钮：一次把 确认函/Assignment/Declaration 三个文档全部重生成，再展示当前 tab。
+// email/source tab 不属文档预览，点刷新时默认落到确认函。
+async function refreshPreview() {
+  if (!taskId) return;
+  const _tid = taskId;
+  $("previewFiles").style.display = "none";
+  $("previewPlaceholder").style.display = "flex";
+  $("previewPlaceholder").textContent = "生成中（确认函 / Assignment / Declaration）…";
+  $("previewFrame").style.display = "none";
+  const results = {}, warns = [];
+  for (const t of PREVIEW_DOC_TARGETS) {
+    try {
+      const r = await _genPreview(t);
+      results[t] = r.files;
+      if (r.warnings.length) warns.push(`${t}：${r.warnings.join("；")}`);
+    } catch (e) {
+      results[t] = null;   // 该文档生成失败（如无转让安排/无发明人），不阻断其余
+      warns.push(`${t} 生成失败：${problemsOf(e).join("；")}`);
+    }
+  }
+  if (_tid !== taskId) return;   // 期间切了任务
+  // 展示当前 tab（email/source 不在文档列 → 落确认函）
+  const showT = PREVIEW_DOC_TARGETS.includes(previewTarget) ? previewTarget : "confirmation";
+  const files = results[showT];
+  if (files && files.length) {
     previewFileList = files;
     $("previewFiles").style.display = "block";
     renderPreviewFileChips(0);
     showPreviewFile(0);
-    if ((d.warnings || []).length) toast("⚠ " + d.warnings.join("；"), 5000);
-  } catch (e) {
-    $("previewPlaceholder").innerHTML = `<div>预览失败：<br>${problemsOf(e).map(esc).join("<br>")}</div>`;
+  } else {
+    $("previewFrame").style.display = "none";
+    $("previewFiles").style.display = "none";
+    $("previewPlaceholder").style.display = "flex";
+    $("previewPlaceholder").textContent = (results[showT] === null) ? "该文档生成失败" : "无产物";
   }
+  if (warns.length) toast("⚠ " + warns.join(" ｜ "), 6000);
 }
 
 /* ───────── 确认发送 ───────── */
