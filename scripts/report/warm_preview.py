@@ -70,8 +70,18 @@ _GEN = {"confirmation": _gen_confirmation,
         "declaration": _gen_declaration}
 
 
+def _applicable(target, fields):
+    """该案是否适用生成此件：Assignment 需有转让安排、Declaration 需有发明人；确认函恒适用。
+    不适用则直接跳过、不生成也不算失败（否则每轮都会对无转让/无发明人的案件报错重试）。"""
+    if target == "assignment":
+        return bool(fields.get("assignments"))
+    if target == "declaration":
+        return bool(fields.get("inventors"))
+    return True
+
+
 def warm_task(task_id, fields):
-    """检查并生成该案缺失的三件预览。已存在跳过、缺失现生成。best-effort：单件失败不影响其余。
+    """检查并生成该案缺失的三件预览。已存在/不适用跳过、缺失现生成。best-effort：单件失败不影响其余。
     :return: (made, skipped, failed) 三个列表。"""
     fields = dict(fields or {})
     # 与 /preview 一致的预处理（推断 subject_matter、规范母案）
@@ -82,6 +92,9 @@ def warm_task(task_id, fields):
     for target in TARGETS:
         if _has_existing(preview_dir, target):
             skipped.append(target)
+            continue
+        if not _applicable(target, fields):
+            skipped.append(target)   # 无转让安排→Assignment / 无发明人→Declaration：直接跳过
             continue
         try:
             preview_dir.mkdir(parents=True, exist_ok=True)
