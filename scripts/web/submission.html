@@ -356,17 +356,17 @@ async function openTask(id) {
   previewTarget = "confirmation";
   document.querySelectorAll(".preview-head .tab").forEach(t => t.classList.toggle("active", t.dataset.target === "confirmation"));
   $("emailPreview").style.display = "none";
-  autoPreviewConfirmation();
+  autoPreview("confirmation");
   loadEmailModules();
 }
 
-// 打开时确认函预览：优先展示 preview/ 里已存在的成品；没有再走 refreshPreview() 生成
-async function autoPreviewConfirmation() {
+// 文档类预览（确认函/Assignment/Declaration）：优先展示 preview/ 里已存在的成品；没有再 refreshPreview() 生成
+async function autoPreview(target) {
   if (!taskId) return;
-  const _tid = taskId;
+  const _tid = taskId, _tgt = target;
   try {
-    const d = await api("GET", `${API}/tasks/${taskId}/preview-existing?target=confirmation`);
-    if (_tid !== taskId) return;   // 期间切了任务就放弃，避免串台
+    const d = await api("GET", `${API}/tasks/${taskId}/preview-existing?target=${encodeURIComponent(target)}`);
+    if (_tid !== taskId || _tgt !== previewTarget) return;   // 期间切了任务/tab 就放弃，避免串台
     const files = d.files || [];
     if (files.length) {
       previewFileList = files;
@@ -376,7 +376,7 @@ async function autoPreviewConfirmation() {
       return;
     }
   } catch (e) { /* 查不到/出错就走生成 */ }
-  if (_tid === taskId) refreshPreview();   // 无已存在文件 → 自动生成
+  if (_tid === taskId && _tgt === previewTarget) refreshPreview();   // 无已存在文件 → 自动生成
 }
 
 /* ───────── 确认邮件正文模块 ───────── */
@@ -919,7 +919,7 @@ function switchPreviewTab(btn) {
   if (previewTarget === "email") { renderEmailPreview(); return; }
   $("emailPreview").style.display = "none";
   if (previewTarget === "source") { loadSourceDocsPreview(); return; }
-  refreshPreview();
+  autoPreview(previewTarget);   // 确认函/Assignment/Declaration：有已存在成品直接展示，无则生成
 }
 function renderEmailPreview() {
   $("previewFrame").style.display = "none";
