@@ -2052,8 +2052,9 @@ def preview_filing_task(task_id: str, req: FilingPreviewReq):
         json.loads(row["fields_json"]) if row["fields_json"] else {})
     fields["subject_matter"] = infer_subject_matter(fields)
     normalize_parents(fields)
-    ci, _ai = _filing_case_info(row, fields)
     opts = req.transmittal_options if req.transmittal_options is not None else (fields.get("transmittal_options") or {})
+    fields["transmittal_options"] = opts   # 合并页面最新递交清单，供 ADS 取实体/图纸页数（原在 ci 之后→取不到最新，已修）
+    ci, _ai = _filing_case_info(row, fields)
 
     preview_dir = SUBMISSION_OUTPUT_DIR / task_id / "preview"
     preview_dir.mkdir(parents=True, exist_ok=True)

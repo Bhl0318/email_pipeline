@@ -164,7 +164,7 @@ def fields_to_case_info(fields: dict, agent_info: dict = None) -> dict:
             [x for x in [(app.get("city_en") or "").strip(), _prov] if x])
         _mail_state = (manual.get("mail_state") or "").strip()   # 默认留空，不自动填省
         inventors.append({
-            "name": full, "firstName": first, "middleName": "", "lastName": last,
+            "name": full, "firstName": first, "middleName": (inv.get("middle_name") or "").strip(), "lastName": last,
             "Residence Information": residency,
             # 非美国居住块（sfNonUSRes）：仅非美国居住时填，美国居住时留空
             "City": "" if _is_us else _res_city,

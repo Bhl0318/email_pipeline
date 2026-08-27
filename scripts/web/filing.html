@@ -477,9 +477,15 @@ function renderForm(){
         <div class="field"><label>邮编</label><input id="fx-inv-${i}-zip" value="${g('mail_postcode','postcode')}"></div>
       </div></div>`;
   }).join("") || '<div style="color:#94a3b8;font-size:12px;">无发明人</div>';
-  const parentRows = (fields.parent_applications||[]).map((p,i)=>
-    `<div class="field"><label>母案 ${esc(p["Application No"]||("#"+(i+1)))} 续案类型</label>
-      <input id="fx-par-${i}-cont" value="${esc(p["Continuity Type"]||"")}" placeholder="如 Continuation of / Continuation in part of / Division of"></div>`
+  const parentRows = (fields.parent_applications||[]).map((p,i)=>`
+    <div style="border:1px solid #e2e8f0;border-radius:6px;padding:8px;margin-bottom:8px;">
+      <div class="grid">
+        <div class="field"><label>母案${i+1} 申请号(ADS)</label><input id="fx-par-${i}-num" value="${esc(p["Prior Application Number"]||p["Application No"]||"")}"></div>
+        <div class="field"><label>申请日</label><input id="fx-par-${i}-date" value="${esc(p["Filing Date"]||"")}" placeholder="YYYY-MM-DD"></div>
+        <div class="field"><label>在先状态</label><select id="fx-par-${i}-status">
+          ${["Pending","Patented","Abandoned"].map(s=>`<option ${(p["Prior Application Status"]||"Pending")===s?"selected":""}>${s}</option>`).join("")}</select></div>
+        <div class="field"><label>续案类型</label><input id="fx-par-${i}-cont" value="${esc(p["Continuity Type"]||"")}" placeholder="如 Continuation of / Continuation in part of / Division of"></div>
+      </div></div>`
   ).join("") || '<div style="color:#94a3b8;font-size:12px;">无母案（新申请）</div>';
   // 案件信息可编辑行（改完点上方预览重新生成；回写见 collectExtra）
   const applicantRows = (fields.applicants||[]).map((a,i)=>`
@@ -499,8 +505,12 @@ function renderForm(){
         <div class="field"><label>国家</label><input id="cf-app-${i}-ctry" value="${esc(a.country_en_us||"")}"></div>
       </div></div>`).join("") || '<div style="color:#94a3b8;font-size:12px;">无申请人</div>';
   const assigneeRows = (fields.assignments||[]).map((asg,i)=>`
-    <div class="field"><label>受让人 #${i+1}（${esc(asg.assignment_type||"")}；地址随对应申请人）</label>
-      <input id="cf-asg-${i}-name" value="${esc(asg.assignee||"")}"></div>`).join("")
+    <div style="border:1px solid #e2e8f0;border-radius:6px;padding:8px;margin-bottom:8px;">
+      <div class="grid">
+        <div class="field"><label>受让人 #${i+1} 名称（${esc(asg.assignment_type||"")}）</label><input id="cf-asg-${i}-name" value="${esc(asg.assignee||"")}"></div>
+        <div class="field"><label>受让公司名(assigning_company)</label><input id="cf-asg-${i}-company" value="${esc(asg.assigning_company||"")}"></div>
+        <div class="field" style="grid-column:1/-1;"><label>受让公司地址(company_address；ADS 非申请人受让人/发明人雇主地址来源)</label><input id="cf-asg-${i}-addr" value="${esc(asg.company_address||"")}"></div>
+      </div></div>`).join("")
     || '<div style="color:#94a3b8;font-size:12px;">无转让/受让人</div>';
   const priorityRows = (fields.priorities||[]).map((p,i)=>`
     <div class="grid">
@@ -514,6 +524,8 @@ function renderForm(){
     return `<div class="grid">
       <div class="field"><label>发明人${i+1} 姓(Last)</label><input id="cf-inv-${i}-last" value="${esc(inv.last_name_en||"")}"></div>
       <div class="field"><label>名(First)</label><input id="cf-inv-${i}-first" value="${esc(inv.first_name_en||"")}"></div>
+      <div class="field"><label>中间名(Middle)</label><input id="cf-inv-${i}-middle" value="${esc(inv.middle_name||"")}"></div>
+      <div class="field"><label>雇主/归属公司(employer)</label><input id="cf-inv-${i}-emp" value="${esc(inv.employer||"")}"></div>
       <div class="field"><label>全名(姓, 名)</label><input readonly value="${esc(full)}"></div>
     </div>`;}).join("") || '<div style="color:#94a3b8;font-size:12px;">无发明人</div>';
   $("formSections").innerHTML = `
@@ -521,6 +533,7 @@ function renderForm(){
       <div class="grid">
         <div class="field"><label>代理所案号</label><input readonly value="${esc(fields.case_volume||"")}"></div>
         <div class="field"><label>主题(Subject Matter)</label><input readonly value="${esc(fields.subject_matter||"")}"></div>
+        <div class="field"><label>落地方式(filing_route)</label><input id="cf-route" value="${esc(fields.filing_route||"")}" placeholder="371 Route / By pass continuation / New / Continuation of / Continuation in part of / Division of / Paris"></div>
         <div class="field"><label>申请名称（递交件自动大写）</label><input id="cf-title" value="${esc(ci.case_name_en||"")}"></div>
       </div>
       <div style="margin:10px 0 4px;font-size:11.5px;color:#64748b;">申请人</div>
@@ -541,6 +554,9 @@ function renderForm(){
       <div style="margin:6px 0;"><button class="primary" onclick="fetchAgentInfo()">查库带出</button></div>
       <div class="grid">
         <div class="field"><label>签字人姓名</label><input id="fx-ag-name" value="${esc(ag["Name"]||"")}"></div>
+        <div class="field"><label>签字人 名(First，ADS)</label><input id="fx-ag-first" value="${esc(ag["First Name"]||"")}"></div>
+        <div class="field"><label>签字人 姓(Last，ADS)</label><input id="fx-ag-last" value="${esc(ag["Last Name"]||"")}"></div>
+        <div class="field"><label>递交日(Date；空=今天)</label><input id="fx-ag-date" value="${esc(ag["Date"]||"")}" placeholder="YYYY-MM-DD"></div>
         <div class="field"><label>执业号(Reg. No.)</label><input id="fx-ag-reg" value="${esc(ag["Registration Number"]||"")}"></div>
         <div class="field"><label>Title</label><input id="fx-ag-title" value="${esc(ag["title"]||"")}"></div>
         <div class="field"><label>Customer Number</label><input id="fx-ag-cust" value="${esc(ag["Customer Number"]||"")}"></div>
@@ -553,9 +569,14 @@ function renderForm(){
       ${invAddrRows}
     </div></div>
 
-    <div class="section"><div class="section-head">母案续案类型（ADS 用）</div><div class="section-body">
+    <div class="section"><div class="section-head">母案（ADS 域内优先权：申请号/申请日/状态/续案类型）</div><div class="section-body">
       ${parentRows}
     </div></div>
+
+    <div class="section"><div class="section-head">PCT / 在先国际申请（ADS 用；371 / bypass 时填）</div><div class="section-body"><div class="grid">
+      <div class="field"><label>PCT 申请号</label><input id="cf-pct-no" value="${esc((fields.case_advance_info||{}).pct_app_no||"")}"></div>
+      <div class="field"><label>PCT 申请日</label><input id="cf-pct-date" value="${esc((fields.case_advance_info||{}).pct_app_date||"")}" placeholder="YYYY-MM-DD"></div>
+    </div></div></div>
 
     ${buildChecklist(declKind)}
 
@@ -632,8 +653,12 @@ function collectExtra(){
   const fx = fields.filing_extra;
   fx.agent_firm = $("fx-firm").value;
   fx.agent_person = $("fx-person").value.trim();
+  const _agv = id => { const e=$(id); return e?e.value.trim():""; };
   fx.agent_info = Object.assign({}, fx.agent_info, {
     "Name": $("fx-ag-name").value.trim(),
+    "First Name": _agv("fx-ag-first"),
+    "Last Name": _agv("fx-ag-last"),
+    "Date": _agv("fx-ag-date"),
     "Registration Number": $("fx-ag-reg").value.trim(),
     "title": $("fx-ag-title").value.trim(),
     "Customer Number": $("fx-ag-cust").value.trim(),
@@ -648,15 +673,24 @@ function collectExtra(){
     mail_country: val(`fx-inv-${i}-ctry`), mail_postcode: val(`fx-inv-${i}-zip`),
   }));
   (fields.parent_applications||[]).forEach((p,i)=>{
-    const el = $(`fx-par-${i}-cont`);
-    if (el) p["Continuity Type"] = el.value.trim();
+    const cont=$(`fx-par-${i}-cont`); if (cont) p["Continuity Type"]=cont.value.trim();
+    const num=$(`fx-par-${i}-num`);   if (num)  p["Prior Application Number"]=num.value.trim();
+    const dt=$(`fx-par-${i}-date`);   if (dt)   p["Filing Date"]=dt.value.trim();
+    const st=$(`fx-par-${i}-status`); if (st)   p["Prior Application Status"]=st.value;
   });
+  // PCT / 在先国际申请（ADS 域内优先权）
+  if ($("cf-pct-no")||$("cf-pct-date")){
+    fields.case_advance_info = fields.case_advance_info || {};
+    if ($("cf-pct-no"))   fields.case_advance_info.pct_app_no  = $("cf-pct-no").value.trim();
+    if ($("cf-pct-date")) fields.case_advance_info.pct_app_date = $("cf-pct-date").value.trim();
+  }
 
-  // 案件信息可编辑字段回写（申请名称/申请人/受让人/优先权/发明人姓名）
+  // 案件信息可编辑字段回写（申请名称/落地方式/申请人/受让人/优先权/发明人姓名）
   if ($("cf-title")) {
     fields.case_info = fields.case_info || {};
     fields.case_info.case_name_en = $("cf-title").value.trim();
   }
+  if ($("cf-route")) fields.filing_route = $("cf-route").value.trim();
   (fields.applicants||[]).forEach((a,i)=>{
     const g=(k)=>{const e=$(`cf-app-${i}-${k}`);return e?e.value.trim():null;};
     const m={name:"applicant_name_en",entity:"entity_en",a1:"address1",a2:"address2",
@@ -665,6 +699,8 @@ function collectExtra(){
   });
   (fields.assignments||[]).forEach((asg,i)=>{
     const e=$(`cf-asg-${i}-name`); if (e) asg.assignee=e.value.trim();
+    const c=$(`cf-asg-${i}-company`); if (c) asg.assigning_company=c.value.trim();
+    const ad=$(`cf-asg-${i}-addr`); if (ad) asg.company_address=ad.value.trim();
   });
   (fields.priorities||[]).forEach((p,i)=>{
     const g=(k)=>{const e=$(`cf-pri-${i}-${k}`);return e?e.value.trim():null;};
@@ -675,6 +711,8 @@ function collectExtra(){
   });
   (fields.inventors||[]).forEach((inv,i)=>{
     const ln=$(`cf-inv-${i}-last`), fn=$(`cf-inv-${i}-first`);
+    const md=$(`cf-inv-${i}-middle`); if (md) inv.middle_name=md.value.trim();
+    const emp=$(`cf-inv-${i}-emp`);   if (emp) inv.employer=emp.value.trim();
     if (ln) inv.last_name_en=ln.value.trim();
     if (fn) inv.first_name_en=fn.value.trim();
     if (ln||fn){
