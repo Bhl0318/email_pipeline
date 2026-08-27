@@ -18,6 +18,14 @@ import json
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 DOWNLOAD_DIR = os.path.join(SCRIPT_DIR, "../..", "attachment")
 
+# 转OA附件/Wiki 只收 PDF 与 Word；USPTO 下载的其它格式(txt/xml 等)一律剔除
+_ALLOWED_DOC_EXTS = (".pdf", ".doc", ".docx")
+
+
+def _keep_pdf_word(files):
+    """只保留 PDF/Word 文件(供转OA附件与Wiki上传)，txt/xml 等丢弃。"""
+    return [f for f in files if f and f.lower().endswith(_ALLOWED_DOC_EXTS)]
+
 
 def get_us_deadline(application_no, document_code, oa_doc_date, project):
     """
@@ -51,8 +59,8 @@ def get_us_deadline(application_no, document_code, oa_doc_date, project):
         print(f"[US] 下载失败: {e}", file=sys.stderr)
         return None
 
-    # 2. 全部下载文件（doc_paths，含 PDF/Word，都作为转OA附件）；PDF 单独挑出用于解析期限/盖章
-    files = [f for f in doc_list.get(project, []) if f and os.path.exists(f)]
+    # 2. 下载文件里只留 PDF/Word 作 doc_paths(转OA附件/Wiki)，txt/xml 等剔除；PDF 单独挑出用于解析期限/盖章
+    files = _keep_pdf_word([f for f in doc_list.get(project, []) if f and os.path.exists(f)])
     pdf_path = next((f for f in files if f.lower().endswith(".pdf")), None)
 
     if not files:
@@ -98,8 +106,8 @@ def download_us_ref_doc(application_no, document_code, official_date, project):
     try:
         uspto = USPTOApplication(download_dir=DOWNLOAD_DIR, project=project)
         doc_list = uspto.downLoad_Documents_ByAPI(application_no, document_code, mailing_date, project, "", kind="ref")
-        # 不过滤格式：USPTO 下载的 PDF/Word 都作为附件
-        return [f for f in doc_list.get(project, []) if f and os.path.exists(f)]
+        # 只保留 PDF/Word 作附件；USPTO 下载的 txt/xml 等其它格式剔除
+        return _keep_pdf_word([f for f in doc_list.get(project, []) if f and os.path.exists(f)])
     except Exception as e:
         print(f"[US-ref] {project} {document_code} 下载失败: {e}", file=sys.stderr)
         return []
