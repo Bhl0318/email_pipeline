@@ -577,7 +577,7 @@ def send_forward_oa(all_results, all_emails=None, dry_run=False):
     from email import encoders
     from forward_oa import (forward_recipients, forward_cc, build_forward_subject,
                             build_forward_body, forward_attachments,
-                            build_assign_notify, OA_ASSIGN_NOTIFY_TO, OA_ASSIGN_NOTIFY_CC)
+                            build_assign_notifies)
 
     if not all_results:
         print("[转OA] 无立项结果，跳过", file=sys.stderr)
@@ -642,9 +642,8 @@ def send_forward_oa(all_results, all_emails=None, dry_run=False):
             print(f"      抄送({len(p['cc'])}): {', '.join(p['cc'])}", file=sys.stderr)
             print(f"      附件({len(atts)}): {', '.join(atts) if atts else '(无)'}", file=sys.stderr)
         print(f"  [dry-run][转OA] 共 {len(plans)} 封待发（未实际发送）", file=sys.stderr)
-        _notify = build_assign_notify(plans)
-        if _notify:
-            print(f"  [dry-run][OA分配链接] → {OA_ASSIGN_NOTIFY_TO}  主题: {_notify[0]}", file=sys.stderr)
+        for _nt in build_assign_notifies(plans):
+            print(f"  [dry-run][OA分配链接] → {_nt['to']} 抄送 {', '.join(_nt['cc'])}  主题: {_nt['subject']}", file=sys.stderr)
         return fwd_actions
 
     if os.environ.get("PIPELINE_NO_EMAIL"):
@@ -714,21 +713,20 @@ def send_forward_oa(all_results, all_emails=None, dry_run=False):
         except Exception as e:
             print(f"[转OA] {p['item'].get('project')} 发送失败: {e}", file=sys.stderr)
 
-    # OA 分配链接：不发流程人员，单独汇总发给薛虹（复用已开 SMTP）
-    _notify = build_assign_notify(plans)
-    if _notify:
+    # OA 分配链接：不发流程人员，按案号路由收件人分组发（20608→王志刚、其余→薛虹，均抄送海灵；复用已开 SMTP）
+    for _nt in build_assign_notifies(plans):
         try:
             nmsg = MIMEMultipart()
             nmsg["From"] = pa_cfg["user"]
-            nmsg["To"] = OA_ASSIGN_NOTIFY_TO
-            if OA_ASSIGN_NOTIFY_CC:
-                nmsg["Cc"] = ", ".join(OA_ASSIGN_NOTIFY_CC)
-            nmsg["Subject"] = _notify[0]
-            nmsg.attach(MIMEText(_notify[1], "plain", "utf-8"))
-            smtp.sendmail(pa_cfg["user"], [OA_ASSIGN_NOTIFY_TO] + OA_ASSIGN_NOTIFY_CC, nmsg.as_string())
-            print(f"[OA分配链接] 已发 → {OA_ASSIGN_NOTIFY_TO} 抄送 {', '.join(OA_ASSIGN_NOTIFY_CC)}", file=sys.stderr)
+            nmsg["To"] = _nt["to"]
+            if _nt["cc"]:
+                nmsg["Cc"] = ", ".join(_nt["cc"])
+            nmsg["Subject"] = _nt["subject"]
+            nmsg.attach(MIMEText(_nt["body"], "plain", "utf-8"))
+            smtp.sendmail(pa_cfg["user"], [_nt["to"]] + _nt["cc"], nmsg.as_string())
+            print(f"[OA分配链接] 已发 → {_nt['to']} 抄送 {', '.join(_nt['cc'])}", file=sys.stderr)
         except Exception as e:
-            print(f"[OA分配链接] 发送失败: {e}", file=sys.stderr)
+            print(f"[OA分配链接] 发送失败 → {_nt.get('to')}: {e}", file=sys.stderr)
 
     try:
         smtp.quit()

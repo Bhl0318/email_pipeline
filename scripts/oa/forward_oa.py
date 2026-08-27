@@ -153,40 +153,48 @@ def build_forward_body(item):
     )
 
 
-# OA 分配链接不进转OA邮件（不发流程人员），单独发给薛虹，抄送海灵
-OA_ASSIGN_NOTIFY_TO = "hxue@metis-ip.com"        # 薛虹
-OA_ASSIGN_NOTIFY_CC = ["hailing.bi@metis-ip.com"]  # 海灵
+# OA 分配链接不进转OA邮件（不发流程人员），按案号路由收件人，统一抄送海灵
+OA_ASSIGN_NOTIFY_CC = ["hailing.bi@metis-ip.com"]   # 海灵（所有分配链接邮件抄送）
+_ASSIGN_NOTIFY_20608 = "zhigang.wang@metis-ip.com"  # 20608 → 王志刚
+_ASSIGN_NOTIFY_20849_68 = "jiao.yang@metis-ip.com"  # 20849/6*/8* → 杨姣
+_ASSIGN_NOTIFY_DEFAULT = "hxue@metis-ip.com"        # 其余 → 薛虹
 
 
-# 这些案号不发 OA 分配链接：20849 / 20608 开头，或 6 / 8 开头
-def _skip_assign_link(project):
+def _assign_notify_to(project):
+    """按案号返回该案分配链接的收件人。
+    20608 开头→王志刚；20849/6*/8* 开头→杨姣；其余→薛虹。"""
     p = (project or "").strip()
-    return p.startswith(("20849", "20608")) or p[:1] in ("6", "8")
+    if p.startswith("20608"):
+        return _ASSIGN_NOTIFY_20608
+    if p.startswith("20849") or p[:1] in ("6", "8"):
+        return _ASSIGN_NOTIFY_20849_68
+    return _ASSIGN_NOTIFY_DEFAULT
 
 
-def build_assign_notify(plans):
-    """汇总本轮各立项案件的 OA 分配链接，生成发给薛虹的 (subject, body)。
-    基址(env OA_ASSIGN_BASE_URL)为空或无可发案件时返回 None（不发）。
-    20849/20608/6*/8* 开头的案号不发分配链接。"""
+def build_assign_notifies(plans):
+    """按收件人分组，返回分配链接邮件列表 [{to, cc, subject, body}]。
+    基址(env OA_ASSIGN_BASE_URL)为空或无可发案件返回 []。"""
     base = os.environ.get("OA_ASSIGN_BASE_URL", "").rstrip("/")
     if not base:
-        return None
-    rows = []
+        return []
+    groups = {}   # to -> [row]
     for p in plans:
         it = p.get("item", {})
         oa_id = it.get("oa_id", "") or ""
         if not oa_id:
             continue
         proj = it.get("project", "")
-        if _skip_assign_link(proj):
+        to = _assign_notify_to(proj)
+        if not to:
             continue
         name = it.get("project_name", "") or it.get("notification_type", "")
-        rows.append(f"{proj} {name}\n  {base}/oa-assign/{oa_id}")
-    if not rows:
-        return None
-    subject = f"【OA分配链接】本轮 {len(rows)} 件待分配"
-    body = "薛虹：\n\n以下为本轮新立项、待人员分配的案件及分配页链接：\n\n" + "\n\n".join(rows) + "\n\n--\n发送人：系统\n"
-    return subject, body
+        groups.setdefault(to, []).append(f"{proj} {name}\n  {base}/oa-assign/{oa_id}")
+    out = []
+    for to, rows in groups.items():
+        subject = f"【OA分配链接】本轮 {len(rows)} 件待分配"
+        body = "您好：\n\n以下为本轮新立项、待人员分配的案件及分配页链接：\n\n" + "\n\n".join(rows) + "\n\n--\n发送人：系统\n"
+        out.append({"to": to, "cc": list(OA_ASSIGN_NOTIFY_CC), "subject": subject, "body": body})
+    return out
 
 
 # 转OA 主题前缀
