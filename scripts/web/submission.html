@@ -60,6 +60,11 @@
   .section-head .spacer { flex: 1; }
   .section-head button { padding: 3px 10px; font-size: 12px; }
   .section-body { padding: 12px 14px; }
+  /* 中栏各模块可折叠：点表头折叠/展开（点表头里的按钮/控件不折叠，见 pane.onclick 委托） */
+  .section-head { cursor: pointer; user-select: none; }
+  .section-head::before { content: '▾'; margin-right: 6px; font-size: 10px; color: #94a3b8; }
+  .section.collapsed .section-head::before { content: '▸'; }
+  .section.collapsed .section-body { display: none; }
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px 14px; }
   .field label { display: block; font-size: 11.5px; color: #64748b; margin-bottom: 3px; }
   .field label .req { color: #dc2626; }
@@ -752,6 +757,12 @@ function renderForm() {
       const p = JSON.parse(dp);
       if (p[0] === "applicants" && p[2] === "applicant_name_en") refreshEmployerSelects();
     }
+  };
+  // 折叠：点 section 表头折叠/展开；点表头里的按钮/输入/链接不折叠（保留原有交互）
+  pane.onclick = e => {
+    const head = e.target.closest(".section-head");
+    if (!head || e.target.closest("button, input, select, a, textarea, label")) return;
+    head.closest(".section")?.classList.toggle("collapsed");
   };
   if (ro) pane.querySelectorAll("input,select,button").forEach(el => { if (!el.closest(".section-head") && !el.classList.contains("reopen-btn")) el.disabled = true; });
   // 入库缺失项高亮（精确路径匹配：assignments[1].assignment_type → assignments.1.assignment_type）
