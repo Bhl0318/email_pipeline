@@ -1129,6 +1129,11 @@ def dispatch_oa(all_results, all_emails=None, dry_run=False, test_project_prefix
         print(f"  [dry-run] 跳过上传官文附件到 OA 信息表页", file=sys.stderr)
     elif all_results:
         from oainfo_cli import WikiClient, find_publication_file
+        try:
+            from word_to_wiki import upload_word_subpage
+        except Exception as _e:
+            upload_word_subpage = None
+            print(f"[Word转Wiki] 无法导入 word_to_wiki（跳过 Word 转子页）: {_e}", file=sys.stderr)
         # msgid -> 邮件保存的官文 PDF（report 读取层存到 _inbox 的）
         msgid_to_pdfs = {}
         for _acc, _em in (all_emails or []):
@@ -1148,6 +1153,16 @@ def dispatch_oa(all_results, all_emails=None, dry_run=False, test_project_prefix
             _pdf = item.get("us_pdf_path", "")
             files.extend([d for d in (item.get("us_doc_paths") or []) if d and d != _pdf])
             files.extend(item.get("us_ref_pdf_paths") or [])   # 同案号 892/1449 文献
+            # US 主官文若有 Word 版：把正文转成 OA信息记录表页下的子页（自包含 word_to_wiki，段落带编号）
+            _us_docx = ([d for d in (item.get("us_doc_paths") or [])
+                         if d and d.lower().endswith(".docx")] if upload_word_subpage else [])
+            for _dx in _us_docx:
+                try:
+                    _st, _title = upload_word_subpage(wiki, page_id, _dx, add_num=True)
+                    print(f"[Word转Wiki] {item.get('project','')} {os.path.basename(_dx)} → "
+                          f"HTTP {_st} 子页:{_title}", file=sys.stderr)
+                except Exception as e:
+                    print(f"[Word转Wiki] {item.get('project','')} 失败 {_dx}: {e}", file=sys.stderr)
             # 公布/公告文件：客户目录名用 atw 客户简称拼；查不到简称/文件则跳过
             pub = find_publication_file(
                 item.get("project", ""), item.get("region", ""),
