@@ -116,7 +116,7 @@ DeepSeek 从**候选人 + 白名单 + 负荷**出 ≥3 组（每组答复负责�
 
 ## 九、关键配置（`scripts/pipeline_config.json`）
 
-`accounts`、`sinks{oa,report}`、`send_email`、`oa_test_project_prefix`、`oa_assign_base_url`。环境变量：`DEEPSEEK_API_KEY`、`QWEN_API_KEY`、`OA_ASSIGN_BASE_URL`、`PIPELINE_NO_EMAIL`、`USPTO_DOWNLOAD_LOG`。
+`accounts`、`sinks{oa,report}`、`send_email`、`send_assign_link`（是否发 OA 分配链接邮件，默认 true；false 则立项/转OA/生成报告照常，仅不发分配链接）、`oa_test_project_prefix`、`oa_assign_base_url`。环境变量：`DEEPSEEK_API_KEY`、`QWEN_API_KEY`、`OA_ASSIGN_BASE_URL`、`OA_SEND_ASSIGN_LINK`（0/false/no/off 关闭分配链接）、`PIPELINE_NO_EMAIL`、`USPTO_DOWNLOAD_LOG`。
 
 ## 十、待完善 / 已知边界
 

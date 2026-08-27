@@ -173,7 +173,10 @@ def _assign_notify_to(project):
 
 def build_assign_notifies(plans):
     """按收件人分组，返回分配链接邮件列表 [{to, cc, subject, body}]。
-    基址(env OA_ASSIGN_BASE_URL)为空或无可发案件返回 []。"""
+    开关(env OA_SEND_ASSIGN_LINK=0/false/no/off)关闭、基址(env OA_ASSIGN_BASE_URL)为空、
+    或无可发案件时返回 []。"""
+    if os.environ.get("OA_SEND_ASSIGN_LINK", "1").strip().lower() in ("0", "false", "no", "off"):
+        return []
     base = os.environ.get("OA_ASSIGN_BASE_URL", "").rstrip("/")
     if not base:
         return []

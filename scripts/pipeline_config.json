@@ -10,5 +10,6 @@
   },
   "oa_test_project_prefix": null,
   "send_email": true,
+  "send_assign_link": true,
   "oa_assign_base_url": "http://10.10.70.88:8501"
 }

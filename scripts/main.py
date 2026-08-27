@@ -49,6 +49,13 @@ def main(dry_run=False):
     if _assign_base:
         os.environ["OA_ASSIGN_BASE_URL"] = _assign_base
 
+    # 是否发送 OA 分配链接邮件（默认发）：false 则立项/转OA/生成报告照常，仅不发分配链接。
+    if cfg.get("send_assign_link", True) is False:
+        os.environ["OA_SEND_ASSIGN_LINK"] = "0"
+        print("[email_pipeline] send_assign_link=false → 本轮不发送 OA 分配链接邮件", file=sys.stderr)
+    else:
+        os.environ["OA_SEND_ASSIGN_LINK"] = "1"
+
     if dry_run:
         print("[email_pipeline] ★ DRY-RUN：照常读邮件+分类，但不写库/不发邮件/不移邮件"
               "（注：读取阶段仍会把官文 PDF 暂存到 output/_inbox/）", file=sys.stderr)
