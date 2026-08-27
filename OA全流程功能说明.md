@@ -51,7 +51,7 @@
 - **审意 OCR**：扫描件无文本层时用 qwen-vl OCR（供分配页第四类）。
 
 ### 5. 写 Wiki 与库
-- **OA 信息记录表页**（每案号一页）：建页 → 上传官文附件（PDF/Word/892·1449/公布公告文件）→ 解析对比文件填「OA 过程」对应 OA{N} 行的对比文件链接列（Google Patents 超链接）：**CN** 解析「本通知书引用对比文件」表（`parse_cn_pdf`）；**US** 从 **PTO‑892**（审查员正式引用清单，优先）或主官文正文抽号（`parse_us_refs`，正则+DeepSeek 兜底），号码**归一化**成 Google Patents 格式（去逗号/空格/斜杠、补 US 前缀）后复用同一 `fill_ref_docs_in_oa_row`；仅取审查员引用（892），不取申请人 IDS（1449）。**US 主官文若有 Word 版**，另调 `oa/word_to_wiki.py`（email_pipeline 自包含，复用 `WikiClient`、只用 python-docx）把 Word 正文（段落带【0001】编号）转成该记录表页下的**子页**，便于按段引用；仅主官文 Word，892/1449 文献不转；同名子页已存在则更新。
+- **OA 信息记录表页**（每案号一页）：建页 → 上传官文附件（PDF/Word/892·1449/公布公告文件）→ 解析对比文件填「OA 过程」对应 OA{N} 行的对比文件链接列（Google Patents 超链接）：**CN** 解析「本通知书引用对比文件」表（`parse_cn_pdf`）；**US** 从 **PTO‑892**（审查员正式引用清单，优先）或主官文正文抽号（`parse_us_refs`，正则+DeepSeek 兜底），号码**归一化**成 Google Patents 格式（去逗号/空格/斜杠、补 US 前缀）后复用同一 `fill_ref_docs_in_oa_row`；仅取审查员引用（892），不取申请人 IDS（1449）。**官文正文另转成该记录表页下的子页**（`oa/word_to_wiki.py`，email_pipeline 自包含，复用 `WikiClient`）：US/CN/EP 的**主官文**——US 有 Word 用 Word（python-docx）、没 Word 用主官文 PDF（PyMuPDF），CN/EP 用邮件主官文 PDF（多附件按「通知书/决定/审查意见」等关键词挑主官文）；正文段落带【0001】编号便于按段引用；**扫描/图片型 PDF 无文本层时用 qwen-vl 逐页 OCR（上限 10 页）**，OCR 也拿不到则不建空页；只转主官文（892/1449/对比文件/公布文件不转）；同名子页已存在则更新。
 - **新增 OA 汇总页「测试页面-写入新增OA」**：每案追加一行（案号/备注/OA 收发日/期限/类别/跟进人/人员分配…），行上埋 `class="oaid-{id}"`（供分配页按 id 定位/回写）。备注：CN 办登=分案评估、补正=补正、其它 OA=同族首案/非同族首案（按同族 project_name 是否含 OA 判定）、预审案件加注。
 - **projects 表**：INSERT，`id = oa_id`(uuid4)，project_type=中国答复及其他/海外答复及其他，customer=atw 客户简称等。
 - **待分配表 `oa_assign_task`**：仅**成功写进 projects** 的案子写入（id + status）。
@@ -121,6 +121,6 @@ DeepSeek 从**候选人 + 白名单 + 负荷**出 ≥3 组（每组答复负责�
 ## 十、待完善 / 已知边界
 
 - US 对比文件抽取（`parse_us_refs`）优先用 892；号码只取到公开号/专利号（非申请号），日期列多为空；扫描件无文本层时暂不 OCR（回退 DeepSeek 也依赖文本层）。
-- Word 版官文作附件，US 主官文 Word 另转 Wiki 子页（`oa/word_to_wiki.py`）；但其审意内容仍不参与 AI 报告第四类（该分析需 PDF/OCR）。
+- 官文正文转 Wiki 子页覆盖 US/CN/EP 主官文（`oa/word_to_wiki.py`，PDF/Word 皆可，扫描件走 qwen-vl OCR）；但其审意内容仍不参与 AI 报告第四类。CN/EP 多附件时按关键词挑主官文，命名不规范时可能挑错；OCR 有页数上限（10 页）与识别误差，超长官文尾部可能截断。
 - 白名单同步 Wiki 按钮暂隐藏；外部 oaInstruct 提示词若含「人员档案/人员安排建议」段，DeepSeek 可能重复生成（应从提示词删除，交由代码查库/schemes）。
 - NAS/atw/Confluence 为内网，相关功能须在可达内网的机器（report_server 所在机）运行。

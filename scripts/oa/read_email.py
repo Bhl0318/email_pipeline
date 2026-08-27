@@ -46,6 +46,42 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.path.join(SCRIPT_DIR, "email_config.json")
 CHECKPOINT_PATH = os.path.join(SCRIPT_DIR, "checkpoint.json")
 
+# CN/EP 邮件主官文识别关键词（多附件时挑通知书/决定/官文那份）
+_OFFICIAL_TITLE_KEYS = ("通知书", "决定", "审查意见", "补正", "复审",
+                        "Communication", "Office Action", "Search Report",
+                        "Examination", "Intention", "Rejection", "Notice")
+
+
+def _pick_main_official_pdf(saved_pdfs):
+    """从一封邮件的官文 PDF 里挑「主官文」那份：唯一则用它；多份按标题关键词命中；否则取第一份。"""
+    pdfs = [p for p in (saved_pdfs or [])
+            if p and p.lower().endswith(".pdf") and os.path.exists(p)]
+    if not pdfs:
+        return None
+    if len(pdfs) == 1:
+        return pdfs[0]
+    for p in pdfs:
+        name = os.path.basename(p)
+        if any(k in name for k in _OFFICIAL_TITLE_KEYS):
+            return p
+    return pdfs[0]
+
+
+def _official_doc_for_subpage(item, saved_pdfs):
+    """返回该案要转成 Wiki 子页的主官文文件：
+    US → 主官文有 Word 用 Word，否则用主官文 PDF；CN/EP → 邮件主官文 PDF。其余/无 → None。"""
+    region = item.get("region")
+    if region == "US":
+        docx = [d for d in (item.get("us_doc_paths") or [])
+                if d and d.lower().endswith(".docx") and os.path.exists(d)]
+        if docx:
+            return docx[0]
+        _pdf = item.get("us_pdf_path")
+        return _pdf if _pdf and os.path.exists(_pdf) else None
+    if region in ("CN", "EP"):
+        return _pick_main_official_pdf(saved_pdfs)
+    return None
+
 
 # ─── 配置 ───────────────────────────────────────────────
 
@@ -1136,10 +1172,10 @@ def dispatch_oa(all_results, all_emails=None, dry_run=False, test_project_prefix
     elif all_results:
         from oainfo_cli import WikiClient, find_publication_file
         try:
-            from word_to_wiki import upload_word_subpage
+            from word_to_wiki import upload_doc_subpage
         except Exception as _e:
-            upload_word_subpage = None
-            print(f"[Word转Wiki] 无法导入 word_to_wiki（跳过 Word 转子页）: {_e}", file=sys.stderr)
+            upload_doc_subpage = None
+            print(f"[官文转Wiki] 无法导入 word_to_wiki（跳过官文转子页）: {_e}", file=sys.stderr)
         # msgid -> 邮件保存的官文 PDF（report 读取层存到 _inbox 的）
         msgid_to_pdfs = {}
         for _acc, _em in (all_emails or []):
@@ -1159,16 +1195,17 @@ def dispatch_oa(all_results, all_emails=None, dry_run=False, test_project_prefix
             _pdf = item.get("us_pdf_path", "")
             files.extend([d for d in (item.get("us_doc_paths") or []) if d and d != _pdf])
             files.extend(item.get("us_ref_pdf_paths") or [])   # 同案号 892/1449 文献
-            # US 主官文若有 Word 版：把正文转成 OA信息记录表页下的子页（自包含 word_to_wiki，段落带编号）
-            _us_docx = ([d for d in (item.get("us_doc_paths") or [])
-                         if d and d.lower().endswith(".docx")] if upload_word_subpage else [])
-            for _dx in _us_docx:
-                try:
-                    _st, _title = upload_word_subpage(wiki, page_id, _dx, add_num=True)
-                    print(f"[Word转Wiki] {item.get('project','')} {os.path.basename(_dx)} → "
-                          f"HTTP {_st} 子页:{_title}", file=sys.stderr)
-                except Exception as e:
-                    print(f"[Word转Wiki] {item.get('project','')} 失败 {_dx}: {e}", file=sys.stderr)
+            # 官文正文转 OA信息记录表页下的子页（US/CN/EP；有 Word 用 Word、没 Word 用 PDF，段落带编号）
+            if upload_doc_subpage:
+                _src = _official_doc_for_subpage(
+                    item, msgid_to_pdfs.get(item.get("message_id", ""), []))
+                if _src:
+                    try:
+                        _st, _title = upload_doc_subpage(wiki, page_id, _src, add_num=True)
+                        print(f"[官文转Wiki] {item.get('project','')} {os.path.basename(_src)} → "
+                              f"HTTP {_st} 子页:{_title}", file=sys.stderr)
+                    except Exception as e:
+                        print(f"[官文转Wiki] {item.get('project','')} 失败 {_src}: {e}", file=sys.stderr)
             # 公布/公告文件：客户目录名用 atw 客户简称拼；查不到简称/文件则跳过
             pub = find_publication_file(
                 item.get("project", ""), item.get("region", ""),

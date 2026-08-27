@@ -1,24 +1,40 @@
 #!/usr/bin/env python3
-"""US 官文 Word 版 → OA信息记录表页的子页（Confluence storage 格式）。
+"""官文正文（Word/PDF）→ OA信息记录表页的子页（Confluence storage 格式）。
 
 自包含于 email_pipeline：复用 oainfo_cli.WikiClient（同一 Wiki），
-不依赖外部 DS/爬取专利生成wiki/word2wiki.py，也不引 pdfminer（此处只处理 Word）。
+不依赖外部 DS/爬取专利生成wiki/word2wiki.py。
 
-- 仅处理 .docx（python-docx）；父页为该案 OA信息记录表页，按 pageId 定位。
+- 按扩展名自动选：`.docx` 用 python-docx，`.pdf` 用 PyMuPDF（有 Word 用 Word、没 Word 用 PDF）。
 - 正文段落可带【0001】编号（便于按段引用），并在页顶标注编号与原文不一定一致。
-- 子页标题 = Word 文件名（去扩展名）；同名已存在则更新（不重复建页）。
+- 父页为该案 OA信息记录表页，按 pageId 定位；子页标题 = 文件名（去扩展名）。
+- 同名子页已存在则更新（不重复建页）。
 """
 import os
-from docx import Document
+import sys
+
+# qwen-vl（扫描/图片型 PDF 无文本层时 OCR，复用 parse_cn_pdf 同一密钥）
+QWEN_BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+QWEN_API_KEY = os.environ.get("QWEN_API_KEY", "REDACTED_API_KEY")
+QWEN_VL_MODEL = "qwen-vl-max"
+OCR_MAX_PAGES = 10   # 扫描件 OCR 页数上限（官文一般几页；防超长/超费）
 
 
 def _esc(s):
-    """HTML 转义（与原 word2wiki 一致：& 必须先转）。"""
+    """HTML 转义（& 必须先转）。"""
     return (s.replace('&', '&amp;').replace('"', '&quot;')
              .replace("'", '&#x27;').replace('<', '&lt;').replace('>', '&gt;'))
 
 
-def _paragraphs_html(doc, add_num):
+def _wrap(body, add_num):
+    head = ("<div class='cell normal' data-type='normal'>"
+            "<p style='color:red'>请注意：本页中的段落编号与原始文本不一定一致，"
+            "如需引用请以原始文本为准。</p>") if add_num else \
+           "<div class='cell normal' data-type='normal'>"
+    return head + body + "</div>"
+
+
+# ── Word(.docx) ──
+def _docx_paragraphs_html(doc, add_num):
     out, n = [], 0
     for p in doc.paragraphs:
         t = _esc(p.text)
@@ -29,7 +45,7 @@ def _paragraphs_html(doc, add_num):
     return "".join(out)
 
 
-def _tables_html(doc):
+def _docx_tables_html(doc):
     out = []
     for tb in doc.tables:
         h = '<table class="confluenceTable"><tbody>'
@@ -45,21 +61,105 @@ def _tables_html(doc):
 
 def docx_to_storage(docx_path, add_num=True):
     """把 .docx 转成 Confluence storage HTML（段落 + 表格）。"""
+    from docx import Document
     doc = Document(docx_path)
-    head = ("<div class='cell normal' data-type='normal'>"
-            "<p style='color:red'>请注意：本页中的段落编号与原始文本不一定一致，"
-            "如需引用请以原始文本为准。</p>") if add_num else \
-           "<div class='cell normal' data-type='normal'>"
-    return head + _paragraphs_html(doc, add_num) + _tables_html(doc) + "</div>"
+    return _wrap(_docx_paragraphs_html(doc, add_num) + _docx_tables_html(doc), add_num)
 
 
-def upload_word_subpage(wiki, parent_page_id, docx_path, add_num=True):
-    """把一份 Word 官文正文转成 parent_page_id 页下的子页（已存在则更新）。
+# ── PDF(.pdf) ──
+def _paras_to_html(paras, add_num):
+    out = []
+    for i, t in enumerate(paras, 1):
+        t = _esc(t)
+        out.append(f"<p>【{i:04d}】{t}</p>" if add_num else f"<p>{t}</p>")
+    return "".join(out)
+
+
+def _pdf_text_paragraphs(pdf_path):
+    """PyMuPDF 抽文本层，返回段落列表；无文本层（扫描/图片型 PDF）返回 []。"""
+    import fitz
+    doc = fitz.open(pdf_path)
+    paras = []
+    for page in doc:
+        for block in page.get_text("blocks"):
+            # block: (x0,y0,x1,y1, text, block_no, block_type)；block_type=1 为图片
+            if len(block) > 6 and block[6] != 0:
+                continue
+            t = " ".join((block[4] or "").split())   # 段内换行并成一段
+            if t:
+                paras.append(t)
+    doc.close()
+    return paras
+
+
+def _ocr_pdf_paragraphs(pdf_path, max_pages=OCR_MAX_PAGES):
+    """扫描/图片型 PDF：逐页渲染成图片发 qwen-vl OCR，返回段落列表；失败/空返回 []。"""
+    try:
+        import base64
+        import fitz
+        from openai import OpenAI
+    except Exception as e:
+        print(f"[官文OCR] 依赖缺失，跳过 OCR: {e}", file=sys.stderr)
+        return []
+    doc = fitz.open(pdf_path)
+    client = OpenAI(api_key=QWEN_API_KEY, base_url=QWEN_BASE_URL)
+    paras = []
+    for i in range(min(max_pages, len(doc))):
+        pix = doc[i].get_pixmap(dpi=200)
+        b64 = base64.b64encode(pix.tobytes("png")).decode("utf-8")
+        content = [
+            {"type": "text", "text": (
+                "这是专利官方文件的一页扫描件。请按阅读顺序输出该页的纯文本，"
+                "保留自然段落、逐段换行；不要额外解释、不要 markdown、不要页码页眉页脚。")},
+            {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b64}"}},
+        ]
+        try:
+            resp = client.chat.completions.create(
+                model=QWEN_VL_MODEL, max_tokens=4000,
+                messages=[{"role": "user", "content": content}])
+            txt = (resp.choices[0].message.content or "").strip()
+        except Exception as e:
+            print(f"[官文OCR] 第{i+1}页失败: {e}", file=sys.stderr)
+            txt = ""
+        for line in txt.split("\n"):
+            line = line.strip()
+            if line:
+                paras.append(line)
+    doc.close()
+    return paras
+
+
+def pdf_to_storage(pdf_path, add_num=True, ocr_max_pages=OCR_MAX_PAGES):
+    """把 .pdf 正文转成 storage HTML（段落级编号）。
+    有文本层走 PyMuPDF；无文本层（扫描件）走 qwen-vl OCR；都拿不到返回 None（供上层不建空页）。"""
+    paras = _pdf_text_paragraphs(pdf_path)
+    if not paras:
+        paras = _ocr_pdf_paragraphs(pdf_path, max_pages=ocr_max_pages)
+        if paras:
+            print(f"[官文OCR] {os.path.basename(pdf_path)} OCR 出 {len(paras)} 段", file=sys.stderr)
+    if not paras:
+        return None
+    return _wrap(_paras_to_html(paras, add_num), add_num)
+
+
+def doc_to_storage(path, add_num=True):
+    """按扩展名把官文转成 storage HTML：.docx→python-docx，.pdf→PyMuPDF(+扫描件 OCR)。
+    PDF 无可提取正文时返回 None。"""
+    ext = os.path.splitext(path)[1].lower()
+    if ext == ".docx":
+        return docx_to_storage(path, add_num)
+    if ext == ".pdf":
+        return pdf_to_storage(path, add_num)
+    raise ValueError(f"不支持的官文格式（仅 .docx/.pdf）: {path}")
+
+
+def upload_doc_subpage(wiki, parent_page_id, doc_path, add_num=True):
+    """把一份官文（Word/PDF）正文转成 parent_page_id 页下的子页（已存在则更新）。
 
     Args:
         wiki: oainfo_cli.WikiClient 实例
         parent_page_id: 父页（案号-OA信息记录表）的 pageId
-        docx_path: 本地 .docx 路径
+        doc_path: 本地官文路径（.docx 或 .pdf）
         add_num: 段落是否加【0001】编号
 
     Returns:
@@ -68,10 +168,14 @@ def upload_word_subpage(wiki, parent_page_id, docx_path, add_num=True):
     parent = wiki.get_page_by_id(parent_page_id)
     if not parent:
         return 404, ""
-    title = os.path.splitext(os.path.basename(docx_path))[0]
+    title = os.path.splitext(os.path.basename(doc_path))[0]
     if not add_num:
         title += "【无序号版】"
-    content = docx_to_storage(docx_path, add_num)
+    content = doc_to_storage(doc_path, add_num)
+    if not content:
+        # 无可提取正文（扫描件且 OCR 失败/空）→ 不建空子页
+        print(f"[官文转Wiki] 无可提取正文，跳过建页: {os.path.basename(doc_path)}", file=sys.stderr)
+        return 0, title
     status = wiki.create_child_page(title, content, parent["space_key"], parent_page_id)
     if status != 200:
         # 同名子页已存在（Confluence 建重名返回 400）→ 按标题回查并更新
@@ -81,12 +185,15 @@ def upload_word_subpage(wiki, parent_page_id, docx_path, add_num=True):
     return status, title
 
 
+# 向后兼容别名（原只支持 Word）
+upload_word_subpage = upload_doc_subpage
+
+
 if __name__ == "__main__":
-    import sys
     from oainfo_cli import WikiClient
     if len(sys.argv) < 3:
-        print("用法: python3 word_to_wiki.py <docx_path> <parent_page_id> [nonum]")
+        print("用法: python3 word_to_wiki.py <官文.docx|官文.pdf> <parent_page_id> [nonum]")
         sys.exit(1)
     _add_num = not (len(sys.argv) > 3 and sys.argv[3] == "nonum")
-    st, tt = upload_word_subpage(WikiClient(), sys.argv[2], sys.argv[1], add_num=_add_num)
+    st, tt = upload_doc_subpage(WikiClient(), sys.argv[2], sys.argv[1], add_num=_add_num)
     print(f"HTTP {st} 子页: {tt}")
