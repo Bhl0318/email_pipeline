@@ -350,7 +350,12 @@ async function openTask(id) {
     customSlots[sid] = { title: (sv || {}).title || "", body: (sv || {}).body || "" };
   $("caseTitle").textContent = task.case_volume || id;
   const b = $("statusBadge"); b.textContent = task.status; b.className = "badge " + task.status;
-  renderMissing(); renderForm(); renderSidebar(); resetPreview();
+  renderMissing(); renderForm(); renderSidebar();
+  // 打开任务即自动生成「确认函」预览，无需手点「刷新预览」（复位 tab 高亮到确认函）
+  previewTarget = "confirmation";
+  document.querySelectorAll(".preview-head .tab").forEach(t => t.classList.toggle("active", t.dataset.target === "confirmation"));
+  $("emailPreview").style.display = "none";
+  refreshPreview();
   loadEmailModules();
 }
 
