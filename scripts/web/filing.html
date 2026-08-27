@@ -299,6 +299,7 @@ async function openTask(id){
   renderForm();
   renderSidebar();
   history.replaceState(null, "", `/submission/filing/${id}`);
+  loadReplacements();      // 加载「替换 POA/Transmittal/ADS」当前状态
   autoPreviewDoc("poa");   // 打开即自动预览默认 tab（POA）：有则展示、无则生成
 }
 
@@ -568,6 +569,11 @@ function renderForm(){
       <div style="margin-top:8px;"><input type="file" id="poaScanFile" accept="application/pdf"> <button onclick="uploadPoaScan()">上传扫描页</button></div>
     </div></div>
 
+    <div class="section"><div class="section-head">替换 POA / Transmittal / ADS（可选上传；上传后预览优先显示、发美代理实发替换件）</div><div class="section-body">
+      <div style="font-size:11px;color:#94a3b8;margin-bottom:8px;">支持 PDF / DOCX。上传后该件预览优先展示替换件；点上方「刷新预览」按数据重生成则回落生成版。发美代理时实发替换件（保留系统命名）。</div>
+      <div id="replaceRows"><span style="font-size:11px;color:#94a3b8;">加载中…</span></div>
+    </div></div>
+
     <div class="section"><div class="section-head">给美代理邮件（正文可编辑，右侧「美代理邮件」tab 预览；随「保存」落库）</div><div class="section-body">
       <div class="field"><label>主题</label><input id="m-subject" style="width:100%;box-sizing:border-box;" value="${esc(mailState.subject)}" oninput="setMail({subject:this.value});syncEmailPreview()"></div>
       <div class="field"><label>正文</label><textarea id="m-body" rows="9" style="width:100%;box-sizing:border-box;font-family:inherit;" oninput="setMail({body:this.value});syncEmailPreview()">${esc(mailState.body)}</textarea></div>
@@ -720,6 +726,54 @@ function addOther(sel){
   if (cur.includes(v)) return;
   inp.value = cur ? (cur + "; " + v) : v;   // 英文分号+空格：PDF 显示正常且可在空格处换行
 }
+/* ───────── 替换 POA/Transmittal/ADS ───────── */
+const REPLACE_TARGETS = [["poa","POA"],["transmittal","Transmittal"],["ads","ADS"]];
+function renderReplacements(map){
+  const box = $("replaceRows");
+  if (!box) return;
+  const ro = data && data.status && data.status !== "pending";
+  box.innerHTML = REPLACE_TARGETS.map(([t,label])=>{
+    const cur = (map||{})[t];
+    const now = cur
+      ? `<a href="${esc(cur.url)}" target="_blank" style="color:#2563eb;">${esc(cur.name)}</a> <button ${ro?"disabled":""} onclick="deleteReplacement('${t}')" style="padding:2px 8px;font-size:11px;">删除</button>`
+      : `<span style="color:#94a3b8;font-size:11px;">未上传（用系统生成版）</span>`;
+    return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap;">
+      <b style="min-width:90px;font-size:12px;">${label}</b>
+      <input type="file" id="rep-${t}" accept=".pdf,.docx" ${ro?"disabled":""}>
+      <button ${ro?"disabled":""} onclick="uploadReplacement('${t}')" style="padding:3px 10px;font-size:12px;">上传替换</button>
+      <span style="font-size:12px;">当前：${now}</span></div>`;
+  }).join("");
+}
+async function loadReplacements(){
+  const _tid = taskId;
+  try {
+    const j = await api("GET", `${API}/${taskId}/replacements`);
+    if (_tid !== taskId) return;
+    renderReplacements(j.replacements || {});
+  } catch(e){ const b=$("replaceRows"); if (b) b.innerHTML = `<span style="color:#dc2626;font-size:11px;">加载失败：${esc(e.message)}</span>`; }
+}
+async function uploadReplacement(target){
+  const inp = $("rep-"+target);
+  const f = inp && inp.files && inp.files[0];
+  if (!f) { toast("请先选择文件"); return; }
+  const fd = new FormData(); fd.append("file", f);
+  try {
+    await api("POST", `${API}/${taskId}/upload-replacement?target=${encodeURIComponent(target)}`, fd, true);
+    toast(target.toUpperCase()+" 替换件已上传");
+    await loadReplacements();
+    // 若当前正看该 tab，刷新为替换件预览
+    if (curTarget === target) autoPreviewDoc(target);
+  } catch(e){ toast("上传失败: "+e.message); }
+}
+async function deleteReplacement(target){
+  try {
+    await api("DELETE", `${API}/${taskId}/replacement?target=${encodeURIComponent(target)}`);
+    toast(target.toUpperCase()+" 替换件已删除");
+    await loadReplacements();
+    if (curTarget === target) autoPreviewDoc(target);
+  } catch(e){ toast("删除失败: "+e.message); }
+}
+
 async function uploadFinal(){
   const files = [...$("finalFile").files];
   if (!files.length) { toast("请先选择文件"); return; }

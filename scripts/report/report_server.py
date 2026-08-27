@@ -1993,6 +1993,51 @@ def delete_poa_scan(task_id: str):
     return {"ok": True}
 
 
+@app.post("/api/submission/filing/{task_id}/upload-replacement")
+def upload_filing_replacement(task_id: str, target: str, file: UploadFile = File(...)):
+    """上传 POA/Transmittal/ADS 的替换件到 manual/（存为 {Token}-replacement.ext，重传覆盖）。
+    预览优先展示、发美代理时实发替换件（覆盖生成件内容、保留生成件 stem）。"""
+    _load_submission_task(task_id)
+    token = _FILING_TOKENS.get(target)
+    if not token:
+        raise HTTPException(400, f"未知 target: {target}")
+    ext = (Path(file.filename or "").suffix or "").lower()
+    if ext not in (".pdf", ".docx"):
+        raise HTTPException(400, "替换件仅支持 PDF 或 DOCX")
+    md = _submission_manual_dir(task_id)
+    md.mkdir(parents=True, exist_ok=True)
+    for old in md.glob(f"{token}-replacement.*"):   # 先清旧的(可能扩展名不同)，再写新的
+        old.unlink()
+    dest = md / f"{token}-replacement{ext}"
+    dest.write_bytes(file.file.read())
+    return {"ok": True, "target": target, "name": dest.name, "url": _output_url(dest)}
+
+
+@app.get("/api/submission/filing/{task_id}/replacements")
+def list_filing_replacements(task_id: str):
+    """列出当前已上传的替换件：{poa|transmittal|ads: {name,url} 或 null}。"""
+    _load_submission_task(task_id)
+    out = {}
+    for tgt in _FILING_TOKENS:
+        p = _filing_replacement_path(task_id, tgt)
+        out[tgt] = {"name": p.name, "url": _output_url(p)} if p else None
+    return {"replacements": out}
+
+
+@app.delete("/api/submission/filing/{task_id}/replacement")
+def delete_filing_replacement(task_id: str, target: str):
+    """删除某 target 的替换件（恢复用系统生成版）。"""
+    _load_submission_task(task_id)
+    token = _FILING_TOKENS.get(target)
+    if not token:
+        raise HTTPException(400, f"未知 target: {target}")
+    md = _submission_manual_dir(task_id)
+    if md.is_dir():
+        for p in md.glob(f"{token}-replacement.*"):
+            p.unlink()
+    return {"ok": True, "target": target}
+
+
 class FilingPreviewReq(BaseModel):
     target: str                    # poa | transmittal | ads
     fields_json: dict = None       # 页面当前编辑值；缺省用库中值
@@ -2036,13 +2081,52 @@ def preview_filing_task(task_id: str, req: FilingPreviewReq):
     return {"target": req.target, "files": files, "warnings": warnings}
 
 
+_FILING_TOKENS = {"poa": "POA", "transmittal": "Transmittal", "ads": "ADS"}
+
+
+def _filing_replacement_path(task_id: str, target: str):
+    """env5 替换件源文件：manual/ 里 {Token}-replacement.(pdf|docx)。无则 None。（发送用，不看 mtime）"""
+    token = _FILING_TOKENS.get(target)
+    md = _submission_manual_dir(task_id)
+    if not token or not md.is_dir():
+        return None
+    cands = sorted((p for p in md.glob(f"{token}-replacement.*") if p.suffix.lower() in (".pdf", ".docx")),
+                   key=lambda p: p.stat().st_mtime, reverse=True)
+    return cands[0] if cands else None
+
+
+def _filing_override_pdf(task_id: str, target: str, gen_mtime: float = 0.0):
+    """预览用替换件(转成可内联的 PDF)：仅当替换件比 gen_mtime(最近一次生成的预览)新才采用——
+    点过刷新预览后生成版更新 → 回落生成版(与 env2 同一 mtime 逻辑)。pdf 直用；docx 转 PDF 到 preview/_ov。"""
+    src = _filing_replacement_path(task_id, target)
+    if not src or src.stat().st_mtime <= gen_mtime:
+        return None
+    if src.suffix.lower() == ".pdf":
+        return src
+    ov_dir = SUBMISSION_OUTPUT_DIR / task_id / "preview" / "_ov"
+    ov_dir.mkdir(parents=True, exist_ok=True)
+    out = ov_dir / (src.stem + ".pdf")
+    if (not out.exists()) or out.stat().st_mtime < src.stat().st_mtime:
+        docx_to_pdf(str(src), ov_dir)
+    return out if out.exists() else None
+
+
 @app.get("/api/submission/filing/{task_id}/preview-existing")
 def filing_preview_existing(task_id: str, target: str = "poa"):
-    """只查不生成：返回 preview/ 里已存在的 POA/Transmittal/ADS 成品(PDF)。
-    供页面打开/切 tab 时「有则直接展示、无则再 POST /preview 生成」。无匹配则 files 为空。"""
+    """展示已存在成品(不重生成)。POA/Transmittal/ADS 优先展示 manual/ 里的替换件(比最近一次
+    生成的预览新时)，无则看 preview/。供打开/切 tab 时「有则直接展示、无则再 POST /preview 生成」。"""
     _load_submission_task(task_id)
     preview_dir = SUBMISSION_OUTPUT_DIR / task_id / "preview"
-    token = {"poa": "POA", "transmittal": "Transmittal", "ads": "ADS"}.get(target, target)
+    token = _FILING_TOKENS.get(target, target)
+    # 替换件优先（比生成版新才用；点过刷新预览→回落生成版）
+    _gen_mtime = 0.0
+    if preview_dir.is_dir():
+        _ms = [p.stat().st_mtime for p in preview_dir.glob("*.pdf") if token.lower() in p.name.lower()]
+        _gen_mtime = max(_ms) if _ms else 0.0
+    ov = _filing_override_pdf(task_id, target, _gen_mtime)
+    if ov:
+        return {"target": target, "override": True,
+                "files": [{"name": ov.stem, "pdf_url": _output_url(ov), "type": "pdf"}]}
     files = []
     if preview_dir.is_dir():
         pdfs = sorted((p for p in preview_dir.glob("*.pdf") if token.lower() in p.name.lower()),
@@ -2168,6 +2252,20 @@ def confirm_filing_task(task_id: str, req: FilingConfirmReq):
                 generate_ads(ci, final_dir)]
         for d in docs:
             warnings.extend(d.get("warnings") or [])
+        # 替换件顶替：有 manual 替换件的成品，用替换件内容覆盖 final/(保留生成件 stem，
+        # 采用替换件扩展名) → 实发替换件；通道按 docs 类型、env6 按 stem 比对，均不受影响。
+        for _i, _tgt in enumerate(("poa", "transmittal", "ads")):
+            _rep = _filing_replacement_path(task_id, _tgt)
+            if not _rep:
+                continue
+            _gen = Path(docs[_i]["file_path"])
+            _dest = final_dir / (_gen.stem + _rep.suffix.lower())
+            _dest.write_bytes(_rep.read_bytes())
+            if _dest != _gen and _gen.exists():
+                _gen.unlink()   # 删原生成件，避免重复附件
+            docs[_i]["file_path"] = str(_dest)
+            docs[_i]["file_name"] = _dest.name
+            warnings.append(f"{_tgt.upper()} 使用了上传的替换件（{_rep.name}）")
     except Exception as exc:
         shutil.rmtree(final_dir, ignore_errors=True)
         raise HTTPException(500, f"成品生成失败：{exc}")
