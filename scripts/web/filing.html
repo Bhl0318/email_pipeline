@@ -105,6 +105,7 @@
         <h1 id="caseTitle">—</h1>
         <span class="badge pending" id="statusBadge">…</span>
         <span class="spacer"></span>
+        <button onclick="refreshAllPreviews()" title="按当前数据重新生成 POA / Transmittal / ADS">↻ 刷新预览</button>
         <button class="primary" id="saveBtn" onclick="save()" disabled>保存</button>
         <button id="reviewerBtn" onclick="openReviewerModal()" disabled>发送审核人</button>
         <button class="success" id="sendBtn" onclick="openSendModal()" disabled>发美代理</button>
@@ -121,7 +122,6 @@
         <button class="tab" data-target="ads" onclick="autoPreviewDoc('ads')">ADS</button>
         <button class="tab" data-target="email" onclick="previewEmail()">美代理邮件</button>
         <button class="tab" data-target="confref" onclick="confRef()" title="客户实际收到的确认函原件（环节2生成，非重新生成）">确认函(原件)</button>
-        <button onclick="refreshAllPreviews()" title="按当前数据重新生成 POA / Transmittal / ADS" style="margin-left:auto;padding:4px 12px;font-size:12px;">↻ 刷新预览</button>
       </div>
       <div id="dlBar" style="display:none;padding:6px 12px;background:#fef3c7;border-bottom:1px solid #fcd34d;font-size:12px;"></div>
       <div class="preview-body">
