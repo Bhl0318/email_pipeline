@@ -351,12 +351,32 @@ async function openTask(id) {
   $("caseTitle").textContent = task.case_volume || id;
   const b = $("statusBadge"); b.textContent = task.status; b.className = "badge " + task.status;
   renderMissing(); renderForm(); renderSidebar();
-  // 打开任务即自动生成「确认函」预览，无需手点「刷新预览」（复位 tab 高亮到确认函）
+  // 打开任务即展示「确认函」预览：先查文件夹里有没有已生成的，有则直接展示、无则自动生成
+  //（复位 tab 高亮到确认函，无需手点「刷新预览」）
   previewTarget = "confirmation";
   document.querySelectorAll(".preview-head .tab").forEach(t => t.classList.toggle("active", t.dataset.target === "confirmation"));
   $("emailPreview").style.display = "none";
-  refreshPreview();
+  autoPreviewConfirmation();
   loadEmailModules();
+}
+
+// 打开时确认函预览：优先展示 preview/ 里已存在的成品；没有再走 refreshPreview() 生成
+async function autoPreviewConfirmation() {
+  if (!taskId) return;
+  const _tid = taskId;
+  try {
+    const d = await api("GET", `${API}/tasks/${taskId}/preview-existing?target=confirmation`);
+    if (_tid !== taskId) return;   // 期间切了任务就放弃，避免串台
+    const files = d.files || [];
+    if (files.length) {
+      previewFileList = files;
+      $("previewFiles").style.display = "block";
+      renderPreviewFileChips(0);
+      showPreviewFile(0);
+      return;
+    }
+  } catch (e) { /* 查不到/出错就走生成 */ }
+  if (_tid === taskId) refreshPreview();   // 无已存在文件 → 自动生成
 }
 
 /* ───────── 确认邮件正文模块 ───────── */

@@ -1018,6 +1018,25 @@ def preview_submission_task(task_id: str, req: SubmissionPreviewReq):
     }
 
 
+@app.get("/api/submission/tasks/{task_id}/preview-existing")
+def preview_existing_submission(task_id: str, target: str = "confirmation"):
+    """只查不生成：返回 preview/ 目录里已存在的该 target 成品(PDF，附同名 docx)。
+    供页面打开时「有则直接展示、无则再 POST /preview 生成」。无匹配则 files 为空。"""
+    _load_submission_task(task_id)
+    preview_dir = SUBMISSION_OUTPUT_DIR / task_id / "preview"
+    token = {"confirmation": "Application Information Sheet",
+             "assignment": "Assignment", "declaration": "Declaration"}.get(target, target)
+    files = []
+    if preview_dir.is_dir():
+        pdfs = sorted((p for p in preview_dir.glob("*.pdf") if token.lower() in p.name.lower()),
+                      key=lambda p: p.stat().st_mtime, reverse=True)
+        for p in pdfs:
+            docx = p.with_suffix(".docx")
+            files.append({"name": p.stem, "pdf_url": _output_url(p),
+                          "docx_url": _output_url(docx) if docx.exists() else None})
+    return {"target": target, "files": files}
+
+
 @app.get("/api/submission/tasks/{task_id}/final-doc")
 def submission_final_doc(task_id: str, target: str):
     """已发版预览：发美代理后文件已锁定，返回 final/(发送时生成) 中匹配 target 的【已发送】
