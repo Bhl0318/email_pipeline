@@ -2036,6 +2036,22 @@ def preview_filing_task(task_id: str, req: FilingPreviewReq):
     return {"target": req.target, "files": files, "warnings": warnings}
 
 
+@app.get("/api/submission/filing/{task_id}/preview-existing")
+def filing_preview_existing(task_id: str, target: str = "poa"):
+    """只查不生成：返回 preview/ 里已存在的 POA/Transmittal/ADS 成品(PDF)。
+    供页面打开/切 tab 时「有则直接展示、无则再 POST /preview 生成」。无匹配则 files 为空。"""
+    _load_submission_task(task_id)
+    preview_dir = SUBMISSION_OUTPUT_DIR / task_id / "preview"
+    token = {"poa": "POA", "transmittal": "Transmittal", "ads": "ADS"}.get(target, target)
+    files = []
+    if preview_dir.is_dir():
+        pdfs = sorted((p for p in preview_dir.glob("*.pdf") if token.lower() in p.name.lower()),
+                      key=lambda p: p.stat().st_mtime, reverse=True)
+        for p in pdfs:
+            files.append({"name": p.stem, "pdf_url": _output_url(p), "type": "pdf"})
+    return {"target": target, "files": files}
+
+
 class FilingAdsXfaReq(BaseModel):
     fields_json: dict = None       # 页面当前编辑值（未保存也生效）；缺省用库中值
     transmittal_options: dict = None

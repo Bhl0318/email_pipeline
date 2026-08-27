@@ -47,6 +47,11 @@
   .banner.ok { background: #d1fae5; border: 1px solid #6ee7b7; color: #047857; }
   .section { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; margin-bottom: 12px; overflow: hidden; }
   .section-head { padding: 9px 14px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; font-weight: 600; font-size: 13px; color: #334155; }
+  /* 中栏各模块可折叠：点表头折叠/展开（点表头里的按钮/控件不折叠，见 pane.onclick 委托） */
+  .section-head { cursor: pointer; user-select: none; }
+  .section-head::before { content: '▾'; margin-right: 6px; font-size: 10px; color: #94a3b8; }
+  .section.collapsed .section-head::before { content: '▸'; }
+  .section.collapsed .section-body { display: none; }
   .section-body { padding: 12px 14px; }
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px 14px; }
   .field label { display: block; font-size: 11.5px; color: #64748b; margin-bottom: 3px; }
@@ -111,11 +116,12 @@
     <div class="preview-pane">
       <div class="preview-head">
         <span style="font-size:12px;color:#64748b;">预览：</span>
-        <button class="tab" data-target="poa" onclick="preview('poa')">POA</button>
-        <button class="tab" data-target="transmittal" onclick="preview('transmittal')">Transmittal</button>
-        <button class="tab" data-target="ads" onclick="preview('ads')">ADS</button>
+        <button class="tab" data-target="poa" onclick="autoPreviewDoc('poa')">POA</button>
+        <button class="tab" data-target="transmittal" onclick="autoPreviewDoc('transmittal')">Transmittal</button>
+        <button class="tab" data-target="ads" onclick="autoPreviewDoc('ads')">ADS</button>
         <button class="tab" data-target="email" onclick="previewEmail()">美代理邮件</button>
         <button class="tab" data-target="confref" onclick="confRef()" title="客户实际收到的确认函原件（环节2生成，非重新生成）">确认函(原件)</button>
+        <button onclick="refreshAllPreviews()" title="按当前数据重新生成 POA / Transmittal / ADS" style="margin-left:auto;padding:4px 12px;font-size:12px;">↻ 刷新预览</button>
       </div>
       <div id="dlBar" style="display:none;padding:6px 12px;background:#fef3c7;border-bottom:1px solid #fcd34d;font-size:12px;"></div>
       <div class="preview-body">
@@ -293,6 +299,7 @@ async function openTask(id){
   renderForm();
   renderSidebar();
   history.replaceState(null, "", `/submission/filing/${id}`);
+  autoPreviewDoc("poa");   // 打开即自动预览默认 tab（POA）：有则展示、无则生成
 }
 
 function _v(path){ return path.split(".").reduce((o,k)=> o==null?undefined:o[k], fields); }
@@ -746,7 +753,54 @@ async function delPoaScan(){
   catch(e){ toast("删除失败: "+e.message); }
 }
 
+let curTarget = "poa";   // 当前文档预览 tab（poa/transmittal/ads），供「刷新预览」后回显
+
+function _showDocPdf(target, pdfUrl){
+  // 展示一份已存在的成品 PDF（与 preview() 生成后的展示一致；ADS 带 XFA 下载条）
+  $("emailPreview").style.display = "none";
+  $("previewPlaceholder").style.display = "none";
+  const fr = $("previewFrame"); fr.style.display = "block"; fr.src = pdfUrl;
+  const bar = $("dlBar");
+  if (target === "ads") {
+    bar.style.display = "block";
+    bar.innerHTML = `当前为<b>数据核对版</b>（本地，仅核对字段）。需要 XFA：` +
+      `<a href="#" onclick="adsXfa(false);return false;" style="color:#b45309;font-weight:600;">⬇ 下载 XFA 版</a>（Adobe 打开）` +
+      ` ｜ <a href="#" onclick="adsXfa(true);return false;" style="color:#b45309;">在线看真实排版</a>（上云扁平化）`;
+  } else { bar.style.display = "none"; }
+}
+
+// 切 tab / 打开页面：有已生成成品直接展示，无则生成（锁定态显示已发版）
+async function autoPreviewDoc(target){
+  curTarget = target;
+  document.querySelectorAll(".preview-head .tab").forEach(b => b.classList.toggle("active", b.dataset.target === target));
+  if (data && data.status && data.status !== "pending") return previewSent(target);
+  try {
+    const j = await api("GET", `${API}/${taskId}/preview-existing?target=${encodeURIComponent(target)}`);
+    const f = (j.files || [])[0];
+    if (f) { _showDocPdf(target, f.pdf_url); return; }
+  } catch(e){ /* 查不到就生成 */ }
+  preview(target);   // 无已存在 → 按数据生成
+}
+
+// 「刷新预览」：按当前数据重新生成 POA/Transmittal/ADS，再回显当前 tab
+async function refreshAllPreviews(){
+  if (!taskId) return;
+  if (data && data.status && data.status !== "pending") { previewSent(curTarget); return; }  // 锁定态不重生成
+  collectOpts();
+  $("emailPreview").style.display = "none";
+  $("previewLoadingText").textContent = "重新生成 POA / Transmittal / ADS…";
+  $("previewLoading").classList.add("show");
+  try {
+    for (const t of ["poa", "transmittal", "ads"]) {
+      try { await api("POST", `${API}/${taskId}/preview`, { target: t, fields_json: fields, transmittal_options: opts }); }
+      catch(e){ /* 单件失败继续下一件 */ }
+    }
+  } finally { $("previewLoading").classList.remove("show"); }
+  autoPreviewDoc(["poa","transmittal","ads"].includes(curTarget) ? curTarget : "poa");
+}
+
 async function preview(target){
+  curTarget = target;
   // 已锁定（发美代理后）：显示已发版(final/)，不按当前编辑重生成
   if (data && data.status && data.status !== "pending") return previewSent(target);
   collectOpts();
@@ -1066,6 +1120,13 @@ async function doSendReviewer(){
   } catch(e){ toast("发送失败: "+e.message); }
   finally { $("rvConfirm").disabled = false; }
 }
+
+// 折叠：点 section 表头折叠/展开；点表头里的按钮/输入/链接不折叠（一次性委托，innerHTML 重建不受影响）
+document.getElementById("formSections").addEventListener("click", e => {
+  const head = e.target.closest(".section-head");
+  if (!head || e.target.closest("button, input, select, a, textarea, label")) return;
+  head.closest(".section")?.classList.toggle("collapsed");
+});
 
 (function init(){
   loadTaskList();
