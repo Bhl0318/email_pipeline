@@ -85,7 +85,7 @@ sys.path.insert(0, str(SCRIPT_DIR))
 from db_query import execute_params  # noqa: E402
 from submission.common import infer_subject_matter, normalize_parents, validate_for_confirm, parse_address_en  # noqa: E402
 from submission.email_modules import build_email_modules  # noqa: E402
-from submission.confirmation_sheet import generate_confirmation_sheet  # noqa: E402
+from submission.confirmation_sheet import generate_confirmation_sheet, list_confirmation_rows  # noqa: E402
 from submission.assignment_generator import generate_assignments  # noqa: E402
 from submission.declaration_generator import generate_declarations  # noqa: E402
 from submission.preview import docx_to_pdf, office_convert  # noqa: E402
@@ -979,7 +979,7 @@ def preview_submission_task(task_id: str, req: SubmissionPreviewReq):
     normalize_parents(fields)
 
     preview_dir = SUBMISSION_OUTPUT_DIR / task_id / "preview"
-    files, missing_fields, missing_optional, warnings = [], [], [], []
+    files, missing_fields, missing_optional, warnings, rows = [], [], [], [], []
 
     def _url(path) -> str:
         return "/output/" + str(Path(path).relative_to(_OUTPUT_DIR_FOR_MOUNT))
@@ -989,6 +989,7 @@ def preview_submission_task(task_id: str, req: SubmissionPreviewReq):
             result = generate_confirmation_sheet(fields, preview_dir)
             missing_fields = result["missing_fields"]
             missing_optional = result["missing_optional_fields"]
+            rows = result.get("rows", [])   # 各行 key/标签/值，供审核页「标黄设置」勾选
             pdf_path = docx_to_pdf(result["file_path"], preview_dir)
             files.append({"name": result["file_name"], "pdf_url": _url(pdf_path),
                           "docx_url": _url(result["file_path"])})
@@ -1015,7 +1016,30 @@ def preview_submission_task(task_id: str, req: SubmissionPreviewReq):
         "missing_fields": missing_fields,
         "missing_optional_fields": missing_optional,
         "warnings": warnings,
+        "rows": rows,   # confirmation 时非空：[{key,label,value}]，供「标黄设置」面板
     }
+
+
+@app.post("/api/submission/tasks/{task_id}/confirmation-rows")
+def confirmation_rows(task_id: str, req: SubmissionPreviewReq):
+    """确认函各行清单（只算不产 PDF），供审核页「标黄设置」勾选。
+    用页面当前编辑值（req.fields_json）优先，否则库中 fields_json。
+    :return: {rows:[{key,label,value}], highlights:[...当前已勾选]}"""
+    row = _load_submission_task(task_id)
+    if req.fields_json is not None:
+        fields = req.fields_json
+    else:
+        try:
+            fields = json.loads(row["fields_json"]) if row["fields_json"] else {}
+        except Exception:
+            raise HTTPException(status_code=500, detail="fields_json 不是合法 JSON")
+    fields["subject_matter"] = infer_subject_matter(fields)
+    normalize_parents(fields)
+    try:
+        rows = list_confirmation_rows(fields)
+    except Exception as exc:   # noqa: BLE001
+        raise HTTPException(status_code=500, detail=f"行清单生成失败：{exc}")
+    return {"rows": rows, "highlights": fields.get("confirmation_highlights") or []}
 
 
 @app.get("/api/submission/tasks/{task_id}/preview-existing")

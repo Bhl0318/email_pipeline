@@ -357,6 +357,7 @@ async function openTask(id) {
   document.querySelectorAll(".preview-head .tab").forEach(t => t.classList.toggle("active", t.dataset.target === "confirmation"));
   $("emailPreview").style.display = "none";
   autoPreview("confirmation");
+  loadHighlightRows();      // 加载「标黄设置」面板（按当前 fields 列出可勾选行）
   loadEmailModules();
 }
 
@@ -377,6 +378,44 @@ async function autoPreview(target) {
     }
   } catch (e) { /* 查不到/出错就走生成 */ }
   if (_tid === taskId && _tgt === previewTarget) generateAndShow(target);   // 无已存在文件 → 只生成这一个
+}
+
+/* ───────── 标黄设置：勾选确认函要整行标黄的行 ───────── */
+function toggleHighlight(key, on) {
+  const cur = new Set(fields.confirmation_highlights || []);
+  if (on) cur.add(key); else cur.delete(key);
+  fields.confirmation_highlights = [...cur];   // 随保存/预览/确认落库，重新预览即整行变黄
+}
+function renderHighlightPanel(rows) {
+  const box = $("sec-highlights");
+  if (!box) return;
+  if (!rows || !rows.length) {
+    box.innerHTML = '<div style="color:#94a3b8;font-size:12px;">（暂无可标黄行）</div>';
+    return;
+  }
+  const ro = task.status !== "pending";
+  const hl = new Set(fields.confirmation_highlights || []);
+  box.innerHTML =
+    '<div class="hint" style="margin-bottom:6px;">勾选需要在确认函中<b>整行标黄</b>的行；勾选后点上方「刷新预览」查看效果。</div>' +
+    rows.map(r => {
+      const val = r.value ? ` <span style="color:#64748b;">— ${esc(r.value)}</span>` : "";
+      return `<label style="display:block;padding:2px 0;font-size:12px;cursor:pointer;">
+        <input type="checkbox" ${hl.has(r.key) ? "checked" : ""} ${ro ? "disabled" : ""}
+          onchange="toggleHighlight('${esc(r.key)}', this.checked)">
+        <b>${esc(r.label)}</b>${val}</label>`;
+    }).join("");
+}
+async function loadHighlightRows() {
+  if (!taskId) return;
+  const _tid = taskId;
+  try {
+    const d = await api("POST", `${API}/tasks/${taskId}/confirmation-rows`, { fields_json: fields });
+    if (_tid !== taskId) return;
+    renderHighlightPanel(d.rows || []);
+  } catch (e) {
+    const box = $("sec-highlights");
+    if (box) box.innerHTML = `<div style="color:#dc2626;font-size:12px;">标黄行清单加载失败：${esc(problemsOf(e).join("；"))}</div>`;
+  }
 }
 
 /* ───────── 确认邮件正文模块 ───────── */
@@ -692,6 +731,9 @@ function renderForm() {
     <div class="section">${head("转让安排", "assignments", "一段转让")}<div class="section-body" id="sec-assignments">
       ${assignmentBlock()}</div></div>
 
+    <div class="section">${head("🟡 标黄设置（确认函整行标黄）")}<div class="section-body" id="sec-highlights">
+      <span style="color:#94a3b8;font-size:12px;">加载中…</span></div></div>
+
     <div class="section"><div class="section-head">确认邮件正文模块（勾选适用项，发送时按勾选拼装）<span class="spacer"></span>
       ${ro ? "" : '<button onclick="regenerateModules()">↻ 重新生成模块</button>'}</div>
       <div class="section-body" id="sec-email-modules">${emailModules.length ? "" : '<span style="color:#94a3b8;font-size:12px;">加载中...</span>'}</div></div>`;
@@ -1002,6 +1044,7 @@ async function refreshPreview() {
     $("previewPlaceholder").textContent = (results[showT] === null) ? "该文档生成失败" : "无产物";
   }
   if (warns.length) toast("⚠ " + warns.join(" ｜ "), 6000);
+  loadHighlightRows();   // 重生成后按最新 fields 刷新「标黄设置」可勾选行
 }
 
 /* ───────── 确认发送 ───────── */

@@ -604,6 +604,42 @@ class PatentApplicationFormGenerator:
 
         data_rows = data_rows1 + data_rows6 + data_rows7 + data_rows2 + data_rows3 + data_rows4 + data_rows5
 
+        # ── 为每行分配稳定 key（供审核页「标黄设置」勾选 + 生成时整行标黄）；表头/分隔行 key=None ──
+        def _mk_keys():
+            ks = ["case.title", None, "case.location"]                       # data_rows1
+            if data_rows6:                                                   # 美国母案
+                ks.append(None)
+                for p in range(1, len(Parent_applications) + 1):
+                    ks += [f"parent.{p}.app_no", f"parent.{p}.filing_date"]
+            if data_rows7:                                                   # PCT
+                ks += [None, "pct.app_no", "pct.filing_date", "pct.pub_no", "pct.pub_date"]
+            ks.append(None)                                                  # 发明人表头
+            for gi, g in enumerate(_groups, 1):                             # 与 data_rows2 构建顺序一致
+                for idx, _inv in g["members"]:
+                    ks.append(f"inventor.{idx}.name")
+                ks += [f"inventor.g{gi}.labor", f"inventor.g{gi}.residence"]
+                ks += [f"inventor.g{gi}.{f}" for f in ("address1", "address2", "city", "state", "post", "nationality")]
+            ks.append(None)                                                  # 申请人表头
+            for ai in range(1, len(applicants) + 1):
+                ks += [f"applicant.{ai}.{f}" for f in ("name", "address1", "address2", "city", "state", "post", "nationality", "entity")]
+            if data_rows4:                                                   # 优先权
+                ks.append(None)
+                for pi in range(1, len(priorities) + 1):
+                    ks += [f"priority.{pi}.no", f"priority.{pi}.date", f"priority.{pi}.das"]
+            ks += [None, "case.filing_route", "case.ae_methods"]             # data_rows5
+            return ks
+
+        _keys = _mk_keys()
+        if len(_keys) != len(data_rows):
+            # 键与行数不一致（模板结构被改动）→ 安全降级：不标黄、不给 meta，避免错位
+            _keys = [None] * len(data_rows)
+        keyed_rows = list(zip(_keys, data_rows))
+        _hl = set(case_info.get("confirmation_highlights") or [])            # 需整行标黄的 key 集合
+        # 供审核页「标黄设置」列出可勾选行（跳过 key=None 的表头/分隔行）
+        self.row_meta = [{"key": k, "label": (r[0] if r else ""),
+                          "value": " / ".join([str(c) for c in r[1:] if str(c).strip()])}
+                         for k, r in keyed_rows if k]
+
         doc = Document()
 
         # 标题
@@ -639,9 +675,10 @@ class PatentApplicationFormGenerator:
         table = doc.add_table(rows=0, cols=3)
         table.style = "Table Grid"
 
-        for row in data_rows:
+        for key, row in keyed_rows:
             tr = table.add_row()
             cells = tr.cells
+            _yellow = bool(key) and key in _hl   # 该行被勾选标黄 → 整行 FFFF00
 
             if len(row) == 1:
                 merged = cells[0].merge(cells[1])
@@ -654,9 +691,15 @@ class PatentApplicationFormGenerator:
                 cells[2].merge(cells[1])
                 self._format_cell(cells[0], row[0], bold=True, valign_center=True)
                 self._format_cell(cells[1], row[1], bold=False, valign_center=True)
+                if _yellow:
+                    self._set_cell_shading(cells[0], "FFFF00")
+                    self._set_cell_shading(cells[1], "FFFF00")
             elif len(row) == 3:
                 for i in range(3):
                     self._format_cell(cells[i], row[i], bold=(i == 0), valign_center=(i == 0))
+                if _yellow:
+                    for i in range(3):
+                        self._set_cell_shading(cells[i], "FFFF00")
 
         col_widths = [Cm(3.24), Cm((14.63 - 3.24) / 2), Cm((14.63 - 3.24) / 2)]
         for idx, width in enumerate(col_widths):

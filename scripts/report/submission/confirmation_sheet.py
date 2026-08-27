@@ -31,6 +31,16 @@ def _normalize_fields(fields: dict) -> dict:
     return normalized
 
 
+def list_confirmation_rows(fields: dict) -> list:
+    """只算确认函各行的 key/标签/值（不产 PDF，仅生成一次性 docx 到临时目录取 row_meta），
+    供审核页「标黄设置」面板列出可勾选行。返回 [{key,label,value}]。"""
+    import tempfile
+    with tempfile.TemporaryDirectory() as td:
+        gen = PatentApplicationFormGenerator(_normalize_fields(fields), str(Path(td) / "_rows.docx"))
+        gen.generate()
+        return getattr(gen, "row_meta", [])
+
+
 def generate_confirmation_sheet(fields: dict, output_dir) -> dict:
     """fields_json → 确认函 docx。
 
@@ -43,13 +53,14 @@ def generate_confirmation_sheet(fields: dict, output_dir) -> dict:
     file_name = f"{date_str}-Application Information Sheet-{case_volume}.docx"
     file_path = output_dir / file_name
 
-    missing_fields, missing_optional_fields = PatentApplicationFormGenerator(
-        _normalize_fields(fields), str(file_path)
-    ).generate()
+    gen = PatentApplicationFormGenerator(_normalize_fields(fields), str(file_path))
+    missing_fields, missing_optional_fields = gen.generate()
 
     return {
         "file_path": str(file_path),
         "file_name": file_name,
         "missing_fields": missing_fields,
         "missing_optional_fields": missing_optional_fields,
+        # 各行的 key/标签/值，供审核页「标黄设置」勾选（key=None 的表头行已在生成器里排除）
+        "rows": getattr(gen, "row_meta", []),
     }
