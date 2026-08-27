@@ -1171,14 +1171,11 @@ def _filing_firm_key(agent_firm):
 
 
 def _filing_send_config(agent_firm):
-    """发美代理发信账号：统一用 accounts.prosecution（prosecution@ip-file.com），不再按代理所切换。
-    配置缺 prosecution 时才回退原逻辑（firm_send_accounts→firm_send_default→pa）。返回 (account_cfg, cc)。"""
+    """发美代理发信账号：按代理所 agent_firm 选 submission.firm_send_accounts 里的账号
+    （Metis→patent_filling@metis-ip.com 等）；识别不出/未配 → firm_send_default，
+    再兜底回退 _submission_send_config()（pa）。返回 (account_cfg, cc)。"""
     cfg = _load_email_config()
     sub = cfg.get("submission", {})
-    account_cfg = cfg.get("accounts", {}).get("prosecution")   # 统一发件人
-    if account_cfg:
-        return account_cfg, sub.get("cc", [])
-    # 兜底（配置未含 prosecution 账号）：原按代理所/默认，再回退 pa
     fmap = sub.get("firm_send_accounts") or {}
     acct_key = fmap.get(_filing_firm_key(agent_firm)) or sub.get("firm_send_default")
     account_cfg = cfg.get("accounts", {}).get(acct_key) if acct_key else None
