@@ -153,36 +153,67 @@ def doc_to_storage(path, add_num=True):
     raise ValueError(f"不支持的官文格式（仅 .docx/.pdf）: {path}")
 
 
-def upload_doc_subpage(wiki, parent_page_id, doc_path, add_num=True):
-    """把一份官文（Word/PDF）正文转成 parent_page_id 页下的子页（已存在则更新）。
+def _content_pieces(path):
+    """抽一次正文，返回 (paras, tables_html)——供渲染有序号/无序号两版复用（避免扫描件 OCR 跑两遍）。
+    .docx→段落原文列表 + 表格HTML；.pdf→段落列表(文本层或 OCR) + ''；PDF 无正文→([], '')。"""
+    ext = os.path.splitext(path)[1].lower()
+    if ext == ".docx":
+        from docx import Document
+        doc = Document(path)
+        paras = [p.text for p in doc.paragraphs if p.text and p.text.strip()]
+        return paras, _docx_tables_html(doc)
+    if ext == ".pdf":
+        paras = _pdf_text_paragraphs(path)
+        if not paras:
+            paras = _ocr_pdf_paragraphs(path)
+            if paras:
+                print(f"[官文OCR] {os.path.basename(path)} OCR 出 {len(paras)} 段", file=sys.stderr)
+        return paras, ""
+    raise ValueError(f"不支持的官文格式（仅 .docx/.pdf）: {path}")
 
-    Args:
-        wiki: oainfo_cli.WikiClient 实例
-        parent_page_id: 父页（案号-OA信息记录表）的 pageId
-        doc_path: 本地官文路径（.docx 或 .pdf）
-        add_num: 段落是否加【0001】编号
 
-    Returns:
-        (status_code, page_title)；父页找不到返回 (404, "")。
-    """
-    parent = wiki.get_page_by_id(parent_page_id)
-    if not parent:
-        return 404, ""
-    title = os.path.splitext(os.path.basename(doc_path))[0]
-    if not add_num:
-        title += "【无序号版】"
-    content = doc_to_storage(doc_path, add_num)
-    if not content:
-        # 无可提取正文（扫描件且 OCR 失败/空）→ 不建空子页
-        print(f"[官文转Wiki] 无可提取正文，跳过建页: {os.path.basename(doc_path)}", file=sys.stderr)
-        return 0, title
-    status = wiki.create_child_page(title, content, parent["space_key"], parent_page_id)
+def _render_storage(paras, tables_html, add_num):
+    return _wrap(_paras_to_html(paras, add_num) + (tables_html or ""), add_num)
+
+
+def _put_subpage(wiki, parent, base_title, content, add_num):
+    """建一个子页（有序号版=base_title；无序号版=base_title【无序号版】）；同名已存在则更新。"""
+    title = base_title if add_num else base_title + "【无序号版】"
+    status = wiki.create_child_page(title, content, parent["space_key"], parent["id"])
     if status != 200:
         # 同名子页已存在（Confluence 建重名返回 400）→ 按标题回查并更新
         existing = wiki.get_page(title)
         if existing:
             status = wiki.update_page(existing["id"], title, content, existing["version"])
     return status, title
+
+
+def upload_doc_subpages(wiki, parent_page_id, doc_path, versions=(True, False)):
+    """把一份官文（Word/PDF）正文转成 parent_page_id 页下的子页，默认建**有序号 + 无序号两版**。
+    正文只抽一次（扫描件只 OCR 一次），渲染两版分别建/更新。
+
+    Returns:
+        list[(status_code, page_title)]；父页找不到返回 [(404, "")]；无可提取正文返回 []（不建空页）。
+    """
+    parent = wiki.get_page_by_id(parent_page_id)
+    if not parent:
+        return [(404, "")]
+    paras, tables_html = _content_pieces(doc_path)
+    if not paras and not tables_html:
+        print(f"[官文转Wiki] 无可提取正文，跳过建页: {os.path.basename(doc_path)}", file=sys.stderr)
+        return []
+    base = os.path.splitext(os.path.basename(doc_path))[0]
+    out = []
+    for add_num in versions:
+        content = _render_storage(paras, tables_html, add_num)
+        out.append(_put_subpage(wiki, parent, base, content, add_num))
+    return out
+
+
+def upload_doc_subpage(wiki, parent_page_id, doc_path, add_num=True):
+    """单版本入口（向后兼容）：只建一个子页（默认有序号版）。"""
+    res = upload_doc_subpages(wiki, parent_page_id, doc_path, versions=(add_num,))
+    return res[0] if res else (0, os.path.splitext(os.path.basename(doc_path))[0])
 
 
 # 向后兼容别名（原只支持 Word）
@@ -192,8 +223,10 @@ upload_word_subpage = upload_doc_subpage
 if __name__ == "__main__":
     from oainfo_cli import WikiClient
     if len(sys.argv) < 3:
-        print("用法: python3 word_to_wiki.py <官文.docx|官文.pdf> <parent_page_id> [nonum]")
+        print("用法: python3 word_to_wiki.py <官文.docx|官文.pdf> <parent_page_id> [num|nonum]")
         sys.exit(1)
-    _add_num = not (len(sys.argv) > 3 and sys.argv[3] == "nonum")
-    st, tt = upload_doc_subpage(WikiClient(), sys.argv[2], sys.argv[1], add_num=_add_num)
-    print(f"HTTP {st} 子页: {tt}")
+    # 默认建两版；给 num 只建有序号、nonum 只建无序号
+    _arg = sys.argv[3] if len(sys.argv) > 3 else ""
+    _versions = (True,) if _arg == "num" else (False,) if _arg == "nonum" else (True, False)
+    for st, tt in upload_doc_subpages(WikiClient(), sys.argv[2], sys.argv[1], versions=_versions):
+        print(f"HTTP {st} 子页: {tt}")

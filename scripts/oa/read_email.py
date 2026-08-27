@@ -1172,9 +1172,9 @@ def dispatch_oa(all_results, all_emails=None, dry_run=False, test_project_prefix
     elif all_results:
         from oainfo_cli import WikiClient, find_publication_file
         try:
-            from word_to_wiki import upload_doc_subpage
+            from word_to_wiki import upload_doc_subpages
         except Exception as _e:
-            upload_doc_subpage = None
+            upload_doc_subpages = None
             print(f"[官文转Wiki] 无法导入 word_to_wiki（跳过官文转子页）: {_e}", file=sys.stderr)
         # msgid -> 邮件保存的官文 PDF（report 读取层存到 _inbox 的）
         msgid_to_pdfs = {}
@@ -1195,15 +1195,16 @@ def dispatch_oa(all_results, all_emails=None, dry_run=False, test_project_prefix
             _pdf = item.get("us_pdf_path", "")
             files.extend([d for d in (item.get("us_doc_paths") or []) if d and d != _pdf])
             files.extend(item.get("us_ref_pdf_paths") or [])   # 同案号 892/1449 文献
-            # 官文正文转 OA信息记录表页下的子页（US/CN/EP；有 Word 用 Word、没 Word 用 PDF，段落带编号）
-            if upload_doc_subpage:
+            # 官文正文转 OA信息记录表页下的子页（US/CN/EP；有 Word 用 Word、没 Word 用 PDF）；
+            # 建有序号版 + 无序号版两个子页（正文只抽一次，扫描件只 OCR 一次）
+            if upload_doc_subpages:
                 _src = _official_doc_for_subpage(
                     item, msgid_to_pdfs.get(item.get("message_id", ""), []))
                 if _src:
                     try:
-                        _st, _title = upload_doc_subpage(wiki, page_id, _src, add_num=True)
-                        print(f"[官文转Wiki] {item.get('project','')} {os.path.basename(_src)} → "
-                              f"HTTP {_st} 子页:{_title}", file=sys.stderr)
+                        for _st, _title in upload_doc_subpages(wiki, page_id, _src):
+                            print(f"[官文转Wiki] {item.get('project','')} {os.path.basename(_src)} → "
+                                  f"HTTP {_st} 子页:{_title}", file=sys.stderr)
                     except Exception as e:
                         print(f"[官文转Wiki] {item.get('project','')} 失败 {_src}: {e}", file=sys.stderr)
             # 公布/公告文件：客户目录名用 atw 客户简称拼；查不到简称/文件则跳过
