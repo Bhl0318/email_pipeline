@@ -98,6 +98,7 @@
   .slot-fields textarea { width: 100%; min-height: 56px; padding: 6px 9px; border: 1px solid #bfdbfe; border-radius: 6px; font-size: 12.5px; font-family: inherit; resize: vertical; background: #f8fbff; }
   .slot-del { font-size: 11px; color: #dc2626; background: none; border: none; cursor: pointer; padding: 4px; }
   .mod-head input[type=checkbox] { width: 15px; height: 15px; cursor: pointer; }
+  .mod-hl { display: inline-flex; align-items: center; gap: 2px; font-size: 11px; cursor: pointer; margin-left: -2px; }
   .mod-title { font-size: 12.5px; font-weight: 600; color: #334155; flex: 1; }
   .mod-item.off .mod-title { color: #94a3b8; font-weight: 400; }
   .mod-note { font-size: 11px; color: #94a3b8; }
@@ -243,6 +244,7 @@ function qaCollect() {   // 组装留痕 payload（随确认发送发给后端�
   };
 }
 let emailModules = [], moduleChecked = {}, moduleParams = {};
+let moduleHighlight = {};   // {模块id: true}——该模块在邮件正文里整块标黄（黄底），随 email_module_state 落库
 let customSlots = {};   // {模块id: {title,body}}——插在该模块之后；key 存在即"已打开槽"
 let openModules = {};   // {模块id: true}——记住展开状态，重建后恢复（否则每次刷新塌回收起）
 
@@ -348,6 +350,7 @@ async function openTask(id) {
   const _ems = fields.email_module_state || {};
   emailModules = [];
   moduleChecked = { ...(_ems.checked || {}) };
+  moduleHighlight = { ...(_ems.highlight || {}) };   // 恢复各模块「整块标黄」状态
   moduleParams = { ...(_ems.params || {}) };   // 恢复下拉决策项（实体类型/延续申请费档位）；自由文本仍现填
   openModules = {};
   customSlots = {};
@@ -460,7 +463,7 @@ function snapshotModules() {
   const params = {};
   if (moduleParams.repeat_entity) params.repeat_entity = moduleParams.repeat_entity;
   if (moduleParams.caf_tier) params.caf_tier = moduleParams.caf_tier;
-  fields.email_module_state = { checked: moduleChecked, slots, params };
+  fields.email_module_state = { checked: moduleChecked, highlight: moduleHighlight, slots, params };
 }
 function renderEmailModules() {
   const el = $("sec-email-modules");
@@ -492,9 +495,11 @@ function renderEmailModules() {
       inputs = `<select class="mod-num" id="modCafTier" onclick="event.stopPropagation()" onchange="regenerateModules()">` +
         [["6-9", "超6年未超9年（$2,700）"], ["9+", "超9年（$4,000）"]].map(o => `<option value="${o[0]}" ${o[0] === cur ? "selected" : ""}>${o[1]}</option>`).join("") + `</select>`;
     }
+    const hi = !!moduleHighlight[m.id];
     return `<div class="mod-item ${on ? "" : "off"} ${openModules[m.id] ? "open" : ""}" id="mod-${esc(m.id)}">
       <div class="mod-head" onclick="toggleModuleBody('${esc(m.id)}')">
         <input type="checkbox" ${on ? "checked" : ""} onclick="event.stopPropagation()" onchange="moduleChecked['${esc(m.id)}']=this.checked;document.getElementById('mod-${esc(m.id)}').classList.toggle('off',!this.checked);if(previewTarget==='email')renderEmailPreview()">
+        <label class="mod-hl" title="在邮件正文中整块标黄" onclick="event.stopPropagation()"><input type="checkbox" ${hi ? "checked" : ""} onchange="moduleHighlight['${esc(m.id)}']=this.checked;if(previewTarget==='email')renderEmailPreview()">🟡</label>
         <span class="mod-title">${esc(m.title)}</span>
         ${inputs}
         ${m.note ? `<span class="mod-note">${esc(m.note)}</span>` : ""}
@@ -545,7 +550,10 @@ function assembleEmailBody() {
   // 按模块顺序拼装：勾选的模块正文 + 该模块之后插入槽的自定义内容
   const parts = [];
   for (const m of emailModules) {
-    if (moduleChecked[m.id]) parts.push(m.html);
+    if (moduleChecked[m.id]) {
+      // 勾了「整块标黄」的模块套黄底（预览与发出的邮件都体现）
+      parts.push(moduleHighlight[m.id] ? `<div style="background:#FFFF00;">${m.html}</div>` : m.html);
+    }
     const s = customSlots[m.id];
     if (s && ((s.title || "").trim() || (s.body || "").trim())) parts.push(customToHtml(s));
   }
