@@ -1042,29 +1042,33 @@ def confirmation_rows(task_id: str, req: SubmissionPreviewReq):
     return {"rows": rows, "highlights": fields.get("confirmation_highlights") or []}
 
 
-def _confirmation_override(task_id: str):
+def _confirmation_override(task_id: str, gen_mtime: float = 0.0):
     """确认函替换件：manual/ 里名字含「Application Information Sheet」的上传件(与发送口径一致)。
-    是 PDF 直接用；是 docx 则转 PDF 缓存到 preview/_ov/（不污染 preview/ 顶层扫描、也不进发送集）。
+    仅当替换件**比 gen_mtime(最近一次按数据生成的预览)更新**时才采用——一旦点过「刷新预览」，
+    生成版时间戳更晚，则不再显示替换件(即使重开页面，因比的是磁盘 mtime)。
+    是 PDF 直接用；是 docx 则转 PDF 缓存到 preview/_ov/（不污染顶层扫描、也不进发送集）。
     :return: (pdf_path, docx_path) 或 (None, None)。"""
     manual_dir = _submission_manual_dir(task_id)
     if not manual_dir.is_dir():
         return None, None
     tk = "application information sheet"
-    pdfs = sorted((p for p in manual_dir.glob("*.pdf") if tk in p.name.lower()),
-                  key=lambda p: p.stat().st_mtime, reverse=True)
-    docxs = sorted((p for p in manual_dir.glob("*.docx") if tk in p.name.lower()),
-                   key=lambda p: p.stat().st_mtime, reverse=True)
-    if pdfs:
-        return pdfs[0], (docxs[0] if docxs else None)
-    if docxs:
-        src = docxs[0]
-        ov_dir = SUBMISSION_OUTPUT_DIR / task_id / "preview" / "_ov"
-        ov_dir.mkdir(parents=True, exist_ok=True)
-        out_pdf = ov_dir / (src.stem + ".pdf")
-        if (not out_pdf.exists()) or out_pdf.stat().st_mtime < src.stat().st_mtime:
-            docx_to_pdf(str(src), ov_dir)   # 上传的是 docx → 转 PDF 供预览
-        return (out_pdf if out_pdf.exists() else None), src
-    return None, None
+    cands = [p for p in manual_dir.glob("*")
+             if p.is_file() and tk in p.name.lower() and p.suffix.lower() in (".pdf", ".docx")]
+    if not cands:
+        return None, None
+    cands.sort(key=lambda p: (p.suffix.lower() != ".pdf", -p.stat().st_mtime))  # pdf 优先，再取新
+    src = cands[0]
+    if src.stat().st_mtime <= gen_mtime:
+        return None, None   # 生成版比替换件新(已点过刷新预览) → 不用替换件，回落生成版
+    if src.suffix.lower() == ".pdf":
+        docx = next((p for p in cands if p.suffix.lower() == ".docx"), None)
+        return src, docx
+    ov_dir = SUBMISSION_OUTPUT_DIR / task_id / "preview" / "_ov"
+    ov_dir.mkdir(parents=True, exist_ok=True)
+    out_pdf = ov_dir / (src.stem + ".pdf")
+    if (not out_pdf.exists()) or out_pdf.stat().st_mtime < src.stat().st_mtime:
+        docx_to_pdf(str(src), ov_dir)   # 上传的是 docx → 转 PDF 供预览
+    return (out_pdf if out_pdf.exists() else None), src
 
 
 @app.get("/api/submission/tasks/{task_id}/preview-existing")
@@ -1076,9 +1080,13 @@ def preview_existing_submission(task_id: str, target: str = "confirmation"):
     token = {"confirmation": "Application Information Sheet",
              "assignment": "Assignment", "declaration": "Declaration"}.get(target, target)
     files = []
-    # 确认函：优先替换件（manual 覆盖），让「所见即所发」
+    # 确认函：替换件比"最近一次生成的预览"更新才优先展示（点过刷新预览后 → 显示生成版）
     if target == "confirmation":
-        ov_pdf, ov_docx = _confirmation_override(task_id)
+        _gen_mtime = 0.0
+        if preview_dir.is_dir():
+            _ms = [p.stat().st_mtime for p in preview_dir.glob("*.pdf") if token.lower() in p.name.lower()]
+            _gen_mtime = max(_ms) if _ms else 0.0
+        ov_pdf, ov_docx = _confirmation_override(task_id, _gen_mtime)
         if ov_pdf:
             return {"target": target, "override": True,
                     "files": [{"name": ov_pdf.stem, "pdf_url": _output_url(ov_pdf),
