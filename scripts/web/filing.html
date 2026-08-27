@@ -439,6 +439,18 @@ function invApplicantAddr(inv){
   if (asg){ const p = asg.company_address.trim().split(/,(.+)/); return {address1:(p[0]||"").trim(), address2:(p[1]||"").trim()}; }
   return apps[0] || {};
 }
+// 发明人全名：姓, 名 中间名（对齐著录项"姓, 名"，中间名并入名后）；三者任一变化实时联动只读全名
+function invFullName(L, F, M){
+  const fm = [F, M].map(s => (s||"").trim()).filter(Boolean).join(" ");
+  L = (L||"").trim();
+  return (L && fm) ? `${L}, ${fm}` : (L || fm);
+}
+function updateInvFull(i){
+  const g = id => { const e = $(id); return e ? e.value : ""; };
+  const out = $(`cf-inv-${i}-full`);
+  if (out) out.value = invFullName(g(`cf-inv-${i}-last`), g(`cf-inv-${i}-first`), g(`cf-inv-${i}-middle`));
+}
+
 function renderForm(){
   const ci = fields.case_info || {};
   const ap = (fields.applicants||[])[0] || {};
@@ -520,13 +532,14 @@ function renderForm(){
       <div class="field"><label>DAS 码</label><input id="cf-pri-${i}-das" value="${esc(p.access_code||"")}"></div>
     </div>`).join("") || '<div style="color:#94a3b8;font-size:12px;">无优先权</div>';
   const inventorNameRows = (fields.inventors||[]).map((inv,i)=>{
-    const full=(inv.full_name_en||`${inv.first_name_en||""} ${inv.last_name_en||""}`).replace(/\s*,\s*/g, ", ").trim();
+    const full = invFullName(inv.last_name_en, inv.first_name_en, inv.middle_name)
+                 || (inv.full_name_en||"").replace(/\s*,\s*/g, ", ").trim();
     return `<div class="grid">
-      <div class="field"><label>发明人${i+1} 姓(Last)</label><input id="cf-inv-${i}-last" value="${esc(inv.last_name_en||"")}"></div>
-      <div class="field"><label>名(First)</label><input id="cf-inv-${i}-first" value="${esc(inv.first_name_en||"")}"></div>
-      <div class="field"><label>中间名(Middle)</label><input id="cf-inv-${i}-middle" value="${esc(inv.middle_name||"")}"></div>
+      <div class="field"><label>发明人${i+1} 姓(Last)</label><input id="cf-inv-${i}-last" value="${esc(inv.last_name_en||"")}" oninput="updateInvFull(${i})"></div>
+      <div class="field"><label>名(First)</label><input id="cf-inv-${i}-first" value="${esc(inv.first_name_en||"")}" oninput="updateInvFull(${i})"></div>
+      <div class="field"><label>中间名(Middle)</label><input id="cf-inv-${i}-middle" value="${esc(inv.middle_name||"")}" oninput="updateInvFull(${i})"></div>
       <div class="field"><label>雇主/归属公司(employer)</label><input id="cf-inv-${i}-emp" value="${esc(inv.employer||"")}"></div>
-      <div class="field"><label>全名(姓, 名)</label><input readonly value="${esc(full)}"></div>
+      <div class="field"><label>全名(姓, 名 中间名)</label><input id="cf-inv-${i}-full" readonly value="${esc(full)}"></div>
     </div>`;}).join("") || '<div style="color:#94a3b8;font-size:12px;">无发明人</div>';
   $("formSections").innerHTML = `
     <div class="section"><div class="section-head">案件信息（可编辑；改完点上方预览重新生成）</div><div class="section-body">
@@ -715,10 +728,9 @@ function collectExtra(){
     const emp=$(`cf-inv-${i}-emp`);   if (emp) inv.employer=emp.value.trim();
     if (ln) inv.last_name_en=ln.value.trim();
     if (fn) inv.first_name_en=fn.value.trim();
-    if (ln||fn){
-      const L=inv.last_name_en||"", F=inv.first_name_en||"";
-      const combined = L&&F ? `${L}, ${F}` : (L||F);      // 对齐著录项"姓, 名"
-      if (combined) inv.full_name_en = combined;          // 姓名都空时不覆盖已有全名
+    if (ln||fn||md){
+      const combined = invFullName(inv.last_name_en, inv.first_name_en, inv.middle_name);  // 姓, 名 中间名
+      if (combined) inv.full_name_en = combined;          // 全空时不覆盖已有全名
     }
   });
 }
