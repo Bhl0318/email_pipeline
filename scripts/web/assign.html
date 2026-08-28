@@ -173,8 +173,8 @@
     <div class="case-list" data-guide="case-list">
       <div class="case-list__action">
         <!-- API: POST /api/assignment/submit/batch -->
-        <el-button type="primary" style="width:100%" :disabled="assignedCount === 0" @click="batchSubmit">
-          提交全部已分配（{{ assignedCount }} 件）
+        <el-button type="primary" style="width:100%" :loading="batchSubmitting" :disabled="assignedCount === 0 || batchSubmitting" @click="batchSubmit">
+          {{ batchSubmitting ? '提交中…' : '提交全部已分配（' + assignedCount + ' 件）' }}
         </el-button>
       </div>
       <div class="case-list__search" data-guide="case-search">
@@ -412,6 +412,7 @@ const app = createApp({
     const selectedCaseId = ref('case-001')
     const caseSelections = ref({}) // { caseId: { schemeId, customResponder, customQc } }
     const reanalyzing = ref(false)
+    const batchSubmitting = ref(false)   // 「提交全部已分配」按钮 loading
 
     const expandedCards = reactive({
       basic: true, claims: true, tech: true, oa: true, personnel: true
@@ -680,12 +681,14 @@ const app = createApp({
 
     // API: POST /api/assignment/submit/batch body: { assignments: [{ caseId, schemeId, responder, qc }] }
     async function batchSubmit() {
+      if (batchSubmitting.value) return          // 防重复点击
       const toSubmit = filteredCases.value.filter(c => {
         const sel = caseSelections.value[c.id]
         if (!sel?.schemeId) return false
         return sel.schemeId === 'custom' ? !!(sel.customResponder && sel.customQc) : true
       })
       if (!toSubmit.length) return
+      batchSubmitting.value = true
       try {
         const r = await apiPost('/api/assignment/submit/batch',
           { assignments: toSubmit.map(_assignmentOf) })
@@ -695,6 +698,8 @@ const app = createApp({
         ElementPlus.ElMessage.success(`已提交 ${r.count ?? toSubmit.length} 件分配`)
       } catch (e) {
         ElementPlus.ElMessage.error('提交失败：' + (e.message || e))
+      } finally {
+        batchSubmitting.value = false
       }
     }
 
@@ -733,7 +738,7 @@ const app = createApp({
     return {
       staffList, allCases, searchText, selectedCaseId,
       caseSelections, currentSelection, assignedCount, isCaseAssigned,
-      expandedCards, reanalyzing, analyzing,
+      expandedCards, reanalyzing, analyzing, batchSubmitting,
       filteredCases, selectedCase, displayedSchemes, renderedMarkdown,
       outlineItems, activeSectionIdx, scrollToSection, onMdScroll,
       selectCase, selectScheme, setCustomResponder, setCustomQc, setPostscript, setCustomNote, queryStaff,
