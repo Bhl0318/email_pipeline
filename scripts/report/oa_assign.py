@@ -18,7 +18,7 @@ import sys
 from datetime import datetime
 
 from fastapi import APIRouter, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 
 _DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -225,6 +225,32 @@ async def assignment_analyze(req: Request):
     _log(f"POST /api/assignment/analyze caseId={cid} → {source}，方案 {len(schemes)} 组")
     return {"caseId": cid, "reportMd": report_md, "schemes": schemes,
             "detail": _placeholder_detail(summary)}
+
+
+@router.get("/oa-record/{cid}")
+def oa_record_redirect(cid: str):
+    """跳转到该案的 `案号-OA信息记录表` Wiki 页。由 cid(=oa_id) 找案号 → 解析 URL → 302。"""
+    st = _store()
+    proj = ""
+    if st is not None:
+        try:
+            row = next((r for r in st.list_pending() if r.get("id") == cid), None)
+            proj = (row or {}).get("case_volume", "") or ""
+        except Exception as e:
+            _log("oa-record 读待分配表失败：", e)
+    url = ""
+    if proj:
+        try:
+            oa_dir = os.path.join(_DIR, "..", "oa")
+            if oa_dir not in sys.path:
+                sys.path.insert(0, oa_dir)
+            from oainfo_cli import oa_record_url
+            url = oa_record_url(proj)
+        except Exception as e:
+            _log("oa-record 解析URL失败：", e)
+    if url:
+        return RedirectResponse(url)
+    return JSONResponse({"error": f"未找到 OA信息记录表：{cid}/{proj or '案号未知'}"}, status_code=404)
 
 
 @router.get("/api/staff/list")

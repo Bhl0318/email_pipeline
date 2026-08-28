@@ -887,6 +887,19 @@ def _set_oa_person_cell(body, oa_id, person_text, assign_person="", assign_time=
     return body[:tr_start] + new_row + body[tr_end:], True
 
 
+def oa_record_url(project):
+    """返回 `案号-OA信息记录表` 页的 URL（按 pageId，跨空间可用、免标题编码）。找不到/异常返回 ""。"""
+    if not project:
+        return ""
+    try:
+        page = WikiClient().get_page(f"{project}-OA信息记录表")
+        if page and page.get("id"):
+            return f"{WIKI_BASE}/pages/viewpage.action?pageId={page['id']}"
+    except Exception as e:
+        logger.warning(f"取OA信息记录表URL失败 {project}: {e}")
+    return ""
+
+
 def _oa_row_project_type(body, oa_id):
     """从 oaid 行取 (案号=col0, OA类别=col5)（供推「分配人」）。取不到对应格返回空串。"""
     a = body.find(f'oaid-{oa_id}')
