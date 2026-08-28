@@ -120,9 +120,9 @@ app.mount("/output", StaticFiles(directory=str(_OUTPUT_DIR_FOR_MOUNT)), name="ou
 # US 递交预览/成品输出目录（挂载在 /output 下，PDF 可直接 URL 访问）
 SUBMISSION_OUTPUT_DIR = _OUTPUT_DIR_FOR_MOUNT / "submission"
 
-# 原始文档预览目录：审核服务（Windows）读 P:\<案号>\（P: 已映射到原始材料盘）。
-# 写死 P:\；挂载容错——非 Windows/盘未映射时跳过挂载、原始页暂不可用，服务不崩。
-SOURCE_DOC_DIR = Path("P:\\")
+# 原始文档预览目录：审核服务（Windows）读 P:\confirmation-intake\<案号>\（P: 已映射到原始材料盘）。
+# 写死 P:\confirmation-intake\；挂载容错——非 Windows/盘未映射时跳过挂载、原始页暂不可用，服务不崩。
+SOURCE_DOC_DIR = Path("P:\\confirmation-intake")
 try:
     SOURCE_DOC_DIR.mkdir(parents=True, exist_ok=True)
 except Exception as _e:  # noqa: BLE001
