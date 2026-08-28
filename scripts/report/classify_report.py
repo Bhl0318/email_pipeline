@@ -292,26 +292,20 @@ def calc_dueDate(item):
 def query_oaNum(project):
     """
     查询案号的下一个 OA 序号。
-    从 projects 表中查找 project_name 含 OA{数字} 的记录，取最大值 + 1。
+    按 time_stamp 由旧到新，统计该案号已有的「答复案」（project_type 含「答复」，
+    如 中国答复及其他 / 海外答复及其他）数量，下一个序号 = 已有数 + 1。
     查询失败时返回 None。
     """
     try:
         from db_query import execute
-        sql = f"SELECT * FROM projects WHERE project='{project}'"
+        sql = (f"SELECT project_type FROM projects WHERE project='{project}' "
+               f"ORDER BY time_stamp ASC")
         rows = execute(sql)
         if isinstance(rows, str):
             return None
 
-        max_oa = 0
-        for row in rows:
-            name = row.get("project_name", "") or ""
-            m = re.search(r'OA(\d+)', name)
-            if m:
-                num = int(m.group(1))
-                if num > max_oa:
-                    max_oa = num
-
-        return max_oa + 1
+        cnt = sum(1 for row in rows if "答复" in (row.get("project_type") or ""))
+        return cnt + 1
     except Exception as e:
         print(f"查询 OA 次数失败 ({project}): {e}", file=sys.stderr)
         return None

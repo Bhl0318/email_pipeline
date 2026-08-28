@@ -71,9 +71,9 @@ def _person_label(name, ex, cache):
     return "；".join(labels) if labels else "—"
 
 
-def _is_oa_name(project_name):
-    """立项名是否为 OA 记录：project_name 含 "OA"（大小写不敏感）。"""
-    return "OA" in (project_name or "").upper()
+def _is_oa_type(project_type):
+    """是否为 OA(答复)立项：project_type 含 "答复"（如 中国答复及其他 / 海外答复及其他）。"""
+    return "答复" in (project_type or "")
 
 
 def _first_nonempty(rows, key):
@@ -85,10 +85,10 @@ def _first_nonempty(rows, key):
 
 
 def _oa_rounds(rows, ex, cache):
-    """同案号行里挑「project_name 含 OA」且有承办的行 → 历史OA markdown 列表项，按轮次排序。"""
+    """同案号行里挑「project_type 含 答复」且有承办的行 → 历史OA markdown 列表项，按轮次排序。"""
     items = []
     for r in rows:
-        if not _is_oa_name(r.get("project_name", "")):
+        if not _is_oa_type(r.get("project_type", "")):
             continue
         leader_raw = (r.get("project_leader") or "").strip()
         qc_raw = (r.get("project_qc") or "").strip()
@@ -151,16 +151,16 @@ def collect_candidates(project, execute=None):
             c["sources"].add(source)
 
     try:
-        own = ex(f"SELECT project_name, project_leader, project_qc FROM projects "
+        own = ex(f"SELECT project_name, project_type, project_leader, project_qc FROM projects "
                  f"WHERE project='{_q(project)}'") or []
         for r in own:
-            src = "本案历史OA" if _is_oa_name(r.get("project_name", "")) else "本案撰写"
+            src = "本案历史OA" if _is_oa_type(r.get("project_type", "")) else "本案撰写"
             _add(r.get("project_leader", ""), src)
             _add(r.get("project_qc", ""), src)
-        fam = ex(f"SELECT project_name, project_leader, project_qc FROM projects "
+        fam = ex(f"SELECT project_name, project_type, project_leader, project_qc FROM projects "
                  f"WHERE project LIKE '{_q(zu)}%' AND project <> '{_q(project)}'") or []
         for r in fam:
-            if _is_oa_name(r.get("project_name", "")):
+            if _is_oa_type(r.get("project_type", "")):
                 _add(r.get("project_leader", ""), "同族OA")
                 _add(r.get("project_qc", ""), "同族OA")
     except Exception as e:
@@ -186,13 +186,13 @@ def build_personnel_md(project, execute=None):
     try:
         # (1) 本案信息 —— 新立项本身无承办，撰写负责人/原QC 取同案号(projects.project=案号)已有的 leader/qc
         L.append("### (1) 本案信息")
-        own = ex(f"SELECT project, project_name, project_leader, project_qc, oa_doc_date "
+        own = ex(f"SELECT project, project_name, project_type, project_leader, project_qc, oa_doc_date "
                  f"FROM projects WHERE project='{_q(project)}'") or []
         leader = _first_nonempty(own, "project_leader")
         qc = _first_nonempty(own, "project_qc")
         L.append(f"- 撰写负责人：{_person_label(leader, ex, cache) if leader else '资料缺失'}")
         L.append(f"- 原 QC：{_person_label(qc, ex, cache) if qc else '资料缺失'}")
-        # 本案历史OA记录：同案号下 project_name 含 "OA" 的行
+        # 本案历史OA记录：同案号下 project_type 含 "答复" 的行
         rounds = _oa_rounds(own, ex, cache)
         L.append("- 历史 OA 记录：" + ("" if rounds else "无"))
         L.extend(rounds)
@@ -200,7 +200,7 @@ def build_personnel_md(project, execute=None):
         # (2) 同族案件信息（案号前10位=组内号，排除本案；同规则）
         L.append("")
         L.append("### (2) 同族案件信息")
-        fam = ex(f"SELECT project, project_name, project_leader, project_qc, oa_doc_date "
+        fam = ex(f"SELECT project, project_name, project_type, project_leader, project_qc, oa_doc_date "
                  f"FROM projects WHERE project LIKE '{_q(zu)}%' AND project <> '{_q(project)}'") or []
         fam_nos = sorted({r.get("project", "") for r in fam if r.get("project")})
         if not fam_nos:
@@ -209,7 +209,7 @@ def build_personnel_md(project, execute=None):
             L.append("- 同族案号：" + "、".join(fam_nos))
             L.append(f"- 同族撰写负责人：{_person_label(_first_nonempty(fam, 'project_leader'), ex, cache) or '资料缺失'}")
             L.append(f"- 同族原 QC：{_person_label(_first_nonempty(fam, 'project_qc'), ex, cache) or '资料缺失'}")
-            # 同族历史OA（各案号分组，project_name 含 OA）
+            # 同族历史OA（各案号分组，project_type 含 答复）
             by_case = {}
             for r in fam:
                 by_case.setdefault(r.get("project", ""), []).append(r)
