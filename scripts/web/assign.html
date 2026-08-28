@@ -173,8 +173,8 @@
     <div class="case-list" data-guide="case-list">
       <div class="case-list__action">
         <!-- API: POST /api/assignment/submit/batch -->
-        <el-button type="primary" style="width:100%" :loading="batchSubmitting" :disabled="assignedCount === 0 || batchSubmitting" @click="batchSubmit">
-          {{ batchSubmitting ? '提交中…' : '提交全部已分配（' + assignedCount + ' 件）' }}
+        <el-button type="primary" style="width:100%" :disabled="assignedCount === 0 || batchSubmitting" @click="batchSubmit">
+          提交全部已分配（{{ assignedCount }} 件）
         </el-button>
       </div>
       <div class="case-list__search" data-guide="case-search">
@@ -689,6 +689,11 @@ const app = createApp({
       })
       if (!toSubmit.length) return
       batchSubmitting.value = true
+      // 页面中央全屏 loading 遮罩（提交期间锁定，防误操作）
+      const loading = ElementPlus.ElLoading.service({
+        lock: true, text: `正在提交 ${toSubmit.length} 件分配…`,
+        background: 'rgba(255,255,255,0.6)',
+      })
       try {
         const r = await apiPost('/api/assignment/submit/batch',
           { assignments: toSubmit.map(_assignmentOf) })
@@ -699,6 +704,7 @@ const app = createApp({
       } catch (e) {
         ElementPlus.ElMessage.error('提交失败：' + (e.message || e))
       } finally {
+        loading.close()
         batchSubmitting.value = false
       }
     }
