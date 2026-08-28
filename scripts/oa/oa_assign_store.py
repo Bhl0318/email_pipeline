@@ -88,22 +88,42 @@ def save_report(oa_id, report_md="", schemes=None, execute=None):
     return True
 
 
+def save_submission(oa_id, submit, execute=None):
+    """把提交的分配结果+附言存入 oa_assign_report.submit_json（UPSERT，行不存在则建）。
+    submit: dict，如 {scheme_id, responder, qc, postscript, reason, submitted_at}。返回是否写入。"""
+    ex = _get_execute(execute)
+    if not oa_id:
+        return False
+    import json
+    submit_json = json.dumps(submit or {}, ensure_ascii=False)
+    if ex(f"SELECT id FROM {REPORT_TABLE} WHERE id='{_q(oa_id)}'"):
+        ex(f"UPDATE {REPORT_TABLE} SET submit_json='{_q(submit_json)}' WHERE id='{_q(oa_id)}'")
+    else:
+        ex(f"INSERT INTO {REPORT_TABLE} (id, submit_json) VALUES ('{_q(oa_id)}', '{_q(submit_json)}')")
+    return True
+
+
 def get_report(oa_id, execute=None):
-    """按 id 取 AI 案件报告。返回 {'report_md':..., 'schemes': [...]}；无记录返回 None。"""
+    """按 id 取 AI 案件报告。返回 {'report_md':..., 'schemes': [...], 'submit': {...}}；无记录返回 None。"""
     ex = _get_execute(execute)
     if not oa_id:
         return None
-    rows = ex(f"SELECT report_md, schemes_json FROM {REPORT_TABLE} WHERE id='{_q(oa_id)}'")
+    rows = ex(f"SELECT report_md, schemes_json, submit_json FROM {REPORT_TABLE} WHERE id='{_q(oa_id)}'")
     if not rows:
         return None
     r = rows[0]
     md = r.get("report_md") or ""
-    raw = r.get("schemes_json") or ""
+    import json
     schemes = []
-    if raw:
-        import json
+    if r.get("schemes_json"):
         try:
-            schemes = json.loads(raw)
+            schemes = json.loads(r["schemes_json"])
         except Exception:
             schemes = []
-    return {"report_md": md, "schemes": schemes}
+    submit = {}
+    if r.get("submit_json"):
+        try:
+            submit = json.loads(r["submit_json"])
+        except Exception:
+            submit = {}
+    return {"report_md": md, "schemes": schemes, "submit": submit}

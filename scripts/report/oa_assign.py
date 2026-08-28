@@ -52,6 +52,25 @@ def _mark(case_id, responder, qc):
         _log("待分配表回填失败：", e)
 
 
+def _save_submission(body):
+    """把提交的分配结果+附言(附言 postscript / 原因 customNote)存入 oa_assign_report.submit_json。best-effort。"""
+    st = _store()
+    cid = body.get("caseId")
+    if st is None or not cid:
+        return
+    try:
+        st.save_submission(cid, {
+            "scheme_id": body.get("schemeId", "") or "",
+            "responder": body.get("responder", "") or "",
+            "qc": body.get("qc", "") or "",
+            "postscript": body.get("postscript", "") or "",   # 分配附言
+            "reason": body.get("customNote", "") or "",        # 分配原因
+            "submitted_at": f"{datetime.now():%Y-%m-%d %H:%M}",
+        })
+    except Exception as e:
+        _log("保存提交结果(submit_json)失败：", e)
+
+
 def _store():
     """取待分配库(oa 侧)模块；不可用返回 None，调用方回退桩数据。"""
     try:
@@ -285,6 +304,7 @@ async def assignment_submit(req: Request):
     cid, responder, qc = body.get("caseId"), body.get("responder"), body.get("qc")
     wb = _write_back(cid, responder, qc)                 # 回写 Wiki 人员分配格
     _mark(cid, responder, qc)                            # 待分配表回填结果+置已分配
+    _save_submission(body)                               # 选中结果+附言(附言/原因)存 oa_assign_report.submit_json
     _log("    回写 Wiki 人员分配：", wb.get("msg"))
     return {"ok": True, "caseId": cid, "writeback": wb}
 
@@ -299,6 +319,7 @@ async def assignment_submit_batch(req: Request):
         _log("    -", json.dumps(a, ensure_ascii=False))
         wb = _write_back(a.get("caseId"), a.get("responder"), a.get("qc"))
         _mark(a.get("caseId"), a.get("responder"), a.get("qc"))
+        _save_submission(a)                              # 选中结果+附言存 oa_assign_report.submit_json
         _log("      回写：", wb.get("msg"))
         results.append({"caseId": a.get("caseId"), "writeback": wb})
     return {"ok": True, "count": len(assignments),
