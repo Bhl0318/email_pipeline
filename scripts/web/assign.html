@@ -211,6 +211,10 @@
       <div class="case-detail__toolbar">
         <span class="case-detail__toolbar-title">
           {{ selectedCase ? selectedCase.caseNo + ' — 案件情况' : '请从左侧选择案件' }}
+          <span v-if="selectedCase && selectedCase.linkSentAt"
+            style="margin-left:8px;font-weight:400;color:#8c8c8c;font-size:12px">
+            · 分配链接发送：{{ selectedCase.linkSentAt }}
+          </span>
         </span>
         <div v-if="selectedCase" style="display:flex;align-items:center;gap:8px">
           <!-- 跳转到该案的 OA信息记录表 Wiki 页（后端按案号解析并302） -->

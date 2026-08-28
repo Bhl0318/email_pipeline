@@ -98,6 +98,7 @@ def _row_to_summary(r):
         "estimate": "",
         "deadline": r.get("project_deadline", ""),
         "submitted": bool(r.get("submitted")),
+        "linkSentAt": str(r.get("link_sent_at") or ""),   # 立项/发分配链接时刻(要求分配的时间)
         "files": [],
     }
 

@@ -28,8 +28,11 @@ def _get_execute(execute):
 
 
 def add_pending(items, execute=None):
-    """立项后把每件 id 写入待分配表(status=0，按 id 去重)。返回新增条数。"""
+    """立项后把每件 id 写入待分配表(status=0，按 id 去重)，并记 link_sent_at=当前时刻
+    (=该案要求分配/发分配链接的时间，供分配页展示)。返回新增条数。"""
     ex = _get_execute(execute)
+    from datetime import datetime
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     added = 0
     for it in items or []:
         oid = it.get("oa_id", "")
@@ -37,7 +40,7 @@ def add_pending(items, execute=None):
             continue
         if ex(f"SELECT id FROM {TABLE} WHERE id='{_q(oid)}'"):
             continue
-        ex(f"INSERT INTO {TABLE} (id, status) VALUES ('{_q(oid)}', 0)")
+        ex(f"INSERT INTO {TABLE} (id, status, link_sent_at) VALUES ('{_q(oid)}', 0, '{now}')")
         added += 1
     return added
 
@@ -46,7 +49,7 @@ def list_pending(execute=None):
     """JOIN projects 返回待分配/已分配案件的展示字段。submitted=status(0/1)。"""
     ex = _get_execute(execute)
     rows = ex(
-        f"SELECT t.id AS id, t.status AS submitted, "
+        f"SELECT t.id AS id, t.status AS submitted, t.link_sent_at AS link_sent_at, "
         f"p.project AS case_volume, p.project_name AS project_name, p.customer AS customer, "
         f"p.oa_doc_date AS oa_doc_date, p.entrust_date AS entrust_date, "
         f"p.project_deadline AS project_deadline "
