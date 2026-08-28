@@ -155,33 +155,36 @@ def build_forward_body(item):
 
 # OA 分配链接不进转OA邮件（不发流程人员），按案号路由收件人，统一抄送海灵
 OA_ASSIGN_NOTIFY_CC = ["hailing.bi@metis-ip.com"]   # 海灵（所有分配链接邮件抄送）
-_ASSIGN_NOTIFY_20608 = "zhigang.wang@metis-ip.com"  # 20608 → 王志刚
-_ASSIGN_NOTIFY_20849_68 = "jiao.yang@metis-ip.com"  # 20849/6*/8* → 杨姣
-_ASSIGN_NOTIFY_DEFAULT = "hxue@metis-ip.com"        # 其余 → 薛虹
+_ASSIGN_NOTIFY_20608 = "zhigang.wang@metis-ip.com"     # 20608 → 王志刚
+_ASSIGN_NOTIFY_20849_568 = "jiao.yang@metis-ip.com"    # 20849/5*/6*/8* → 杨姣
+_ASSIGN_NOTIFY_DEFAULT = "hxue@metis-ip.com"           # 其余 → 薛虹
 
 
-def _assign_notify_to(project):
-    """按案号返回该案分配链接的收件人。
-    20608 开头→王志刚；20849/6*/8* 开头→杨姣；其余→薛虹。"""
+def _assign_notify_to(project, oa_type=""):
+    """按 OA类型/案号返回该案分配链接的收件人。
+    补正类（oa_type 含「补正」）→杨姣（不看案号）；
+    否则按案号：20608 开头→王志刚；20849/5*/6*/8* 开头→杨姣；其余→薛虹。"""
+    if "补正" in (oa_type or ""):
+        return _ASSIGN_NOTIFY_20849_568
     p = (project or "").strip()
     if p.startswith("20608"):
         return _ASSIGN_NOTIFY_20608
-    if p.startswith("20849") or p[:1] in ("6", "8"):
-        return _ASSIGN_NOTIFY_20849_68
+    if p.startswith("20849") or p[:1] in ("5", "6", "8"):
+        return _ASSIGN_NOTIFY_20849_568
     return _ASSIGN_NOTIFY_DEFAULT
 
 
 # 分配人姓名（= 收到该案分配链接的人）：与收件人路由同源，供 Wiki「分配人」列填写
 _ASSIGN_PERSON_NAMES = {
     _ASSIGN_NOTIFY_20608: "王志刚",
-    _ASSIGN_NOTIFY_20849_68: "杨姣",
+    _ASSIGN_NOTIFY_20849_568: "杨姣",
     _ASSIGN_NOTIFY_DEFAULT: "薛虹",
 }
 
 
-def assign_person_name(project):
-    """按案号返回「分配人」姓名（= 收到该案分配链接的人）。取不到返回空串。"""
-    return _ASSIGN_PERSON_NAMES.get(_assign_notify_to(project), "")
+def assign_person_name(project, oa_type=""):
+    """返回「分配人」姓名（= 收到该案分配链接的人）：补正类看类型给杨姣，否则按案号。取不到返回空串。"""
+    return _ASSIGN_PERSON_NAMES.get(_assign_notify_to(project, oa_type), "")
 
 
 def build_assign_notifies(plans):
@@ -200,10 +203,10 @@ def build_assign_notifies(plans):
         if not oa_id:
             continue
         proj = it.get("project", "")
-        to = _assign_notify_to(proj)
+        name = it.get("project_name", "") or it.get("notification_type", "")
+        to = _assign_notify_to(proj, name)   # name 作 OA类型：含「补正」→杨姣（不看案号）
         if not to:
             continue
-        name = it.get("project_name", "") or it.get("notification_type", "")
         groups.setdefault(to, []).append(f"{proj} {name}\n  {base}/oa-assign/{oa_id}")
     out = []
     for to, rows in groups.items():

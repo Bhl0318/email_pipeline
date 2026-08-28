@@ -887,18 +887,20 @@ def _set_oa_person_cell(body, oa_id, person_text, assign_person="", assign_time=
     return body[:tr_start] + new_row + body[tr_end:], True
 
 
-def _oa_row_project(body, oa_id):
-    """从 oaid 行的第1格取案号（供推「分配人」）。取不到返回空串。"""
+def _oa_row_project_type(body, oa_id):
+    """从 oaid 行取 (案号=col0, OA类别=col5)（供推「分配人」）。取不到对应格返回空串。"""
     a = body.find(f'oaid-{oa_id}')
     if a == -1:
-        return ""
+        return "", ""
     tr_start = body.rfind("<tr", 0, a)
     tr_end = body.find("</tr>", a)
     if tr_start == -1 or tr_end == -1:
-        return ""
+        return "", ""
     row = body[tr_start:tr_end]
-    m = re.search(r'<td\b[^>]*>(.*?)</td>', row, re.DOTALL)
-    return _strip_tags(m.group(1)) if m else ""
+    cells = re.findall(r'<td\b[^>]*>(.*?)</td>', row, re.DOTALL)
+    proj = _strip_tags(cells[0]) if cells else ""
+    otype = _strip_tags(cells[5]) if len(cells) > 5 else ""
+    return proj, otype
 
 
 def write_oa_assignment(oa_id, responder, qc, project=""):
@@ -916,12 +918,13 @@ def write_oa_assignment(oa_id, responder, qc, project=""):
         if not page:
             return {"code": 1, "msg": f"未找到页面: {OA_LIST_PAGE_TITLE}"}
         body = page["body"]
-        # 分配人：优先入参 project，否则从该行案号(col0)推 → 按案号路由取姓名
-        proj = project or _oa_row_project(body, oa_id)
+        # 分配人：从该行取 案号(col0)+OA类别(col5) → 补正类看类型给杨姣、否则按案号路由取姓名
+        row_proj, oa_type = _oa_row_project_type(body, oa_id)
+        proj = project or row_proj
         assign_person = ""
         try:
             from forward_oa import assign_person_name
-            assign_person = assign_person_name(proj)
+            assign_person = assign_person_name(proj, oa_type)
         except Exception as e:
             logger.warning(f"分配人解析失败 oa_id={oa_id}: {e}")
         from datetime import datetime
