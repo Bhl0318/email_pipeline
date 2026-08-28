@@ -365,6 +365,22 @@ def _deepseek_report(basic, application_text, oa_text):
         return None
 
 
+def _read_docs_md(spec_path, oa_pdf_path):
+    """报告顶部「读取的文档」一节：列出申请文件 + 审意官文各文件名（供分配页展示实际读了哪些材料）。"""
+    if isinstance(oa_pdf_path, str):
+        oas = [oa_pdf_path] if oa_pdf_path else []
+    else:
+        oas = list(oa_pdf_path or [])
+    L = ["## 读取的文档", ""]
+    L.append(f"- 申请文件：{os.path.basename(spec_path)}" if spec_path else "- 申请文件：未找到")
+    if oas:
+        L.append("- 审意官文：")
+        L += [f"  - {os.path.basename(p)}" for p in oas]
+    else:
+        L.append("- 审意官文：未获取")
+    return "\n".join(L)
+
+
 def build_case_report(item, oa_pdf_path=None, app_dir=None, with_personnel=True, execute=None):
     """生成一件的 AI 案件报告（markdown 正文）。绝不抛异常。
 
@@ -413,6 +429,7 @@ def build_case_report(item, oa_pdf_path=None, app_dir=None, with_personnel=True,
                 if oa_pdf_path:
                     print(f"[oa_report_ai] 审意 PDF 回退申请文件目录：{os.path.basename(oa_pdf_path)}", file=sys.stderr)
     oa_text = _pdf_text(oa_pdf_path)
+    read_docs_md = _read_docs_md(files.get("spec"), oa_pdf_path)   # 顶部「读取的文档」节
 
     md = _deepseek_report(basic, application_text, oa_text)
     workload_md = ""
@@ -439,7 +456,8 @@ def build_case_report(item, oa_pdf_path=None, app_dir=None, with_personnel=True,
     # 第六节：预估工作量（附加分配辅助信息，AI 依据报告内容判断）
     if workload_md:
         md = md.rstrip() + "\n\n## 预估工作量（附加分配辅助信息）\n\n" + workload_md
-    return md
+    # 顶部置「读取的文档」一节，让分配页直观看到实际读了哪些材料
+    return read_docs_md + "\n\n" + md
 
 
 if __name__ == "__main__":

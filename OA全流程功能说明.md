@@ -73,6 +73,7 @@
 
 ### 1. AI 案件报告（`oa/oa_report_ai.py`）
 中栏 markdown，首次打开时若 `oa_assign_report` 无缓存则现场生成（DeepSeek），生成后落库；含：
+- 顶部「读取的文档」：列出本次实际读取的申请文件名 + 审意官文各文件名（缺失标「未找到/未获取」），便于核对报告依据的材料
 - 一、案件基础信息　二、权利要求结构解析　三、技术方案速览　四、审查意见深度解析（前四类由 DeepSeek 依据**申请文件 + 审意 PDF** 生成；提示词默认读 atw `zxassist_result_instruction.mtype='oaInstruct'`）
 - 内部人员档案（代码查 `projects/users` 拼，非 AI）
 - 预估工作量（DeepSeek）
