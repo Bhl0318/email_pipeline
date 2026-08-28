@@ -137,7 +137,7 @@
 <div class="modal-mask" id="sendModal">
   <div class="modal">
     <h3>发送给美国代理人</h3>
-    <div class="field"><label>发件邮箱（按代理所自动确定，仅系统发「内部邮箱」件时生效）</label><input id="mFrom" readonly style="background:#f1f5f9;color:#475569;"></div>
+    <div class="field"><label>发件邮箱（统一 prosecution@ip-file.com，仅系统发「内部邮箱」件时生效）</label><input id="mFrom" readonly style="background:#f1f5f9;color:#475569;"></div>
     <div class="field"><label>收件人（美代理，多个用逗号分隔）<span style="color:#dc2626">*</span></label><input id="mTo" placeholder="agent@example.com"></div>
     <div class="field"><label>抄送</label><input id="mCc"></div>
     <div class="field"><label>主题</label><input id="mSubject"></div>
@@ -1068,12 +1068,9 @@ async function confRef(){
   } catch(e){ toast("加载失败: "+e.message); }
   finally { $("previewLoading").classList.remove("show"); }
 }
-// 发件邮箱按代理所解析（与后端 _filing_firm_key + firm_send_default 一致）
+// 发件邮箱：发美代理统一 prosecution@ip-file.com（与后端 firm_send_accounts 全指向 prosecution 一致）
 function resolveSenderFrom(firm){
-  const f = (firm||"").toLowerCase();
-  if (f.includes("poseidon")) return "patent_filling@poseidonadvanced.com";
-  if (f.includes("porus"))    return "patent_filling@porusip.com";
-  return "patent_filling@metis-ip.com";   // Metis / 识别不出(含 Lai Runzhi) → 兜底
+  return "prosecution@ip-file.com";
 }
 function openSendModal(){
   if (!taskId) return;
