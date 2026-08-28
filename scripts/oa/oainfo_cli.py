@@ -684,8 +684,9 @@ FOLLOWUP_ROTATION = ["苏雅", "苏雅", "姚涓涓"]
 
 
 def _build_table_row(item, followup=""):
-    """根据筛选结果构建一行 HTML。列序对应页面表头：
-    案号/备注/OA收到日/OA发文日/答复期限/OA类别/跟进人/其它备注事项/人员分配/是否正式立项。"""
+    """根据筛选结果构建一行 HTML。列序对应页面表头（12 列）：
+    案号/备注/OA收到日/OA发文日/答复期限/OA类别/跟进人/其它备注事项/人员分配/分配人/分配时间/是否正式立项。
+    分配人/分配时间在提交分配时回写（write_oa_assignment），立项时留空。"""
     project = item.get("project", "")
     oa_remark = item.get("oa_remark", "")
     entrust_date = item.get("entrust_date", "")
@@ -707,22 +708,26 @@ def _build_table_row(item, followup=""):
         f"<td>{followup}</td>"             # 跟进人
         f"<td></td>"                       # 其它备注事项
         f"<td></td>"                       # 人员分配
+        f"<td></td>"                       # 分配人（提交分配时回写）
+        f"<td></td>"                       # 分配时间（提交分配时回写）
         f"<td></td>"                       # 是否正式立项
         f"</tr>"
     )
 
 
-# 新建月份折叠块用的表格骨架（列宽/表头对齐现有页面的 10 列）
+# 新建月份折叠块用的表格骨架（列宽/表头对齐现有页面的 12 列，含 分配人/分配时间）
 _OA_LIST_COLGROUP = (
-    '<colgroup><col style="width: 135.0px;" /><col style="width: 107.0px;" />'
+    '<colgroup><col style="width: 134.0px;" /><col style="width: 123.0px;" />'
     '<col style="width: 95.0px;" /><col style="width: 95.0px;" />'
     '<col style="width: 111.0px;" /><col style="width: 248.0px;" />'
     '<col style="width: 84.0px;" /><col style="width: 127.0px;" />'
-    '<col style="width: 373.0px;" /><col style="width: 246.0px;" /></colgroup>'
+    '<col style="width: 373.0px;" /><col style="width: 99.0px;" />'
+    '<col style="width: 101.0px;" /><col style="width: 246.0px;" /></colgroup>'
 )
 _OA_LIST_HEADER_ROW = (
     '<tr><th>案号</th><th>备注</th><th>OA收到日</th><th>OA发文日</th><th>答复期限</th>'
-    '<th>OA类别</th><th>跟进人</th><th>其它备注事项</th><th>人员分配</th><th>是否正式立项</th></tr>'
+    '<th>OA类别</th><th>跟进人</th><th>其它备注事项</th><th>人员分配</th>'
+    '<th>分配人</th><th>分配时间</th><th>是否正式立项</th></tr>'
 )
 
 
@@ -839,9 +844,16 @@ def _append_person_inner(inner, person_text):
     return inner.rstrip() + "<br/>" + person_text
 
 
-def _set_oa_person_cell(body, oa_id, person_text):
-    """在 <tr class="oaid-{oa_id}"> 行里把第9格「人员分配」**追加** person_text（不覆盖）。
-    纯字符串处理，便于测试。返回 (new_body, found)。"""
+def _fill_if_empty(inner, value):
+    """单元格为空（含仅 <br/>/空段落）才写 value，否则保留原内容。"""
+    return value if not _strip_tags(inner) else inner
+
+
+def _set_oa_person_cell(body, oa_id, person_text, assign_person="", assign_time=""):
+    """在 <tr class="oaid-{oa_id}"> 行里回写分配相关单元格（纯字符串处理，便于测试）：
+    第9格「人员分配」(idx8) **追加** person_text（不覆盖）；
+    第10格「分配人」(idx9)、第11格「分配时间」(idx10) 空则填（幂等：已有不覆盖）。
+    返回 (new_body, found)。列不足（旧结构）时按已有列数尽量填。"""
     a = body.find(f'oaid-{oa_id}')
     if a == -1:
         return body, False
@@ -851,20 +863,47 @@ def _set_oa_person_cell(body, oa_id, person_text):
         return body, False
     tr_end += len("</tr>")
     row = body[tr_start:tr_end]
-    # 用 finditer 按位置替换第9格(0基索引8)；不能用 replace——空格 <td></td> 彼此相同会替错
+    # 用 finditer 按位置替换单元格；不能用 replace——空格 <td></td> 彼此相同会替错
     matches = list(re.finditer(r'<td\b[^>]*>.*?</td>', row, re.DOTALL))
     if len(matches) < 9:
         return body, False
-    m = matches[8]
-    new_cell = re.sub(r'(<td\b[^>]*>)(.*?)(</td>)',
-                      lambda x: x.group(1) + _append_person_inner(x.group(2), person_text) + x.group(3),
-                      m.group(0), count=1, flags=re.DOTALL)
-    new_row = row[:m.start()] + new_cell + row[m.end():]
+    # 各格的改写函数（idx → inner→new_inner）
+    edits = {8: lambda inner: _append_person_inner(inner, person_text)}
+    # 分配人(idx9)/分配时间(idx10) 只在整行满 12 列时填，避免误写进老结构(10列)的其它格
+    if len(matches) >= 12:
+        if assign_person:
+            edits[9] = lambda inner: _fill_if_empty(inner, assign_person)
+        if assign_time:
+            edits[10] = lambda inner: _fill_if_empty(inner, assign_time)
+    # 从右到左应用，避免前面替换改变后续 match 的偏移
+    new_row = row
+    for idx in sorted(edits, reverse=True):
+        m = matches[idx]
+        fn = edits[idx]
+        new_cell = re.sub(r'(<td\b[^>]*>)(.*?)(</td>)',
+                          lambda x: x.group(1) + fn(x.group(2)) + x.group(3),
+                          m.group(0), count=1, flags=re.DOTALL)
+        new_row = new_row[:m.start()] + new_cell + new_row[m.end():]
     return body[:tr_start] + new_row + body[tr_end:], True
 
 
-def write_oa_assignment(oa_id, responder, qc):
-    """按 oa_id 找「测试页面-写入新增OA」里 data-oa-id 匹配的行，写入人员分配格。
+def _oa_row_project(body, oa_id):
+    """从 oaid 行的第1格取案号（供推「分配人」）。取不到返回空串。"""
+    a = body.find(f'oaid-{oa_id}')
+    if a == -1:
+        return ""
+    tr_start = body.rfind("<tr", 0, a)
+    tr_end = body.find("</tr>", a)
+    if tr_start == -1 or tr_end == -1:
+        return ""
+    row = body[tr_start:tr_end]
+    m = re.search(r'<td\b[^>]*>(.*?)</td>', row, re.DOTALL)
+    return _strip_tags(m.group(1)) if m else ""
+
+
+def write_oa_assignment(oa_id, responder, qc, project=""):
+    """按 oa_id 找「测试页面-写入新增OA」里 data-oa-id 匹配的行，回写：
+    人员分配（追加）+ 分配人（=收到分配链接的人，按案号路由）+ 分配时间（当前时间，空则填）。
     返回 {code, msg}。找不到行/异常不抛。"""
     if not oa_id:
         return {"code": 1, "msg": "缺 oa_id"}
@@ -876,9 +915,21 @@ def write_oa_assignment(oa_id, responder, qc):
         page = wiki.get_page(OA_LIST_PAGE_TITLE)
         if not page:
             return {"code": 1, "msg": f"未找到页面: {OA_LIST_PAGE_TITLE}"}
-        body, found = _set_oa_person_cell(page["body"], oa_id, text)
+        body = page["body"]
+        # 分配人：优先入参 project，否则从该行案号(col0)推 → 按案号路由取姓名
+        proj = project or _oa_row_project(body, oa_id)
+        assign_person = ""
+        try:
+            from forward_oa import assign_person_name
+            assign_person = assign_person_name(proj)
+        except Exception as e:
+            logger.warning(f"分配人解析失败 oa_id={oa_id}: {e}")
+        from datetime import datetime
+        assign_time = f"{datetime.now():%Y-%m-%d %H:%M}"
+        new_body, found = _set_oa_person_cell(body, oa_id, text, assign_person, assign_time)
         if not found:
             return {"code": 1, "msg": f"未找到 data-oa-id={oa_id} 的行"}
+        body = new_body
         status = wiki.update_page(page["id"], OA_LIST_PAGE_TITLE, body, page["version"])
         if status == 200:
             logger.info(f"人员分配写入成功 oa_id={oa_id}: {text}")

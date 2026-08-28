@@ -171,6 +171,19 @@ def _assign_notify_to(project):
     return _ASSIGN_NOTIFY_DEFAULT
 
 
+# 分配人姓名（= 收到该案分配链接的人）：与收件人路由同源，供 Wiki「分配人」列填写
+_ASSIGN_PERSON_NAMES = {
+    _ASSIGN_NOTIFY_20608: "王志刚",
+    _ASSIGN_NOTIFY_20849_68: "杨姣",
+    _ASSIGN_NOTIFY_DEFAULT: "薛虹",
+}
+
+
+def assign_person_name(project):
+    """按案号返回「分配人」姓名（= 收到该案分配链接的人）。取不到返回空串。"""
+    return _ASSIGN_PERSON_NAMES.get(_assign_notify_to(project), "")
+
+
 def build_assign_notifies(plans):
     """按收件人分组，返回分配链接邮件列表 [{to, cc, subject, body}]。
     开关(env OA_SEND_ASSIGN_LINK=0/false/no/off)关闭、基址(env OA_ASSIGN_BASE_URL)为空、
