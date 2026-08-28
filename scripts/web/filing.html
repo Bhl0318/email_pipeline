@@ -300,6 +300,7 @@ async function openTask(id){
   renderSidebar();
   history.replaceState(null, "", `/submission/filing/${id}`);
   loadReplacements();      // 加载「替换 POA/Transmittal/ADS」当前状态
+  loadAgentPersons();      // 按已选代理所预填「代理人」下拉
   autoPreviewDoc("poa");   // 打开即自动预览默认 tab（POA）：有则展示、无则生成
 }
 
@@ -561,8 +562,10 @@ function renderForm(){
 
     <div class="section"><div class="section-head">签字代理人（选代理所/代理人「查库带出」，可手改；用于 POA/ADS/Transmittal 签字块）</div><div class="section-body">
       <div class="grid">
-        <div class="field"><label>代理所</label><select id="fx-firm">${firmOpts}</select></div>
-        <div class="field"><label>代理人</label><input id="fx-person" value="${esc(fx.agent_person||"")}"></div>
+        <div class="field"><label>代理所</label><select id="fx-firm" onchange="loadAgentPersons()">${firmOpts}</select></div>
+        <div class="field"><label>代理人（选代理所后下拉，可手输）</label>
+          <input id="fx-person" list="fx-person-dl" value="${esc(fx.agent_person||"")}" autocomplete="off">
+          <datalist id="fx-person-dl"></datalist></div>
       </div>
       <div style="margin:6px 0;"><button class="primary" onclick="fetchAgentInfo()">查库带出</button></div>
       <div class="grid">
@@ -733,6 +736,18 @@ function collectExtra(){
       if (combined) inv.full_name_en = combined;          // 全空时不覆盖已有全名
     }
   });
+}
+
+// 代理所变化 → 拉取该所可选代理人，填充「代理人」下拉（datalist，仍可手输）
+async function loadAgentPersons(){
+  const dl = $("fx-person-dl"); if (!dl) return;
+  const firm = ($("fx-firm")||{}).value || "";
+  if (!firm) { dl.innerHTML = ""; return; }
+  try {
+    const j = await api("GET", `/api/submission/agent-persons?firm=${encodeURIComponent(firm)}`
+      + `&case_volume=${encodeURIComponent((data&&data.case_volume)||"")}`);
+    dl.innerHTML = (j.persons||[]).map(p=>`<option value="${esc(p)}"></option>`).join("");
+  } catch(e){ dl.innerHTML = ""; }
 }
 
 // 「查库带出」：按代理所+代理人查 agent_info，回填签字人快照（可再手改）

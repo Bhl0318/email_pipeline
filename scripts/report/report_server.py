@@ -1866,6 +1866,24 @@ def list_agent_firms():
     return {"firms": FILING_AGENT_FIRMS}
 
 
+@app.get("/api/submission/agent-persons")
+def list_agent_persons(firm: str, case_volume: str = ""):
+    """按代理所列该所可选代理人（CNname 去重），供 filing 审核页「代理人」下拉。
+    cus_code 与查库带出同口径（按代理所+案号重映射）；查不到/异常返回空列表（不阻塞手填）。"""
+    try:
+        cus_code = _resolve_agent_cus_code(case_volume, firm)
+        rows = execute_params(
+            "SELECT DISTINCT CNname FROM agent_info "
+            "WHERE cus_code=%s AND agent LIKE %s AND CNname IS NOT NULL AND CNname<>'' "
+            "ORDER BY CNname",
+            (cus_code, f"%{firm}%")) or []
+        persons = [r.get("CNname").strip() for r in rows if (r.get("CNname") or "").strip()]
+    except Exception as exc:   # noqa: BLE001
+        print(f"[agent-persons] 查代理人失败 firm={firm}: {exc}", file=sys.stderr)
+        persons = []
+    return {"firm": firm, "persons": persons}
+
+
 @app.get("/api/submission/agent-info")
 def get_agent_info(case_volume: str, firm: str, person: str):
     """按代理所/代理人查 agent_info，供 filing 审核页「查库带出」签字人/Customer No/Deposit/邮箱。"""
