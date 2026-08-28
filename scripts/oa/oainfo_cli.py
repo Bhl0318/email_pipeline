@@ -849,19 +849,15 @@ def _fill_if_empty(inner, value):
     return value if not _strip_tags(inner) else inner
 
 
-def _set_oa_person_cell(body, oa_id, person_text, assign_person="", assign_time=""):
+def _set_oa_person_cell(body, oa_id, person_text, assign_person="", assign_time="", expected_project=""):
     """在 <tr class="oaid-{oa_id}"> 行里回写分配相关单元格（纯字符串处理，便于测试）：
     第9格「人员分配」(idx8) **追加** person_text（不覆盖）；
     第10格「分配人」(idx9)、第11格「分配时间」(idx10) 空则填（幂等：已有不覆盖）。
+    expected_project 非空时**必须**行内第1格案号一致才写（防手动复制导致 class 重复而写错行）。
     返回 (new_body, found)。列不足（旧结构）时按已有列数尽量填。"""
-    a = body.find(f'oaid-{oa_id}')
-    if a == -1:
+    tr_start, tr_end = _find_oa_row(body, oa_id, expected_project)
+    if tr_start == -1:
         return body, False
-    tr_start = body.rfind("<tr", 0, a)
-    tr_end = body.find("</tr>", a)
-    if tr_start == -1 or tr_end == -1:
-        return body, False
-    tr_end += len("</tr>")
     row = body[tr_start:tr_end]
     # 用 finditer 按位置替换单元格；不能用 replace——空格 <td></td> 彼此相同会替错
     matches = list(re.finditer(r'<td\b[^>]*>.*?</td>', row, re.DOTALL))
@@ -900,25 +896,64 @@ def oa_record_url(project):
     return ""
 
 
-def _oa_row_project_type(body, oa_id):
-    """从 oaid 行取 (案号=col0, OA类别=col5)（供推「分配人」）。取不到对应格返回空串。"""
-    a = body.find(f'oaid-{oa_id}')
-    if a == -1:
+def _project_of_oa_id(oa_id):
+    """查 projects 里 oa_id(=id) 对应的权威案号，供回写时比对。查不到/异常返回 ""。"""
+    if not oa_id:
+        return ""
+    try:
+        from db_query import execute
+        _safe = str(oa_id).replace("'", "''")
+        rows = execute(f"SELECT project FROM projects WHERE id='{_safe}'")
+        if rows and not isinstance(rows, str):
+            return (rows[0].get("project") or "").strip()
+    except Exception as e:
+        logger.warning(f"查案号失败 oa_id={oa_id}: {e}")
+    return ""
+
+
+def _find_oa_row(body, oa_id, expected_project=""):
+    """定位 <tr class="oaid-{oa_id}"> 行，返回 (tr_start, tr_end) 或 (-1, -1)。
+    给了 expected_project 时**必须**第1格案号一致才认（防手动复制导致 class 被复制到别案号行而写错行）；
+    有 oaid 行但没一行案号对得上 → (-1,-1)（宁可不写也不写错）。未给期望案号 → 取第一处 oaid 行。"""
+    marker = f'oaid-{oa_id}'
+    exp = (expected_project or "").strip()
+    pos, fallback = 0, (-1, -1)
+    while True:
+        a = body.find(marker, pos)
+        if a == -1:
+            break
+        tr_start = body.rfind("<tr", 0, a)
+        tr_end = body.find("</tr>", a)
+        if tr_start == -1 or tr_end == -1:
+            pos = a + len(marker)
+            continue
+        tr_end += len("</tr>")
+        if not exp:
+            return tr_start, tr_end
+        m = re.search(r'<td\b[^>]*>(.*?)</td>', body[tr_start:tr_end], re.DOTALL)
+        if m and _strip_tags(m.group(1)) == exp:
+            return tr_start, tr_end
+        if fallback == (-1, -1):
+            fallback = (tr_start, tr_end)
+        pos = tr_end
+    return (-1, -1) if exp else fallback
+
+
+def _oa_row_project_type(body, oa_id, expected_project=""):
+    """从 oaid（+可选案号比对）行取 (案号=col0, OA类别=col5)。取不到返回空串。"""
+    tr_start, tr_end = _find_oa_row(body, oa_id, expected_project)
+    if tr_start == -1:
         return "", ""
-    tr_start = body.rfind("<tr", 0, a)
-    tr_end = body.find("</tr>", a)
-    if tr_start == -1 or tr_end == -1:
-        return "", ""
-    row = body[tr_start:tr_end]
-    cells = re.findall(r'<td\b[^>]*>(.*?)</td>', row, re.DOTALL)
+    cells = re.findall(r'<td\b[^>]*>(.*?)</td>', body[tr_start:tr_end], re.DOTALL)
     proj = _strip_tags(cells[0]) if cells else ""
     otype = _strip_tags(cells[5]) if len(cells) > 5 else ""
     return proj, otype
 
 
 def write_oa_assignment(oa_id, responder, qc, project=""):
-    """按 oa_id 找「测试页面-写入新增OA」里 data-oa-id 匹配的行，回写：
+    """按 oa_id **且案号一致** 找「测试页面-写入新增OA」里的行，回写：
     人员分配（追加）+ 分配人（=收到分配链接的人，按案号路由）+ 分配时间（当前时间，空则填）。
+    期望案号取自入参 project，否则查 projects（防手动复制导致 class 重复而写错行）。
     返回 {code, msg}。找不到行/异常不抛。"""
     if not oa_id:
         return {"code": 1, "msg": "缺 oa_id"}
@@ -931,9 +966,11 @@ def write_oa_assignment(oa_id, responder, qc, project=""):
         if not page:
             return {"code": 1, "msg": f"未找到页面: {OA_LIST_PAGE_TITLE}"}
         body = page["body"]
-        # 分配人：从该行取 案号(col0)+OA类别(col5) → 补正类看类型给杨姣、否则按案号路由取姓名
-        row_proj, oa_type = _oa_row_project_type(body, oa_id)
-        proj = project or row_proj
+        # 期望案号：优先入参，否则查 projects（oa_id=projects.id 的权威案号）→ 回写时按案号比对
+        expected = (project or "").strip() or _project_of_oa_id(oa_id)
+        # 分配人：从命中行取 案号(col0)+OA类别(col5) → 补正类看类型给杨姣、否则按案号路由取姓名
+        row_proj, oa_type = _oa_row_project_type(body, oa_id, expected)
+        proj = expected or row_proj
         assign_person = ""
         try:
             from forward_oa import assign_person_name
@@ -942,9 +979,10 @@ def write_oa_assignment(oa_id, responder, qc, project=""):
             logger.warning(f"分配人解析失败 oa_id={oa_id}: {e}")
         from datetime import datetime
         assign_time = f"{datetime.now():%Y-%m-%d %H:%M}"
-        new_body, found = _set_oa_person_cell(body, oa_id, text, assign_person, assign_time)
+        new_body, found = _set_oa_person_cell(body, oa_id, text, assign_person, assign_time,
+                                              expected_project=expected)
         if not found:
-            return {"code": 1, "msg": f"未找到 data-oa-id={oa_id} 的行"}
+            return {"code": 1, "msg": f"未找到 oaid={oa_id} 且案号={expected or '?'} 的行（可能 class 被复制到别案号行）"}
         body = new_body
         status = wiki.update_page(page["id"], OA_LIST_PAGE_TITLE, body, page["version"])
         if status == 200:
