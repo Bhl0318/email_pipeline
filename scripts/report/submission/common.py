@@ -455,14 +455,19 @@ def normalize_parents(fields: dict) -> dict:
     兼容存量任务：早期 finalize 未做 key 转换，库里可能是小写 application_no/filing_date。
     幂等，可重复调用。
     """
-    fields["parent_applications"] = [
-        {
-            "Application No": (p or {}).get("Application No") or (p or {}).get("application_no") or "",
-            "Filing Date": (p or {}).get("Filing Date") or (p or {}).get("filing_date") or "",
-            "Continuity Type": (p or {}).get("Continuity Type") or (p or {}).get("continuity_type") or "",
-        }
-        for p in (fields.get("parent_applications") or [])
-    ]
+    out = []
+    for p in (fields.get("parent_applications") or []):
+        p = p or {}
+        appno = p.get("Application No") or p.get("application_no") or ""
+        out.append({
+            "Application No": appno,
+            # env5 可编辑的在先申请号/在先状态要保留（否则 ADS 取不到、状态回落 Pending）
+            "Prior Application Number": p.get("Prior Application Number") or appno,
+            "Filing Date": p.get("Filing Date") or p.get("filing_date") or "",
+            "Continuity Type": p.get("Continuity Type") or p.get("continuity_type") or "",
+            "Prior Application Status": p.get("Prior Application Status") or "",
+        })
+    fields["parent_applications"] = out
     return fields
 
 
