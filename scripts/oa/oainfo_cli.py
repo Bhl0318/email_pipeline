@@ -736,21 +736,22 @@ def _month_title(dt):
     return f"{dt.year}年{dt.month}月"
 
 
-def _new_month_block(month_title, rows_html):
-    """构造一个新的月份折叠块（expand 宏 + 表头 + 数据行）。"""
+def _new_month_block(month_title, rows_html, colgroup=_OA_LIST_COLGROUP, header_row=_OA_LIST_HEADER_ROW):
+    """构造一个新的月份折叠块（expand 宏 + 表头 + 数据行）。colgroup/header_row 可换页面。"""
     return (
         '<ac:structured-macro ac:name="expand" ac:schema-version="1">'
         f'<ac:parameter ac:name="title">{month_title}</ac:parameter>'
         '<ac:rich-text-body>'
-        f'<table class="fixed-table wrapped">{_OA_LIST_COLGROUP}<tbody>'
-        f'{_OA_LIST_HEADER_ROW}{rows_html}</tbody></table>'
+        f'<table class="fixed-table wrapped">{colgroup}<tbody>'
+        f'{header_row}{rows_html}</tbody></table>'
         '</ac:rich-text-body></ac:structured-macro>'
     )
 
 
-def _insert_rows_by_month(body, rows_html, month_title):
+def _insert_rows_by_month(body, rows_html, month_title,
+                          colgroup=_OA_LIST_COLGROUP, header_row=_OA_LIST_HEADER_ROW):
     """把 rows_html 插入 month_title 对应折叠块表格的顶部（表头行之后）。
-    该月折叠块不存在时，新建并插到所有折叠块最前面。
+    该月折叠块不存在时，新建并插到所有折叠块最前面。colgroup/header_row 可换页面。
     返回 (new_body, created)。"""
     title_tag = f'<ac:parameter ac:name="title">{month_title}</ac:parameter>'
     idx = body.find(title_tag)
@@ -766,11 +767,95 @@ def _insert_rows_by_month(body, rows_html, month_title):
         # 结构异常兜底：插到全页第一个 </tbody> 前
         return body.replace('</tbody>', rows_html + '</tbody>', 1), False
     # 该月折叠块不存在 → 新建，插到第一个 expand 宏之前（置顶）
-    block = _new_month_block(month_title, rows_html)
+    block = _new_month_block(month_title, rows_html, colgroup, header_row)
     m = re.search(r'<ac:structured-macro ac:name="expand"', body)
     if m:
         return body[:m.start()] + block + body[m.start():], True
     return body + block, True
+
+
+# ── 分配人专属历史页（如 薛虹/延总：193786632）：分配提交时追加一行 ──
+# 表列：案号/类型/答复期限/OA信息表/人员分配/分配人·分配时间/是否立项/备注（8列）
+_ASSIGNEE_HISTORY_PAGES = {
+    "薛虹": "193786632",
+}
+_ASSIGNEE_HIST_COLGROUP = (
+    '<colgroup><col style="width: 167.0px;" /><col style="width: 111.0px;" />'
+    '<col style="width: 128.0px;" /><col style="width: 162.0px;" />'
+    '<col style="width: 340.0px;" /><col style="width: 157.0px;" />'
+    '<col style="width: 148.0px;" /><col style="width: 295.0px;" /></colgroup>'
+)
+_ASSIGNEE_HIST_HEADER_ROW = (
+    '<tr><th>案号</th><th>类型</th><th>答复期限</th><th>OA信息表</th>'
+    '<th>人员分配</th><th>分配人/分配时间</th><th>是否立项</th><th>备注</th></tr>'
+)
+
+
+def _oa_type_short(oa_type):
+    """OA类别 → 历史页「类型」短名：
+    OA{数字}-… → OA{数字}；第[一二三…]次审查意见 → {数字}通；审查意见(无次) → 一通；其余原样。"""
+    s = oa_type or ""
+    m = re.search(r'OA(\d+)', s)
+    if m:
+        return f"OA{m.group(1)}"
+    m = re.search(r'第([一二三四五六七八九十]+)次审查意见', s)
+    if m:
+        return f"{m.group(1)}通"
+    if "审查意见" in s:
+        return "一通"
+    return s
+
+
+def _assignee_hist_row(oa_id, project, oa_type, deadline, oa_info_cell,
+                       person_text, assign_cell, remark=""):
+    """8列行；行上埋 oaid class 供幂等去重。是否立项默认留空、备注=分配附言+自定义方案说明。"""
+    tr = f'<tr class="oaid-{oa_id}">' if oa_id else "<tr>"
+    return (tr
+            + f"<td>{project}</td>"        # 案号
+            f"<td>{oa_type}</td>"          # 类型
+            f"<td>{deadline}</td>"         # 答复期限
+            f"<td>{oa_info_cell}</td>"     # OA信息表
+            f"<td>{person_text}</td>"      # 人员分配
+            f"<td>{assign_cell}</td>"      # 分配人/分配时间
+            f"<td></td>"                   # 是否立项（默认空）
+            f"<td>{remark}</td>"           # 备注（分配附言 + 自定义方案说明）
+            "</tr>")
+
+
+def write_assignee_history(assign_person, oa_id, project, oa_type, deadline,
+                           person_text, assign_time, remark=""):
+    """把某分配人(如薛虹)分配的案子追加到其专属历史页(当月折叠块)。
+    remark=分配附言+自定义方案说明。仅当该分配人配了页面才写；同 oaid 已在页上则跳过(幂等)。返回 {code,msg}。"""
+    page_id = _ASSIGNEE_HISTORY_PAGES.get(assign_person)
+    if not page_id:
+        return {"code": 0, "msg": "该分配人无专属历史页，跳过"}
+    try:
+        wiki = WikiClient()
+        page = wiki.get_page_by_id(page_id)
+        if not page:
+            return {"code": 1, "msg": f"历史页不存在: {page_id}"}
+        if oa_id and f"oaid-{oa_id}" in page["body"]:
+            return {"code": 0, "msg": "已写过，跳过"}
+        record_url = oa_record_url(project)
+        oa_info_cell = (f'<a href="{record_url}">{project}-OA信息记录表</a>'
+                        if record_url else "")
+        # 分配人/分配时间 → 「薛虹/2026/8/25」（斜杠、年/月/日不补零、不带时分）
+        _date = ""
+        if assign_time:
+            _p = assign_time.split()[0].split("-")   # "2026-08-25 14:30" → ["2026","08","25"]
+            _date = f"{_p[0]}/{int(_p[1])}/{int(_p[2])}" if len(_p) == 3 else assign_time.split()[0]
+        assign_cell = f"{assign_person}/{_date}" if _date else assign_person
+        row = _assignee_hist_row(oa_id, project, _oa_type_short(oa_type), deadline, oa_info_cell,
+                                 person_text, assign_cell, remark)
+        from datetime import datetime
+        month_title = f"{datetime.now():%Y-%m}"   # 该页月份标题格式 2026-08
+        new_body, _ = _insert_rows_by_month(page["body"], row, month_title,
+                                            _ASSIGNEE_HIST_COLGROUP, _ASSIGNEE_HIST_HEADER_ROW)
+        code = wiki.update_page(page["id"], page["title"], new_body, page["version"])
+        return {"code": 0 if code == 200 else 1, "msg": f"HTTP {code}"}
+    except Exception as e:
+        logger.warning(f"写分配人历史页失败 {assign_person}/{project}: {e}")
+        return {"code": 1, "msg": str(e)}
 
 
 def append_oa_to_wiki(results):
@@ -940,17 +1025,18 @@ def _find_oa_row(body, oa_id, expected_project=""):
 
 
 def _oa_row_project_type(body, oa_id, expected_project=""):
-    """从 oaid（+可选案号比对）行取 (案号=col0, OA类别=col5)。取不到返回空串。"""
+    """从 oaid（+可选案号比对）行取 (案号=col0, OA类别=col5, 答复期限=col4)。取不到返回空串。"""
     tr_start, tr_end = _find_oa_row(body, oa_id, expected_project)
     if tr_start == -1:
-        return "", ""
+        return "", "", ""
     cells = re.findall(r'<td\b[^>]*>(.*?)</td>', body[tr_start:tr_end], re.DOTALL)
     proj = _strip_tags(cells[0]) if cells else ""
     otype = _strip_tags(cells[5]) if len(cells) > 5 else ""
-    return proj, otype
+    deadline = _strip_tags(cells[4]) if len(cells) > 4 else ""
+    return proj, otype, deadline
 
 
-def write_oa_assignment(oa_id, responder, qc, project=""):
+def write_oa_assignment(oa_id, responder, qc, project="", postscript="", custom_note=""):
     """按 oa_id **且案号一致** 找「测试页面-写入新增OA」里的行，回写：
     人员分配（追加）+ 分配人（=收到分配链接的人，按案号路由）+ 分配时间（当前时间，空则填）。
     期望案号取自入参 project，否则查 projects（防手动复制导致 class 重复而写错行）。
@@ -968,8 +1054,8 @@ def write_oa_assignment(oa_id, responder, qc, project=""):
         body = page["body"]
         # 期望案号：优先入参，否则查 projects（oa_id=projects.id 的权威案号）→ 回写时按案号比对
         expected = (project or "").strip() or _project_of_oa_id(oa_id)
-        # 分配人：从命中行取 案号(col0)+OA类别(col5) → 补正类看类型给杨姣、否则按案号路由取姓名
-        row_proj, oa_type = _oa_row_project_type(body, oa_id, expected)
+        # 分配人：从命中行取 案号(col0)+OA类别(col5)+答复期限(col4) → 补正类看类型给杨姣、否则按案号路由取姓名
+        row_proj, oa_type, deadline = _oa_row_project_type(body, oa_id, expected)
         proj = expected or row_proj
         assign_person = ""
         try:
@@ -985,10 +1071,16 @@ def write_oa_assignment(oa_id, responder, qc, project=""):
             return {"code": 1, "msg": f"未找到 oaid={oa_id} 且案号={expected or '?'} 的行（可能 class 被复制到别案号行）"}
         body = new_body
         status = wiki.update_page(page["id"], OA_LIST_PAGE_TITLE, body, page["version"])
-        if status == 200:
-            logger.info(f"人员分配写入成功 oa_id={oa_id}: {text}")
-            return {"code": 0, "msg": f"写入成功: {text}"}
-        return {"code": 1, "msg": f"页面更新失败 HTTP {status}"}
+        if status != 200:
+            return {"code": 1, "msg": f"页面更新失败 HTTP {status}"}
+        logger.info(f"人员分配写入成功 oa_id={oa_id}: {text}")
+        # 分配人若配了专属历史页（如薛虹→193786632），额外追加一行（幂等，失败不影响主结果）
+        remark = "；".join([x for x in [(postscript or "").strip(), (custom_note or "").strip()] if x])
+        hist = write_assignee_history(assign_person, oa_id, proj, oa_type, deadline, text,
+                                      assign_time, remark)
+        if hist.get("code") == 0 and "跳过" not in hist.get("msg", ""):
+            logger.info(f"分配人历史页写入 {assign_person} {proj}: {hist.get('msg')}")
+        return {"code": 0, "msg": f"写入成功: {text}", "history": hist.get("msg", "")}
     except Exception as e:
         logger.warning(f"人员分配写入失败 oa_id={oa_id}: {e}")
         return {"code": 1, "msg": f"异常: {e}"}

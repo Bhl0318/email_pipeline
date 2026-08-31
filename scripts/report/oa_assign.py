@@ -29,14 +29,16 @@ def _log(*a):
     print(f"[{datetime.now():%H:%M:%S}][oa-assign]", *a, file=sys.stderr, flush=True)
 
 
-def _write_back(case_id, responder, qc):
-    """按 case_id(=oa_id) 回写 Wiki 新增OA 人员分配格。best-effort：桩数据/无 Wiki 时返回失败也不抛。"""
+def _write_back(case_id, responder, qc, postscript="", custom_note=""):
+    """按 case_id(=oa_id) 回写 Wiki 新增OA 人员分配格（+分配人历史页，备注=附言+自定义方案说明）。
+    best-effort：桩数据/无 Wiki 时返回失败也不抛。"""
     try:
         oa_dir = os.path.join(_DIR, "..", "oa")
         if oa_dir not in sys.path:
             sys.path.insert(0, oa_dir)
         from oainfo_cli import write_oa_assignment
-        return write_oa_assignment(case_id, responder, qc)
+        return write_oa_assignment(case_id, responder, qc,
+                                   postscript=postscript, custom_note=custom_note)
     except Exception as e:
         return {"code": 1, "msg": f"回写调用失败: {e}"}
 
@@ -317,7 +319,7 @@ async def assignment_submit(req: Request):
     body = await req.json()
     _log("POST /api/assignment/submit 收到：", json.dumps(body, ensure_ascii=False))
     cid, responder, qc = body.get("caseId"), body.get("responder"), body.get("qc")
-    wb = _write_back(cid, responder, qc)                 # 回写 Wiki 人员分配格
+    wb = _write_back(cid, responder, qc, body.get("postscript", ""), body.get("customNote", ""))  # 回写 Wiki
     _mark(cid, responder, qc)                            # 待分配表回填结果+置已分配
     _save_submission(body)                               # 选中结果+附言(附言/原因)存 oa_assign_report.submit_json
     _log("    回写 Wiki 人员分配：", wb.get("msg"))
@@ -332,7 +334,8 @@ async def assignment_submit_batch(req: Request):
     results = []
     for a in assignments:
         _log("    -", json.dumps(a, ensure_ascii=False))
-        wb = _write_back(a.get("caseId"), a.get("responder"), a.get("qc"))
+        wb = _write_back(a.get("caseId"), a.get("responder"), a.get("qc"),
+                         a.get("postscript", ""), a.get("customNote", ""))
         _mark(a.get("caseId"), a.get("responder"), a.get("qc"))
         _save_submission(a)                              # 选中结果+附言存 oa_assign_report.submit_json
         _log("      回写：", wb.get("msg"))
