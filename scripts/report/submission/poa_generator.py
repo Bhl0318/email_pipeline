@@ -10,6 +10,7 @@
 ⚠️ 空 POA.pdf 模板需放入 submission/templates/POA.pdf（同 ADS，从旧机取回）。
 """
 import datetime
+import re
 from pathlib import Path
 
 import fitz  # PyMuPDF
@@ -63,6 +64,53 @@ def generate_poa(case_info: dict, output_dir, template_pdf=None, scan_pdf=None) 
     if scan_pdf and Path(scan_pdf).is_file():
         _append_scan_page(file_path, Path(scan_pdf))
     return {"file_path": str(file_path), "file_name": file_name, "type": "POA"}
+
+
+def _safe_appname(name, idx):
+    """申请人名清洗成安全文件名片段；空则用 applicantN。"""
+    s = re.sub(r'[\\/:*?"<>|\r\n\t]+', "_", (name or "").strip())
+    s = re.sub(r"\s+", " ", s).strip().strip(".")[:40]
+    return s or f"applicant{idx + 1}"
+
+
+def generate_poas(case_info: dict, output_dir, template_pdf=None, scan_paths=None) -> list:
+    """每个申请人各生成一份 POA（各填各的申请人名、各附各的扫描页）。
+    scan_paths: {申请人下标: 扫描件路径}（缺则该份不附扫描页）。
+    文件名：单申请人 {日期}-POA-{案号}.pdf（兼容原命名）；多申请人 {日期}-POA-{案号}-{申请人名}.pdf。
+    :return: [{"file_path","file_name","type","applicant","index"} ...]（至少一份）。"""
+    template_pdf = template_pdf or POA_TEMPLATE
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    sig = case_info.get("Signature", {})
+    inventors = case_info.get("Inventors") or [{}]
+    applicants = case_info.get("Applicants") or [{}]
+    scan_paths = scan_paths or {}
+    today = datetime.datetime.now().strftime("%Y-%m-%d")
+    ref = case_info.get("Our Ref.", "UNKNOWN")
+    multi = len(applicants) > 1
+    out = []
+    for i, app in enumerate(applicants):
+        field_updates = {
+            "First Named Inventor": inventors[0].get("name", ""),
+            "Title": case_info.get("Title", ""),
+            "Attorney Docket Number": case_info.get("Our Ref.", ""),
+            "Name": sig.get("Name", ""),
+            "Registration Number": str(sig.get("Registration Number", "")),
+            "Title if Applicant is a juristic entity": sig.get("title", ""),
+            "Applicant Name if Applicant is a juristic entity": app.get("Name", ""),  # 各填各的申请人
+            "Number of forms being submitted": True,
+            "Number of forms": "1",
+        }
+        suffix = f"-{_safe_appname(app.get('Name'), i)}" if multi else ""   # 单申请人保持原名
+        file_name = f"{today}-POA-{ref}{suffix}.pdf"
+        file_path = output_dir / file_name
+        fill_pdf_form(template_pdf, file_path, field_updates)
+        scan = scan_paths.get(i)
+        if scan and Path(scan).is_file():
+            _append_scan_page(file_path, Path(scan))   # 该申请人各自的扫描页
+        out.append({"file_path": str(file_path), "file_name": file_name, "type": "POA",
+                    "applicant": app.get("Name", ""), "index": i})
+    return out
 
 
 if __name__ == "__main__":

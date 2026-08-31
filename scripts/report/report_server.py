@@ -91,7 +91,7 @@ from submission.declaration_generator import generate_declarations  # noqa: E402
 from submission.preview import docx_to_pdf, office_convert  # noqa: E402
 # 环节4（递交文件）生成器 —— 与环节2 互不影响
 from submission.fields_mapping import fields_to_case_info, load_agent_info  # noqa: E402
-from submission.poa_generator import generate_poa  # noqa: E402
+from submission.poa_generator import generate_poa, generate_poas  # noqa: E402
 from submission.transmittal_generator import generate_transmittal  # noqa: E402
 from submission.ads_generator import generate_ads, generate_ads_preview, generate_ads_flat  # noqa: E402
 from submission.agent_email import build_agent_email  # noqa: E402
@@ -1617,14 +1617,26 @@ def _filing_poa_scan_dir(task_id: str) -> Path:
     return SUBMISSION_OUTPUT_DIR / task_id / "poa-scan"
 
 
-def _filing_poa_scan_path(task_id: str):
-    """当前 POA 扫描件路径（无则 None）。"""
+def _filing_poa_scan_paths(task_id: str) -> dict:
+    """按申请人下标取 POA 扫描件：poa-scan/{i}.pdf → {i: Path}。
+    兼容旧的单张(非 {i}.pdf 命名)：无任何 {i}.pdf 时把目录里第一张 pdf 当作 index 0。"""
     d = _filing_poa_scan_dir(task_id)
-    if d.exists():
+    out = {}
+    if not d.is_dir():
+        return out
+    for p in d.glob("*.pdf"):
+        if p.is_file() and p.stem.isdigit():
+            out[int(p.stem)] = p
+    if not out:   # 旧单张兼容
         pdfs = sorted(p for p in d.glob("*.pdf") if p.is_file())
         if pdfs:
-            return pdfs[0]
-    return None
+            out[0] = pdfs[0]
+    return out
+
+
+def _filing_poa_scan_path(task_id: str):
+    """兼容旧调用：返回 index 0 的扫描件（无则 None）。"""
+    return _filing_poa_scan_paths(task_id).get(0)
 
 
 def _find_confirmation_original(conf_task_id: str):
@@ -1987,28 +1999,33 @@ def delete_final_doc(task_id: str, name: str):
 
 
 @app.post("/api/submission/filing/{task_id}/upload-poa-scan")
-def upload_poa_scan(task_id: str, file: UploadFile = File(...)):
-    """上传 POA 第二页扫描件（单张 PDF，重传覆盖）。生成/发送 POA 时追加为第二页。"""
+def upload_poa_scan(task_id: str, index: int = 0, file: UploadFile = File(...)):
+    """上传第 index 个申请人的 POA 第二页扫描件（每人一份，存 poa-scan/{index}.pdf，重传覆盖该份）。
+    生成/发送该申请人的 POA 时追加为第二页。"""
     _load_submission_task(task_id)
     raw = file.file.read()
-    name = re.sub(r'[\\/:*?"<>|\r\n\t]+', "_", file.filename or "poa-scan.pdf").strip() or "poa-scan.pdf"
-    if not name.lower().endswith(".pdf") or not raw.startswith(b"%PDF"):
+    if not (file.filename or "").lower().endswith(".pdf") or not raw.startswith(b"%PDF"):
         raise HTTPException(400, "POA 扫描件必须是 PDF 文件")
     dest_dir = _filing_poa_scan_dir(task_id)
-    if dest_dir.exists():
-        shutil.rmtree(dest_dir)          # 单张，重传即覆盖
     dest_dir.mkdir(parents=True, exist_ok=True)
-    dest = dest_dir / name
+    dest = dest_dir / f"{int(index)}.pdf"      # 按申请人下标命名，只覆盖该份
     dest.write_bytes(raw)
-    return {"ok": True, "name": name, "url": _output_url(dest)}
+    return {"ok": True, "index": int(index), "name": dest.name, "url": _output_url(dest)}
 
 
 @app.delete("/api/submission/filing/{task_id}/poa-scan")
-def delete_poa_scan(task_id: str):
+def delete_poa_scan(task_id: str, index: int = None):
+    """删除 POA 扫描件：给 index 删该申请人那份(poa-scan/{index}.pdf)；不给 index 删全部(兼容)。"""
     d = _filing_poa_scan_dir(task_id)
-    if d.exists():
+    if not d.is_dir():
+        return {"ok": True}
+    if index is None:
         shutil.rmtree(d)
-    return {"ok": True}
+    else:
+        p = d / f"{int(index)}.pdf"
+        if p.is_file():
+            p.unlink()
+    return {"ok": True, "index": index}
 
 
 @app.post("/api/submission/filing/{task_id}/upload-replacement")
@@ -2079,9 +2096,10 @@ def preview_filing_task(task_id: str, req: FilingPreviewReq):
     warnings = []
     try:
         if req.target == "poa":
-            scan = _filing_poa_scan_path(task_id)
-            d = generate_poa(ci, preview_dir, scan_pdf=str(scan) if scan else None)
-            files = [{"name": d["file_name"], "pdf_url": _output_url(d["file_path"]), "type": d.get("type")}]
+            scans = _filing_poa_scan_paths(task_id)   # {申请人下标: 扫描件}
+            poas = generate_poas(ci, preview_dir, scan_paths={i: str(p) for i, p in scans.items()})
+            files = [{"name": d["file_name"], "pdf_url": _output_url(d["file_path"]),
+                      "type": d.get("type"), "applicant": d.get("applicant", "")} for d in poas]
         elif req.target == "transmittal":
             d = generate_transmittal(ci, preview_dir, options=opts)
             warnings.extend(d.get("warnings") or [])
@@ -2265,25 +2283,33 @@ def confirm_filing_task(task_id: str, req: FilingConfirmReq):
     final_dir.mkdir(parents=True, exist_ok=True)
     warnings = []
     try:
-        _poa_scan = _filing_poa_scan_path(task_id)
-        docs = [generate_poa(ci, final_dir, scan_pdf=str(_poa_scan) if _poa_scan else None),
+        _scans = _filing_poa_scan_paths(task_id)   # {申请人下标: 扫描件}
+        _poas = generate_poas(ci, final_dir, scan_paths={i: str(p) for i, p in _scans.items()})   # 每申请人一份
+        docs = [*_poas,                                                  # 多份 POA（每申请人一份）
                 generate_transmittal(ci, final_dir, options=opts),
                 generate_ads(ci, final_dir)]
         for d in docs:
             warnings.extend(d.get("warnings") or [])
-        # 替换件顶替：有 manual 替换件的成品，用替换件内容覆盖 final/(保留生成件 stem，
-        # 采用替换件扩展名) → 实发替换件；通道按 docs 类型、env6 按 stem 比对，均不受影响。
-        for _i, _tgt in enumerate(("poa", "transmittal", "ads")):
+        # 替换件顶替：有 manual 替换件的成品，用替换件内容覆盖 final/(保留生成件 stem，采用替换件扩展名)。
+        # 通道按 docs 类型、env6 按 stem 比对，均不受影响。POA 多份(多申请人)时替换歧义 → 仅单份时替换。
+        _poa_ct = len(_poas)
+        for _d in docs:
+            _tgt = {"POA": "poa", "Transmittal": "transmittal", "ADS": "ads"}.get(
+                "Transmittal" if "Transmittal" in (_d.get("type") or "") else (_d.get("type") or ""))
+            if not _tgt:
+                continue
+            if _tgt == "poa" and _poa_ct > 1:
+                continue   # 多申请人多 POA：替换哪一份有歧义，暂不替换（Transmittal/ADS 不受影响）
             _rep = _filing_replacement_path(task_id, _tgt)
             if not _rep:
                 continue
-            _gen = Path(docs[_i]["file_path"])
+            _gen = Path(_d["file_path"])
             _dest = final_dir / (_gen.stem + _rep.suffix.lower())
             _dest.write_bytes(_rep.read_bytes())
             if _dest != _gen and _gen.exists():
                 _gen.unlink()   # 删原生成件，避免重复附件
-            docs[_i]["file_path"] = str(_dest)
-            docs[_i]["file_name"] = _dest.name
+            _d["file_path"] = str(_dest)
+            _d["file_name"] = _dest.name
             warnings.append(f"{_tgt.upper()} 使用了上传的替换件（{_rep.name}）")
     except Exception as exc:
         shutil.rmtree(final_dir, ignore_errors=True)
