@@ -23,11 +23,41 @@ except Exception:
 
 BASE = "https://patentcenter.uspto.gov/"
 
-LOGIN = {
-    "email": "DSfiling@porus-ip.com",
-    "password": "metisIP@2023",
-    "headless": False,
-}
+import os
+import json
+
+# 内置默认账号（uspto_accounts.json 读不到时回退）
+_LOGIN_FALLBACK = {"email": "DSfiling@porus-ip.com", "password": "metisIP@2023"}
+
+
+def _load_login_account():
+    """从同目录 uspto_accounts.json 读 USPTO 登录账号；**手动选账号**优先级：
+       环境变量 USPTO_ACCOUNT（整数下标 或 邮箱子串）→ json 的 "active"（下标或邮箱）→ 默认 0。
+       读不到文件/账号 → 回退内置默认。返回 {email, password}。"""
+    try:
+        cfg = json.loads((Path(__file__).resolve().parent / "uspto_accounts.json").read_text(encoding="utf-8"))
+        accts = cfg.get("accounts") or []
+        if not accts:
+            return dict(_LOGIN_FALLBACK)
+        sel = os.environ.get("USPTO_ACCOUNT")
+        if sel is None:
+            sel = cfg.get("active", 0)
+        s = str(sel).strip()
+        idx = int(s) if s.isdigit() else next(
+            (i for i, a in enumerate(accts) if s and s.lower() in (a.get("user") or "").lower()), 0)
+        if idx < 0 or idx >= len(accts):
+            idx = 0
+        a = accts[idx]
+        print(f"[login] 使用账号 accounts[{idx}] = {a.get('user')}（{a.get('note', '')}）")
+        return {"email": a.get("user") or _LOGIN_FALLBACK["email"],
+                "password": a.get("password") or _LOGIN_FALLBACK["password"]}
+    except Exception as e:  # noqa: BLE001
+        print(f"[login] 读 uspto_accounts.json 失败，用内置默认账号：{e}")
+        return dict(_LOGIN_FALLBACK)
+
+
+LOGIN = {"headless": False}
+LOGIN.update(_load_login_account())   # email/password 来自 uspto_accounts.json（可手动切换）
 
 # OTP 获取：dingtalk=钉钉机器人 Stream Mode 直接收你的回复（无 :5000/公网）；terminal=终端手输
 OTP = {
