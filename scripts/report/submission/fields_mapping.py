@@ -275,19 +275,21 @@ def fields_to_case_info(fields: dict, agent_info: dict = None) -> dict:
     drawing_sheets = _opts.get("drawing_sheets", "") or ""
 
     # Domestic Benefit / National Stage：parent_applications 的 Continuity Type 规范成代码；
-    # Bypass/371 时把 PCT(case_advance_info) 合成一条（bypass→CON、371→NST）
-    # 父案/PCT 的号是「在先申请号」→ domPriorAppNum（表单 Prior Application Number）；
-    # domappNumber（Application Number=当前申请号，未分配）留空。
+    # 母案按链逐段填（parent_applications 需按「最近母案在前、祖父案在后」排序）：
+    #   每段 Application Number = 该段「较晚一件」的号 = 上一段的在先号；首段=本申请(未分配→空)。
+    #   Prior Application Number = 本段母案号。→ 形成 本申请←父案←祖父案… 的域内优先权链。
     parents = []
+    _prev_no = ""   # 首段本申请自己的号（未分配→空）
     for p in fields.get("parent_applications") or []:
         prior_no = (p.get("Prior Application Number") or p.get("Application No") or "").strip()
         parents.append({
-            "Application No": "",                       # 当前申请号，留空
-            "Prior Application Number": prior_no,        # 父案号 → Prior Application Number
+            "Application No": _prev_no,                   # 链式：本段申请号=上一段的在先号
+            "Prior Application Number": prior_no,        # 本段母案号 → Prior Application Number
             "Filing Date": p.get("Filing Date", ""),
             "Continuity Type": _continuity_display(p.get("Continuity Type")),
             "Prior Application Status": (p.get("Prior Application Status") or "").strip() or "Pending",
         })
+        _prev_no = prior_no                              # 下一段 Application Number = 本段母案号
     _route = _norm(fields.get("filing_route"))
     _pct = fields.get("case_advance_info") or {}
     _pct_no = (_pct.get("pct_app_no") or "").strip()
