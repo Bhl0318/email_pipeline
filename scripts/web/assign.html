@@ -172,7 +172,7 @@
     <!-- Component: CaseList -->
     <div class="case-list" data-guide="case-list">
       <div v-if="filterByAssignee" style="padding:8px 12px;background:#eef4ff;border-bottom:1px solid #dbe6ff;font-size:13px;color:#2b5aa0">
-        👤 {{ assignee }} 的待分配案件（{{ allCases.length }} 件）
+        👤 {{ assignee }} 的待分配案件（{{ pendingCount }} 件）
       </div>
       <div class="case-list__action">
         <!-- API: POST /api/assignment/submit/batch -->
@@ -437,6 +437,8 @@ const app = createApp({
         return c.caseNo.toLowerCase().includes(q) || c.name.toLowerCase().includes(q)
       })
     )
+    // 待分配(未提交)件数——表头用，避免把已分配的也算进去
+    const pendingCount = computed(() => allCases.value.filter(c => !c.submitted).length)
 
     const selectedCase = computed(() =>
       allCases.value.find(c => c.id === selectedCaseId.value) || null
@@ -756,7 +758,7 @@ const app = createApp({
     return {
       staffList, allCases, searchText, selectedCaseId,
       caseSelections, currentSelection, assignedCount, isCaseAssigned,
-      expandedCards, reanalyzing, analyzing, batchSubmitting, assignee, filterByAssignee,
+      expandedCards, reanalyzing, analyzing, batchSubmitting, assignee, filterByAssignee, pendingCount,
       filteredCases, selectedCase, displayedSchemes, renderedMarkdown,
       outlineItems, activeSectionIdx, scrollToSection, onMdScroll,
       selectCase, selectScheme, setCustomResponder, setCustomQc, setPostscript, setCustomNote, queryStaff,
