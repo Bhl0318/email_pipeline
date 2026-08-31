@@ -196,7 +196,8 @@ def build_assign_notifies(plans):
     base = os.environ.get("OA_ASSIGN_BASE_URL", "").rstrip("/")
     if not base:
         return []
-    groups = {}   # to -> [row]
+    from urllib.parse import quote
+    groups = {}   # to -> [案号 名称]
     for p in plans:
         it = p.get("item", {})
         oa_id = it.get("oa_id", "") or ""
@@ -207,11 +208,16 @@ def build_assign_notifies(plans):
         to = _assign_notify_to(proj, name)   # name 作 OA类型：含「补正」→杨姣（不看案号）
         if not to:
             continue
-        groups.setdefault(to, []).append(f"{proj} {name}\n  {base}/oa-assign/{oa_id}")
+        groups.setdefault(to, []).append(f"  {proj}  {name}")
     out = []
     for to, rows in groups.items():
+        # 每人一条链接：打开分配页只显示分配给本人的案件（页面按 assignee 过滤）
+        person = _ASSIGN_PERSON_NAMES.get(to, "")
+        link = f"{base}/oa-assign?assignee={quote(person)}" if person else f"{base}/oa-assign"
         subject = f"【OA分配链接】本轮 {len(rows)} 件待分配"
-        body = "您好：\n\n以下为本轮新立项、待人员分配的案件及分配页链接：\n\n" + "\n\n".join(rows) + "\n\n--\n发送人：系统\n"
+        body = ("您好：\n\n以下为本轮新立项、待您分配的案件：\n\n" + "\n".join(rows) +
+                "\n\n请打开分配页处理（仅显示分配给您的案件）：\n  " + link +
+                "\n\n--\n发送人：系统\n")
         out.append({"to": to, "cc": list(OA_ASSIGN_NOTIFY_CC), "subject": subject, "body": body})
     return out
 

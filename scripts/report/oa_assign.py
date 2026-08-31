@@ -134,19 +134,33 @@ def _placeholder_detail(summary):
 
 
 @router.get("/api/cases/pending")
-def cases_pending(page: int = 1, pageSize: int = 100):
-    # 读真实待分配表（oa_assign_task JOIN projects）。
+def cases_pending(page: int = 1, pageSize: int = 100, assignee: str = ""):
+    # 读真实待分配表（oa_assign_task JOIN projects）。assignee 非空则只留分配给该人的案件。
     st = _store()
     if st is None:
         return {"total": 0, "items": [], "error": "待分配库模块不可用"}
     try:
         rows = st.list_pending()
+        if assignee:
+            rows = [r for r in rows if _assignee_of(r) == assignee]
         items = [_row_to_summary(r) for r in rows]
-        _log(f"GET  /api/cases/pending → {len(items)} 件(待分配表)")
-        return {"total": len(items), "items": items}
+        _log(f"GET  /api/cases/pending assignee={assignee or '(全部)'} → {len(items)} 件")
+        return {"total": len(items), "items": items, "assignee": assignee}
     except Exception as e:
         _log("读待分配表失败：", e)
         return {"total": 0, "items": [], "error": f"读待分配表失败: {e}"}
+
+
+def _assignee_of(row):
+    """该案分配人姓名（=收到分配链接的人，按案号+OA类别路由，与发信同源）。取不到返回 ""。"""
+    try:
+        oa_dir = os.path.join(_DIR, "..", "oa")
+        if oa_dir not in sys.path:
+            sys.path.insert(0, oa_dir)
+        from forward_oa import assign_person_name
+        return assign_person_name(row.get("case_volume", ""), row.get("project_name", ""))
+    except Exception:
+        return ""
 
 
 def _derive_region(project):

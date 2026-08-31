@@ -171,6 +171,9 @@
 
     <!-- Component: CaseList -->
     <div class="case-list" data-guide="case-list">
+      <div v-if="assignee" style="padding:8px 12px;background:#eef4ff;border-bottom:1px solid #dbe6ff;font-size:13px;color:#2b5aa0">
+        👤 {{ assignee }} 的待分配案件（{{ allCases.length }} 件）
+      </div>
       <div class="case-list__action">
         <!-- API: POST /api/assignment/submit/batch -->
         <el-button type="primary" style="width:100%" :disabled="assignedCount === 0 || batchSubmitting" @click="batchSubmit">
@@ -417,6 +420,7 @@ const app = createApp({
     const caseSelections = ref({}) // { caseId: { schemeId, customResponder, customQc } }
     const reanalyzing = ref(false)
     const batchSubmitting = ref(false)   // 「提交全部已分配」按钮 loading
+    const assignee = ref(new URLSearchParams(location.search).get('assignee') || '')  // 只看该分配人的案件
 
     const expandedCards = reactive({
       basic: true, claims: true, tech: true, oa: true, personnel: true
@@ -719,8 +723,10 @@ const app = createApp({
     async function loadData() {
       loadError.value = ''
       try {
+        const pendingUrl = '/api/cases/pending' +
+          (assignee.value ? '?assignee=' + encodeURIComponent(assignee.value) : '')
         const [cs, st] = await Promise.all([
-          apiGet('/api/cases/pending'),
+          apiGet(pendingUrl),
           apiGet('/api/staff/list'),
         ])
         allCases.value = cs.items || cs || []
@@ -748,7 +754,7 @@ const app = createApp({
     return {
       staffList, allCases, searchText, selectedCaseId,
       caseSelections, currentSelection, assignedCount, isCaseAssigned,
-      expandedCards, reanalyzing, analyzing, batchSubmitting,
+      expandedCards, reanalyzing, analyzing, batchSubmitting, assignee,
       filteredCases, selectedCase, displayedSchemes, renderedMarkdown,
       outlineItems, activeSectionIdx, scrollToSection, onMdScroll,
       selectCase, selectScheme, setCustomResponder, setCustomQc, setPostscript, setCustomNote, queryStaff,

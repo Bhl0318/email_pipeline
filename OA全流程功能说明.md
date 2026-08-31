@@ -65,11 +65,11 @@
 - 抄送 = 固定 9 人（伍美欣/赵敏/李晶晶/oa/苏雅/姚涓涓/张琴/丁玲/王圆）。
 - 主题 `【OA自动立项通知】{发文日-官文名-案号}`；正文 OP02 模板（预审/未公开另加注）。
 - 附件：官文（US 盖章 PDF + Word、CN/EP 邮件官文）、892/1449 文献（PDF/Word）。
-- **OA 分配链接**：不进转 OA 正文，**单独按案号路由收件人、均抄送海灵（hailing.bi）**，每轮按收件人分组汇总各案号 + `{基址}/oa-assign/{oa_id}`。基址由 `pipeline_config.json` 的 `oa_assign_base_url` 提供。路由（`forward_oa._assign_notify_to`）：**补正类（OA类别含「补正」）→杨姣（jiao.yang），不看案号**；否则按案号——**20608 开头→王志刚（zhigang.wang）**；**20849/5*/6*/8* 开头→杨姣**；**其余→薛虹（hxue）**。
+- **OA 分配链接**：不进转 OA 正文，**单独按案号路由收件人、均抄送海灵（hailing.bi）**，每轮按收件人分组，正文列各案号，并给每人**一条 `{基址}/oa-assign?assignee={本人}` 链接**——打开分配页**只显示分配给本人的案件**（页面按 assignee 过滤，分配人按案号+OA类别路由算，与发信同源）。基址由 `pipeline_config.json` 的 `oa_assign_base_url` 提供。路由（`forward_oa._assign_notify_to`）：**补正类（OA类别含「补正」）→杨姣（jiao.yang），不看案号**；否则按案号——**20608 开头→王志刚（zhigang.wang）**；**20849/5*/6*/8* 开头→杨姣**；**其余→薛虹（hxue）**。
 
 ## 五、OA 人员分配（`report/oa_assign.py` + `web/assign.html`，report_server:8501）
 
-入口 `/oa-assign`（列表）、`/oa-assign/{oa_id}`（定位到某案）。三栏：待分配列表 / 中栏 AI 案件报告 / 右栏人员方案。
+入口 `/oa-assign`（全部待分配，供海灵/管理）、`/oa-assign?assignee={人}`（**只看分配给该人的案件**，各分配人从邮件链接进）、`/oa-assign/{oa_id}`（定位到某案）。三栏：待分配列表 / 中栏 AI 案件报告 / 右栏人员方案。带 assignee 时左栏顶部标「{人} 的待分配案件（N 件）」。
 
 ### 1. AI 案件报告（`oa/oa_report_ai.py`）
 中栏 markdown，首次打开时若 `oa_assign_report` 无缓存则现场生成（DeepSeek），生成后落库；含：

@@ -141,8 +141,11 @@ def root():
 
 
 @app.get("/oa-assign")
-def oa_assign_page():
-    """OA 分配三栏页入口 → /static/assign.html（相对资源如 script-debug.html 在 /static 下自动解析）。"""
+def oa_assign_page(assignee: str = ""):
+    """OA 分配三栏页入口 → /static/assign.html。带 ?assignee=X 时转发，前端只显示分配给 X 的案件。"""
+    if assignee:
+        from urllib.parse import quote
+        return RedirectResponse(f"/static/assign.html?assignee={quote(assignee)}")
     return RedirectResponse("/static/assign.html")
 
 
