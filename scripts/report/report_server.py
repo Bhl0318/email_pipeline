@@ -1940,8 +1940,9 @@ def get_filing_task(task_id: str):
     final_docs = ([{"name": p.name, "url": _output_url(p)}
                    for p in sorted(final_dir.glob("*")) if p.is_file()]
                   if final_dir.exists() else [])
-    scan = _filing_poa_scan_path(task_id)
-    poa_scan = {"name": scan.name, "url": _output_url(scan)} if scan else None
+    _scans = _filing_poa_scan_paths(task_id)
+    poa_scans = {str(i): {"name": p.name, "url": _output_url(p)} for i, p in _scans.items()}   # 按申请人下标
+    poa_scan = poa_scans.get("0")   # 兼容旧前端（单张=index 0）
     # 同案确认函任务 id（供送审邮件附「确认函及参考文件页」链接 /submission/review/{id}）
     conf = execute_params(
         "SELECT id FROM submission_tasks WHERE task_type='filing_confirmation' AND case_volume=%s "
@@ -1955,6 +1956,7 @@ def get_filing_task(task_id: str):
         "transmittal_options": fields.get("transmittal_options") or {},
         "final_docs": final_docs,
         "poa_scan": poa_scan,
+        "poa_scans": poa_scans,   # {申请人下标: {name,url}}，每人一份
         "confirmation_task_id": conf[0]["id"] if conf else None,
     }
 

@@ -123,6 +123,7 @@
         <button class="tab" data-target="email" onclick="previewEmail()">美代理邮件</button>
         <button class="tab" data-target="confref" onclick="confRef()" title="客户实际收到的确认函原件（环节2生成，非重新生成）">确认函(原件)</button>
       </div>
+      <div id="docChips" style="display:none;padding:6px 12px;border-bottom:1px solid #e2e8f0;background:#f8fafc;font-size:12px;"></div>
       <div id="dlBar" style="display:none;padding:6px 12px;background:#fef3c7;border-bottom:1px solid #fcd34d;font-size:12px;"></div>
       <div class="preview-body">
         <iframe id="previewFrame" style="display:none"></iframe>
@@ -457,10 +458,22 @@ function renderForm(){
   const ap = (fields.applicants||[])[0] || {};
   const invs = (fields.inventors||[]).map(i=>(i.full_name_en||`${i.first_name_en||""} ${i.last_name_en||""}`).replace(/\s*,\s*/g, ", ").trim()).filter(Boolean).join("；");
   const docs = (data.final_docs||[]).map(d=>`<div class="docrow">📄 <a href="${esc(d.url)}" target="_blank">${esc(d.name)}</a><button class="del" onclick="delFinal('${esc(d.name)}')">删除</button></div>`).join("") || '<div style="color:#94a3b8;font-size:12px;">尚未上传定稿</div>';
-  const scan = data.poa_scan;
-  const scanRow = scan
-    ? `<div class="docrow">📄 <a href="${esc(scan.url)}" target="_blank">${esc(scan.name)}</a><button class="del" onclick="delPoaScan()">删除</button></div>`
-    : '<div style="color:#94a3b8;font-size:12px;">尚未上传（POA 仅表单一页）</div>';
+  // POA 扫描页：每个申请人一份(index 对应)。无申请人时退化为单份(index 0)。
+  const _scanApps = (fields.applicants||[]);
+  const _scanN = Math.max(1, _scanApps.length);
+  const _poaScans = data.poa_scans || (data.poa_scan ? {"0": data.poa_scan} : {});
+  const scanRow = Array.from({length:_scanN}, (_,i)=>{
+    const s = _poaScans[String(i)];
+    const who = (_scanApps[i]||{}).applicant_name_en || (`申请人${i+1}`);
+    const cur = s
+      ? `📄 <a href="${esc(s.url)}" target="_blank">${esc(s.name)}</a><button class="del" onclick="delPoaScan(${i})">删除</button>`
+      : `<span style="color:#94a3b8;font-size:12px;">未上传（POA 仅表单一页）</span>`;
+    return `<div class="docrow" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">
+      <b style="min-width:120px;font-size:12px;">${esc(who)}</b>
+      <input type="file" id="poaScanFile-${i}" accept="application/pdf" style="max-width:220px;">
+      <button onclick="uploadPoaScan(${i})">上传扫描页</button>
+      <span>当前：${cur}</span></div>`;
+  }).join("");
   const ck = (k)=> opts[k] ? "checked" : "";
   const declKind = opts.declaration_kind || deriveDeclKind();   // 6a/6b：存过用存的，否则按续案类型派生
   // 递交特有可编辑字段（存 fields.filing_extra）
@@ -601,9 +614,8 @@ function renderForm(){
       <div style="margin-top:8px;"><input type="file" id="finalFile" multiple> <button onclick="uploadFinal()">上传定稿</button><span style="font-size:11px;color:#94a3b8;margin-left:6px;">可一次多选</span></div>
     </div></div>
 
-    <div class="section"><div class="section-head">POA 扫描页（PDF，作为 POA 第二页；可选）</div><div class="section-body">
+    <div class="section"><div class="section-head">POA 扫描页（PDF，作为对应申请人 POA 的第二页；每个申请人各一份，可选）</div><div class="section-body">
       <div id="poaScanDoc">${scanRow}</div>
-      <div style="margin-top:8px;"><input type="file" id="poaScanFile" accept="application/pdf"> <button onclick="uploadPoaScan()">上传扫描页</button></div>
     </div></div>
 
     <div class="section"><div class="section-head">替换 POA / Transmittal / ADS（可选上传；上传后预览优先显示、发美代理实发替换件）</div><div class="section-body">
@@ -780,6 +792,7 @@ async function refreshFinalDocs(){
   const fresh = await api("GET", `${API}/${taskId}`);
   data.final_docs = fresh.final_docs || [];
   data.poa_scan = fresh.poa_scan || null;
+  data.poa_scans = fresh.poa_scans || {};   // 每申请人扫描页
   renderForm();
 }
 // Other 下拉选常用项 → 把官方全名追加进 o-remark（已有则不重复；文本框仍可手动改）
@@ -858,21 +871,41 @@ async function delFinal(name){
   try { await api("DELETE", `${API}/${taskId}/final/${encodeURIComponent(name)}`); await refreshFinalDocs(); }
   catch(e){ toast("删除失败: "+e.message); }
 }
-async function uploadPoaScan(){
-  const f = $("poaScanFile").files[0];
+async function uploadPoaScan(index){
+  index = index || 0;
+  const inp = $(`poaScanFile-${index}`);
+  const f = inp && inp.files && inp.files[0];
   if (!f) { toast("请先选择 PDF"); return; }
   collectOpts();                                   // 快照当前编辑，防重渲染丢失
   const fd = new FormData(); fd.append("file", f);
-  try { await api("POST", `${API}/${taskId}/upload-poa-scan`, fd, true); toast("扫描页已上传"); await refreshFinalDocs(); }
+  try { await api("POST", `${API}/${taskId}/upload-poa-scan?index=${encodeURIComponent(index)}`, fd, true); toast("扫描页已上传"); await refreshFinalDocs(); }
   catch(e){ toast("上传失败: "+e.message); }
 }
-async function delPoaScan(){
+async function delPoaScan(index){
   collectOpts();
-  try { await api("DELETE", `${API}/${taskId}/poa-scan`); await refreshFinalDocs(); }
+  try { await api("DELETE", `${API}/${taskId}/poa-scan?index=${encodeURIComponent(index||0)}`); await refreshFinalDocs(); }
   catch(e){ toast("删除失败: "+e.message); }
 }
 
 let curTarget = "poa";   // 当前文档预览 tab（poa/transmittal/ads），供「刷新预览」后回显
+let docFileList = [];    // 当前 tab 的成品文件（POA 多申请人时多份）
+
+// 多份成品的切换 chips（>1 才显示；POA 多申请人常见）
+function renderDocChips(activeIdx){
+  const bar = $("docChips"); if (!bar) return;
+  if (!docFileList || docFileList.length <= 1) { bar.style.display = "none"; bar.innerHTML = ""; return; }
+  bar.style.display = "block";
+  bar.innerHTML = "多份（每申请人一份）：" + docFileList.map((f,i)=>
+    `<span onclick="showDocFile(${i})" title="${esc(f.name||'')}" style="cursor:pointer;display:inline-block;padding:2px 8px;margin:2px 3px;border-radius:6px;`
+    + `border:1px solid ${i===activeIdx?'#2563eb':'#e2e8f0'};background:${i===activeIdx?'#2563eb':'#fff'};color:${i===activeIdx?'#fff':'#334155'};">`
+    + `${esc(f.applicant || f.name || ('#'+(i+1)))}</span>`).join("");
+}
+function showDocFile(i){
+  const f = docFileList[i]; if (!f) return;
+  renderDocChips(i);
+  _showDocPdf(curTarget, f.pdf_url);
+}
+function _hideDocChips(){ docFileList = []; const b=$("docChips"); if (b){ b.style.display="none"; b.innerHTML=""; } }
 
 function _showDocPdf(target, pdfUrl){
   // 展示一份已存在的成品 PDF（与 preview() 生成后的展示一致；ADS 带 XFA 下载条）
@@ -895,8 +928,8 @@ async function autoPreviewDoc(target){
   if (data && data.status && data.status !== "pending") return previewSent(target);
   try {
     const j = await api("GET", `${API}/${taskId}/preview-existing?target=${encodeURIComponent(target)}`);
-    const f = (j.files || [])[0];
-    if (f) { _showDocPdf(target, f.pdf_url); return; }
+    const files = j.files || [];
+    if (files.length) { docFileList = files; renderDocChips(0); _showDocPdf(target, files[0].pdf_url); return; }
   } catch(e){ /* 查不到就生成 */ }
   preview(target);   // 无已存在 → 按数据生成
 }
@@ -930,20 +963,11 @@ async function preview(target){
   $("previewLoading").classList.add("show");
   try {
     const j = await api("POST", `${API}/${taskId}/preview`, { target, fields_json: fields, transmittal_options: opts });
-    const file = (j.files||[])[0];
-    if (!file) { toast("未生成文件"); return; }
-    // 数据核对版（含 ADS）内联显示；ADS 额外给 XFA 下载条
-    $("previewPlaceholder").style.display = "none";
-    const fr = $("previewFrame"); fr.style.display = "block"; fr.src = file.pdf_url;
-    const bar = $("dlBar");
-    if (target === "ads") {
-      bar.style.display = "block";
-      bar.innerHTML = `当前为<b>数据核对版</b>（本地，仅核对字段）。需要 XFA：` +
-        `<a href="#" onclick="adsXfa(false);return false;" style="color:#b45309;font-weight:600;">⬇ 下载 XFA 版</a>（Adobe 打开）` +
-        ` ｜ <a href="#" onclick="adsXfa(true);return false;" style="color:#b45309;">在线看真实排版</a>（上云扁平化）`;
-    } else {
-      bar.style.display = "none";
-    }
+    const files = j.files || [];
+    if (!files.length) { toast("未生成文件"); return; }
+    docFileList = files;                       // POA 多申请人时多份
+    renderDocChips(0);                         // >1 才显示切换 chips
+    _showDocPdf(target, files[0].pdf_url);     // 展示第一份（ADS 带 XFA 下载条，见 _showDocPdf）
     if ((j.warnings||[]).length) toast(j.warnings[0]);
   } catch(e){ toast("预览失败: "+e.message); }
   finally { $("previewLoading").classList.remove("show"); }
@@ -952,6 +976,7 @@ async function preview(target){
 // 已发版预览：发美代理后文件锁定，显示 final/ 里【已发送】的那版，不重生成
 async function previewSent(target){
   document.querySelectorAll(".preview-head .tab").forEach(b => b.classList.toggle("active", b.dataset.target === target));
+  _hideDocChips();
   $("emailPreview").style.display = "none";
   $("previewLoadingText").textContent = "加载已发版…";
   $("previewLoading").classList.add("show");
@@ -1048,6 +1073,7 @@ function attachChannelListHtml(){
 function previewEmail(){
   if (!taskId) { toast("请先从左侧选择任务"); return; }
   document.querySelectorAll(".preview-head .tab").forEach(b => b.classList.toggle("active", b.dataset.target === "email"));
+  _hideDocChips();
   $("previewFrame").style.display = "none";
   $("dlBar").style.display = "none";
   $("previewPlaceholder").style.display = "none";
@@ -1065,6 +1091,7 @@ function previewEmail(){
 async function confRef(){
   if (!taskId) return;
   document.querySelectorAll(".preview-head .tab").forEach(b => b.classList.toggle("active", b.dataset.target === "confref"));
+  _hideDocChips();
   $("emailPreview").style.display = "none";
   $("dlBar").style.display = "none";
   $("previewFrame").style.display = "none";
