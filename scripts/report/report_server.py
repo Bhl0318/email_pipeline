@@ -2165,7 +2165,8 @@ def filing_preview_existing(task_id: str, target: str = "poa"):
     # 替换件优先（比生成版新才用；点过刷新预览→回落生成版）
     _gen_mtime = 0.0
     if preview_dir.is_dir():
-        _ms = [p.stat().st_mtime for p in preview_dir.glob("*.pdf") if token.lower() in p.name.lower()]
+        _ms = [p.stat().st_mtime for p in preview_dir.glob("*.pdf")
+               if token.lower() in p.name.lower() and "-flat" not in p.name.lower()]
         _gen_mtime = max(_ms) if _ms else 0.0
     ov = _filing_override_pdf(task_id, target, _gen_mtime)
     if ov:
@@ -2173,9 +2174,19 @@ def filing_preview_existing(task_id: str, target: str = "poa"):
                 "files": [{"name": ov.stem, "pdf_url": _output_url(ov), "type": "pdf"}]}
     files = []
     if preview_dir.is_dir():
-        pdfs = sorted((p for p in preview_dir.glob("*.pdf") if token.lower() in p.name.lower()),
-                      key=lambda p: p.stat().st_mtime, reverse=True)
-        for p in pdfs:
+        cand = [p for p in preview_dir.glob("*.pdf")
+                if token.lower() in p.name.lower() and "-flat" not in p.name.lower()]  # 排除在线扁平版
+        # 按基名去重（去掉 _free_output_path 在 Windows 占用时追加的 -时间戳 锁后缀），每组取最新
+        best = {}
+        for p in cand:
+            base = re.sub(r"-\d{6,}$", "", p.stem)   # POA 多申请人时 base 含申请人名 → 每人各留一份
+            if base not in best or p.stat().st_mtime > best[base].stat().st_mtime:
+                best[base] = p
+        picks = sorted(best.values(), key=lambda p: p.stat().st_mtime, reverse=True)
+        # ADS/Transmittal 天然单份 → 只取最新一份（POA 可多份=每申请人一份）
+        if target in ("ads", "transmittal"):
+            picks = picks[:1]
+        for p in picks:
             files.append({"name": p.stem, "pdf_url": _output_url(p), "type": "pdf"})
     return {"target": target, "files": files}
 
