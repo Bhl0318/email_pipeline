@@ -141,11 +141,13 @@ def root():
 
 
 @app.get("/oa-assign")
-def oa_assign_page(assignee: str = ""):
-    """OA 分配三栏页入口 → /static/assign.html。带 ?assignee=X 时转发，前端只显示分配给 X 的案件。"""
-    if assignee:
-        from urllib.parse import quote
-        return RedirectResponse(f"/static/assign.html?assignee={quote(assignee)}")
+def oa_assign_page(assignee: str = "", oaid: str = ""):
+    """OA 分配三栏页入口 → /static/assign.html。
+    带 oaid 时：过滤到该分配人(assignee)的案件并直达该案(openId)；无 oaid 则显示汇总(全部)。"""
+    from urllib.parse import urlencode
+    if oaid:
+        q = urlencode({"assignee": assignee, "openId": oaid}) if assignee else urlencode({"openId": oaid})
+        return RedirectResponse(f"/static/assign.html?{q}")
     return RedirectResponse("/static/assign.html")
 
 

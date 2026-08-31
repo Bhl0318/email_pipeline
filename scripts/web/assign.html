@@ -171,7 +171,7 @@
 
     <!-- Component: CaseList -->
     <div class="case-list" data-guide="case-list">
-      <div v-if="assignee" style="padding:8px 12px;background:#eef4ff;border-bottom:1px solid #dbe6ff;font-size:13px;color:#2b5aa0">
+      <div v-if="filterByAssignee" style="padding:8px 12px;background:#eef4ff;border-bottom:1px solid #dbe6ff;font-size:13px;color:#2b5aa0">
         👤 {{ assignee }} 的待分配案件（{{ allCases.length }} 件）
       </div>
       <div class="case-list__action">
@@ -420,7 +420,10 @@ const app = createApp({
     const caseSelections = ref({}) // { caseId: { schemeId, customResponder, customQc } }
     const reanalyzing = ref(false)
     const batchSubmitting = ref(false)   // 「提交全部已分配」按钮 loading
-    const assignee = ref(new URLSearchParams(location.search).get('assignee') || '')  // 只看该分配人的案件
+    const _urlParams = new URLSearchParams(location.search)
+    const assignee = ref(_urlParams.get('assignee') || '')   // 分配人
+    const openId = ref(_urlParams.get('openId') || '')        // 直达案件(oaid)；有则过滤到本人，无则汇总
+    const filterByAssignee = computed(() => !!(openId.value && assignee.value))
 
     const expandedCards = reactive({
       basic: true, claims: true, tech: true, oa: true, personnel: true
@@ -724,7 +727,7 @@ const app = createApp({
       loadError.value = ''
       try {
         const pendingUrl = '/api/cases/pending' +
-          (assignee.value ? '?assignee=' + encodeURIComponent(assignee.value) : '')
+          (filterByAssignee.value ? '?assignee=' + encodeURIComponent(assignee.value) : '')
         const [cs, st] = await Promise.all([
           apiGet(pendingUrl),
           apiGet('/api/staff/list'),
@@ -739,13 +742,12 @@ const app = createApp({
     }
 
     onMounted(() => {
-      // 加载完成后，若 URL 带 openId(=oa_id) 则自动定位到该案
+      // 加载完成后，若 URL 带 openId(=oaid) 则自动定位到该案（列表已按 assignee 过滤）
       loadData().then(() => {
-        const openId = new URLSearchParams(location.search).get('openId')
-        if (openId) {
-          const c = allCases.value.find(x => x.id === openId)
+        if (openId.value) {
+          const c = allCases.value.find(x => x.id === openId.value)
           if (c) selectCase(c)
-          else ElementPlus.ElMessage.warning(`未找到待分配案件：${openId}`)
+          else ElementPlus.ElMessage.warning(`未找到待分配案件：${openId.value}`)
         }
       })
       // 新手引导已关闭：不自动弹引导
@@ -754,7 +756,7 @@ const app = createApp({
     return {
       staffList, allCases, searchText, selectedCaseId,
       caseSelections, currentSelection, assignedCount, isCaseAssigned,
-      expandedCards, reanalyzing, analyzing, batchSubmitting, assignee,
+      expandedCards, reanalyzing, analyzing, batchSubmitting, assignee, filterByAssignee,
       filteredCases, selectedCase, displayedSchemes, renderedMarkdown,
       outlineItems, activeSectionIdx, scrollToSection, onMdScroll,
       selectCase, selectScheme, setCustomResponder, setCustomQc, setPostscript, setCustomNote, queryStaff,
