@@ -397,6 +397,14 @@ def inject_ads_datasets(template_pdf, datasets_xml: str, out_path) -> None:
         new_ds = tmpl_ds.replace(
             "</xfa:datasets>", "<xfa:data>" + data_inner + "</xfa:data></xfa:datasets>", 1)
     ds_stream.write(new_ds.encode("utf-8"))
+    # 移除 form 包：Adobe 打开时若有 form 包，会用其中「已渲染的旧表单状态」，不按最新数据
+    # 重走动态渲染（如 Prior Application Status=Patented 应切到专利块）。删掉它 → 强制从
+    # template+datasets 重建，按当前 domAppStatusList 值渲染出正确子表单。
+    for _i in range(len(xfa) - 2, -1, -2):
+        if str(xfa[_i]) == "form":
+            del xfa[_i + 1]   # 先删 stream，再删 name（避免下标位移）
+            del xfa[_i]
+            break
     acro.NeedsRendering = True  # 让 Adobe 重渲染动态 XFA
     pdf.save(str(out_path))
 
