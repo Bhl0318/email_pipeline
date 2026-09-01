@@ -156,28 +156,31 @@ def build_forward_body(item):
 # OA 分配链接不进转OA邮件（不发流程人员），按案号路由收件人，统一抄送海灵
 OA_ASSIGN_NOTIFY_CC = ["hailing.bi@metis-ip.com"]   # 海灵（所有分配链接邮件抄送）
 _ASSIGN_NOTIFY_20608 = "zhigang.wang@metis-ip.com"     # 20608 → 王志刚
-_ASSIGN_NOTIFY_20849_568 = "jiao.yang@metis-ip.com"    # 20849/5*/6*/8* → 杨姣
+_ASSIGN_NOTIFY_YANGJIAO = "jiao.yang@metis-ip.com"     # 见 _YANGJIAO_PREFIXES / 5*/6*/8* → 杨姣
 _ASSIGN_NOTIFY_DEFAULT = "hxue@metis-ip.com"           # 其余 → 薛虹
+
+# 归杨姣的 5 位案号前缀（客户）：20849秦川 / 20830象山德曼 / 20769兴容 / 20901普惠道 / 20918千岸科技
+_YANGJIAO_PREFIXES = ("20849", "20830", "20769", "20901", "20918")
 
 
 def _assign_notify_to(project, oa_type=""):
     """按 OA类型/案号返回该案分配链接的收件人。
     补正类（oa_type 含「补正」）→杨姣（不看案号）；
-    否则按案号：20608 开头→王志刚；20849/5*/6*/8* 开头→杨姣；其余→薛虹。"""
+    否则按案号：20608 开头→王志刚；_YANGJIAO_PREFIXES 或 5*/6*/8* 开头→杨姣；其余→薛虹。"""
     if "补正" in (oa_type or ""):
-        return _ASSIGN_NOTIFY_20849_568
+        return _ASSIGN_NOTIFY_YANGJIAO
     p = (project or "").strip()
     if p.startswith("20608"):
         return _ASSIGN_NOTIFY_20608
-    if p.startswith("20849") or p[:1] in ("5", "6", "8"):
-        return _ASSIGN_NOTIFY_20849_568
+    if p.startswith(_YANGJIAO_PREFIXES) or p[:1] in ("5", "6", "8"):
+        return _ASSIGN_NOTIFY_YANGJIAO
     return _ASSIGN_NOTIFY_DEFAULT
 
 
 # 分配人姓名（= 收到该案分配链接的人）：与收件人路由同源，供 Wiki「分配人」列填写
 _ASSIGN_PERSON_NAMES = {
     _ASSIGN_NOTIFY_20608: "王志刚",
-    _ASSIGN_NOTIFY_20849_568: "杨姣",
+    _ASSIGN_NOTIFY_YANGJIAO: "杨姣",
     _ASSIGN_NOTIFY_DEFAULT: "薛虹",
 }
 
