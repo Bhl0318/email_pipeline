@@ -4,21 +4,47 @@
 FPO 直链规则：https://www.freepatentsonline.com/{纯数字号}.pdf
 支持多种输入写法：US20250150762A1 / 20250150762 / "US 2025/0150762 A1" / CN110693604A（取其中数字部分）。
 
+FPO 有 Cloudflare 反爬（会在 TLS 层直接 reset 掉普通 Python 请求）。
+本脚本**优先用 curl_cffi 模拟 Chrome 的 TLS 指纹**绕过，装不上时回退 requests（多半会被 reset）：
+  pip install curl_cffi        # 强烈建议装这个，否则大概率下不下来
+  pip install requests         # 回退用
+
 用法:
   python download_patent_pdf.py US20250150762A1 [输出路径.pdf]
   python download_patent_pdf.py 20250150762
   python download_patent_pdf.py 20250150762 20070083192 110693604   # 批量
-
-依赖: pip install requests
 """
 import re
 import sys
 import os
 
-import requests
-
 UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-      "(KHTML, like Gecko) Chrome/120.0 Safari/537.36")
+      "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+_BROWSER_HEADERS = {
+    "User-Agent": UA,
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,application/pdf,*/*;q=0.8",
+    "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+    "Referer": "https://www.freepatentsonline.com/",
+    "Upgrade-Insecure-Requests": "1",
+    "Sec-Fetch-Dest": "document",
+    "Sec-Fetch-Mode": "navigate",
+    "Sec-Fetch-Site": "same-origin",
+}
+
+
+def _new_session():
+    """优先 curl_cffi(模拟 Chrome TLS 指纹，绕 Cloudflare)，否则回退 requests。返回 (session, is_cffi)。"""
+    try:
+        from curl_cffi import requests as cffi
+        s = cffi.Session(impersonate="chrome", headers=_BROWSER_HEADERS)
+        return s, True
+    except Exception:
+        import requests
+        s = requests.Session()
+        s.headers.update(_BROWSER_HEADERS)
+        print("  [提示] 未装 curl_cffi，回退 requests，FPO 可能仍被 reset。"
+              "建议: pip install curl_cffi", file=sys.stderr)
+        return s, False
 
 
 def _digits(raw):
@@ -55,14 +81,18 @@ def _download(url, out_path, session):
 
 def download_patent_pdf(raw_no, out_path=None, session=None):
     """从 FPO 下载一件专利 PDF。返回本地路径或 None。"""
-    session = session or requests.Session()
-    session.headers.update({"User-Agent": UA,
-                            "Referer": "https://www.freepatentsonline.com/"})
+    if session is None:
+        session, _ = _new_session()
     num = _digits(raw_no)
     if not num:
         print(f"[跳过] 取不到数字号: {raw_no!r}", file=sys.stderr)
         return None
     out_path = out_path or f"{num}.pdf"
+    # 先访问首页拿 cookie（过 Cloudflare 一次性校验），失败不阻断
+    try:
+        session.get("https://www.freepatentsonline.com/", timeout=40)
+    except Exception:
+        pass
     url = f"https://www.freepatentsonline.com/{num}.pdf"
     print(f"[{raw_no} → {num}] {url}", file=sys.stderr)
     if _download(url, out_path, session):
@@ -79,6 +109,6 @@ if __name__ == "__main__":
     args = sys.argv[1:]
     if len(args) == 2 and args[1].lower().endswith(".pdf"):
         sys.exit(0 if download_patent_pdf(args[0], args[1]) else 1)
-    sess = requests.Session()
+    sess, _ = _new_session()
     fail = sum(1 for a in args if not download_patent_pdf(a, session=sess))
     sys.exit(1 if fail else 0)
