@@ -355,6 +355,28 @@ def build_ads_datasets_xml(case_info: dict) -> str:
 _DATA_RE = re.compile(r"<xfa:data\b[^>]*>.*</xfa:data\s*>", re.S)
 _USREQ_RE = re.compile(r"<us-request\b.*</us-request\s*>", re.S)
 
+# ── 实验性：往模板 sfDomesticContinuity 行注入 form:ready 脚本，打开时按状态自动切专利块 ──
+# Patented → 显示专利块(sfDomesContinfoPatent)、隐藏 Pending 块(sfDomesContInfo)；否则反之。
+# 挂在“母案行 subform”上，故每条母案各跑一次（多母案链也正常）。保留原 change 脚本不动。
+_VIS_SCRIPT = (
+    '<event activity="ready" ref="$form">'
+    '<script contentType="application/x-javascript">'
+    'try{'
+    'var _s=this.sfDomesContinuity.sfdomesContAppStat.domAppStatusList.rawValue;'
+    'if(_s=="Patented"){this.sfDomesContInfo.presence="hidden";this.sfDomesContinfoPatent.presence="visible";}'
+    'else{this.sfDomesContInfo.presence="visible";this.sfDomesContinfoPatent.presence="hidden";}'
+    '}catch(_e){}'
+    '</script></event>'
+)
+_SFDC_OPEN_RE = re.compile(r'(<subform\b[^>]*\bname="sfDomesticContinuity"[^>]*>)')
+
+
+def _inject_visibility_script(template_xml: str) -> str:
+    """在模板每个 sfDomesticContinuity 行 subform 开标签后插入 form:ready 显隐脚本（幂等）。"""
+    if "domAppStatusList.rawValue" in template_xml:   # 已注入过，跳过
+        return template_xml
+    return _SFDC_OPEN_RE.sub(lambda m: m.group(1) + _VIS_SCRIPT, template_xml, count=1)
+
 
 def inject_ads_datasets(template_pdf, datasets_xml: str, out_path) -> None:
     """把数据注入 XFA 模板的 datasets 流并保存（本地 pikepdf，替代旧 pdfRest 云）。
@@ -378,12 +400,24 @@ def inject_ads_datasets(template_pdf, datasets_xml: str, out_path) -> None:
         return
 
     ds_stream = None
+    tmpl_stream = None
     for i in range(0, len(xfa) - 1, 2):
         if str(xfa[i]) == "datasets":
             ds_stream = xfa[i + 1]
-            break
+        elif str(xfa[i]) == "template":
+            tmpl_stream = xfa[i + 1]
     if ds_stream is None:
         raise ValueError("XFA 数组中未找到 datasets 项，无法注入")
+
+    # 实验性：往 template 包注入“打开时按状态切专利块”的 form:ready 脚本
+    if tmpl_stream is not None:
+        try:
+            _t = bytes(tmpl_stream.read_bytes()).decode("utf-8", "ignore")
+            _t2 = _inject_visibility_script(_t)
+            if _t2 != _t:
+                tmpl_stream.write(_t2.encode("utf-8"))
+        except Exception as _e:  # noqa: BLE001
+            print(f"[ADS] 注入显隐脚本失败（忽略，不影响数据）：{_e}", file=sys.stderr)
 
     tmpl_ds = bytes(ds_stream.read_bytes()).decode("utf-8", "ignore")
     m = _USREQ_RE.search(datasets_xml)
