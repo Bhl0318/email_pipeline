@@ -57,25 +57,31 @@ def _digits(raw):
     return re.sub(r"[^0-9]", "", s)
 
 
-def _download(url, out_path, session):
-    """下载 url 到 out_path，校验开头是 %PDF。成功返回 True，否则删掉文件返回 False。"""
+def _extract_pdf_url(page_html):
+    """从 FPO 页面 HTML 里取 iframe 的 S3 预签名 PDF 直链（去 HTML 转义 & 去 #fragment）。取不到返回 ""。"""
+    # iframe src 指向 s3.amazonaws.com/pdf.sumobrain.com/{号}.pdf?X-Amz-...
+    m = re.search(r'<iframe[^>]+src=["\']([^"\']*sumobrain[^"\']*)["\']', page_html, re.I)
+    if not m:
+        m = re.search(r'(https?://s3\.amazonaws\.com/pdf\.sumobrain\.com/[^"\'\s]+)', page_html, re.I)
+    if not m:
+        return ""
+    url = m.group(1).replace("&amp;", "&")   # HTML 反转义（S3 签名里只有 &amp;）
+    return url.split("#")[0]                  # 去掉 #view=FitH
+
+
+def _save_pdf(url, out_path, session):
+    """下载 url，校验开头 %PDF。成功存盘并返回 True，否则打印原因返回 False。"""
     try:
-        r = session.get(url, timeout=120, stream=True)
+        r = session.get(url, timeout=120)
+        data = r.content
     except Exception as e:
         print(f"  下载异常: {e}", file=sys.stderr)
         return False
-    if r.status_code != 200:
-        print(f"  下载返回 HTTP {r.status_code}", file=sys.stderr)
+    if not data[:5].startswith(b"%PDF"):
+        print(f"  下到的不是 PDF（HTTP {r.status_code}，开头={data[:12]!r}）", file=sys.stderr)
         return False
     with open(out_path, "wb") as f:
-        for chunk in r.iter_content(8192):
-            f.write(chunk)
-    with open(out_path, "rb") as f:
-        head = f.read(5)
-    if not head.startswith(b"%PDF"):
-        print(f"  下到的不是 PDF（开头={head!r}），可能被 Cloudflare/登录页拦截", file=sys.stderr)
-        os.remove(out_path)
-        return False
+        f.write(data)
     return True
 
 
@@ -93,12 +99,31 @@ def download_patent_pdf(raw_no, out_path=None, session=None):
         session.get("https://www.freepatentsonline.com/", timeout=40)
     except Exception:
         pass
-    url = f"https://www.freepatentsonline.com/{num}.pdf"
-    print(f"[{raw_no} → {num}] {url}", file=sys.stderr)
-    if _download(url, out_path, session):
+    # 1) 取 FPO 页面 HTML（.pdf 地址返回的正是带 iframe 的查看页）
+    page_url = f"https://www.freepatentsonline.com/{num}.pdf"
+    print(f"[{raw_no} → {num}] 取页面 {page_url}", file=sys.stderr)
+    try:
+        page = session.get(page_url, timeout=60).text
+    except Exception as e:
+        print(f"  打开页面失败: {e}", file=sys.stderr)
+        return None
+    # 2) 抠 iframe 的 S3 预签名 PDF 直链
+    pdf_url = _extract_pdf_url(page)
+    if not pdf_url:
+        dbg = out_path + ".debug.html"
+        try:
+            with open(dbg, "w", encoding="utf-8") as f:
+                f.write(page)
+        except Exception:
+            dbg = "(存盘失败)"
+        print(f"  页面里没找到 iframe PDF 链接（可能挑战/登录页），已存 {dbg}", file=sys.stderr)
+        return None
+    print(f"  PDF直链(S3签名): {pdf_url[:90]}…", file=sys.stderr)
+    # 3) 下载真 PDF
+    if _save_pdf(pdf_url, out_path, session):
         print(f"  ✓ 成功: {out_path}")
         return out_path
-    print(f"  ✗ 失败: {raw_no}", file=sys.stderr)
+    print(f"  ✗ 下载 S3 直链失败: {raw_no}", file=sys.stderr)
     return None
 
 
