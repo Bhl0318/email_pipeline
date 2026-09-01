@@ -1097,9 +1097,18 @@ def preview_existing_submission(task_id: str, target: str = "confirmation"):
                     "files": [{"name": ov_pdf.stem, "pdf_url": _output_url(ov_pdf),
                                "docx_url": _output_url(ov_docx) if ov_docx else None}]}
     if preview_dir.is_dir():
-        pdfs = sorted((p for p in preview_dir.glob("*.pdf") if token.lower() in p.name.lower()),
-                      key=lambda p: p.stat().st_mtime, reverse=True)
-        for p in pdfs:
+        cand = [p for p in preview_dir.glob("*.pdf") if token.lower() in p.name.lower()]
+        # 去重（Windows 占用时 _free_output_path 追加的 -时间戳 锁后缀 / 不同日期前缀），每组取最新
+        best = {}
+        for p in cand:
+            base = re.sub(r"-\d{6,}$", "", p.stem)
+            if base not in best or p.stat().st_mtime > best[base].stat().st_mtime:
+                best[base] = p
+        picks = sorted(best.values(), key=lambda p: p.stat().st_mtime, reverse=True)
+        # 确认函/Declaration 天然单份 → 只取最新一份（Assignment 可多份=多段转让）
+        if target in ("confirmation", "declaration"):
+            picks = picks[:1]
+        for p in picks:
             docx = p.with_suffix(".docx")
             files.append({"name": p.stem, "pdf_url": _output_url(p),
                           "docx_url": _output_url(docx) if docx.exists() else None})
