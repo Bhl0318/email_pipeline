@@ -288,6 +288,8 @@ def fields_to_case_info(fields: dict, agent_info: dict = None) -> dict:
             "Filing Date": p.get("Filing Date", ""),
             "Continuity Type": _continuity_display(p.get("Continuity Type")),
             "Prior Application Status": (p.get("Prior Application Status") or "").strip() or "Pending",
+            "Patent Number": (p.get("Patent Number") or "").strip(),   # Patented 时用（专利块）
+            "Issue Date": (p.get("Issue Date") or "").strip(),
         })
         _prev_no = prior_no                              # 下一段 Application Number = 本段母案号
     _route = _norm(fields.get("filing_route"))

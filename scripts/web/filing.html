@@ -511,6 +511,8 @@ function renderForm(){
         <div class="field"><label>在先状态</label><select id="fx-par-${i}-status">
           ${["Pending","Patented","Abandoned"].map(s=>`<option ${(p["Prior Application Status"]||"Pending")===s?"selected":""}>${s}</option>`).join("")}</select></div>
         <div class="field"><label>续案类型</label><input id="fx-par-${i}-cont" value="${esc(p["Continuity Type"]||"")}" placeholder="如 Continuation of / Continuation in part of / Division of"></div>
+        <div class="field"><label>专利号(Patent No，仅 Patented 时填)</label><input id="fx-par-${i}-patnum" value="${esc(p["Patent Number"]||"")}"></div>
+        <div class="field"><label>授权日(Issue Date，仅 Patented 时填)</label><input id="fx-par-${i}-issdate" value="${esc(p["Issue Date"]||"")}" placeholder="YYYY-MM-DD"></div>
       </div></div>`
   ).join("") || '<div style="color:#94a3b8;font-size:12px;">无母案（新申请）</div>';
   // 案件信息可编辑行（改完点上方预览重新生成；回写见 collectExtra）
@@ -705,6 +707,8 @@ function collectExtra(){
     const num=$(`fx-par-${i}-num`);   if (num)  p["Prior Application Number"]=num.value.trim();
     const dt=$(`fx-par-${i}-date`);   if (dt)   p["Filing Date"]=dt.value.trim();
     const st=$(`fx-par-${i}-status`); if (st)   p["Prior Application Status"]=st.value;
+    const pn=$(`fx-par-${i}-patnum`); if (pn)   p["Patent Number"]=pn.value.trim();
+    const isd=$(`fx-par-${i}-issdate`); if (isd) p["Issue Date"]=isd.value.trim();
   });
   // PCT / 在先国际申请（ADS 域内优先权）
   if ($("cf-pct-no")||$("cf-pct-date")){

@@ -169,23 +169,38 @@ def build_ads_datasets_xml(case_info: dict) -> str:
 
     domestic_benefit = ""
     for idx, app in enumerate(case_info.get("Parent Applications", []), start=1):
+        _status = (app.get("Prior Application Status") or "").strip()
+        _appno = _ads_appnum(app.get("Application No", ''))                 # 本段申请号（链上一段的在先号）
+        _cont = app.get('Continuity Type', '')
+        _prior = _ads_appnum(app.get("Prior Application Number", ''))       # 本段母案号
+        _fdate = app.get("Filing Date", '')
+        # Patented → 填「专利块」(含专利号/授权日)、Pending 块留空；否则(Pending/Abandoned)填 Pending 块、专利块留空。
+        # 专利块字段映射：patAppNum=申请号 / domesContList=续案类型 / patContType=在先申请号(母案号) /
+        #                patprDate=母案申请日 / patPatNum=专利号 / patIsDate=授权日。
+        if _status.lower() == "patented":
+            _pending = "<domappNumber/><domesContList/><domPriorAppNum/><DateTimeField1/>"
+            _patent = (f"<patAppNum>{_appno}</patAppNum>"
+                       f"<domesContList>{_cont}</domesContList>"
+                       f"<patContType>{_prior}</patContType>"
+                       f"<patprDate>{_fdate}</patprDate>"
+                       f"<patPatNum>{_ads_appnum(app.get('Patent Number', ''))}</patPatNum>"
+                       f"<patIsDate>{app.get('Issue Date', '')}</patIsDate>")
+        else:
+            _pending = (f"<domappNumber>{_appno}</domappNumber>"
+                        f"<domesContList>{_cont}</domesContList>"
+                        f"<domPriorAppNum>{_prior}</domPriorAppNum>"
+                        f"<DateTimeField1>{_fdate}</DateTimeField1>")
+            _patent = "<patAppNum/><domesContList/><patContType/><patprDate/><patPatNum/><patIsDate/>"
         domestic_benefit += f"""
 <sfDomesticContinuity>
       <sfDomesContinuity>
         <sfdomesContAppStat>
-          <domAppStatusList>{app.get("Prior Application Status", '')}</domAppStatusList>
+          <domAppStatusList>{_status}</domAppStatusList>
           <domsequence>{idx}</domsequence>
         </sfdomesContAppStat>
       </sfDomesContinuity>
-      <sfDomesContInfo>
-        <domappNumber>{_ads_appnum(app.get("Application No", ''))}</domappNumber>
-        <domesContList>{app.get('Continuity Type', '')}</domesContList>
-        <domPriorAppNum>{_ads_appnum(app.get("Prior Application Number", ''))}</domPriorAppNum>
-        <DateTimeField1>{app.get("Filing Date", '')}</DateTimeField1>
-      </sfDomesContInfo>
-      <sfDomesContinfoPatent>
-        <patAppNum/><domesContList/><patContType/><patprDate/><patPatNum/><patIsDate/>
-      </sfDomesContinfoPatent>
+      <sfDomesContInfo>{_pending}</sfDomesContInfo>
+      <sfDomesContinfoPatent>{_patent}</sfDomesContinfoPatent>
     </sfDomesticContinuity>
 """
 

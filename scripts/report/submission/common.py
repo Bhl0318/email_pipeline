@@ -466,6 +466,8 @@ def normalize_parents(fields: dict) -> dict:
             "Filing Date": p.get("Filing Date") or p.get("filing_date") or "",
             "Continuity Type": p.get("Continuity Type") or p.get("continuity_type") or "",
             "Prior Application Status": p.get("Prior Application Status") or "",
+            "Patent Number": p.get("Patent Number") or "",   # Patented 时的专利号/授权日
+            "Issue Date": p.get("Issue Date") or "",
         })
     fields["parent_applications"] = out
     return fields
