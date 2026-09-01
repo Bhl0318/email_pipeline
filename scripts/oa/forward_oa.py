@@ -159,8 +159,9 @@ _ASSIGN_NOTIFY_20608 = "zhigang.wang@metis-ip.com"     # 20608 → 王志刚
 _ASSIGN_NOTIFY_YANGJIAO = "jiao.yang@metis-ip.com"     # 见 _YANGJIAO_PREFIXES / 5*/6*/8* → 杨姣
 _ASSIGN_NOTIFY_DEFAULT = "hxue@metis-ip.com"           # 其余 → 薛虹
 
-# 归杨姣的 5 位案号前缀（客户）：20849秦川 / 20830象山德曼 / 20769兴容 / 20901普惠道 / 20918千岸科技
-_YANGJIAO_PREFIXES = ("20849", "20830", "20769", "20901", "20918")
+# 归杨姣的 5 位案号前缀（=培训部客户）：
+#   20849秦川 / 20830象山德曼 / 20769兴容 / 20901普惠道 / 20651汉桑 / 20918千岸科技
+_YANGJIAO_PREFIXES = ("20849", "20830", "20769", "20901", "20651", "20918")
 
 
 def _assign_notify_to(project, oa_type=""):
