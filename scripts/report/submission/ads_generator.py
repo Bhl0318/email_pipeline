@@ -178,7 +178,7 @@ def build_ads_datasets_xml(case_info: dict) -> str:
         </sfdomesContAppStat>
       </sfDomesContinuity>
       <sfDomesContInfo>
-        <domappNumber>{app.get("Application No", '')}</domappNumber>
+        <domappNumber>{_ads_appnum(app.get("Application No", ''))}</domappNumber>
         <domesContList>{app.get('Continuity Type', '')}</domesContList>
         <domPriorAppNum>{_ads_appnum(app.get("Prior Application Number", ''))}</domPriorAppNum>
         <DateTimeField1>{app.get("Filing Date", '')}</DateTimeField1>
@@ -501,7 +501,7 @@ def _build_ads_preview_docx(case_info: dict, out_dir):
         h[0].text, h[1].text, h[2].text = "申请号", "申请日", "Continuity Type"
         for pa in case_info["Parent Applications"]:
             c = tm.add_row().cells
-            c[0].text = pa.get("Application No", ""); c[1].text = pa.get("Filing Date", "")
+            c[0].text = _ads_appnum(pa.get("Application No", "")); c[1].text = pa.get("Filing Date", "")
             c[2].text = pa.get("Continuity Type", "")
 
     corr = case_info.get("Correspondence Information", {})
