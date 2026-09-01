@@ -20,6 +20,40 @@ if _DIR not in sys.path:
     sys.path.insert(0, _DIR)
 
 
+def _print_history(project):
+    print("【历史OA数据 projects】（本案 + 同族；行首 * = 识别为答复案：project_type 含「答复」）")
+    try:
+        from db_query import execute
+    except Exception as e:
+        print(f"  DB 不可用：{e}\n")
+        return
+    zu = (project or "")[:10]
+    _q = lambda v: str(v or "").replace("'", "\\'")
+    cols = "project,project_name,project_type,project_leader,project_qc,oa_doc_date"
+
+    def _show(rows, tag):
+        if isinstance(rows, str) or not rows:
+            return 0
+        for r in rows:
+            pt = r.get("project_type", "") or ""
+            star = "*" if "答复" in pt else " "
+            print(f"  {star}[{tag}] {r.get('project', '')} | {r.get('project_name', '')} | "
+                  f"type={pt} | 负责人={r.get('project_leader', '')} | QC={r.get('project_qc', '')} | "
+                  f"{str(r.get('oa_doc_date') or '')[:10]}")
+        return len(rows)
+
+    try:
+        own = execute(f"SELECT {cols} FROM projects WHERE project='{_q(project)}' ORDER BY time_stamp")
+        fam = execute(f"SELECT {cols} FROM projects WHERE project LIKE '{_q(zu)}%' "
+                      f"AND project<>'{_q(project)}' ORDER BY project, time_stamp")
+        n = _show(own, "本案") + _show(fam, "同族")
+        if not n:
+            print("  (无)")
+    except Exception as e:
+        print(f"  查询失败：{e}")
+    print()
+
+
 def _print_candidates(project):
     print("【候选人库 collect_candidates】（连续性来源 + 在职状态）")
     try:
@@ -77,6 +111,7 @@ def main():
     grade = _grade(project, region)
     print(f"\n=== 案号 {project}  region={region or '(按案号推)'}  档位={grade or '未知'} ===\n")
 
+    _print_history(project)
     _print_candidates(project)
     _print_whitelist(grade)
 

@@ -111,6 +111,13 @@ def _deepseek_schemes_wl(candidates, whitelist, grade, report_md):
             note = f"，{w['note']}" if w.get("note") else ""
             wl_lines.append(f"  - {w['name']}（{w.get('tier','')}{mark}{note}）")
     wl_block = "\n".join(wl_lines)
+    # 连续性候选（本案撰写/上次OA/同族承办人）：不受领域限制，答复负责人优先从这里取
+    cont_lines = []
+    for c in candidates:
+        attr = "/".join(x for x in (c.get("duty"), c.get("level")) if x) or "职务职级未知"
+        src = "/".join(c.get("sources", [])) or "承办"
+        cont_lines.append(f"  - {c['name']}（{attr}，{c.get('status') or '在职状态未知'}；{src}）")
+    cont_block = "\n".join(cont_lines) if cont_lines else "  (无)"
     # 人员负荷（读 Confluence 负荷页；连不上则空，不阻断）
     try:
         from oa_workload import workload_block
@@ -122,12 +129,18 @@ def _deepseek_schemes_wl(candidates, whitelist, grade, report_md):
     prompt = (
         _schemes_instruction().rstrip() + "\n\n"
         "【本案档位】" + (grade or "未知") + "（白名单已按此档位给出）\n\n"
-        "【判定要求】先据下方报告判断本案技术领域属 通用/结构/生化 中的哪一个，"
-        "再仅从该领域的白名单里选人；答复负责人优先取标注「本案/同族承办」的（连续性），"
-        "其次梯队1，可下探梯队2/3；QC 取该领域白名单中的 QC 档；**推荐人必须在白名单内，禁止编造**。"
+        "【判定要求】先据下方报告判断本案技术领域属 通用/结构/生化 中的哪一个。\n"
+        "答复负责人选人顺序（**连续性优先，不受领域限制**）：\n"
+        "  1) **优先取【连续性候选】里在职的人**（即上次OA/本案·同族承办人；即使其不在本案判定领域的白名单，也应优先，以保证承办连续性）；\n"
+        "  2) 连续性候选无在职合适人 → 从**本案判定领域**的白名单选，梯队1→2→3；\n"
+        "QC 选人：优先取【连续性候选】里适合任 QC 的在职人员，否则取该领域白名单 QC 档；同一人不得兼两角色。\n"
+        "报告的「历史 OA 记录」标明了上次的答复负责人/QC，请据此还原承办组合（负责人对负责人、QC 对 QC）。\n"
+        "**推荐人必须出自【连续性候选】或【白名单】，禁止编造库外姓名。**\n"
         "每组方案的 JSON 里额外带一个字段 \"field\"，值为你判定的技术领域（通用/结构/生化）。\n\n"
-        "【案件报告（判领域用，节选）】\n" + (report_md or "")[:4000] + "\n\n"
-        "【本档位白名单（按领域/梯队；只能从这里选）】\n" + wl_block
+        "【案件报告（判领域 + 看历史OA承办人用，节选）】\n" + (report_md or "")[:4000] + "\n\n"
+        "【连续性候选（上次OA/本案·同族承办人，不受领域限制，答复负责人优先从这里取；在职优先，离职不作首选）】\n"
+        + cont_block + "\n\n"
+        "【本档位白名单（按领域/梯队；连续性候选取不到时，从本案判定领域的白名单选）】\n" + wl_block
         + load_part
     )
     return _deepseek(prompt)
@@ -181,9 +194,9 @@ def build_assignment_schemes(project, region="", report_md="", execute=None):
         responder = responder if responder in valid_names else ""
         qc = qc if qc in valid_names else ""
         field = (s.get("field") or "").strip()   # DeepSeek 判定的技术领域，供兜底补人
-        # 兜底(规则⑤)：角色空 → 从同技术领域白名单补人；同领域补不到再跨领域
+        # 兜底：角色空 → 先从连续性候选(在职)补，再从同技术领域白名单补（同领域补不到再跨领域）
         if whitelist and (not responder or not qc):
-            responder, qc = _fallback_fill(whitelist, field, responder, qc)
+            responder, qc = _fallback_fill(whitelist, field, responder, qc, candidates)
         if not responder and not qc:
             continue
         schemes.append({
@@ -196,19 +209,22 @@ def build_assignment_schemes(project, region="", report_md="", execute=None):
     return schemes
 
 
-def _fallback_fill(whitelist, field, responder, qc):
-    """角色空时从白名单补：负责人取梯队1→2→3，QC 取 QC 档；优先同 field，补不到跨 field；避开同人。"""
+def _fallback_fill(whitelist, field, responder, qc, candidates=None):
+    """角色空时补人：**先从连续性候选(在职)补**（不受领域限制，落实规则②/④），
+    再从白名单补（负责人梯队1→2→3、QC 取 QC 档；优先同 field，补不到跨 field）；避开同人。"""
+    cont = [c["name"] for c in (candidates or []) if c.get("name") and c.get("status") != "离职"]
+
     def pool(is_qc, fld):
         rows = [w for w in whitelist
                 if (w.get("tier") == "QC") == is_qc and (not fld or w.get("field") == fld)]
         return [w["name"] for w in sorted(rows, key=lambda x: x.get("tier_level", 99))]
     if not responder:
-        for n in pool(False, field) + (pool(False, "") if field else []):
+        for n in cont + pool(False, field) + (pool(False, "") if field else []):
             if n and n != qc:
                 responder = n
                 break
     if not qc:
-        for n in pool(True, field) + (pool(True, "") if field else []):
+        for n in cont + pool(True, field) + (pool(True, "") if field else []):
             if n and n != responder:
                 qc = n
                 break
