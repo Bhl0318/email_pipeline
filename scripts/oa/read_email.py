@@ -83,6 +83,33 @@ def _official_doc_for_subpage(item, saved_pdfs):
     return None
 
 
+def _download_case_publication(project):
+    """按本案公开号从 FPO 下载公布文本 PDF，存 attachment/{案号}/{案号}-公布文本.pdf。
+    返回路径或 None（best-effort：取不到公开号/下载失败均静默跳过，不阻断上传）。"""
+    project = (project or "").strip()
+    if not project:
+        return None
+    try:
+        from oainfo_cli import find_project_info
+        _, pub_no = find_project_info(project)   # (案件名, 公开号)
+    except Exception as e:
+        print(f"[公布文本] {project} 取公开号失败: {e}", file=sys.stderr)
+        return None
+    if not pub_no:
+        return None
+    attach_dir = os.path.join(SCRIPT_DIR, "..", "..", "attachment", project)
+    out = os.path.join(attach_dir, f"{project}-公布文本.pdf")
+    if os.path.exists(out):
+        return out
+    try:
+        os.makedirs(attach_dir, exist_ok=True)
+        from download_patent_pdf import download_patent_pdf
+        return download_patent_pdf(pub_no, out)
+    except Exception as e:
+        print(f"[公布文本] {project} 下载失败({pub_no}): {e}", file=sys.stderr)
+        return None
+
+
 # ─── 配置 ───────────────────────────────────────────────
 
 def load_config():
@@ -1214,6 +1241,11 @@ def dispatch_oa(all_results, all_emails=None, dry_run=False, test_project_prefix
             if pub:
                 files.append(pub)
                 print(f"[公布文件] {item.get('project')} → {os.path.basename(pub)}", file=sys.stderr)
+            # 本案公布文本：按公开号从 FPO 下载 PDF，一并上传（NAS 公布文件的补充/兜底）
+            pub_txt = _download_case_publication(item.get("project", ""))
+            if pub_txt and os.path.exists(pub_txt) and pub_txt not in files:
+                files.append(pub_txt)
+                print(f"[公布文本] {item.get('project')} → {os.path.basename(pub_txt)}", file=sys.stderr)
             for fp in files:
                 try:
                     if wiki.upload_attachment(page_id, fp):
