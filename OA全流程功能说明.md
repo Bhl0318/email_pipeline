@@ -91,7 +91,7 @@ DeepSeek 从**候选人 + 白名单 + 负荷**出 ≥3 组（每组答复负责�
 
 ### 3. 选人与提交
 - 自定义选人只能从 `users`（在职）搜索选择，不能手填（`/api/staff/list`）。
-- 提交（单案/批量）：**回写 Wiki**「测试页面-写入新增OA」人员分配格（按 **oa_id + 案号双重比对**定位——案号取自 projects 的权威值，防手动复制导致 `class="oaid-{id}"` 被复制到别案号行而写错行；对不上任何行则不写，**追加不覆盖**），同时回写**分配人**（=收到分配链接的人，按案号路由）+ **分配时间**（提交时刻，空则填）+ 写 `projects`（leader/qc/participant）+ 写 `tip_budgetperformance_role`（pid=oa_id，答复负责人→wkrole=答复负责人·role=PM、答复QC→wkrole=答复QC·role=QC，name=人名、perf=0、uid=users.userid[按username_zn查]；先删该 pid 答复角色行再插，支持重分配）+ `oa_assign_task` 置已分配 + 把**选中结果+分配附言(postscript)+分配原因(customNote)**存入 `oa_assign_report.submit_json`（UPSERT，`save_submission`）。
+- 提交：**单案**逐条回写；**批量提交一次性回写**（`write_oa_assignments_batch`：一次 `get_page` → 内存里逐案改行 → 一次 `update_page`，分配人历史页按页合并成一次取一次存；N 取 N 存降到 ~2 取 2 存，页面版本只涨一次）。**回写 Wiki**「测试页面-写入新增OA」人员分配格（按 **oa_id + 案号双重比对**定位——案号取自 projects 的权威值，防手动复制导致 `class="oaid-{id}"` 被复制到别案号行而写错行；对不上任何行则不写，**追加不覆盖**），同时回写**分配人**（=收到分配链接的人，按案号路由）+ **分配时间**（提交时刻，空则填）+ 写 `projects`（leader/qc/participant）+ 写 `tip_budgetperformance_role`（pid=oa_id，答复负责人→wkrole=答复负责人·role=PM、答复QC→wkrole=答复QC·role=QC，name=人名、perf=0、uid=users.userid[按username_zn查]；先删该 pid 答复角色行再插，支持重分配）+ `oa_assign_task` 置已分配 + 把**选中结果+分配附言(postscript)+分配原因(customNote)**存入 `oa_assign_report.submit_json`（UPSERT，`save_submission`）。
 - **分配人专属历史页**：若分配人配了专属页（`oainfo_cli._ASSIGNEE_HISTORY_PAGES`，当前 **薛虹→pageId 193786632**），提交时**额外往该页当月折叠块追加一行**（8 列：案号/类型/答复期限/OA信息表[记录表页超链]/人员分配/分配人·分配时间/是否立项/备注；行埋 `oaid` 幂等去重）。失败不影响主回写。
 
 ## 六、OA 白名单维护（`web/whitelist.html` + `report/oa_whitelist.py`）

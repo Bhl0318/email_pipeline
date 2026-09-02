@@ -43,6 +43,22 @@ def _write_back(case_id, responder, qc, postscript="", custom_note=""):
         return {"code": 1, "msg": f"回写调用失败: {e}"}
 
 
+def _write_back_batch(assignments):
+    """批量回写 Wiki 新增OA页（一次取页一次存页）+ 分配人历史页（按页合并）。返回 {caseId: {code,msg}}。"""
+    try:
+        oa_dir = os.path.join(_DIR, "..", "oa")
+        if oa_dir not in sys.path:
+            sys.path.insert(0, oa_dir)
+        from oainfo_cli import write_oa_assignments_batch
+        items = [{"oa_id": a.get("caseId"), "responder": a.get("responder"), "qc": a.get("qc"),
+                  "project": a.get("caseNo", ""),          # 案号用于双重比对（前端 _assignmentOf 已带）
+                  "postscript": a.get("postscript", ""), "custom_note": a.get("customNote", "")}
+                 for a in assignments]
+        return write_oa_assignments_batch(items)
+    except Exception as e:
+        return {a.get("caseId"): {"code": 1, "msg": f"批量回写调用失败: {e}"} for a in assignments}
+
+
 def _mark(case_id, responder, qc):
     """待分配表回填分配结果并置已分配 + 写 tip_budgetperformance_role。best-effort，不抛。"""
     st = _store()
@@ -335,14 +351,14 @@ async def assignment_submit_batch(req: Request):
     body = await req.json()
     assignments = body.get("assignments", []) or []
     _log(f"POST /api/assignment/submit/batch 收到 {len(assignments)} 件：")
-    results = []
+    # Wiki 回写：一次性批量（一次取页一次存页），不再逐案 get/update
+    wb_map = _write_back_batch(assignments)
+    # DB 回写（projects / oa_assign_task / tip_budgetperformance_role）+ submit_json：逐案
     for a in assignments:
-        _log("    -", json.dumps(a, ensure_ascii=False))
-        wb = _write_back(a.get("caseId"), a.get("responder"), a.get("qc"),
-                         a.get("postscript", ""), a.get("customNote", ""))
         _mark(a.get("caseId"), a.get("responder"), a.get("qc"))
-        _save_submission(a)                              # 选中结果+附言存 oa_assign_report.submit_json
-        _log("      回写：", wb.get("msg"))
-        results.append({"caseId": a.get("caseId"), "writeback": wb})
+        _save_submission(a)
+    results = [{"caseId": a.get("caseId"),
+                "writeback": wb_map.get(a.get("caseId"), {"code": 1, "msg": "无回写结果"})}
+               for a in assignments]
     return {"ok": True, "count": len(assignments),
             "caseIds": [a.get("caseId") for a in assignments], "results": results}

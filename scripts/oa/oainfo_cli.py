@@ -822,6 +822,22 @@ def _assignee_hist_row(oa_id, project, oa_type, deadline, oa_info_cell,
             "</tr>")
 
 
+def _assignee_hist_row_html(assign_person, oa_id, project, oa_type, deadline,
+                            person_text, assign_time, remark=""):
+    """构建一行分配人历史页行（OA信息表超链 + 类型短名 + 「薛虹/2026/8/25」分配人时间 + 备注）。"""
+    record_url = oa_record_url(project)
+    oa_info_cell = (f'<a href="{record_url}">{project}-OA信息记录表</a>'
+                    if record_url else "")
+    # 分配人/分配时间 → 「薛虹/2026/8/25」（斜杠、年/月/日不补零、不带时分）
+    _date = ""
+    if assign_time:
+        _p = assign_time.split()[0].split("-")   # "2026-08-25 14:30" → ["2026","08","25"]
+        _date = f"{_p[0]}/{int(_p[1])}/{int(_p[2])}" if len(_p) == 3 else assign_time.split()[0]
+    assign_cell = f"{assign_person}/{_date}" if _date else assign_person
+    return _assignee_hist_row(oa_id, project, _oa_type_short(oa_type), deadline, oa_info_cell,
+                              person_text, assign_cell, remark)
+
+
 def write_assignee_history(assign_person, oa_id, project, oa_type, deadline,
                            person_text, assign_time, remark=""):
     """把某分配人(如薛虹)分配的案子追加到其专属历史页(当月折叠块)。
@@ -836,17 +852,8 @@ def write_assignee_history(assign_person, oa_id, project, oa_type, deadline,
             return {"code": 1, "msg": f"历史页不存在: {page_id}"}
         if oa_id and f"oaid-{oa_id}" in page["body"]:
             return {"code": 0, "msg": "已写过，跳过"}
-        record_url = oa_record_url(project)
-        oa_info_cell = (f'<a href="{record_url}">{project}-OA信息记录表</a>'
-                        if record_url else "")
-        # 分配人/分配时间 → 「薛虹/2026/8/25」（斜杠、年/月/日不补零、不带时分）
-        _date = ""
-        if assign_time:
-            _p = assign_time.split()[0].split("-")   # "2026-08-25 14:30" → ["2026","08","25"]
-            _date = f"{_p[0]}/{int(_p[1])}/{int(_p[2])}" if len(_p) == 3 else assign_time.split()[0]
-        assign_cell = f"{assign_person}/{_date}" if _date else assign_person
-        row = _assignee_hist_row(oa_id, project, _oa_type_short(oa_type), deadline, oa_info_cell,
-                                 person_text, assign_cell, remark)
+        row = _assignee_hist_row_html(assign_person, oa_id, project, oa_type, deadline,
+                                      person_text, assign_time, remark)
         from datetime import datetime
         month_title = f"{datetime.now():%Y-%m}"   # 该页月份标题格式 2026-08
         new_body, _ = _insert_rows_by_month(page["body"], row, month_title,
@@ -856,6 +863,27 @@ def write_assignee_history(assign_person, oa_id, project, oa_type, deadline,
     except Exception as e:
         logger.warning(f"写分配人历史页失败 {assign_person}/{project}: {e}")
         return {"code": 1, "msg": str(e)}
+
+
+def _write_assignee_history_page_batch(person, rows):
+    """把某分配人本批的多行一次性写入其历史页：一次取页 → 跳过已在页上的 oaid → 合并插当月块 → 一次存页。
+    rows: [(oa_id, row_html)]。"""
+    page_id = _ASSIGNEE_HISTORY_PAGES.get(person)
+    if not page_id or not rows:
+        return
+    wiki = WikiClient()
+    page = wiki.get_page_by_id(page_id)
+    if not page:
+        return
+    body = page["body"]
+    fresh = [html for (oa_id, html) in rows if not (oa_id and f"oaid-{oa_id}" in body)]
+    if not fresh:
+        return
+    from datetime import datetime
+    month_title = f"{datetime.now():%Y-%m}"
+    new_body, _ = _insert_rows_by_month(body, "".join(fresh), month_title,
+                                        _ASSIGNEE_HIST_COLGROUP, _ASSIGNEE_HIST_HEADER_ROW)
+    wiki.update_page(page["id"], page["title"], new_body, page["version"])
 
 
 def append_oa_to_wiki(results):
@@ -1084,6 +1112,73 @@ def write_oa_assignment(oa_id, responder, qc, project="", postscript="", custom_
     except Exception as e:
         logger.warning(f"人员分配写入失败 oa_id={oa_id}: {e}")
         return {"code": 1, "msg": f"异常: {e}"}
+
+
+def write_oa_assignments_batch(items):
+    """**批量**回写「测试页面-写入新增OA」：一次 get_page → 内存里逐案改行 → 一次 update_page；
+    分配人有专属历史页(如薛虹)的，按页合并成一次取一次存。相比逐案回写，把 N 取 N 存降到 ~2 取 2 存。
+    items: [{oa_id, responder, qc, project?, postscript?, custom_note?}]（project 建议传案号，用于案号双重比对）。
+    返回 {oa_id: {code, msg}}。"""
+    results = {}
+    items = [it for it in (items or []) if (it or {}).get("oa_id")]
+    if not items:
+        return results
+    from datetime import datetime
+    now = f"{datetime.now():%Y-%m-%d %H:%M}"
+    hist_by_person = {}   # 分配人 -> [(oa_id, row_html)]
+    try:
+        wiki = WikiClient()
+        page = wiki.get_page(OA_LIST_PAGE_TITLE)
+        if not page:
+            return {it["oa_id"]: {"code": 1, "msg": f"未找到页面: {OA_LIST_PAGE_TITLE}"} for it in items}
+        body = page["body"]
+        for it in items:
+            oa_id = (it.get("oa_id") or "").strip()
+            text = format_oa_person(it.get("responder", ""), it.get("qc", ""))
+            if not text:
+                results[oa_id] = {"code": 1, "msg": "负责人/QC 均为空，不写入"}
+                continue
+            expected = (it.get("project") or "").strip() or _project_of_oa_id(oa_id)
+            row_proj, oa_type, deadline = _oa_row_project_type(body, oa_id, expected)
+            proj = expected or row_proj
+            try:
+                from forward_oa import assign_person_name
+                assign_person = assign_person_name(proj, oa_type)
+            except Exception:
+                assign_person = ""
+            new_body, found = _set_oa_person_cell(body, oa_id, text, assign_person, now,
+                                                  expected_project=expected)
+            if not found:
+                results[oa_id] = {"code": 1, "msg": f"未找到 oaid={oa_id} 且案号={expected or '?'} 的行"}
+                continue
+            body = new_body
+            results[oa_id] = {"code": 0, "msg": f"写入成功: {text}"}
+            if assign_person in _ASSIGNEE_HISTORY_PAGES:
+                remark = "；".join([x for x in [(it.get("postscript") or "").strip(),
+                                                (it.get("custom_note") or "").strip()] if x])
+                row_html = _assignee_hist_row_html(assign_person, oa_id, proj, oa_type, deadline,
+                                                   text, now, remark)
+                hist_by_person.setdefault(assign_person, []).append((oa_id, row_html))
+        # 一次性更新新增OA页
+        code = wiki.update_page(page["id"], OA_LIST_PAGE_TITLE, body, page["version"])
+        if code != 200:
+            for k, v in results.items():
+                if v.get("code") == 0:
+                    results[k] = {"code": 1, "msg": f"页面更新失败 HTTP {code}"}
+            return results
+        logger.info(f"[批量]新增OA页回写 {sum(1 for v in results.values() if v.get('code')==0)} 条")
+    except Exception as e:
+        logger.warning(f"[批量]新增OA页回写失败: {e}")
+        for it in items:
+            results.setdefault(it["oa_id"], {"code": 1, "msg": f"异常: {e}"})
+        return results
+    # 专属历史页：每人一页，一次取一次存（失败不影响主结果）
+    for person, rows in hist_by_person.items():
+        try:
+            _write_assignee_history_page_batch(person, rows)
+        except Exception as e:
+            logger.warning(f"[批量]写历史页失败 {person}: {e}")
+    return results
 
 
 # ============================================================
