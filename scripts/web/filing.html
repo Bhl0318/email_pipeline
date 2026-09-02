@@ -912,6 +912,8 @@ function showDocFile(i){
 }
 function _hideDocChips(){ docFileList = []; const b=$("docChips"); if (b){ b.style.display="none"; b.innerHTML=""; } }
 
+// 弹出的独立窗口引用（按窗口名记，供主页面关闭时一并关掉）
+const popWindows = {};
 // 把当前预览的文档弹出成独立窗口（可拖到别的显示器；不同文档各自独立窗口，能同时多屏对照）
 function popOutDoc(){
   const fr = $("previewFrame");
@@ -922,8 +924,13 @@ function popOutDoc(){
     ? docFileList.findIndex(f => f.pdf_url === url) : 0;
   const name = `filing_${taskId||""}_${curTarget}_${chipIdx < 0 ? 0 : chipIdx}`;
   const w = window.open(url, name, "width=900,height=1150,scrollbars=yes,resizable=yes");
-  if (!w) alert("弹出被浏览器拦截，请允许本站弹出窗口后重试");
+  if (!w){ alert("弹出被浏览器拦截，请允许本站弹出窗口后重试"); return; }
+  popWindows[name] = w;
 }
+// 主页面关闭/刷新时，一并关掉所有弹出的独立窗口
+window.addEventListener("beforeunload", () => {
+  Object.values(popWindows).forEach(w => { try { if (w && !w.closed) w.close(); } catch(e){} });
+});
 
 function _showDocPdf(target, pdfUrl){
   // 展示一份已存在的成品 PDF（与 preview() 生成后的展示一致；ADS 带 XFA 下载条）
