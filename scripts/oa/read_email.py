@@ -1231,8 +1231,17 @@ def dispatch_oa(all_results, all_emails=None, dry_run=False, test_project_prefix
                 _src = _official_doc_for_subpage(
                     item, msgid_to_pdfs.get(item.get("message_id", ""), []))
                 if _src:
+                    # EP：官文附件是 panovision 按「代理号-日期-号-类型」命名的，子页标题统一改成
+                    # 「发文日-类型-案号」（US 下载名/CN 附件名本就规范，不传 base_title 沿用文件名）。
+                    _bt = None
+                    if item.get("region") == "EP":
+                        _dt = (item.get("oa_doc_date", "") or "")[:10]
+                        _pj = item.get("project", "") or ""
+                        _ty = (item.get("notification_type", "") or "").strip()
+                        if _dt and _pj:
+                            _bt = "-".join(x for x in (_dt, _ty, _pj) if x)
                     try:
-                        for _st, _title in upload_doc_subpages(wiki, page_id, _src):
+                        for _st, _title in upload_doc_subpages(wiki, page_id, _src, base_title=_bt):
                             print(f"[官文转Wiki] {item.get('project','')} {os.path.basename(_src)} → "
                                   f"HTTP {_st} 子页:{_title}", file=sys.stderr)
                     except Exception as e:

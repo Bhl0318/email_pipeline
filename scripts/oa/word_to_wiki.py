@@ -188,9 +188,12 @@ def _put_subpage(wiki, parent, base_title, content, add_num):
     return status, title
 
 
-def upload_doc_subpages(wiki, parent_page_id, doc_path, versions=(True, False)):
+def upload_doc_subpages(wiki, parent_page_id, doc_path, versions=(True, False), base_title=None):
     """把一份官文（Word/PDF）正文转成 parent_page_id 页下的子页，默认建**有序号 + 无序号两版**。
     正文只抽一次（扫描件只 OCR 一次），渲染两版分别建/更新。
+
+    base_title：指定子页标题（去扩展名版），用于统一命名（如 EP 传 `发文日-类型-案号`）；
+    不传则沿用官文文件名（US 下载名本就是 `发文日-描述-案号`、CN 附件名已规范）。
 
     Returns:
         list[(status_code, page_title)]；父页找不到返回 [(404, "")]；无可提取正文返回 []（不建空页）。
@@ -202,7 +205,7 @@ def upload_doc_subpages(wiki, parent_page_id, doc_path, versions=(True, False)):
     if not paras and not tables_html:
         print(f"[官文转Wiki] 无可提取正文，跳过建页: {os.path.basename(doc_path)}", file=sys.stderr)
         return []
-    base = os.path.splitext(os.path.basename(doc_path))[0]
+    base = (base_title or "").strip() or os.path.splitext(os.path.basename(doc_path))[0]
     out = []
     for add_num in versions:
         content = _render_storage(paras, tables_html, add_num)
