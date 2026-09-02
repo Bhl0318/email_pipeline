@@ -912,7 +912,7 @@ function showDocFile(i){
 }
 function _hideDocChips(){ docFileList = []; const b=$("docChips"); if (b){ b.style.display="none"; b.innerHTML=""; } }
 
-// 弹出的独立窗口引用（按窗口名记，供主页面关闭时一并关掉）
+// 弹出的独立窗口：name -> {win, target, chipIdx}（供主页面关闭时一并关、刷新预览后重载最新版）
 const popWindows = {};
 // 把当前预览的文档弹出成独立窗口（可拖到别的显示器；不同文档各自独立窗口，能同时多屏对照）
 function popOutDoc(){
@@ -920,17 +920,32 @@ function popOutDoc(){
   const url = (fr && fr.style.display !== "none" && fr.src) ? fr.src : "";
   if (!url){ alert("当前没有可弹出的文档，请先在上方选一个文档预览"); return; }
   // 窗口名按 文档类型+多份序号 区分：同类型复用同窗口、不同类型各开一个 → 可同时开多个
-  const chipIdx = (docFileList && docFileList.length > 1)
+  let chipIdx = (docFileList && docFileList.length > 1)
     ? docFileList.findIndex(f => f.pdf_url === url) : 0;
-  const name = `filing_${taskId||""}_${curTarget}_${chipIdx < 0 ? 0 : chipIdx}`;
+  if (chipIdx < 0) chipIdx = 0;
+  const name = `filing_${taskId||""}_${curTarget}_${chipIdx}`;
   const w = window.open(url, name, "width=900,height=1150,scrollbars=yes,resizable=yes");
   if (!w){ alert("弹出被浏览器拦截，请允许本站弹出窗口后重试"); return; }
-  popWindows[name] = w;
+  popWindows[name] = { win: w, target: curTarget, chipIdx };
 }
 // 主页面关闭/刷新时，一并关掉所有弹出的独立窗口
 window.addEventListener("beforeunload", () => {
-  Object.values(popWindows).forEach(w => { try { if (w && !w.closed) w.close(); } catch(e){} });
+  Object.values(popWindows).forEach(e => { try { if (e.win && !e.win.closed) e.win.close(); } catch(_){} });
 });
+// 刷新预览后：把还开着的弹窗各自重载到最新 PDF（已关的清理掉）
+async function _syncPopWindows(){
+  for (const [name, e] of Object.entries(popWindows)){
+    if (!e.win || e.win.closed){ delete popWindows[name]; continue; }
+    try {
+      const j = await api("GET", `${API}/${taskId}/preview-existing?target=${encodeURIComponent(e.target)}`);
+      const files = j.files || [];
+      const f = files[e.chipIdx] || files[0];
+      if (f && f.pdf_url){
+        e.win.location.replace(f.pdf_url + (f.pdf_url.includes("?") ? "&" : "?") + "t=" + Date.now());
+      }
+    } catch(_){ /* 该件同步失败忽略 */ }
+  }
+}
 
 function _showDocPdf(target, pdfUrl){
   // 展示一份已存在的成品 PDF（与 preview() 生成后的展示一致；ADS 带 XFA 下载条）
@@ -974,6 +989,7 @@ async function refreshAllPreviews(){
     }
   } finally { $("previewLoading").classList.remove("show"); }
   autoPreviewDoc(["poa","transmittal","ads"].includes(curTarget) ? curTarget : "poa");
+  _syncPopWindows();   // 重新生成后，让已弹出的独立窗口也刷新到最新版
 }
 
 async function preview(target){
