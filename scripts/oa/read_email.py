@@ -84,7 +84,7 @@ def _official_doc_for_subpage(item, saved_pdfs):
 
 
 def _download_case_publication(project):
-    """按本案公开号从 FPO 下载公布文本 PDF，存 attachment/{案号}/{案号}-公布文本.pdf。
+    """按本案公开号从 FPO 下载公布文本 PDF，存 attachment/{案号}/{公开号}.pdf。
     返回路径或 None（best-effort：取不到公开号/下载失败均静默跳过，不阻断上传）。"""
     project = (project or "").strip()
     if not project:
@@ -95,10 +95,13 @@ def _download_case_publication(project):
     except Exception as e:
         print(f"[公布文本] {project} 取公开号失败: {e}", file=sys.stderr)
         return None
+    pub_no = (pub_no or "").strip()
     if not pub_no:
         return None
+    # 用公开号做文件名，去掉空格/斜杠等非法字符（如 'US 2025/0150762 A1' → 'US20250150762A1'）
+    safe_pub = re.sub(r'[\\/:*?"<>|\s]', '', pub_no)
     attach_dir = os.path.join(SCRIPT_DIR, "..", "..", "attachment", project)
-    out = os.path.join(attach_dir, f"{project}-公布文本.pdf")
+    out = os.path.join(attach_dir, f"{safe_pub}.pdf")
     if os.path.exists(out):
         return out
     try:
