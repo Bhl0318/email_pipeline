@@ -163,12 +163,22 @@ _ASSIGN_NOTIFY_DEFAULT = "hxue@metis-ip.com"           # 其余 → 薛虹
 #   20849秦川 / 20830象山德曼 / 20769兴容 / 20901普惠道 / 20651汉桑 / 20918千岸科技
 _YANGJIAO_PREFIXES = ("20849", "20830", "20769", "20901", "20651", "20918")
 
+# 归杨姣的「非实质/程序·形式类」OA——按立项名(OA类别)含以下关键词判定，不看案号：
+#   补正/复审补正/missing parts/corrected papers(名含"补正") · 限制或选择(RR/CTRS) · Ex Parte Quayle(CTEQ)
+#   · Advisory Action(CTAV) · 部分补充检索报告 · 授权意向通告 Rule 71(3) · Rule 62a(1)多重独权 · IDS文献确认
+# 注：仅单一性/仅双专利/仅不清楚且简单/修改超范围 等"要读OA内容才判"的，立项名看不出，无法自动识别→仍默认发薛虹。
+_YANGJIAO_TYPE_KEYWORDS = (
+    "补正", "Restriction", "Election", "Quayle", "Advisory",
+    "Partial Supplementary", "Rule 71(3)", "授权意向", "Rule 62a", "IDS",
+)
+
 
 def _assign_notify_to(project, oa_type=""):
     """按 OA类型/案号返回该案分配链接的收件人。
-    补正类（oa_type 含「补正」）→杨姣（不看案号）；
-    否则按案号：20608 开头→王志刚；_YANGJIAO_PREFIXES 或 5*/6*/8* 开头→杨姣；其余→薛虹。"""
-    if "补正" in (oa_type or ""):
+    非实质/程序类（oa_type 命中 _YANGJIAO_TYPE_KEYWORDS，如补正/RR/Ex Parte Quayle/Advisory/授权意向等）
+    →杨姣（不看案号）；否则按案号：20608 开头→王志刚；_YANGJIAO_PREFIXES 或 5*/6*/8* 开头→杨姣；其余→薛虹。"""
+    ot = oa_type or ""
+    if any(k in ot for k in _YANGJIAO_TYPE_KEYWORDS):
         return _ASSIGN_NOTIFY_YANGJIAO
     p = (project or "").strip()
     if p.startswith("20608"):

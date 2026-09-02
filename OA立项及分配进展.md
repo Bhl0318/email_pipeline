@@ -8,6 +8,8 @@
 
 ## 2026-09-02
 
+- `[新功能]` **非实质/程序类 OA 归杨姣（不看案号）**：`_assign_notify_to` 把「补正」扩成关键词组 `_YANGJIAO_TYPE_KEYWORDS`（补正/RR限制选择/Ex Parte Quayle/Advisory/部分补充检索/Rule 71(3)授权意向/Rule 62a/IDS），立项名命中即路由杨姣。**注**：仅单一性/仅双专利/仅不清楚且简单/修改超范围等"要读OA内容才判"的，立项名看不出、无法自动识别，仍默认发薛虹（人工改）。
+- `[优化]` **query_oaNum 改回**：先筛答复案(project_type含答复)→在这些里从 project_name 抠 `OA{数字}` 取最大+1（无则1）。
 - `[优化]` **公布文本命名改用公开号**：下载的本案公布文本文件名由 `{案号}-公布文本.pdf` 改为 `{公开号}.pdf`（去空格/斜杠等非法字符）。
 - `[新功能]` **立项 projects 写入客户案号**：INSERT 增列 `project_customernumber` = 客户案号(委托方案号)，取自 IPEasy `p_case_info.case_volume_customer`（`find_customer_case_no`，best-effort）。
 - `[优化]` **批量提交 Wiki 回写改一次性**：批量提交时「测试页面-写入新增OA」由逐案 get/update 改为**一次取页 → 内存逐案改行 → 一次存页**；分配人历史页按页合并。N 取 N 存降到 ~2 取 2 存，页面版本只涨一次。（66554da）
