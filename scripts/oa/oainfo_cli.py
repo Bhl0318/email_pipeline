@@ -1381,39 +1381,41 @@ def _splice_oa_row(body, oa_seq, cells_by_header):
     cells_by_header: {列名关键字: 单元格内 HTML/文本}，如
         {"OA收文日": "2026-07-09", "期限": "2026-09-09", "对比文件链接": "<a…>…</a>"}
     只填空单元格（逐列幂等，不覆盖已有内容）。
-    该表以「含『对比文件链接』列」判定（= 完整版模板；简版无此列 → skip_no_column），
-    同时避开简版「答复期限」列被「期限」误命中。
+    OA过程表以「表头含『OA次数』列」判定（完整版/简版都有）。列名按子串匹配：
+    完整版「期限」命中「期限」列、简版「期限」命中「答复期限」列；「OA收文日」「对比文件链接」
+    简版无对应列则自动落空、只写命中的列。
 
     Returns:
         (new_body, status)。status ∈
           filled          至少填入一个空单元格
           added_row        无 OA{N} 行，自动补一行并填入
-          skip_no_column   页面无「对比文件链接」列（简版模板）
+          skip_no_column   页面无「OA次数」表 / 该表无任一待写列
           skip_nonempty    OA{N} 行存在但目标单元格都已有内容，不覆盖
     """
-    # 1. 找含「对比文件链接」的那张表（table 不嵌套，非贪婪安全）
+    # 1. 找「OA过程」表：表头含「OA次数」的那张（完整版/简版都有此列；table 不嵌套，非贪婪安全）
     target = None
+    header_texts = []
     for m in re.finditer(r'<table\b.*?</table>', body, re.DOTALL):
-        if '对比文件链接' in m.group(0):
+        ths = re.findall(r'<th\b[^>]*>.*?</th>', m.group(0), re.DOTALL)
+        hts = [_strip_tags(th) for th in ths]
+        if any('OA次数' in h for h in hts):
             target = m
+            header_texts = hts
             break
     if target is None:
         return body, "skip_no_column"
     tbl = target.group(0)
+    col_count = len(header_texts)
 
-    # 2. 表头 → 每个待填列名的列序号
-    ths = re.findall(r'<th\b[^>]*>.*?</th>', tbl, re.DOTALL)
-    col_count = len(ths)
-    header_texts = [_strip_tags(th) for th in ths]
+    # 2. 表头 → 每个待填列名的列序号（子串匹配：简版「期限」命中「答复期限」列，
+    #    完整版「期限」命中「期限」列；「OA收文日」「对比文件链接」简版无列自动落空）
     col_of = {}
     for key in cells_by_header:
         idx = next((i for i, h in enumerate(header_texts) if key in h), None)
         if idx is not None:
             col_of[key] = idx
-    # 完整版模板识别：看该表「表头」是否有「对比文件链接」列，而非调用方是否要写它
-    # （只写 OA收文日/期限、不写对比文件时也要能落到完整版表）。
-    if not any('对比文件链接' in h for h in header_texts):
-        return body, "skip_no_column"
+    if not col_of:
+        return body, "skip_no_column"   # 该表没有任一待写列
 
     tb = re.search(r'<tbody\b[^>]*>(.*?)</tbody>', tbl, re.DOTALL)
     if not tb:
