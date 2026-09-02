@@ -2185,10 +2185,12 @@ def filing_preview_existing(task_id: str, target: str = "poa"):
     if preview_dir.is_dir():
         cand = [p for p in preview_dir.glob("*.pdf")
                 if token.lower() in p.name.lower() and "-flat" not in p.name.lower()]  # 排除在线扁平版
-        # 按基名去重（去掉 _free_output_path 在 Windows 占用时追加的 -时间戳 锁后缀），每组取最新
+        # 按基名去重：去掉日期前缀(YYYY-MM-DD-)和 _free_output_path 在 Windows 占用时追加的 -时间戳 锁后缀，
+        # 这样同一份 POA 的不同日期/重生成版本合并为一条；POA 多申请人时基名含申请人名 → 每人各留一份。
         best = {}
         for p in cand:
-            base = re.sub(r"-\d{6,}$", "", p.stem)   # POA 多申请人时 base 含申请人名 → 每人各留一份
+            base = re.sub(r"^\d{4}-\d{2}-\d{2}-", "", p.stem)   # 去日期前缀
+            base = re.sub(r"-\d{6,}$", "", base)                # 去时间戳锁后缀
             if base not in best or p.stat().st_mtime > best[base].stat().st_mtime:
                 best[base] = p
         picks = sorted(best.values(), key=lambda p: p.stat().st_mtime, reverse=True)
