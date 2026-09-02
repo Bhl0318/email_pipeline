@@ -437,6 +437,17 @@
           ]
         }
       },
+      "20753": {
+        "action": "skip",
+        "forward": {
+          "to": [
+            "xin.han@metis-ip.com"
+          ],
+          "cc": [
+            "patents_pa@metis-ip.com"
+          ]
+        }
+      },
       "其他": {
         "action": "assign",
         "preparer": "jing.wang@metis-ip.com"
@@ -478,6 +489,17 @@
           ],
           "cc": [
             "tzhao@metis-ip.com"
+          ]
+        }
+      },
+      "20753": {
+        "action": "skip",
+        "forward": {
+          "to": [
+            "xin.han@metis-ip.com"
+          ],
+          "cc": [
+            "patents_pa@metis-ip.com"
           ]
         }
       },
@@ -525,6 +547,17 @@
           ]
         }
       },
+      "20753": {
+        "action": "skip",
+        "forward": {
+          "to": [
+            "xin.han@metis-ip.com"
+          ],
+          "cc": [
+            "patents_pa@metis-ip.com"
+          ]
+        }
+      },
       "其他": {
         "action": "assign",
         "preparer": "jing.wang@metis-ip.com"
@@ -569,6 +602,17 @@
           ]
         }
       },
+      "20753": {
+        "action": "skip",
+        "forward": {
+          "to": [
+            "xin.han@metis-ip.com"
+          ],
+          "cc": [
+            "patents_pa@metis-ip.com"
+          ]
+        }
+      },
       "其他": {
         "action": "assign",
         "preparer": "jing.wang@metis-ip.com"
@@ -610,6 +654,17 @@
           ],
           "cc": [
             "tzhao@metis-ip.com"
+          ]
+        }
+      },
+      "20753": {
+        "action": "skip",
+        "forward": {
+          "to": [
+            "xin.han@metis-ip.com"
+          ],
+          "cc": [
+            "patents_pa@metis-ip.com"
           ]
         }
       },
