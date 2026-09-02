@@ -1388,6 +1388,12 @@ def dispatch_oa(all_results, all_emails=None, dry_run=False, test_project_prefix
             # customer：客户简称，按真实客户代码查 atw customer 表（测试前缀下用原始代码）
             cust_code = item.get("_orig_customer_code") or (project or "")[:5]
             item["customer"] = query_customer_shortname(cust_code)
+            # 客户案号(委托方案号)：查 IPEasy p_case_info.case_volume_customer（best-effort，取不到留空）
+            try:
+                from oainfo_cli import find_customer_case_no
+                item["project_customernumber"] = find_customer_case_no(project)
+            except Exception as e:
+                print(f"[TIP] {project} 查客户案号失败: {e}", file=sys.stderr)
             # 检查是否已存在
             check_sql = f"SELECT COUNT(*) as cnt FROM projects WHERE project='{project}' AND project_name='{project_name}'"
             try:
@@ -1401,7 +1407,8 @@ def dispatch_oa(all_results, all_emails=None, dry_run=False, test_project_prefix
             # 构建 INSERT；id 复用上面生成的 oa_id（与 Wiki 行 data-oa-id 一致）
             import uuid
             row_id = item.get("oa_id") or str(uuid.uuid4())
-            fields = ["id", "project", "project_name", "project_type", "customer", "oa_doc_date", "entrust_date",
+            fields = ["id", "project", "project_customernumber", "project_name", "project_type",
+                       "customer", "oa_doc_date", "entrust_date",
                        "oaNum", "applytype", "project_deadline", "dueDate",
                        "now_status", "project_phase", "submitby", "oa_remark", "wikiurl"]
             values = []

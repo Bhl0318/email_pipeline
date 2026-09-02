@@ -125,6 +125,25 @@ def find_project_info(project):
         conn.close()
 
 
+def find_customer_case_no(project):
+    """从 IPEasy p_case_info 查客户案号(委托方案号 case_volume_customer)。查不到/异常返回 ''。"""
+    if not project:
+        return ''
+    import pymssql
+    try:
+        conn = pymssql.connect(MSSQL_HOST, MSSQL_USER, MSSQL_PWD, MSSQL_DB, charset='utf8')
+        try:
+            cur = conn.cursor()
+            cur.execute("SELECT case_volume_customer FROM p_case_info WHERE case_volume = %s", (project,))
+            row = cur.fetchone()
+            return (row[0] or '') if row else ''
+        finally:
+            conn.close()
+    except Exception as e:
+        logger.warning(f"查客户案号失败 {project}: {e}")
+        return ''
+
+
 # IPEasy 案件状态中文名属于这几种 → 视为已结案（无需转 OA）
 CLOSED_CASE_STATUSES = {"终止", "维持", "结案"}
 

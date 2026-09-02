@@ -8,6 +8,7 @@
 
 ## 2026-09-02
 
+- `[新功能]` **立项 projects 写入客户案号**：INSERT 增列 `project_customernumber` = 客户案号(委托方案号)，取自 IPEasy `p_case_info.case_volume_customer`（`find_customer_case_no`，best-effort）。
 - `[优化]` **批量提交 Wiki 回写改一次性**：批量提交时「测试页面-写入新增OA」由逐案 get/update 改为**一次取页 → 内存逐案改行 → 一次存页**；分配人历史页按页合并。N 取 N 存降到 ~2 取 2 存，页面版本只涨一次。（66554da）
 - `[新功能]` **提交分配写 `tip_budgetperformance_role`**：提交时按答复负责人(role=PM)/答复QC(role=QC)各写一行，pid=oa_id、perf=0、uid 按 username_zn 查 users.userid；先删该 pid 答复角色再插（支持重分配）。（e1845a3）
 
