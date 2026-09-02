@@ -44,7 +44,7 @@ def _write_back(case_id, responder, qc, postscript="", custom_note=""):
 
 
 def _mark(case_id, responder, qc):
-    """待分配表回填分配结果并置已分配。best-effort，不抛。"""
+    """待分配表回填分配结果并置已分配 + 写 tip_budgetperformance_role。best-effort，不抛。"""
     st = _store()
     if st is None or not case_id:
         return
@@ -52,6 +52,10 @@ def _mark(case_id, responder, qc):
         st.mark_submitted(case_id, responder or "", qc or "")
     except Exception as e:
         _log("待分配表回填失败：", e)
+    try:
+        st.write_perf_roles(case_id, responder or "", qc or "")   # 答复负责人/QC → tip_budgetperformance_role
+    except Exception as e:
+        _log("写 tip_budgetperformance_role 失败：", e)
 
 
 def _save_submission(body):

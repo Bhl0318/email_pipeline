@@ -69,6 +69,48 @@ def mark_submitted(oa_id, responder="", qc="", execute=None):
     return bool(ex(f"SELECT id FROM {TABLE} WHERE id='{_q(oa_id)}'"))
 
 
+PERF_ROLE_TABLE = "tip_budgetperformance_role"
+
+
+def _user_id(name, ex):
+    """按中文名查 users.userid；查不到/异常返回 ""。"""
+    name = (name or "").strip()
+    if not name:
+        return ""
+    rows = ex(f"SELECT userid FROM users WHERE username_zn='{_q(name)}'")
+    if isinstance(rows, str) or not rows:
+        return ""
+    return str(rows[0].get("userid") or "")
+
+
+def write_perf_roles(oa_id, responder="", qc="", execute=None):
+    """提交分配时把答复负责人/QC 写进 tip_budgetperformance_role（pid=oa_id）：
+      答复负责人 → wkrole='答复负责人', role='PM'
+      答复 QC    → wkrole='答复QC',    role='QC'
+      name=人名, perf=0, uid=users.userid(按 username_zn 查)
+    幂等/支持重分配：先删该 pid 的答复角色行再插。返回写入条数。best-effort，不抛。"""
+    ex = _get_execute(execute)
+    if not oa_id:
+        return 0
+    try:
+        ex(f"DELETE FROM {PERF_ROLE_TABLE} WHERE pid='{_q(oa_id)}' "
+           f"AND wkrole IN ('答复负责人','答复QC')")
+        n = 0
+        for name, wkrole, role in ((responder, "答复负责人", "PM"), (qc, "答复QC", "QC")):
+            name = (name or "").strip()
+            if not name:
+                continue
+            uid = _user_id(name, ex)
+            ex(f"INSERT INTO {PERF_ROLE_TABLE} (pid, name, wkrole, role, perf, uid) "
+               f"VALUES ('{_q(oa_id)}', '{_q(name)}', '{wkrole}', '{role}', 0, '{_q(uid)}')")
+            n += 1
+        return n
+    except Exception as e:
+        import sys
+        print(f"[perf_role] 写入失败 pid={oa_id}: {e}", file=sys.stderr)
+        return 0
+
+
 def save_report(oa_id, report_md="", schemes=None, execute=None):
     """立项时按 id 存 AI 案件报告(markdown)+方案 JSON。存在则覆盖(UPSERT)。返回是否写入。
     schemes 为 list/dict 时序列化为 JSON 文本；None/空则存空串。"""
