@@ -1257,6 +1257,27 @@ def dispatch_oa(all_results, all_emails=None, dry_run=False, test_project_prefix
                     print(f"[Wiki 附件] {item.get('project','')} 上传失败 {fp}: {e}", file=sys.stderr)
         print(f"[Wiki 附件] 上传完成: {uploaded} 个文件", file=sys.stderr)
 
+    # OA收文日 + 答复期限：直接用 item 字段（与「新增OA列表」同源）写到 OA信息记录表
+    # 「OA过程」表对应 OA{N} 行，不依赖对比文件解析。
+    # OA次数：CN 审查意见用 parse_oa_seq(第N次)、US/EP 用 oaNum；
+    # 补正/驳回/复审无「第N次」、无 oaNum → oa_seq 为空自然跳过（它们无 OA{N} 行）。
+    from parse_cn_pdf import parse_oa_seq as _parse_oa_seq
+    from oainfo_cli import fill_ref_docs_in_oa_row as _fill_oa_row
+    for item in all_results:
+        oa_seq = (_parse_oa_seq(item.get("project_name", "") or "")
+                  if item.get("region") == "CN" else item.get("oaNum"))
+        if not oa_seq:
+            continue
+        oa_doc_date = item.get("oa_doc_date", "")
+        deadline = item.get("project_deadline", "")
+        if not (oa_doc_date or deadline):
+            continue
+        try:
+            _fill_oa_row(f"{item.get('project','')}-OA信息记录表", oa_seq, [],
+                         oa_doc_date=oa_doc_date, project_deadline=deadline, dry_run=dry_run)
+        except Exception as e:
+            print(f"[OA收文日/期限] {item.get('project','')} 写回失败: {e}", file=sys.stderr)
+
     # 对比文件（仅 CN）：解析审查意见通知书官文 PDF「本通知书引用下列对比文件」表，
     # 填到该案 OA信息记录表页「OA过程」表对应 OA{N} 行的「对比文件链接」列。
     cn_items = [r for r in all_results if r.get("region") == "CN"]

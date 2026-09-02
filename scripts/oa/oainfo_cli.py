@@ -1410,7 +1410,9 @@ def _splice_oa_row(body, oa_seq, cells_by_header):
         idx = next((i for i, h in enumerate(header_texts) if key in h), None)
         if idx is not None:
             col_of[key] = idx
-    if '对比文件链接' not in col_of:
+    # 完整版模板识别：看该表「表头」是否有「对比文件链接」列，而非调用方是否要写它
+    # （只写 OA收文日/期限、不写对比文件时也要能落到完整版表）。
+    if not any('对比文件链接' in h for h in header_texts):
         return body, "skip_no_column"
 
     tb = re.search(r'<tbody\b[^>]*>(.*?)</tbody>', tbl, re.DOTALL)
@@ -1472,27 +1474,28 @@ def fill_ref_docs_in_oa_row(page_title, oa_seq, ref_docs,
     期限 ← project_deadline。仅完整版模板有这些列；简版 skip_no_column。逐列幂等：已有内容不覆盖。
     Returns: dict {status, http?}
     """
-    if not ref_docs:
-        return {"status": "no_ref_docs"}
     if not oa_seq:
-        logger.warning(f"[对比文件] {page_title} 无法确定 OA 次数，跳过")
+        logger.warning(f"[OA过程] {page_title} 无法确定 OA 次数，跳过")
         return {"status": "no_oa_seq"}
 
-    wiki = WikiClient()
-    page = wiki.get_page(page_title)
-    if not page:
-        logger.warning(f"[对比文件] 未找到页面: {page_title}")
-        return {"status": "page_not_found"}
-
-    cell_html = _ref_docs_cell_html(ref_docs)
-    if not cell_html:
-        return {"status": "no_ref_docs"}
-
-    cells_by_header = {"对比文件链接": cell_html}
+    # 对比文件链接为可选：ref_docs 为空时仍写 OA收文日/期限（都直接来自 item 字段，
+    # 与「新增OA列表」同源，不依赖官文 PDF 解析）。三列都无内容才跳过。
+    cells_by_header = {}
+    cell_html = _ref_docs_cell_html(ref_docs) if ref_docs else ""
+    if cell_html:
+        cells_by_header["对比文件链接"] = cell_html
     if oa_doc_date:
         cells_by_header["OA收文日"] = oa_doc_date
     if project_deadline:
         cells_by_header["期限"] = project_deadline
+    if not cells_by_header:
+        return {"status": "nothing_to_write"}
+
+    wiki = WikiClient()
+    page = wiki.get_page(page_title)
+    if not page:
+        logger.warning(f"[OA过程] 未找到页面: {page_title}")
+        return {"status": "page_not_found"}
 
     new_body, status = _splice_oa_row(page["body"], oa_seq, cells_by_header)
     if status.startswith("skip") or new_body == page["body"]:
