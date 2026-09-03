@@ -277,8 +277,6 @@
         <div class="assign-panel__header-top">
           <span class="assign-panel__title">人员分配方案</span>
           <div style="display:flex;gap:6px;align-items:center">
-            <el-button v-if="selectedCase" size="small" @click="skipCase"
-              title="标记此案不需人员分配，从待分配列表移除">不需处理</el-button>
             <a v-if="selectedCase"
               href="http://10.10.70.88:8082/script-debug?module=oa_schemes&name=OA%E5%88%86%E9%85%8D"
               target="_blank">
@@ -312,7 +310,10 @@
                   @change="selectScheme(scheme.id)" @click.stop>
                 <span class="scheme-card__label">{{ scheme.label }}</span>
               </div>
-              <template v-if="scheme.id !== 'custom'">
+              <template v-if="scheme.id === 'skip'">
+                <div class="scheme-card__note-body">{{ scheme.note }}</div>
+              </template>
+              <template v-else-if="scheme.id !== 'custom'">
                 <div class="scheme-card__body">
                   <div class="scheme-card__role">
                     <div class="scheme-card__role-label">答复负责人</div>
@@ -697,25 +698,30 @@ const app = createApp({
     // API: POST /api/assignment/submit/batch body: { assignments: [{ caseId, schemeId, responder, qc }] }
     async function batchSubmit() {
       if (batchSubmitting.value) return          // 防重复点击
-      const toSubmit = filteredCases.value.filter(c => {
+      const chosen = filteredCases.value.filter(c => {
         const sel = caseSelections.value[c.id]
         if (!sel?.schemeId) return false
+        if (sel.schemeId === 'skip') return true                       // 无需处理
         return sel.schemeId === 'custom' ? !!(sel.customResponder && sel.customQc) : true
       })
-      if (!toSubmit.length) return
+      if (!chosen.length) return
+      const skipCases = chosen.filter(c => caseSelections.value[c.id].schemeId === 'skip')
+      const assignCases = chosen.filter(c => caseSelections.value[c.id].schemeId !== 'skip')
       batchSubmitting.value = true
       // 页面中央全屏 loading 遮罩（提交期间锁定，防误操作）
       const loading = ElementPlus.ElLoading.service({
-        lock: true, text: `正在提交 ${toSubmit.length} 件分配…`,
+        lock: true, text: `正在提交 ${chosen.length} 件…`,
         background: 'rgba(255,255,255,0.6)',
       })
       try {
-        const r = await apiPost('/api/assignment/submit/batch',
-          { assignments: toSubmit.map(_assignmentOf) })
-        toSubmit.forEach(c => _doSubmitCase(c))
+        if (assignCases.length)
+          await apiPost('/api/assignment/submit/batch', { assignments: assignCases.map(_assignmentOf) })
+        if (skipCases.length)
+          await apiPost('/api/assignment/skip/batch', { caseIds: skipCases.map(c => c.id) })
+        chosen.forEach(c => _doSubmitCase(c))
         const next = filteredCases.value[0]
         selectedCaseId.value = next ? next.id : null
-        ElementPlus.ElMessage.success(`已提交 ${r.count ?? toSubmit.length} 件分配`)
+        ElementPlus.ElMessage.success(`已提交 ${assignCases.length} 件分配、${skipCases.length} 件无需处理`)
       } catch (e) {
         ElementPlus.ElMessage.error('提交失败：' + (e.message || e))
       } finally {
@@ -725,27 +731,6 @@ const app = createApp({
     }
 
 
-
-    // 标记「不需处理」：从待分配列表移除（后端置 status=2，不写 Wiki/projects/绩效表）
-    async function skipCase() {
-      const c = selectedCase.value;
-      if (!c) return;
-      try {
-        await ElementPlus.ElMessageBox.confirm(
-          `确认「${c.caseNo}」不需处理？将从待分配列表移除。`, "标记不需处理",
-          { type: "warning", confirmButtonText: "不需处理", cancelButtonText: "取消" });
-      } catch (e) { return; }   // 取消
-      try {
-        await apiPost("/api/assignment/skip", { caseId: c.id });
-        c.submitted = true;                       // filteredCases 隐藏 submitted → 从列表移除
-        delete caseSelections.value[c.id];
-        ElementPlus.ElMessage.success(`已标记「${c.caseNo}」不需处理`);
-        const next = filteredCases.value[0];
-        selectedCaseId.value = next ? next.id : null;
-      } catch (e) {
-        ElementPlus.ElMessage.error("标记失败：" + (e.message || e));
-      }
-    }
 
     // 拉取待分配案件列表 + 人员库（后端桩数据）
     async function loadData() {
@@ -781,7 +766,7 @@ const app = createApp({
     return {
       staffList, allCases, searchText, selectedCaseId,
       caseSelections, currentSelection, assignedCount, isCaseAssigned,
-      expandedCards, reanalyzing, analyzing, batchSubmitting, assignee, filterByAssignee, pendingCount, skipCase,
+      expandedCards, reanalyzing, analyzing, batchSubmitting, assignee, filterByAssignee, pendingCount,
       filteredCases, selectedCase, displayedSchemes, renderedMarkdown,
       outlineItems, activeSectionIdx, scrollToSection, onMdScroll,
       selectCase, selectScheme, setCustomResponder, setCustomQc, setPostscript, setCustomNote, queryStaff,

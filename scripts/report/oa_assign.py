@@ -127,6 +127,8 @@ def _row_to_summary(r):
 
 # 真实待分配案件暂无 AI 报告：给结构完整的占位报告(前端不崩) + 仅"自定义方案"供人工选人
 _CUSTOM_SCHEME = {"id": "custom", "label": "自定义方案", "note": "", "responder": "", "qc": ""}
+_SKIP_SCHEME = {"id": "skip", "label": "无需处理", "responder": "", "qc": "",
+                "note": "标记此案不需人员分配；提交时从待分配列表移除，不写人员/Wiki/绩效表。"}
 
 
 def _placeholder_md(summary):
@@ -275,9 +277,11 @@ async def assignment_analyze(req: Request):
             _log("现场生成失败：", e)
             report_md = _placeholder_md(summary)
             source = "占位(生成失败)"
-    # AI 方案后始终追加「自定义方案」，供操作人手工选人
+    # AI 方案后始终追加「自定义方案」+「无需处理」，供操作人手工选人/标记不处理
     if not any((s or {}).get("id") == "custom" for s in schemes):
         schemes = list(schemes) + [dict(_CUSTOM_SCHEME)]
+    if not any((s or {}).get("id") == "skip" for s in schemes):
+        schemes = list(schemes) + [dict(_SKIP_SCHEME)]
     _log(f"POST /api/assignment/analyze caseId={cid} → {source}，方案 {len(schemes)} 组")
     return {"caseId": cid, "reportMd": report_md, "schemes": schemes,
             "detail": _placeholder_detail(summary)}
@@ -363,6 +367,27 @@ async def assignment_skip(req: Request):
     except Exception as e:
         _log("标记不需处理失败：", e)
         return {"ok": False, "caseId": cid, "msg": str(e)}
+
+
+@router.post("/api/assignment/skip/batch")
+async def assignment_skip_batch(req: Request):
+    """批量标记「无需处理」：逐案置 oa_assign_task.status=2（从待分配移除），不写 Wiki/projects/绩效表。"""
+    body = await req.json()
+    ids = [i for i in (body.get("caseIds", []) or []) if i]
+    st = _store()
+    if st is None:
+        return {"ok": False, "count": 0, "msg": "待分配库不可用"}
+    n = 0
+    for cid in ids:
+        try:
+            st.mark_skipped(cid)
+            st.save_submission(cid, {"skipped": True,
+                                     "submitted_at": f"{datetime.now():%Y-%m-%d %H:%M}"})
+            n += 1
+        except Exception as e:
+            _log("批量标记不需处理失败：", cid, e)
+    _log(f"POST /api/assignment/skip/batch → {n}/{len(ids)} 件不需处理")
+    return {"ok": True, "count": n}
 
 
 @router.post("/api/assignment/submit/batch")
