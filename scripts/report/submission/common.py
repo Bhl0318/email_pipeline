@@ -436,11 +436,15 @@ def validate_for_confirm(fields: dict) -> list:
                 "assigning_company": "转让方公司名称",
                 "company_representative": "签字代表姓名",
                 "representative_title": "代表职位",
-                "company_address": "公司地址",
             }
             for key, label in labels.items():
                 if not (item.get(key) or "").strip():
                     problems.append(f"转让安排第{idx}段（公司转公司）缺少{label}（{key}）")
+            # 公司地址：页面填的是结构化字段(company_address1/城市/邮编/国家)，company_address 是旧单串。
+            # 生成时 company_addr_dict 结构化优先，故任一有值即算已填（避免只填结构化仍误报缺失）。
+            if not ((item.get("company_address") or "").strip()
+                    or (item.get("company_address1") or "").strip()):
+                problems.append(f"转让安排第{idx}段（公司转公司）缺少公司地址（company_address / 地址1）")
 
     if not fields.get("inventors"):
         problems.append("发明人列表为空")
