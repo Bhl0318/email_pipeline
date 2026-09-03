@@ -69,6 +69,16 @@ def mark_submitted(oa_id, responder="", qc="", execute=None):
     return bool(ex(f"SELECT id FROM {TABLE} WHERE id='{_q(oa_id)}'"))
 
 
+def mark_skipped(oa_id, execute=None):
+    """标记该案「不需处理」：oa_assign_task.status=2（区别于 0待分配/1已分配）→ 从待分配列表移除。
+    不写 projects/Wiki/绩效表。返回是否命中。"""
+    ex = _get_execute(execute)
+    if not oa_id:
+        return False
+    ex(f"UPDATE {TABLE} SET status=2 WHERE id='{_q(oa_id)}'")
+    return bool(ex(f"SELECT id FROM {TABLE} WHERE id='{_q(oa_id)}'"))
+
+
 PERF_ROLE_TABLE = "tip_budgetperformance_role"
 
 

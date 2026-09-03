@@ -277,6 +277,8 @@
         <div class="assign-panel__header-top">
           <span class="assign-panel__title">人员分配方案</span>
           <div style="display:flex;gap:6px;align-items:center">
+            <el-button v-if="selectedCase" size="small" @click="skipCase"
+              title="标记此案不需人员分配，从待分配列表移除">不需处理</el-button>
             <a v-if="selectedCase"
               href="http://10.10.70.88:8082/script-debug?module=oa_schemes&name=OA%E5%88%86%E9%85%8D"
               target="_blank">
@@ -724,6 +726,27 @@ const app = createApp({
 
 
 
+    // 标记「不需处理」：从待分配列表移除（后端置 status=2，不写 Wiki/projects/绩效表）
+    async function skipCase() {
+      const c = selectedCase.value;
+      if (!c) return;
+      try {
+        await ElementPlus.ElMessageBox.confirm(
+          `确认「${c.caseNo}」不需处理？将从待分配列表移除。`, "标记不需处理",
+          { type: "warning", confirmButtonText: "不需处理", cancelButtonText: "取消" });
+      } catch (e) { return; }   // 取消
+      try {
+        await apiPost("/api/assignment/skip", { caseId: c.id });
+        c.submitted = true;                       // filteredCases 隐藏 submitted → 从列表移除
+        delete caseSelections.value[c.id];
+        ElementPlus.ElMessage.success(`已标记「${c.caseNo}」不需处理`);
+        const next = filteredCases.value[0];
+        selectedCaseId.value = next ? next.id : null;
+      } catch (e) {
+        ElementPlus.ElMessage.error("标记失败：" + (e.message || e));
+      }
+    }
+
     // 拉取待分配案件列表 + 人员库（后端桩数据）
     async function loadData() {
       loadError.value = ''
@@ -758,7 +781,7 @@ const app = createApp({
     return {
       staffList, allCases, searchText, selectedCaseId,
       caseSelections, currentSelection, assignedCount, isCaseAssigned,
-      expandedCards, reanalyzing, analyzing, batchSubmitting, assignee, filterByAssignee, pendingCount,
+      expandedCards, reanalyzing, analyzing, batchSubmitting, assignee, filterByAssignee, pendingCount, skipCase,
       filteredCases, selectedCase, displayedSchemes, renderedMarkdown,
       outlineItems, activeSectionIdx, scrollToSection, onMdScroll,
       selectCase, selectScheme, setCustomResponder, setCustomQc, setPostscript, setCustomNote, queryStaff,

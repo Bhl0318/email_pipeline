@@ -346,6 +346,25 @@ async def assignment_submit(req: Request):
     return {"ok": True, "caseId": cid, "writeback": wb}
 
 
+@router.post("/api/assignment/skip")
+async def assignment_skip(req: Request):
+    """标记某案「不需处理」：只置 oa_assign_task.status=2（从待分配列表移除），不写 Wiki/projects/绩效表。"""
+    body = await req.json()
+    cid = body.get("caseId")
+    st = _store()
+    if st is None or not cid:
+        return {"ok": False, "msg": "待分配库不可用或缺 caseId"}
+    try:
+        ok = st.mark_skipped(cid)
+        st.save_submission(cid, {"skipped": True,
+                                 "submitted_at": f"{datetime.now():%Y-%m-%d %H:%M}"})  # 留痕
+        _log(f"POST /api/assignment/skip caseId={cid} → 不需处理")
+        return {"ok": bool(ok), "caseId": cid}
+    except Exception as e:
+        _log("标记不需处理失败：", e)
+        return {"ok": False, "caseId": cid, "msg": str(e)}
+
+
 @router.post("/api/assignment/submit/batch")
 async def assignment_submit_batch(req: Request):
     body = await req.json()
