@@ -94,16 +94,25 @@ def get_customer_contacts(project, execute=None):
 # （原 (20608, NOA)→丁晓龙 已移除：NOA 不再立项，转OA 不会发出，规则永不触发）。
 EXTRA_CC_RULES = {}
 
+# 客户级额外抄送：该客户的所有 OA(转OA立项通知)都加抄这些人（不看官文类型）
+CUSTOMER_EXTRA_CC = {
+    "20608": ["xlding@metis-ip.com"],   # 韶音：全部 OA 抄送丁晓龙
+}
+
 
 def forward_cc(project, item=None, execute=None):
-    """转OA 抄送 = 固定7人(OP02) + 客户接口人 + 特殊规则额外抄送。去重保序。
+    """转OA 抄送 = 固定7人(OP02) + 客户接口人 + 客户级额外抄送 + (客户码,官文类型)特殊规则。去重保序。
     item 提供 notification_type，用于匹配 EXTRA_CC_RULES；execute 可注入(测试用)。"""
     cc = list(FORWARD_FIXED_CC)
     for mail in get_customer_contacts(project, execute=execute):
         if mail not in cc:
             cc.append(mail)
-    # (客户码, 官文类型) 特殊规则
     code = (project or "").split("-")[0].strip()
+    # 客户级额外抄送（该客户所有 OA 都抄，不看类型）
+    for mail in CUSTOMER_EXTRA_CC.get(code, []):
+        if mail not in cc:
+            cc.append(mail)
+    # (客户码, 官文类型) 特殊规则
     ntype = (item or {}).get("notification_type", "")
     for mail in EXTRA_CC_RULES.get((code, ntype), []):
         if mail not in cc:
