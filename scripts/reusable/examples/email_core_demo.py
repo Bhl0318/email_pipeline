@@ -9,7 +9,8 @@ import email
 import os
 import sys
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+_LIB = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # scripts/reusable
+sys.path.insert(0, os.path.join(_LIB, "services"))
 from email_core import parse_message, decode_str, html_to_text  # noqa: E402
 
 RAW = """From: =?utf-8?B?5byg5LiJ?= <zhang@example.com>

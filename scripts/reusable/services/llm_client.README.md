@@ -1,13 +1,13 @@
 # llm_client —— 统一大模型调用模块（接口说明）
 
 把散在各文件的 DeepSeek / qwen 调用收敛成一处。fail-soft：异常 → stderr → 返回 None。
-目前为纯新增，未迁移原调用方。可运行示例：`python3 scripts/examples/llm_client_basic.py`。
+目前为纯新增，未迁移原调用方。可运行示例：`python3 scripts/reusable/examples/llm_client_basic.py`。
 
 ## 如何 import + 配置
 
 ```python
 import os, sys
-sys.path.insert(0, "<...>/scripts")
+sys.path.insert(0, "<...>/scripts/reusable/services")
 import llm_client
 ```
 

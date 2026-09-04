@@ -6,7 +6,8 @@
 import os
 import sys
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+_LIB = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # scripts/reusable
+sys.path.insert(0, os.path.join(_LIB, "services"))
 import llm_client  # noqa: E402
 
 

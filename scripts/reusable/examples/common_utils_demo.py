@@ -6,7 +6,8 @@ import os
 import sys
 from datetime import datetime
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+_LIB = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # scripts/reusable
+sys.path.insert(0, os.path.join(_LIB, "foundation"))
 from common import (  # noqa: E402
     parse_date, add_months, move_to_workday,
     normalize_pub_no, get_by_path, set_by_path,

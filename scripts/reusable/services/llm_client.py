@@ -27,9 +27,12 @@ _PROFILES = {
 
 # email_config.json 的候选位置（隔离加载下 oa/ 与 report/ 各自独占 sys.path，
 # 故按顺序探测，用第一个存在的）。
+# 本模块在 scripts/reusable/services/ 下，email_config.json 在 scripts/（上溯两级）
+_SCRIPTS_DIR = os.path.abspath(
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
 _CONFIG_CANDIDATES = [
-    os.path.join(os.path.dirname(os.path.abspath(__file__)), "email_config.json"),
-    os.path.join(os.path.dirname(os.path.abspath(__file__)), "report", "email_config.json"),
+    os.path.join(_SCRIPTS_DIR, "email_config.json"),
+    os.path.join(_SCRIPTS_DIR, "report", "email_config.json"),
 ]
 
 

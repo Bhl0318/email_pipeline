@@ -2,13 +2,13 @@
 
 抽自 `submission/common.py`、`run_uspto_upload.py`、`oa/oa_report_ai.py`、`oa/parse_us_refs.py`，逻辑不变，零业务耦合。目前为纯新增，未迁移原调用方。
 不含 `flatten_pdf`（耦合 pdfRest 云）、扫描件 OCR（耦合大模型——用 `llm_client.vision` 组合）。
-可运行示例：`python3 scripts/examples/doc_utils_demo.py`。
+可运行示例：`python3 scripts/reusable/examples/doc_utils_demo.py`。
 
 ## 如何 import
 
 ```python
 import os, sys
-sys.path.insert(0, "<...>/scripts")
+sys.path.insert(0, "<...>/scripts/reusable/services")
 from doc_utils import fill_pdf_form, gs_bin, to_pdfa, others_to_pdfa, \
     pdf_text, docx_text, split_spec, pick_latest_docx
 ```

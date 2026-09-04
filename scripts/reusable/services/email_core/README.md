@@ -1,13 +1,13 @@
 # email_core —— 可复用邮件收发核心库（接口说明）
 
 抽自 `oa/read_email.py` 与 `report/submission_mailer.py`，逻辑不变。`account_cfg` 由调用方传入，不绑配置文件。依赖：标准库 + `requests`。目前为纯新增，未迁移原调用方。
-可运行示例：`python3 scripts/examples/email_core_demo.py`。
+可运行示例：`python3 scripts/reusable/examples/email_core_demo.py`。
 
 ## 如何 import
 
 ```python
 import os, sys
-sys.path.insert(0, "<...>/scripts")
+sys.path.insert(0, "<...>/scripts/reusable/services")
 from email_core import config, read_emails, move_emails, send_html, parse_message
 from email_core.checkpoint import update_checkpoint
 acc = config.get_account_config("scripts/email_config.json", "docketing")

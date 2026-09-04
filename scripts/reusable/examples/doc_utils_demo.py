@@ -8,13 +8,14 @@ PDF/A 需 Ghostscript，缺则只示范写法。
 import os
 import sys
 
-_SCRIPTS = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, _SCRIPTS)
+_LIB = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # scripts/reusable
+sys.path.insert(0, os.path.join(_LIB, "services"))
 from doc_utils import (  # noqa: E402
     docx_text, pdf_text, split_spec, pick_latest_docx, gs_bin, to_pdfa, fill_pdf_form,
 )
 
-_SAMPLE_DIR = os.path.join(os.path.dirname(_SCRIPTS), "申请文件")
+# 申请文件/ 在 email_pipeline 根（scripts/reusable 上溯两级）
+_SAMPLE_DIR = os.path.join(_LIB, "..", "..", "申请文件")
 
 
 def demo():

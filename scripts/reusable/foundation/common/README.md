@@ -1,13 +1,13 @@
 # common —— 可复用纯函数工具集（接口说明）
 
 零依赖（仅标准库）、零业务耦合。从现有业务文件抽出，逻辑不变。目前为纯新增，未迁移原调用方。
-可运行示例：`python3 scripts/examples/common_utils_demo.py`。
+可运行示例：`python3 scripts/reusable/examples/common_utils_demo.py`。
 
 ## 如何 import
 
 ```python
 import os, sys
-sys.path.insert(0, "<...>/scripts")
+sys.path.insert(0, "<...>/scripts/reusable/foundation")
 from common import parse_date, add_months, move_to_workday, normalize_pub_no, \
     get_by_path, set_by_path, strip_tags, split_cells
 ```
