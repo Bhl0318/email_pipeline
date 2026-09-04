@@ -146,6 +146,27 @@ def _deepseek_schemes_wl(candidates, whitelist, grade, report_md):
     return _deepseek(prompt)
 
 
+def _existing_usernames(names, execute=None):
+    """从 names 里筛出确实在 users.username_zn 的（AI 组合的人名必须经 users 验证）。
+    一次 IN 查询；DB 异常/无结果解析失败时**不拦**（原样返回），避免误清空。"""
+    names = {(n or "").strip() for n in names if (n or "").strip()}
+    if not names:
+        return set()
+    try:
+        ex = execute
+        if ex is None:
+            from db_query import execute as ex
+        vals = ",".join("'" + n.replace("'", "\\'") + "'" for n in names)
+        rows = ex(f"SELECT username_zn FROM users WHERE username_zn IN ({vals})")
+        if isinstance(rows, str) or rows is None:
+            return names   # 查询异常 → 不拦
+        got = {(r.get("username_zn") or "").strip() for r in rows if r.get("username_zn")}
+        return got or names   # 一个都没查到多半是查询问题 → 不拦
+    except Exception as e:
+        print(f"[oa_schemes] 人名 users 验证失败(不拦): {e}", file=sys.stderr)
+        return names
+
+
 def build_assignment_schemes(project, region="", report_md="", execute=None):
     """生成本次 OA 人员安排建议（≥3 组）。绝不抛异常，失败返回 []。
     白名单可用时按 档位(案号/地区)×领域(DeepSeek判) 选人；否则退回候选池逻辑。
@@ -166,6 +187,13 @@ def build_assignment_schemes(project, region="", report_md="", execute=None):
             whitelist = list_for("OA实质", grade, execute=execute)
         except Exception as e:
             print(f"[oa_schemes] 读白名单失败: {e}", file=sys.stderr)
+
+    # AI 组合的人名必须都在 users.username_zn：先把 白名单/候选池 过滤到 users 里存在的人，
+    # 这样喂给 DeepSeek 的、校验用的、兜底补的，全是验证过的人名。
+    _names = {w.get("name") for w in whitelist} | {c.get("name") for c in candidates}
+    _valid_users = _existing_usernames(_names, execute)
+    whitelist = [w for w in whitelist if w.get("name") in _valid_users]
+    candidates = [c for c in candidates if c.get("name") in _valid_users]
 
     if whitelist:
         raw = _deepseek_schemes_wl(candidates, whitelist, grade, report_md)

@@ -714,14 +714,30 @@ const app = createApp({
         background: 'rgba(255,255,255,0.6)',
       })
       try {
-        if (assignCases.length)
-          await apiPost('/api/assignment/submit/batch', { assignments: assignCases.map(_assignmentOf) })
+        let invalid = {}   // caseId -> [不在 users 库的人名]
+        if (assignCases.length) {
+          const r = await apiPost('/api/assignment/submit/batch', { assignments: assignCases.map(_assignmentOf) })
+          invalid = r.invalid || {}
+        }
         if (skipCases.length)
           await apiPost('/api/assignment/skip/batch', { caseIds: skipCases.map(c => c.id) })
-        chosen.forEach(c => _doSubmitCase(c))
+        // 只移除写成功的；人名不在库的保留在列表供改选
+        assignCases.forEach(c => { if (!invalid[c.id]) _doSubmitCase(c) })
+        skipCases.forEach(c => _doSubmitCase(c))
         const next = filteredCases.value[0]
         selectedCaseId.value = next ? next.id : null
-        ElementPlus.ElMessage.success(`已提交 ${assignCases.length} 件分配、${skipCases.length} 件无需处理`)
+        const badIds = Object.keys(invalid)
+        const okAssign = assignCases.length - badIds.length
+        if (badIds.length) {
+          const detail = badIds.map(id => {
+            const cc = allCases.value.find(x => x.id === id)
+            return (cc?.caseNo || id) + '（' + invalid[id].join('、') + '）'
+          }).join('；')
+          ElementPlus.ElMessage.warning(
+            `已提交 ${okAssign} 件分配、${skipCases.length} 件无需处理；${badIds.length} 件人员不在库未提交：${detail}`)
+        } else {
+          ElementPlus.ElMessage.success(`已提交 ${okAssign} 件分配、${skipCases.length} 件无需处理`)
+        }
       } catch (e) {
         ElementPlus.ElMessage.error('提交失败：' + (e.message || e))
       } finally {

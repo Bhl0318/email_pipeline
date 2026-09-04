@@ -69,6 +69,21 @@ def mark_submitted(oa_id, responder="", qc="", execute=None):
     return bool(ex(f"SELECT id FROM {TABLE} WHERE id='{_q(oa_id)}'"))
 
 
+def user_exists(name, execute=None):
+    """校验中文名是否在 users.username_zn（提交分配前用；空名视为通过）。异常时不拦(返回 True)。"""
+    name = (name or "").strip()
+    if not name:
+        return True
+    ex = _get_execute(execute)
+    try:
+        rows = ex(f"SELECT userid FROM users WHERE username_zn='{_q(name)}'")
+        if isinstance(rows, str):
+            return True   # 查询异常不拦
+        return bool(rows)
+    except Exception:
+        return True
+
+
 def mark_skipped(oa_id, execute=None):
     """标记该案「不需处理」：oa_assign_task.status=2（区别于 0待分配/1已分配）→ 从待分配列表移除。
     不写 projects/Wiki/绩效表。返回是否命中。"""

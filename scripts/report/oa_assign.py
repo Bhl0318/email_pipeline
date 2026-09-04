@@ -74,6 +74,18 @@ def _mark(case_id, responder, qc):
         _log("写 tip_budgetperformance_role 失败：", e)
 
 
+def _invalid_names(responder, qc):
+    """返回 responder/qc 里不在 users.username_zn 的名字列表；DB 不可用则不拦（返回 []）。"""
+    st = _store()
+    if st is None:
+        return []
+    bad = []
+    for n in [(responder or "").strip(), (qc or "").strip()]:
+        if n and not st.user_exists(n):
+            bad.append(n)
+    return bad
+
+
 def _save_submission(body):
     """把提交的分配结果+附言(附言 postscript / 原因 customNote)存入 oa_assign_report.submit_json。best-effort。"""
     st = _store()
@@ -343,6 +355,10 @@ async def assignment_submit(req: Request):
     body = await req.json()
     _log("POST /api/assignment/submit 收到：", json.dumps(body, ensure_ascii=False))
     cid, responder, qc = body.get("caseId"), body.get("responder"), body.get("qc")
+    bad = _invalid_names(responder, qc)                  # 校验人名在 users.username_zn
+    if bad:
+        return {"ok": False, "caseId": cid,
+                "writeback": {"code": 1, "msg": f"以下人员不在 users 库：{'、'.join(bad)}，请改选"}}
     wb = _write_back(cid, responder, qc, body.get("postscript", ""), body.get("customNote", ""))  # 回写 Wiki
     _mark(cid, responder, qc)                            # 待分配表回填结果+置已分配
     _save_submission(body)                               # 选中结果+附言(附言/原因)存 oa_assign_report.submit_json
@@ -395,14 +411,28 @@ async def assignment_submit_batch(req: Request):
     body = await req.json()
     assignments = body.get("assignments", []) or []
     _log(f"POST /api/assignment/submit/batch 收到 {len(assignments)} 件：")
-    # Wiki 回写：一次性批量（一次取页一次存页），不再逐案 get/update
-    wb_map = _write_back_batch(assignments)
-    # DB 回写（projects / oa_assign_task / tip_budgetperformance_role）+ submit_json：逐案
+    # 人名校验：不在 users.username_zn 的案子不写，单独报错
+    bad_map = {}   # caseId -> [不存在的名字]
+    valid = []
     for a in assignments:
+        bad = _invalid_names(a.get("responder"), a.get("qc"))
+        if bad:
+            bad_map[a.get("caseId")] = bad
+        else:
+            valid.append(a)
+    # Wiki 回写：一次性批量（一次取页一次存页），不再逐案 get/update
+    wb_map = _write_back_batch(valid)
+    # DB 回写（projects / oa_assign_task / tip_budgetperformance_role）+ submit_json：逐案
+    for a in valid:
         _mark(a.get("caseId"), a.get("responder"), a.get("qc"))
         _save_submission(a)
-    results = [{"caseId": a.get("caseId"),
-                "writeback": wb_map.get(a.get("caseId"), {"code": 1, "msg": "无回写结果"})}
-               for a in assignments]
-    return {"ok": True, "count": len(assignments),
-            "caseIds": [a.get("caseId") for a in assignments], "results": results}
+    results = []
+    for a in assignments:
+        cid = a.get("caseId")
+        if cid in bad_map:
+            results.append({"caseId": cid, "writeback": {"code": 1,
+                            "msg": f"以下人员不在 users 库：{'、'.join(bad_map[cid])}，请改选"}})
+        else:
+            results.append({"caseId": cid, "writeback": wb_map.get(cid, {"code": 1, "msg": "无回写结果"})})
+    return {"ok": not bad_map, "count": len(valid), "invalid": bad_map,
+            "caseIds": [a.get("caseId") for a in valid], "results": results}
