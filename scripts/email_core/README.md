@@ -2,7 +2,6 @@
 
 抽自 `oa/read_email.py` 与 `report/submission_mailer.py`，逻辑不变。`account_cfg` 由调用方传入，不绑配置文件。依赖：标准库 + `requests`。目前为纯新增，未迁移原调用方。
 可运行示例：`python3 scripts/examples/email_core_demo.py`。
-测试：`python3 scripts/email_core/test_email_core.py`（6 条；MIME 解析/断点/取账号离线，收发不在单测内，已通过）。
 
 ## 如何 import
 
@@ -65,6 +64,43 @@ acc = config.get_account_config("scripts/email_config.json", "docketing")
 | `send_html` | `send_html("主题", "<b>正文</b>", ["to@x.com"], acc, cc_addrs=["cc@x.com"])` | subject；html；recipients: list[str]；account_cfg；cc_addrs｜None | 无（发一封 HTML 邮件，失败抛异常） |
 | `send_smtp` | `send_smtp(msg, acc, recipients, cc_addrs=None)` | msg: MIMEMultipart；account_cfg；recipients；cc_addrs｜None | 无（发信，失败抛异常；会重写 msg 的 From/To/Cc） |
 | `get_smtp_oauth2_token` | `get_smtp_oauth2_token(acc)` | account_cfg: dict | token str；未启用/失败→None |
+
+## 使用示例
+
+### 端到端：读邮件 → 记断点 → 归档 → 发信
+
+```python
+from email_core import config, read_emails, move_emails, send_html
+from email_core.checkpoint import update_checkpoint
+
+acc = config.get_account_config("scripts/email_config.json", "docketing")
+
+# 读最近 10 封（account_name 传了则按断点只取新邮件）
+mails = read_emails(acc, folder="INBOX", count=10, account_name="docketing")
+for m in mails:
+    print(m["subject"], m["from"], len(m["attachments"]))
+
+update_checkpoint("docketing", "INBOX", mails)                 # 记断点，下次不重复
+move_emails(acc, "INBOX", [m["message_id"] for m in mails],    # 归档（不可逆）
+            target_folder="TEST_AUTO")
+
+pa = config.get_account_config("scripts/email_config.json", "pa")
+send_html("主题", "<b>正文</b>", ["to@x.com"], pa, cc_addrs=["cc@x.com"])
+```
+
+### 只解析一封原始邮件（离线，不连服务器）
+
+```python
+import email
+from email_core import parse_message
+
+msg = email.message_from_bytes(raw_bytes)
+d = parse_message(msg)
+# d == {'subject': '测试邮件', 'from': '张三 <zhang@example.com>',
+#       'to': ['a@example.com', 'b@example.com'], 'cc': ['c@example.com'],
+#       'date': '2026-02-02T10:00:00+08:00', 'message_id': '<abc123@example.com>',
+#       'body': '正文第一行。', 'html_body': '', 'attachments': []}
+```
 
 ## 来源与差异
 

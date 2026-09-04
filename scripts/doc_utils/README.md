@@ -3,7 +3,6 @@
 抽自 `submission/common.py`、`run_uspto_upload.py`、`oa/oa_report_ai.py`、`oa/parse_us_refs.py`，逻辑不变，零业务耦合。目前为纯新增，未迁移原调用方。
 不含 `flatten_pdf`（耦合 pdfRest 云）、扫描件 OCR（耦合大模型——用 `llm_client.vision` 组合）。
 可运行示例：`python3 scripts/examples/doc_utils_demo.py`。
-测试：`python3 scripts/doc_utils/test_doc_utils.py`（8 条；纯函数/错误路径离线，docx/pdf 用真实样本，已通过）。
 
 ## 如何 import
 
@@ -38,6 +37,30 @@ from doc_utils import fill_pdf_form, gs_bin, to_pdfa, others_to_pdfa, \
 | `docx_text` | `docx_text("spec.docx")` | path: str | str（python-docx，失败退解压 XML）；缺文件→`""` |
 | `split_spec` | `desc, claims = split_spec(text)` | spec_text: str（说明书全文） | (description, claims)；权要以 WHAT IS CLAIMED IS/CLAIMS/权利要求 起、到 ABSTRACT/摘要 止；切不出→claims=`""` |
 | `pick_latest_docx` | `pick_latest_docx("申请文件", keywords=["spec"])` | dirpath: str；keywords: list[str]｜None | str（最新匹配 docx 路径，本层优先、无则递归子目录）；无→None |
+
+## 使用示例
+
+```python
+from doc_utils import pick_latest_docx, docx_text, split_spec, pdf_text, \
+    fill_pdf_form, gs_bin, to_pdfa
+
+# 1. 定位并抽取说明书，再切成 说明/权要（实测输出见 demo）
+spec = pick_latest_docx("申请文件", keywords=["spec"])
+# -> '.../2022-09-15-SPEC-20618-0424US00.docx'
+text = docx_text(spec)                       # -> 说明书全文 str
+desc, claims = split_spec(text)
+# desc 约 10.9 万字；claims 以 'WHAT IS CLAIMED IS:' 起，约 2.8 万字
+
+# 2. 抽 PDF 文本层（扫描件无文本层返回 ''，需 OCR 时用 llm_client.vision）
+pdf_text("oa.pdf", max_pages=6)              # -> 文本 str 或 ''
+
+# 3. 填 AcroForm 表单
+fill_pdf_form("POA.pdf", "out.pdf", {"applicant_name": "张三", "checkbox_a": True})
+
+# 4. 转 PDF/A-2b（需 Ghostscript）
+if gs_bin():
+    to_pdfa("draft.pdf", "out_dir")          # -> 'out_dir/draft.pdf'
+```
 
 ## 来源
 

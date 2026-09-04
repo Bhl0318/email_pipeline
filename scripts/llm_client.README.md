@@ -2,7 +2,6 @@
 
 把散在各文件的 DeepSeek / qwen 调用收敛成一处。fail-soft：异常 → stderr → 返回 None。
 目前为纯新增，未迁移原调用方。可运行示例：`python3 scripts/examples/llm_client_basic.py`。
-测试：`python3 scripts/test_llm_client.py`（5 条；配置/JSON抠取/图片编码/fail-soft 离线，不发真实请求，已通过）。
 
 ## 如何 import + 配置
 
@@ -57,6 +56,32 @@ result = llm_client.vision(
 | `extract` | `"text"`（默认）｜`"json"` |
 
 **返回**：str 或（extract="json"）dict/list/None；**无有效图片时直接 None**（不发请求）；异常 → None。
+
+## 使用示例
+
+```python
+import llm_client
+
+# 文本：取原文
+llm_client.chat("用一句话解释专利答复期限。", max_tokens=100)
+# -> "专利答复期限是……"（str）
+
+# 文本：要 JSON 并自动解析
+llm_client.chat('从这段话提取答复月数，只输出 JSON：{"months": <int>}。原文：……',
+                extract="json")
+# -> {"months": 3}
+
+# 文本：换 qwen、覆盖 model
+llm_client.chat("……", profile="qwen", model="qwen-plus")
+
+# 图片：扫描件逐页 OCR/判断（images 可为 base64/bytes/路径/data URI）
+llm_client.vision([b64_png_page1, b64_png_page2],
+                  '这些官文页里答复期限几个月？只输出 JSON: {"months": <int>}',
+                  extract="json")
+# -> {"months": 3}；无有效图片时返回 None（不发请求）
+
+# 缺 key 或服务不可达：不抛异常，返回 None（fail-soft）
+```
 
 ## 迁移状态
 
