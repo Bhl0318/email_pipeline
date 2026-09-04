@@ -6,6 +6,7 @@
     "以 _ 开头的键是注释，代码用 .get() 取键、忽略多余键，所以填完后留着或删掉都行。",
     "imap_host/imap_port/smtp_host/smtp_port/resource 已是 partner.outlook.cn 正确值，通常不用改。",
     "凭据（client_id/client_secret/token_url 的 tenant）来自 Azure 应用注册（世纪互联 China 云）。",
+    "llm 段供 llm_client.py 读取，只需放 scripts/email_config.json（模块优先读这份）；也可改用环境变量 DEEPSEEK_API_KEY/QWEN_API_KEY 覆盖。",
     "本文件不含任何真实凭据，可安全提交到 git；真实的 email_config.json 已被 gitignore。"
   ],
 
@@ -68,6 +69,20 @@
       "_说明": "汇报信审核链接通知（dispatch_report → send_review_links_email）的收件人。测试期填自己的测试邮箱，切勿填客户。",
       "recipients": ["<汇报信审核通知收件人邮箱>"],
       "cc": ["<抄送邮箱，没有就写 []>"]
+    }
+  },
+
+  "llm": {
+    "_说明": "大模型调用配置，供 llm_client.py 读取。只需放 scripts/email_config.json。api_key 也可用环境变量 DEEPSEEK_API_KEY/QWEN_API_KEY 覆盖；base_url/model 为公开默认值，通常不用改。",
+    "deepseek": {
+      "api_key": "<DeepSeek api_key，如 sk-...>",
+      "base_url": "https://api.deepseek.com",
+      "model": "deepseek-chat"
+    },
+    "qwen": {
+      "api_key": "<通义千问 api_key，如 sk-...>",
+      "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+      "model": "qwen-vl-max"
     }
   }
 }
