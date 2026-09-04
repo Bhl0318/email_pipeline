@@ -2,6 +2,7 @@
 
 零依赖（仅标准库）、零业务耦合。从现有业务文件抽出，逻辑不变。目前为纯新增，未迁移原调用方。
 可运行示例：`python3 scripts/examples/common_utils_demo.py`。
+测试：`python3 scripts/common/test_common.py`（8 条，离线，已通过）。
 
 ## 如何 import
 

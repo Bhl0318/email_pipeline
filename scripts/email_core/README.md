@@ -2,6 +2,7 @@
 
 抽自 `oa/read_email.py` 与 `report/submission_mailer.py`，逻辑不变。`account_cfg` 由调用方传入，不绑配置文件。依赖：标准库 + `requests`。目前为纯新增，未迁移原调用方。
 可运行示例：`python3 scripts/examples/email_core_demo.py`。
+测试：`python3 scripts/email_core/test_email_core.py`（6 条；MIME 解析/断点/取账号离线，收发不在单测内，已通过）。
 
 ## 如何 import
 

@@ -2,6 +2,7 @@
 
 把散在各文件的 DeepSeek / qwen 调用收敛成一处。fail-soft：异常 → stderr → 返回 None。
 目前为纯新增，未迁移原调用方。可运行示例：`python3 scripts/examples/llm_client_basic.py`。
+测试：`python3 scripts/test_llm_client.py`（5 条；配置/JSON抠取/图片编码/fail-soft 离线，不发真实请求，已通过）。
 
 ## 如何 import + 配置
 
