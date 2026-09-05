@@ -31,6 +31,34 @@ scripts/reusable/
 
 ---
 
+## 按能力检索（想做什么 → 找哪个模块）
+
+按使用需求检索现成件，不一定要先懂分层。
+
+| 想做什么 | 去哪个模块 | 函数/子模块 |
+|---|---|---|
+| 解析日期（ISO / `02/14/2026` / `February 12, 2026`） | foundation/common → dates | `parse_date` |
+| 算期限/加月（月末落点） | foundation/common → dates | `add_months` |
+| 期限逢周末移到工作日 | foundation/common → dates | `move_to_workday` |
+| 专利公开号归一化 | foundation/common → patents | `normalize_pub_no` |
+| 深嵌套 dict/list 按点号路径读写 | foundation/common → jsonpath | `get_by_path` / `set_by_path` |
+| 剥 HTML 标签 / `&nbsp;` | foundation/common → html_text | `strip_tags` |
+| 切开一行 HTML 的表格单元格 | foundation/common → html_text | `split_cells` |
+| 调 DeepSeek / qwen 文本（可要 JSON） | services → llm_client | `chat` |
+| 扫描件 OCR / 图片判断（多模态） | services → llm_client | `vision` |
+| 读收件箱（IMAP，含 OAuth2/降级密码） | services → email_core | `read_emails` |
+| 增量去重（只取新邮件） | services → email_core.checkpoint | `filter_new_emails` / `update_checkpoint` |
+| 邮件归档（不可逆） | services → email_core | `move_emails` |
+| 发 HTML 邮件（SMTP） | services → email_core | `send_html` |
+| 解析一封邮件的正文/附件/地址/日期 | services → email_core.mime_parse | `parse_message` 等 |
+| 填 AcroForm 表单 | services → doc_utils | `fill_pdf_form` |
+| PDF 转 PDF/A-2b | services → doc_utils | `to_pdfa` / `others_to_pdfa` |
+| 抽 PDF 文本层 | services → doc_utils.doc_text | `pdf_text` |
+| 抽 docx 文本 / 切说明书权要 | services → doc_utils.doc_text | `docx_text` / `split_spec` |
+| 定位最新匹配的 docx | services → doc_utils.doc_text | `pick_latest_docx` |
+
+---
+
 ## 第一层 · 基础工具层
 
 ### common — 通用纯函数工具
