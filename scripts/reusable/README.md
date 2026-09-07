@@ -5,8 +5,8 @@
 ```text
 scripts/reusable/
 ├── README.md              ← 本目录（分层索引）
-├── foundation/   基础通用层 —— common / email_core / doc_utils / net_clients
-├── business/     业务支撑层 —— doc_extract / rule_engine / doc_generator
+├── foundation/   基础通用层 —— common / email_core / doc_utils / net_clients / db
+├── business/     业务支撑层 —— doc_extract / rule_engine / doc_generator / db_merge
 ├── integration/  应用集成层 —— llm_client
 ├── datasets/     数据资产 —— 模板 / 规则表 / 提示词（归纳副本）
 └── examples/              各模块使用示例
@@ -22,9 +22,11 @@ scripts/reusable/
 | 基础通用层 | email_core | 收发和解析邮件：IMAP 收信、解析正文/附件、按记录增量去重、SMTP 发信 | `foundation/email_core/` | `foundation/email_core/README.md` | `examples/email_core_demo.py` |
 | 基础通用层 | doc_utils | 处理 PDF/Word：填 PDF 表单、转 PDF/A、从 PDF/docx 抽文本并切分说明书 | `foundation/doc_utils/` | `foundation/doc_utils/README.md` | `examples/doc_utils_demo.py` |
 | 基础通用层 | net_clients | 从外部下专利文档：按申请号下 USPTO 官文、按号从 FPO 下专利 PDF | `foundation/net_clients/` | `foundation/net_clients/README.md` | `examples/net_clients_demo.py` |
+| 基础通用层 | db | 查数据库：atw(MySQL) 与唯德 IPEasy(MSSQL) 两个客户端，参数化、统一读 db_config | `foundation/db/` | `foundation/db/README.md` | `examples/db_demo.py` |
 | 业务支撑层 | doc_extract | 从 PDF 抽结构化数据，正则→大模型→图片OCR 三级兜底（组合 doc_utils+llm_client） | `business/doc_extract/` | `business/doc_extract/README.md` | `examples/doc_extract_demo.py` |
 | 业务支撑层 | rule_engine | 规则外置 JSON，按多维键分级查表（通配符→精确→有序兜底）出结论 | `business/rule_engine/` | `business/rule_engine/README.md` | `examples/rule_engine_demo.py` |
 | 业务支撑层 | doc_generator | 按数据生成表单的骨架：字段映射→选模板→编排一组生成器（统一契约+逐个兜底） | `business/doc_generator/` | `business/doc_generator/README.md` | `examples/doc_generator_demo.py` |
+| 业务支撑层 | db_merge | 跨库按键合并：同一键查多个数据源，应用层合并、逐源兜底（不跨库 JOIN） | `business/db_merge/` | `business/db_merge/README.md` | `examples/db_demo.py` |
 | 应用集成层 | llm_client | 统一调用大模型：一个入口发文本/图片给 DeepSeek/千问，密钥集中配置，出错不中断 | `integration/llm_client.py` | `integration/llm_client.README.md` | `examples/llm_client_basic.py` |
 
 ## 按能力检索（想做什么 → 找哪个）
@@ -39,6 +41,8 @@ scripts/reusable/
 | 解析一封邮件的正文/附件/地址/日期 | email_core.mime_parse | `parse_message` |
 | 填 AcroForm 表单 / 转 PDF/A / 抽文本 / 切说明书 | doc_utils | `fill_pdf_form` / `to_pdfa` / `pdf_text` / `docx_text` / `split_spec` |
 | 按申请号下 USPTO 官文 / 按号下专利 PDF | net_clients | `USPTOApplication` / `download_patent_pdf` |
+| 查 atw(MySQL) / 唯德 IPEasy(MSSQL) | db | `mysql_query` / `mssql_query` |
+| 查多个库按同一键合并成一条 | db_merge | `merge_by_key` |
 | 调大模型文本（可要 JSON）/ 图片 OCR | llm_client | `chat` / `vision` |
 | 从 PDF 抽结构化数据（正则→大模型→图片 三级兜底） | doc_extract | `extract_from_pdf` |
 | 按多维键查规则表、层层兜底出结论 | rule_engine | `load_rules` / `resolve` |
@@ -96,6 +100,16 @@ scripts/reusable/
 
 出处：`oa/downloadByAPI.py`（USPTO）、`oa/download_patent_pdf.py`（FPO）。USPTO API key 已由硬编码改走配置。
 
+### db — 数据库查询客户端
+查 atw(MySQL/TIP) 和唯德 IPEasy(SQL Server) 两个库，参数化查询、返回 list[dict]，统一从 db_config.json 读连接。
+
+| 子模块 | 作用 | 入口 |
+|---|---|---|
+| mysql | 查 atw(MySQL) | `mysql_query` |
+| mssql | 查唯德 IPEasy(SQL Server) | `mssql_query` |
+
+出处：`report/db_query.py`（MySQL）、`report/enrich_report.py`（MSSQL 连接样板）。改动：MySQL 连接由硬编码改走配置；MSSQL 三处重复 connect 归一。
+
 ---
 
 ## 二、业务支撑层
@@ -131,6 +145,15 @@ scripts/reusable/
 | 生成器编排 | 跑一组生成器、逐个兜底、汇总 | `build_documents` |
 
 出处：范式抽象自 `report/submission/`（fields_mapping ↔ 各 *_generator、filing_preparation）。
+
+### db_merge — 跨库按键合并
+同一个键分别查多个数据源（atw + IPEasy），在应用层合并成一个 dict；不跨库 JOIN、某源查不到/连不上就跳过不阻塞。引擎只管调多源+合并+兜底，每个源查什么由调用方写在 fetcher 里。
+
+| 能力 | 作用 | 入口 |
+|---|---|---|
+| 跨库合并 | 按键调多源、合并结果、逐源兜底 | `merge_by_key` |
+
+出处：范式抽象自 `report/enrich_report.py`（`enrich_cn_fields`）。
 
 ---
 
