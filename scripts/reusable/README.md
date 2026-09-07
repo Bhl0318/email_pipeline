@@ -5,7 +5,7 @@
 ```text
 scripts/reusable/
 ├── README.md              ← 本目录（分层索引）
-├── foundation/   基础通用层 —— common / email_core / doc_utils
+├── foundation/   基础通用层 —— common / email_core / doc_utils / net_clients
 ├── business/     业务支撑层 —— doc_extract / rule_engine / doc_generator
 ├── integration/  应用集成层 —— llm_client
 ├── datasets/     数据资产 —— 模板 / 规则表 / 提示词（归纳副本）
@@ -21,6 +21,7 @@ scripts/reusable/
 | 基础通用层 | common | 与业务无关的通用小工具：解析/计算日期、归一化专利号、按路径存取嵌套数据、处理 HTML 文本 | `foundation/common/` | `foundation/common/README.md` | `examples/common_utils_demo.py` |
 | 基础通用层 | email_core | 收发和解析邮件：IMAP 收信、解析正文/附件、按记录增量去重、SMTP 发信 | `foundation/email_core/` | `foundation/email_core/README.md` | `examples/email_core_demo.py` |
 | 基础通用层 | doc_utils | 处理 PDF/Word：填 PDF 表单、转 PDF/A、从 PDF/docx 抽文本并切分说明书 | `foundation/doc_utils/` | `foundation/doc_utils/README.md` | `examples/doc_utils_demo.py` |
+| 基础通用层 | net_clients | 从外部下专利文档：按申请号下 USPTO 官文、按号从 FPO 下专利 PDF | `foundation/net_clients/` | `foundation/net_clients/README.md` | `examples/net_clients_demo.py` |
 | 业务支撑层 | doc_extract | 从 PDF 抽结构化数据，正则→大模型→图片OCR 三级兜底（组合 doc_utils+llm_client） | `business/doc_extract/` | `business/doc_extract/README.md` | `examples/doc_extract_demo.py` |
 | 业务支撑层 | rule_engine | 规则外置 JSON，按多维键分级查表（通配符→精确→有序兜底）出结论 | `business/rule_engine/` | `business/rule_engine/README.md` | `examples/rule_engine_demo.py` |
 | 业务支撑层 | doc_generator | 按数据生成表单的骨架：字段映射→选模板→编排一组生成器（统一契约+逐个兜底） | `business/doc_generator/` | `business/doc_generator/README.md` | `examples/doc_generator_demo.py` |
@@ -37,6 +38,7 @@ scripts/reusable/
 | 读收件箱（IMAP）/ 增量只取新邮件 / 归档 / 发信 | email_core | `read_emails` / `filter_new_emails` / `move_emails` / `send_html` |
 | 解析一封邮件的正文/附件/地址/日期 | email_core.mime_parse | `parse_message` |
 | 填 AcroForm 表单 / 转 PDF/A / 抽文本 / 切说明书 | doc_utils | `fill_pdf_form` / `to_pdfa` / `pdf_text` / `docx_text` / `split_spec` |
+| 按申请号下 USPTO 官文 / 按号下专利 PDF | net_clients | `USPTOApplication` / `download_patent_pdf` |
 | 调大模型文本（可要 JSON）/ 图片 OCR | llm_client | `chat` / `vision` |
 | 从 PDF 抽结构化数据（正则→大模型→图片 三级兜底） | doc_extract | `extract_from_pdf` |
 | 按多维键查规则表、层层兜底出结论 | rule_engine | `load_rules` / `resolve` |
@@ -83,6 +85,16 @@ scripts/reusable/
 | doc_text | 从文档抽文本、切分说明书 | `pdf_text` / `docx_text` / `split_spec` / `pick_latest_docx` |
 
 出处：`submission/common.py`（填表）、`run_uspto_upload.py`（PDF/A）、`oa/parse_us_refs.py` 与 `oa/oa_report_ai.py`（抽文本/切分）。
+
+### net_clients — 网络与服务调用
+从外部专利数据源下文档的客户端，与业务无关。
+
+| 子模块 | 作用 | 入口 |
+|---|---|---|
+| uspto | 按申请号从 USPTO 官方 API 下官文（按代码+日期精确匹配、写下载日志、暴露 403） | `USPTOApplication` |
+| patent_pdf | 按号从 FreePatentsOnline 下专利 PDF（curl_cffi 绕 Cloudflare） | `download_patent_pdf` |
+
+出处：`oa/downloadByAPI.py`（USPTO）、`oa/download_patent_pdf.py`（FPO）。USPTO API key 已由硬编码改走配置。
 
 ---
 
