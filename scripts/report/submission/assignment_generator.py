@@ -280,13 +280,15 @@ def _fill_inventor_tables(doc, names, addr_lines):
 
 # ─── 主入口 ──────────────────────────────────────────────
 
-def generate_assignment(fields: dict, assignment: dict, output_dir, seq: int = 1, total: int = 1) -> dict:
+def generate_assignment(fields: dict, assignment: dict, output_dir, seq: int = 1,
+                        total: int = 1, name_tag: str = "") -> dict:
     """按一段转让安排生成一份 Assignment docx。
 
     :param fields: submission_tasks.fields_json
     :param assignment: assignments 数组中的一个元素
     :param output_dir: 输出目录
-    :param seq/total: 当前序号 / 总段数（total>1 时文件名带序号和类型）
+    :param seq/total: 当前序号 / 总份数（total>1 时文件名带序号和标签）
+    :param name_tag: 文件名标签（多份区分用；如发明人姓）。缺省用 assignment_type。
     :return: {"file_path", "file_name", "warnings": [...]}
     """
     fields = blank_none(fields or {})          # 深度 None→''，Assignment 不出现字面 'None'
@@ -390,7 +392,7 @@ def generate_assignment(fields: dict, assignment: dict, output_dir, seq: int = 1
     output_dir.mkdir(parents=True, exist_ok=True)
     date_str = today.strftime("%Y-%m-%d")
     if total > 1:
-        file_name = f"{date_str}-Assignment-{case_volume}-{seq}-{assignment_type}.docx"
+        file_name = f"{date_str}-Assignment-{case_volume}-{seq}-{name_tag or assignment_type}.docx"
     else:
         file_name = f"{date_str}-Assignment-{case_volume}.docx"
     file_path = output_dir / file_name
@@ -399,19 +401,38 @@ def generate_assignment(fields: dict, assignment: dict, output_dir, seq: int = 1
     return {"file_path": str(file_path), "file_name": file_name, "warnings": warnings}
 
 
+def _inv_file_tag(name: str) -> str:
+    """发明人名 → 文件名安全标签（取姓、去非法字符/空格）。空则回退 INV。"""
+    s = (name or "").split(",")[0].strip()             # "LAST, First" 取姓
+    s = re.sub(r'[\\/:*?"<>|]+', "", s)                 # 去 Windows 文件名非法字符
+    s = re.sub(r"\s+", "", s)
+    return s or "INV"
+
+
 def generate_assignments(fields: dict, output_dir) -> list:
     """按转让段逐段生成，返回结果列表。
 
     转让段取 effective_assignments：发明人有 employer 时按归属公司分组派生个人转公司段
     （与确认函同源，解决"多公司只出一份"），无 employer 时沿用上游 assignments。
-    派生过程的告警挂到首份结果的 warnings 上。"""
+    **个人转公司段按发明人拆：每个发明人各一份**（便于分别发给各发明人签字）；
+    公司转公司段不涉发明人签字，仍一份。派生告警挂到首份结果 warnings。"""
     assignments, derive_warnings = effective_assignments(fields)
     if not assignments:
         raise ValueError("assignments 为空，无法生成 Assignment")
-    total = len(assignments)
+    # 展开成「生成单元」：(单段 assignment, 文件名标签)
+    units = []
+    for seg in assignments:
+        if (seg.get("assignment_type") or "") == "个人转公司":
+            seg_names = [str(n).strip() for n in (seg.get("assignor_inventors") or []) if str(n).strip()] \
+                        or inventor_names(fields)
+            for nm in seg_names:                          # 每发明人一份
+                units.append(({**seg, "assignor_inventors": [nm]}, _inv_file_tag(nm)))
+        else:
+            units.append((seg, ""))                       # 公司转公司不拆
+    total = len(units)
     results = [
-        generate_assignment(fields, item, output_dir, seq=i, total=total)
-        for i, item in enumerate(assignments, start=1)
+        generate_assignment(fields, item, output_dir, seq=i, total=total, name_tag=tag)
+        for i, (item, tag) in enumerate(units, start=1)
     ]
     if derive_warnings and results:
         results[0]["warnings"] = derive_warnings + (results[0].get("warnings") or [])
