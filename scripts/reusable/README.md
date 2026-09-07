@@ -6,7 +6,7 @@
 scripts/reusable/
 ├── README.md              ← 本目录（分层索引）
 ├── foundation/   基础通用层 —— common / email_core / doc_utils / net_clients / db / wiki / dingtalk
-├── business/     业务支撑层 —— doc_extract / rule_engine / doc_generator / db_merge
+├── business/     业务支撑层 —— doc_extract / rule_engine / doc_generator / db_merge / nas_locator
 ├── integration/  应用集成层 —— llm_client
 ├── datasets/     数据资产 —— 模板 / 规则表 / 提示词（归纳副本）
 └── examples/              各模块使用示例
@@ -29,6 +29,7 @@ scripts/reusable/
 | 业务支撑层 | rule_engine | 规则外置 JSON，按多维键分级查表（通配符→精确→有序兜底）出结论 | `business/rule_engine/` | `business/rule_engine/README.md` | `examples/rule_engine_demo.py` |
 | 业务支撑层 | doc_generator | 按数据生成表单的骨架：字段映射→选模板→编排一组生成器（统一契约+逐个兜底） | `business/doc_generator/` | `business/doc_generator/README.md` | `examples/doc_generator_demo.py` |
 | 业务支撑层 | db_merge | 跨库按键合并：同一键查多个数据源，应用层合并、逐源兜底（不跨库 JOIN） | `business/db_merge/` | `business/db_merge/README.md` | `examples/db_demo.py` |
+| 业务支撑层 | nas_locator | 按案号+地区在 NAS 定位「递交文件」目录、取说明书 docx（路径规则作 config、查库注入） | `business/nas_locator/` | `business/nas_locator/README.md` | `examples/nas_locator_demo.py` |
 | 应用集成层 | llm_client | 统一调用大模型：一个入口发文本/图片给 DeepSeek/千问，密钥集中配置，出错不中断 | `integration/llm_client.py` | `integration/llm_client.README.md` | `examples/llm_client_basic.py` |
 
 ## 按能力检索（想做什么 → 找哪个）
@@ -45,6 +46,7 @@ scripts/reusable/
 | 按申请号下 USPTO 官文 / 按号下专利 PDF | net_clients | `USPTOApplication` / `download_patent_pdf` |
 | 查 atw(MySQL) / 唯德 IPEasy(MSSQL) | db | `mysql_query` / `mssql_query` |
 | 查多个库按同一键合并成一条 | db_merge | `merge_by_key` |
+| 按案号在 NAS 找申请文件（说明书 docx） | nas_locator | `find_application_file` |
 | 读/写 Confluence 页面、传附件 | wiki | `WikiClient` |
 | 钉钉发消息 / 收用户回复（收验证码等） | dingtalk | `send_message` / `wait_for_reply` |
 | 调大模型文本（可要 JSON）/ 图片 OCR | llm_client | `chat` / `vision` |
@@ -178,6 +180,16 @@ scripts/reusable/
 | 跨库合并 | 按键调多源、合并结果、逐源兜底 | `merge_by_key` |
 
 出处：范式抽象自 `report/enrich_report.py`（`enrich_cn_fields`）。
+
+### nas_locator — NAS 申请文件定位
+按案号+地区在 NAS（Z 盘）目录树里定位案件的「递交文件」目录、取说明书 docx。NAS 路径规则作 config、客户简称查库注入为 shortname_lookup，故不直接依赖数据库；选文件复用 doc_utils.pick_latest_docx。
+
+| 能力 | 作用 | 入口 |
+|---|---|---|
+| 定位目录 | 按案号+地区找「递交文件」目录 | `resolve_app_dir` |
+| 取说明书 | 目录内按地区关键词取最新 docx | `find_application_file` |
+
+出处：范式抽象自 `oa/oa_report_ai.py`（`_resolve_app_dir`/`find_application_files`）。
 
 ---
 
