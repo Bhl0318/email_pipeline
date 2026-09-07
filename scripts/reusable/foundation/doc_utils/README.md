@@ -1,6 +1,6 @@
 # doc_utils —— 文档与 PDF 处理（接口说明）
 
-**做什么用**：处理 PDF/Word 文档——填 PDF 表单、把 PDF 转成 PDF/A 存档格式、从 PDF/docx 抽文本并把说明书切成"说明"和"权利要求"。与具体业务无关。从现有业务文件抽出，逻辑不变；纯新增，未迁移原调用方。
+**做什么用**：处理 PDF/Word 文档——填 PDF 表单、把 PDF 转成 PDF/A 存档格式、从 PDF/docx 抽文本并把说明书切成"说明"和"权利要求"。与具体业务无关。从现有业务文件抽出，逻辑不变。
 不含 `flatten_pdf`（耦合 pdfRest 云）、扫描件 OCR（耦合大模型——用 `llm_client.vision` 组合）。
 
 可运行示例：`python3 scripts/reusable/examples/doc_utils_demo.py`。

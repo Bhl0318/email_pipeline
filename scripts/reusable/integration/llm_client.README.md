@@ -1,6 +1,6 @@
 # llm_client —— 大模型调用与路由（接口说明）
 
-**做什么用**：一个入口统一调用大模型——发文本给 DeepSeek 或发图片给千问（qwen），密钥集中在配置里、可选自动解析 JSON、任何异常都返回 None 不中断主流程（fail-soft）。从各文件内联的调用收敛而来；纯新增，未迁移原调用方。
+**做什么用**：一个入口统一调用大模型——发文本给 DeepSeek 或发图片给千问（qwen），密钥集中在配置里、可选自动解析 JSON、任何异常都返回 None 不中断主流程（fail-soft）。从各文件内联的调用收敛而来。
 
 可运行示例：`python3 scripts/reusable/examples/llm_client_basic.py`。
 
@@ -65,9 +65,3 @@ llm_client.vision([b64_png_page1, b64_png_page2],
                   extract="json")
 # -> {"months": 3}；无有效图片时返回 None（不发请求）
 ```
-
-## 迁移状态
-
-现有内联调用点（各处 `OpenAI(...)+create(...)`）共 16 处，分布在
-`oa/{parse_us_pdf,parse_cn_pdf,parse_us_refs,filter_oa_email,oa_schemes,oa_report_ai,word_to_wiki}.py`、
-`report/classify_report.py`、`submission/qa_seed.py`——尚未迁移，待逐个替换为 `chat/vision`。
