@@ -514,16 +514,6 @@ class PatentApplicationFormGenerator:
                                             app.get("province_city_zh_cn", ""), app.get("country_zh_cn", "")] if x])
             return res_en, res_cn
 
-        def _detail_rows(app):
-            return [
-                ["Address1/地址1:", app.get("address1", ""), app.get("contact_address_cn", "")],
-                ["Address2/地址2:", app.get("address2", ""), app.get("contact_address_cn2", "")],
-                ["City/城市:", app.get("city_en", ""), app.get("city_cn", "")],
-                ["State/Province/州/省", app.get("province_city_en_us", ""), app.get("province_city_zh_cn", "")],
-                ["Post/邮编:", app.get("postcode", ""), ''],
-                ["Nationality/国家:", app.get("country_en_us", ""), app.get("country_zh_cn", "")],
-            ]
-
         def _fmt_idxs(idxs):
             """连续序号压成区间：[1,2,3]→1-3、[4,5,6,7]→4-7、[1,3,5]→1、3、5。"""
             parts, i = [], 0
@@ -574,8 +564,8 @@ class PatentApplicationFormGenerator:
                 res_label = f"Residence/Mailing Address for inventors{tag}/发明人{tag}住址"
             data_rows2.append([labor_label, labor_en, labor_cn])
             data_rows2.append([res_label, res_en, res_cn])
-            for r in _detail_rows(app):
-                data_rows2.append(r)
+            # 发明人住址明细(Address1/Address2/City/State/Post/Nationality)不再渲染进确认函；
+            # 值仍存于 fields_json（env2 左侧输入框可编辑保存），仅不体现在文档中。
 
         applicants = case_info.get("applicants", []) or []
         data_rows3 = [['Applicant(s)/申请人']]
@@ -583,12 +573,8 @@ class PatentApplicationFormGenerator:
         for applicant in applicants:
             applicant_index += 1
             data_rows3.append([f'Name{str(applicant_index)}/申请人{str(applicant_index)}:', applicant.get('applicant_name_en', ''), applicant.get('applicant_name_cn', '')])
-            data_rows3.append(['Address1/地址1:', applicant.get('address1', ''), applicant.get('contact_address_cn', '')])
-            data_rows3.append(['Address2/地址2:', applicant.get('address2', ''), ''])
-            data_rows3.append(['City/城市:', applicant.get('city_en', ''), applicant.get('city_cn', '')])
-            data_rows3.append(['State/Province/州/省:', applicant.get('province_city_en_us', ''), applicant.get('province_city_zh_cn', '')])
-            data_rows3.append(['Post/邮编：', applicant.get('postcode', '')])
-            data_rows3.append(['Nationality/国家:', applicant.get('country_en_us', ''), applicant.get('country_zh_cn', '')])
+            # 申请人住址明细(Address1/Address2/City/State/Post/Nationality)不再渲染进确认函；
+            # 值仍存于 fields_json（env2 左侧输入框可编辑保存），仅不体现在文档中。
             data_rows3.append(['Entity/实体', applicant.get('entity_en', ''), applicant.get('entity_cn', '')])
 
         # 优先权：无优先权数据则整段不渲染
@@ -631,10 +617,10 @@ class PatentApplicationFormGenerator:
                 for idx, _inv in g["members"]:
                     ks.append(f"inventor.{idx}.name")
                 ks += [f"inventor.g{gi}.labor", f"inventor.g{gi}.residence"]
-                ks += [f"inventor.g{gi}.{f}" for f in ("address1", "address2", "city", "state", "post", "nationality")]
+                # 发明人住址明细行已去掉 → 不再分配对应 key（与 data_rows2 行数保持一致）
             ks.append(None)                                                  # 申请人表头
             for ai in range(1, len(applicants) + 1):
-                ks += [f"applicant.{ai}.{f}" for f in ("name", "address1", "address2", "city", "state", "post", "nationality", "entity")]
+                ks += [f"applicant.{ai}.{f}" for f in ("name", "entity")]   # 申请人住址明细行已去掉
             if data_rows4:                                                   # 优先权
                 ks.append(None)
                 for pi in range(1, len(priorities) + 1):
