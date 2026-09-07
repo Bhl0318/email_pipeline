@@ -3,14 +3,14 @@
 离线部分（MIME 解析）直接跑并打印输入→输出；
 收发部分（IMAP/SMTP）需真实账号，只示范调用写法（默认不执行）。
 
-运行：python3 scripts/examples/email_core_demo.py
+运行：python3 scripts/reusable/examples/email_core_demo.py
 """
 import email
 import os
 import sys
 
 _LIB = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # scripts/reusable
-sys.path.insert(0, os.path.join(_LIB, "services"))
+sys.path.insert(0, os.path.join(_LIB, "foundation"))
 from email_core import parse_message, decode_str, html_to_text  # noqa: E402
 
 RAW = """From: =?utf-8?B?5byg5LiJ?= <zhang@example.com>

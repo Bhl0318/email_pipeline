@@ -3,13 +3,13 @@
 样本：email_pipeline/申请文件/（真实案件 docx + PDF）。
 PDF/A 需 Ghostscript，缺则只示范写法。
 
-运行：python3 scripts/examples/doc_utils_demo.py
+运行：python3 scripts/reusable/examples/doc_utils_demo.py
 """
 import os
 import sys
 
 _LIB = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # scripts/reusable
-sys.path.insert(0, os.path.join(_LIB, "services"))
+sys.path.insert(0, os.path.join(_LIB, "foundation"))
 from doc_utils import (  # noqa: E402
     docx_text, pdf_text, split_spec, pick_latest_docx, gs_bin, to_pdfa, fill_pdf_form,
 )

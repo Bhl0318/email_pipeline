@@ -1,112 +1,115 @@
 # 可复用资产库（总目录）
 
-本文件是可复用资产库 `scripts/reusable/` 的索引。库把**目录（本文件）与抽取的模块放在一起**，目录结构本身即分层体系：
+可复用资产库 `scripts/reusable/`。分层对应《可复用模块与资产整理需求文档》的三层模型：**基础通用层 / 业务支撑层 / 应用集成层**。库把索引（本文件）与模块放在一起，目录即分层。
 
 ```text
 scripts/reusable/
-├── README.md            ← 本目录（分层索引）
-├── foundation/          第一层 · 基础工具层（纯 Python，零外部依赖）
-│   └── common/          日期 / 专利号 / JSON路径 / HTML
-├── services/            第二层 · 外部服务与资源封装层（封装外部系统/API/库）
-│   ├── llm_client.py    大模型服务（DeepSeek 文本 / qwen 图片）
-│   ├── email_core/      邮件系统（IMAP 收 / SMTP 发 / 解析 / 断点）
-│   └── doc_utils/       文档与 PDF（表单填充 / PDF-A / 抽文本）
-└── examples/            各模块使用示例
+├── README.md              ← 本目录（分层索引）
+├── foundation/   基础通用层 —— common / email_core / doc_utils
+├── integration/  应用集成层 —— llm_client
+└── examples/              各模块使用示例
 ```
 
-每个模块均带接口说明（逐函数：调用方法/输入/返回）与使用示例；均为纯新增，尚未迁移原调用方。
+> 业务支撑层目前尚无已抽取的独立模块；email_pipeline 中已识别、可复用的业务支撑层/应用集成层**模块级**资产，见文末"待抽取模块级资产"。
 
-## 一览
+## 已抽取模块一览
 
-| 层次 | 模块 | 位置（库内） | 接口说明 | 示例 |
-|---|---|---|---|---|
-| 基础工具层 | common | `foundation/common/` | `foundation/common/README.md` | `examples/common_utils_demo.py` |
-| 外部服务封装层 | llm_client | `services/llm_client.py` | `services/llm_client.README.md` | `examples/llm_client_basic.py` |
-| 外部服务封装层 | email_core | `services/email_core/` | `services/email_core/README.md` | `examples/email_core_demo.py` |
-| 外部服务封装层 | doc_utils | `services/doc_utils/` | `services/doc_utils/README.md` | `examples/doc_utils_demo.py` |
+| 层次 | 模块 | 做什么用 | 位置 | 接口说明 | 示例 |
+|---|---|---|---|---|---|
+| 基础通用层 | common | 与业务无关的通用小工具：解析/计算日期、归一化专利号、按路径存取嵌套数据、处理 HTML 文本 | `foundation/common/` | `foundation/common/README.md` | `examples/common_utils_demo.py` |
+| 基础通用层 | email_core | 收发和解析邮件：IMAP 收信、解析正文/附件、按记录增量去重、SMTP 发信 | `foundation/email_core/` | `foundation/email_core/README.md` | `examples/email_core_demo.py` |
+| 基础通用层 | doc_utils | 处理 PDF/Word：填 PDF 表单、转 PDF/A、从 PDF/docx 抽文本并切分说明书 | `foundation/doc_utils/` | `foundation/doc_utils/README.md` | `examples/doc_utils_demo.py` |
+| 应用集成层 | llm_client | 统一调用大模型：一个入口发文本/图片给 DeepSeek/千问，密钥集中配置，出错不中断 | `integration/llm_client.py` | `integration/llm_client.README.md` | `examples/llm_client_basic.py` |
 
----
+## 按能力检索（想做什么 → 找哪个）
 
-## 按能力检索（想做什么 → 找哪个模块）
-
-按使用需求检索现成件，不一定要先懂分层。
-
-| 想做什么 | 去哪个模块 | 函数/子模块 |
+| 想做什么 | 模块 | 函数 |
 |---|---|---|
-| 解析日期（ISO / `02/14/2026` / `February 12, 2026`） | foundation/common → dates | `parse_date` |
-| 算期限/加月（月末落点） | foundation/common → dates | `add_months` |
-| 期限逢周末移到工作日 | foundation/common → dates | `move_to_workday` |
-| 专利公开号归一化 | foundation/common → patents | `normalize_pub_no` |
-| 深嵌套 dict/list 按点号路径读写 | foundation/common → jsonpath | `get_by_path` / `set_by_path` |
-| 剥 HTML 标签 / `&nbsp;` | foundation/common → html_text | `strip_tags` |
-| 切开一行 HTML 的表格单元格 | foundation/common → html_text | `split_cells` |
-| 调 DeepSeek / qwen 文本（可要 JSON） | services → llm_client | `chat` |
-| 扫描件 OCR / 图片判断（多模态） | services → llm_client | `vision` |
-| 读收件箱（IMAP，含 OAuth2/降级密码） | services → email_core | `read_emails` |
-| 增量去重（只取新邮件） | services → email_core.checkpoint | `filter_new_emails` / `update_checkpoint` |
-| 邮件归档（不可逆） | services → email_core | `move_emails` |
-| 发 HTML 邮件（SMTP） | services → email_core | `send_html` |
-| 解析一封邮件的正文/附件/地址/日期 | services → email_core.mime_parse | `parse_message` 等 |
-| 填 AcroForm 表单 | services → doc_utils | `fill_pdf_form` |
-| PDF 转 PDF/A-2b | services → doc_utils | `to_pdfa` / `others_to_pdfa` |
-| 抽 PDF 文本层 | services → doc_utils.doc_text | `pdf_text` |
-| 抽 docx 文本 / 切说明书权要 | services → doc_utils.doc_text | `docx_text` / `split_spec` |
-| 定位最新匹配的 docx | services → doc_utils.doc_text | `pick_latest_docx` |
+| 解析日期 / 加月算期限 / 逢周末移工作日 | common.dates | `parse_date` / `add_months` / `move_to_workday` |
+| 专利公开号归一化 | common.patents | `normalize_pub_no` |
+| 按点号路径读写嵌套 dict/list | common.jsonpath | `get_by_path` / `set_by_path` |
+| 剥 HTML 标签 / 切表格单元格 | common.html_text | `strip_tags` / `split_cells` |
+| 读收件箱（IMAP）/ 增量只取新邮件 / 归档 / 发信 | email_core | `read_emails` / `filter_new_emails` / `move_emails` / `send_html` |
+| 解析一封邮件的正文/附件/地址/日期 | email_core.mime_parse | `parse_message` |
+| 填 AcroForm 表单 / 转 PDF/A / 抽文本 / 切说明书 | doc_utils | `fill_pdf_form` / `to_pdfa` / `pdf_text` / `docx_text` / `split_spec` |
+| 调大模型文本（可要 JSON）/ 图片 OCR | llm_client | `chat` / `vision` |
 
 ---
 
-## 第一层 · 基础工具层
+## 一、基础通用层
+
+与具体业务无关、多项目可直接用的能力。
 
 ### common — 通用纯函数工具
-
 零依赖、零业务耦合。按能力域分四个子模块：
 
-| 子模块 | 能力 | 函数 |
+| 子模块 | 作用 | 函数 |
 |---|---|---|
-| dates | 日期解析/计算 | `parse_date` / `add_months` / `move_to_workday` |
+| dates | 日期解析与计算 | `parse_date` / `add_months` / `move_to_workday` |
 | patents | 专利号归一化 | `normalize_pub_no` |
-| jsonpath | 点号路径读写 | `get_by_path` / `set_by_path` |
+| jsonpath | 按点号路径读写嵌套数据 | `get_by_path` / `set_by_path` |
 | html_text | HTML 文本处理 | `strip_tags` / `split_cells` |
 
 出处：`oa/filter_oa_email.py`（日期）、`oa/parse_us_refs.py`（专利号）、`submission/qa_seed.py`（JSON 路径）、`oa/oainfo_cli.py`（HTML）。
 
----
+### email_core — 邮件收发核心
+封装邮箱的收、发、解析与增量去重，账号信息由调用方传入。按能力域分五个子模块：
 
-## 第二层 · 外部服务与资源封装层
-
-### llm_client — 大模型服务封装
-
-统一 DeepSeek/qwen 调用，key 走配置、异常 fail-soft 返回 None。
-
-| 能力 | 函数 |
-|---|---|
-| 文本调用（可自动解析 JSON） | `chat` |
-| 图片多模态调用（OCR/判断） | `vision` |
-
-出处：`oa/{filter_oa_email,oa_schemes,oa_report_ai,parse_us_pdf,parse_cn_pdf,parse_us_refs,word_to_wiki}.py`、`report/classify_report.py`、`submission/qa_seed.py` 内联的 16 处 DeepSeek/qwen 调用。
-
-### email_core — 邮件系统封装
-
-IMAP 收信、SMTP 发信、MIME 解析、增量去重。按能力域分五个子模块：
-
-| 子模块 | 能力 | 函数 |
+| 子模块 | 作用 | 函数 |
 |---|---|---|
-| config | 账号配置读取 | `load_config` / `get_account_config` |
+| config | 读账号配置 | `load_config` / `get_account_config` |
 | imap_client | 收信 | `get_oauth2_token` / `login_imap` / `list_folders` / `read_emails` / `move_emails` |
-| mime_parse | 邮件解析 | `decode_str` / `html_to_text` / `get_body` / `get_attachments` / `save_attachments` / `parse_email_date` / `parse_address_list` / `parse_message` |
-| checkpoint | 增量去重 | `set_checkpoint_path` / `load_checkpoint` / `save_checkpoint` / `get_checkpoint` / `update_checkpoint` / `filter_new_emails` |
+| mime_parse | 把邮件解析成结构化数据 | `decode_str` / `html_to_text` / `get_body` / `get_attachments` / `save_attachments` / `parse_email_date` / `parse_address_list` / `parse_message` |
+| checkpoint | 记录已处理、增量去重 | `set_checkpoint_path` / `load_checkpoint` / `save_checkpoint` / `get_checkpoint` / `update_checkpoint` / `filter_new_emails` |
 | smtp_client | 发信 | `get_smtp_oauth2_token` / `send_smtp` / `send_html` |
 
 出处：`oa/read_email.py`（收信/解析/断点，与 `report/read_email.py` 逐字相同）、`report/submission_mailer.py`（发信）。
 
 ### doc_utils — 文档与 PDF 处理
+填表单、转 PDF/A、抽文本，与具体业务无关。按能力域分三个子模块：
 
-AcroForm 填表、PDF/A 转换、文档抽文本。按能力域分三个子模块：
-
-| 子模块 | 能力 | 函数 |
+| 子模块 | 作用 | 函数 |
 |---|---|---|
-| pdf_form | 表单填充 | `fill_pdf_form` |
-| pdfa | PDF→PDF/A-2b | `gs_bin` / `to_pdfa` / `others_to_pdfa` |
-| doc_text | 文档抽文本/切分 | `pdf_text` / `docx_text` / `split_spec` / `pick_latest_docx` |
+| pdf_form | 填 PDF AcroForm 表单 | `fill_pdf_form` |
+| pdfa | PDF 转 PDF/A-2b（存档格式） | `gs_bin` / `to_pdfa` / `others_to_pdfa` |
+| doc_text | 从文档抽文本、切分说明书 | `pdf_text` / `docx_text` / `split_spec` / `pick_latest_docx` |
 
 出处：`submission/common.py`（填表）、`run_uspto_upload.py`（PDF/A）、`oa/parse_us_refs.py` 与 `oa/oa_report_ai.py`（抽文本/切分）。
+
+---
+
+## 二、业务支撑层
+
+在基础能力之上、服务多个业务场景的处理模块。目前尚无已抽取的独立模块，下列为已识别、待抽取的模块级资产（见文末）。
+
+---
+
+## 三、应用集成层
+
+与具体应用运行方式相关、组合底层能力的模块。
+
+### llm_client — 大模型调用与路由
+一个入口调 DeepSeek（文本）或千问（图片），密钥集中配置、可选自动解析 JSON、出错返回 None 不中断主流程。
+
+| 能力 | 作用 | 函数 |
+|---|---|---|
+| 文本调用 | 发文本给大模型，可要求返回并解析 JSON | `chat` |
+| 图片调用 | 发图片给多模态模型做 OCR/判断 | `vision` |
+
+出处：`oa/{filter_oa_email,oa_schemes,oa_report_ai,parse_us_pdf,parse_cn_pdf,parse_us_refs,word_to_wiki}.py`、`report/classify_report.py`、`submission/qa_seed.py` 内联的 16 处 DeepSeek/千问调用。
+
+---
+
+## 附：待抽取的模块级资产（已识别）
+
+email_pipeline 中除上述工具型模块外，还有**模块级**可复用能力，与业务规则有耦合、尚未抽为独立模块，先按需求文档层次登记，供后续抽取：
+
+| 层次 | 资产 | 做什么用 | 现位置 |
+|---|---|---|---|
+| 业务支撑层 | 文档解析范式 | 从官文 PDF 抽答复期限/对比文件，正则→大模型→图片 OCR 三级兜底 | `oa/parse_cn_pdf.py`、`oa/parse_us_pdf.py`、`oa/parse_us_refs.py` |
+| 业务支撑层 | 规则引擎 | 客户×官文类型×次数 → 动作(立项/转发/跳过)，规则外置 JSON、多级 fallback | `report/read_email.py`（`_resolve_oa_action`）+ `report/oa_report_rules.json` |
+| 业务支撑层 | 指令(提示词)外置 | 提示词存库、改库即生效、读不到回退默认 | `oa/oa_schemes.py`、`oa/oa_report_ai.py`（读 `zxassist_result_instruction`） |
+| 业务支撑层 | 文档生成器骨架 | "字段映射 ↔ 生成器"分离，按数据生成 PDF/docx 表单 | `report/submission/`（fields_mapping + 各 *_generator） |
+| 应用集成层 | 单入口扇出编排 | 一封邮件只读一次、只分类一次，按开关扇出多个下游 | `scripts/main.py` |
+| 应用集成层 | 隔离加载 | 让同名模块（oa/ 与 report/）在同进程互不串味 | `scripts/loader.py` |
+| 应用集成层 | 邮件分类引擎 | 按发件域分派 CN/US/EP，抽案号/类型/期限、判断是否立项 | `oa/filter_oa_email.py`、`report/classify_report.py` |

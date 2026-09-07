@@ -1,6 +1,6 @@
 """common 纯函数工具集用法示例：每个函数打印「输入 → 输出」。
 
-运行：python3 scripts/examples/common_utils_demo.py
+运行：python3 scripts/reusable/examples/common_utils_demo.py
 """
 import os
 import sys
