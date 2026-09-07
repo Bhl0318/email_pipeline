@@ -454,6 +454,23 @@ function updateInvFull(i){
   if (out) out.value = invFullName(g(`cf-inv-${i}-last`), g(`cf-inv-${i}-first`), g(`cf-inv-${i}-middle`));
 }
 
+// 续案类型：把存量值（代码/略号/长文）归一到 7 个标准显示串，用于下拉预选（对齐后端 _continuity_display）
+const _CONT_LIST=["Continuation of","Continuation in part of","Division of","a 371 of international","substitution of","reissue of","Claims benefit of provisional"];
+function _contDisplay(v){
+  const s=String(v||"").trim().toLowerCase().replace(/-/g," ").replace(/\s+/g," ");
+  const M={"con":"Continuation of","continuation":"Continuation of","continuation of":"Continuation of",
+    "cip":"Continuation in part of","continuation in part":"Continuation in part of","continuation in part of":"Continuation in part of",
+    "div":"Division of","division":"Division of","division of":"Division of","divisional":"Division of","divisional of":"Division of",
+    "nst":"a 371 of international","371":"a 371 of international","national stage":"a 371 of international","a 371 of international":"a 371 of international",
+    "sub":"substitution of","substitution":"substitution of","substitution of":"substitution of",
+    "rei":"reissue of","reissue":"reissue of","reissue of":"reissue of",
+    "pro":"Claims benefit of provisional","provisional":"Claims benefit of provisional","claims benefit of provisional":"Claims benefit of provisional",
+    "bypass":"Continuation of"};
+  return M[s]||"";
+}
+const _contOpts=(cur)=>{const c=_contDisplay(cur);
+  return '<option value=""></option>'+_CONT_LIST.map(s=>`<option ${c===s?"selected":""}>${s}</option>`).join("");};
+
 function renderForm(){
   const ci = fields.case_info || {};
   const ap = (fields.applicants||[])[0] || {};
@@ -513,7 +530,7 @@ function renderForm(){
         <div class="field"><label>在先申请号(Prior，ADS)</label><input id="fx-par-${i}-num" value="${esc(p["Prior Application Number"]||"")}"></div>
         <div class="field"><label>申请日</label><input id="fx-par-${i}-date" value="${esc(p["Filing Date"]||"")}" placeholder="YYYY-MM-DD"></div>
         <div class="field"><label>在先状态</label><select id="fx-par-${i}-status">${_parStatus(p["Prior Application Status"])}</select></div>
-        <div class="field"><label>续案类型</label><input id="fx-par-${i}-cont" value="${esc(p["Continuity Type"]||"")}" placeholder="如 Continuation of / Continuation in part of / Division of"></div>
+        <div class="field"><label>续案类型</label><select id="fx-par-${i}-cont">${_contOpts(p["Continuity Type"])}</select></div>
         <div class="field"><label>专利号(Patent No，仅 Patented 时填)</label><input id="fx-par-${i}-patnum" value="${esc(p["Patent Number"]||"")}"></div>
         <div class="field"><label>授权日(Issue Date，仅 Patented 时填)</label><input id="fx-par-${i}-issdate" value="${esc(p["Issue Date"]||"")}" placeholder="YYYY-MM-DD"></div>
       </div>

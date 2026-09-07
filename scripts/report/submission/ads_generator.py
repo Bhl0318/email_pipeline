@@ -171,11 +171,18 @@ def build_ads_datasets_xml(case_info: dict) -> str:
     # domAppStatusList 是 XFA 双 items 字段：显示值(Patented/…)与绑定值(patented/…)分离，
     # 数据里必须写「绑定值=小写」，否则 Adobe 打开时下拉匹配不上、显示空白。
     _STATUS_BIND = {"patented", "pending", "abandoned", "expired"}
+    # domesContList 同为双 items：显示值(Continuation of/…) vs 绑定值=代码(CON/…)。写代码。
+    _CONT_CODE = {
+        "Continuation of": "CON", "Continuation in part of": "CIP", "Division of": "DIV",
+        "a 371 of international": "NST", "substitution of": "SUB", "reissue of": "REI",
+        "Claims benefit of provisional": "PRO",
+    }
+    _cont_bind = lambda c: _CONT_CODE.get((c or "").strip(), (c or "").strip())  # 已是代码则原样
     for idx, app in enumerate(case_info.get("Parent Applications", []), start=1):
         _status = (app.get("Prior Application Status") or "").strip()
         _status_val = _status.lower() if _status.lower() in _STATUS_BIND else "pending"
         _appno = _ads_appnum(app.get("Application No", ''))                 # 本段申请号（链上一段的在先号）
-        _cont = app.get('Continuity Type', '')
+        _cont = _cont_bind(app.get('Continuity Type', ''))                  # 写 XFA 绑定代码
         _prior = _ads_appnum(app.get("Prior Application Number", ''))       # 本段母案号
         _fdate = app.get("Filing Date", '')
         # Patented → 填「专利块」(含专利号/授权日)、Pending 块留空；否则(Pending/Abandoned)填 Pending 块、专利块留空。
