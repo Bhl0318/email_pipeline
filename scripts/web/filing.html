@@ -504,19 +504,27 @@ function renderForm(){
         <div class="field"><label>邮编</label><input id="fx-inv-${i}-zip" value="${g('mail_postcode','postcode')}"></div>
       </div></div>`;
   }).join("") || '<div style="color:#94a3b8;font-size:12px;">无发明人</div>';
-  const parentRows = (fields.parent_applications||[]).map((p,i)=>`
+  const _parStatus = (cur)=>["Pending","Patented","Abandoned","Expired"].map(s=>
+      `<option ${String(cur||"Pending").toLowerCase()===s.toLowerCase()?"selected":""}>${s}</option>`).join("");
+  const parentCards = (fields.parent_applications||[]).map((p,i)=>`
     <div style="border:1px solid #e2e8f0;border-radius:6px;padding:8px;margin-bottom:8px;">
       <div class="grid">
         <div class="field"><label>母案${i+1} 本段申请号(This App，可空=本申请)</label><input id="fx-par-${i}-thisapp" value="${esc(p["Application No"]||"")}" placeholder="该在先件的子案号；首段留空=本申请"></div>
         <div class="field"><label>在先申请号(Prior，ADS)</label><input id="fx-par-${i}-num" value="${esc(p["Prior Application Number"]||"")}"></div>
         <div class="field"><label>申请日</label><input id="fx-par-${i}-date" value="${esc(p["Filing Date"]||"")}" placeholder="YYYY-MM-DD"></div>
-        <div class="field"><label>在先状态</label><select id="fx-par-${i}-status">
-          ${["Pending","Patented","Abandoned"].map(s=>`<option ${(p["Prior Application Status"]||"Pending")===s?"selected":""}>${s}</option>`).join("")}</select></div>
+        <div class="field"><label>在先状态</label><select id="fx-par-${i}-status">${_parStatus(p["Prior Application Status"])}</select></div>
         <div class="field"><label>续案类型</label><input id="fx-par-${i}-cont" value="${esc(p["Continuity Type"]||"")}" placeholder="如 Continuation of / Continuation in part of / Division of"></div>
         <div class="field"><label>专利号(Patent No，仅 Patented 时填)</label><input id="fx-par-${i}-patnum" value="${esc(p["Patent Number"]||"")}"></div>
         <div class="field"><label>授权日(Issue Date，仅 Patented 时填)</label><input id="fx-par-${i}-issdate" value="${esc(p["Issue Date"]||"")}" placeholder="YYYY-MM-DD"></div>
-      </div></div>`
-  ).join("") || '<div style="color:#94a3b8;font-size:12px;">无母案（新申请）</div>';
+      </div>
+      <div style="margin-top:6px;display:flex;gap:8px;">
+        <button type="button" onclick="addParent(${i})" style="padding:4px 10px;border:1px solid #cbd5e1;border-radius:5px;background:#f8fafc;cursor:pointer;font-size:12px;color:#334155;">＋ 在下方插入母案</button>
+        <button type="button" onclick="removeParent(${i})" style="padding:4px 10px;border:1px solid #fecaca;border-radius:5px;background:#fff5f5;cursor:pointer;font-size:12px;color:#b91c1c;">删除本母案</button>
+      </div>
+    </div>`
+  ).join("");
+  const parentRows = (parentCards || '<div style="color:#94a3b8;font-size:12px;margin-bottom:6px;">无母案（新申请）</div>')
+    + '<div><button type="button" onclick="addParent(-1)" style="padding:5px 12px;border:1px dashed #94a3b8;border-radius:6px;background:#f8fafc;cursor:pointer;font-size:12px;color:#334155;">＋ 增加母案</button></div>';
   // 案件信息可编辑行（改完点上方预览重新生成；回写见 collectExtra）
   const applicantRows = (fields.applicants||[]).map((a,i)=>`
     <div style="border:1px solid #e2e8f0;border-radius:6px;padding:8px;margin-bottom:8px;">
@@ -755,6 +763,26 @@ function collectExtra(){
       if (combined) inv.full_name_en = combined;          // 全空时不覆盖已有全名
     }
   });
+}
+
+// 母案链动态增删：先快照当前编辑(collectExtra)→改数组→重渲染表单(保留替换/代理人面板)
+function _reRenderKeepPanels(){ renderForm(); loadReplacements(); loadAgentPersons(); }
+function addParent(afterIndex){
+  collectExtra();
+  fields.parent_applications = fields.parent_applications || [];
+  const blank = {"Application No":"","Prior Application Number":"","Filing Date":"",
+                 "Prior Application Status":"Pending","Continuity Type":"","Patent Number":"","Issue Date":""};
+  if (afterIndex==null || afterIndex<0 || afterIndex>=fields.parent_applications.length)
+    fields.parent_applications.push(blank);               // 追加到末尾
+  else fields.parent_applications.splice(afterIndex+1, 0, blank);  // 在该母案后插入
+  _reRenderKeepPanels();
+}
+function removeParent(i){
+  collectExtra();
+  if (fields.parent_applications && i>=0 && i<fields.parent_applications.length){
+    fields.parent_applications.splice(i, 1);
+    _reRenderKeepPanels();
+  }
 }
 
 // 代理所变化 → 拉取该所可选代理人，填充「代理人」下拉（datalist，仍可手输）

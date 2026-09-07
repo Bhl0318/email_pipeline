@@ -168,8 +168,12 @@ def build_ads_datasets_xml(case_info: dict) -> str:
 """
 
     domestic_benefit = ""
+    # domAppStatusList 是 XFA 双 items 字段：显示值(Patented/…)与绑定值(patented/…)分离，
+    # 数据里必须写「绑定值=小写」，否则 Adobe 打开时下拉匹配不上、显示空白。
+    _STATUS_BIND = {"patented", "pending", "abandoned", "expired"}
     for idx, app in enumerate(case_info.get("Parent Applications", []), start=1):
         _status = (app.get("Prior Application Status") or "").strip()
+        _status_val = _status.lower() if _status.lower() in _STATUS_BIND else "pending"
         _appno = _ads_appnum(app.get("Application No", ''))                 # 本段申请号（链上一段的在先号）
         _cont = app.get('Continuity Type', '')
         _prior = _ads_appnum(app.get("Prior Application Number", ''))       # 本段母案号
@@ -195,7 +199,7 @@ def build_ads_datasets_xml(case_info: dict) -> str:
 <sfDomesticContinuity>
       <sfDomesContinuity>
         <sfdomesContAppStat>
-          <domAppStatusList>{_status}</domAppStatusList>
+          <domAppStatusList>{_status_val}</domAppStatusList>
           <domsequence>{idx}</domsequence>
         </sfdomesContAppStat>
       </sfDomesContinuity>

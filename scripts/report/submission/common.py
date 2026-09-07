@@ -464,9 +464,10 @@ def normalize_parents(fields: dict) -> dict:
         p = p or {}
         appno = p.get("Application No") or p.get("application_no") or ""
         out.append({
-            "Application No": appno,
-            # env5 可编辑的在先申请号/在先状态要保留（否则 ADS 取不到、状态回落 Pending）
-            "Prior Application Number": p.get("Prior Application Number") or appno,
+            "Application No": appno,   # 本段申请号(This App，子案)；首段=本申请→空
+            # 在先号(Prior，父案) 只取 Prior，不再回落 appno —— appno 现为 This App，
+            # 混填会把子案号错当父案（分叉家族/新增空白行 Prior 未填时尤甚）。
+            "Prior Application Number": p.get("Prior Application Number") or "",
             "Filing Date": p.get("Filing Date") or p.get("filing_date") or "",
             "Continuity Type": p.get("Continuity Type") or p.get("continuity_type") or "",
             "Prior Application Status": p.get("Prior Application Status") or "",
