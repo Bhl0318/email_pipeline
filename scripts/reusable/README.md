@@ -6,11 +6,12 @@
 scripts/reusable/
 ├── README.md              ← 本目录（分层索引）
 ├── foundation/   基础通用层 —— common / email_core / doc_utils
+├── business/     业务支撑层 —— doc_extract
 ├── integration/  应用集成层 —— llm_client
 └── examples/              各模块使用示例
 ```
 
-> 业务支撑层目前尚无已抽取的独立模块；email_pipeline 中已识别、可复用的业务支撑层/应用集成层**模块级**资产，见文末"待抽取模块级资产"。
+> 除已抽取模块外，email_pipeline 中还有其它已识别、可复用的模块级资产（规则引擎/编排骨架等），见文末"待抽取模块级资产"。
 
 ## 已抽取模块一览
 
@@ -19,6 +20,7 @@ scripts/reusable/
 | 基础通用层 | common | 与业务无关的通用小工具：解析/计算日期、归一化专利号、按路径存取嵌套数据、处理 HTML 文本 | `foundation/common/` | `foundation/common/README.md` | `examples/common_utils_demo.py` |
 | 基础通用层 | email_core | 收发和解析邮件：IMAP 收信、解析正文/附件、按记录增量去重、SMTP 发信 | `foundation/email_core/` | `foundation/email_core/README.md` | `examples/email_core_demo.py` |
 | 基础通用层 | doc_utils | 处理 PDF/Word：填 PDF 表单、转 PDF/A、从 PDF/docx 抽文本并切分说明书 | `foundation/doc_utils/` | `foundation/doc_utils/README.md` | `examples/doc_utils_demo.py` |
+| 业务支撑层 | doc_extract | 从 PDF 抽结构化数据，正则→大模型→图片OCR 三级兜底（组合 doc_utils+llm_client） | `business/doc_extract/` | `business/doc_extract/README.md` | `examples/doc_extract_demo.py` |
 | 应用集成层 | llm_client | 统一调用大模型：一个入口发文本/图片给 DeepSeek/千问，密钥集中配置，出错不中断 | `integration/llm_client.py` | `integration/llm_client.README.md` | `examples/llm_client_basic.py` |
 
 ## 按能力检索（想做什么 → 找哪个）
@@ -33,6 +35,7 @@ scripts/reusable/
 | 解析一封邮件的正文/附件/地址/日期 | email_core.mime_parse | `parse_message` |
 | 填 AcroForm 表单 / 转 PDF/A / 抽文本 / 切说明书 | doc_utils | `fill_pdf_form` / `to_pdfa` / `pdf_text` / `docx_text` / `split_spec` |
 | 调大模型文本（可要 JSON）/ 图片 OCR | llm_client | `chat` / `vision` |
+| 从 PDF 抽结构化数据（正则→大模型→图片 三级兜底） | doc_extract | `extract_from_pdf` |
 
 ---
 
@@ -80,7 +83,16 @@ scripts/reusable/
 
 ## 二、业务支撑层
 
-在基础能力之上、服务多个业务场景的处理模块。目前尚无已抽取的独立模块，下列为已识别、待抽取的模块级资产（见文末）。
+在基础能力之上、服务多个业务场景的处理模块。
+
+### doc_extract — 分级文档抽取组件
+从 PDF 抽结构化数据，按"正则 → 大模型读文本 → 扫描件图片OCR"三级自动兜底；调用方给正则/提示词，内部编排。是模块级组件，组合了 `doc_utils`（取文本）和 `llm_client`（调模型）。
+
+| 能力 | 作用 | 入口 |
+|---|---|---|
+| 三级兜底抽取 | 给 PDF + 正则/提示词 → 结构化结果 | `extract_from_pdf` |
+
+出处：范式抽象自 `oa/parse_us_pdf.py`、`oa/parse_cn_pdf.py`、`oa/parse_us_refs.py`。
 
 ---
 
@@ -106,7 +118,6 @@ email_pipeline 中除上述工具型模块外，还有**模块级**可复用能�
 
 | 层次 | 资产 | 做什么用 | 现位置 |
 |---|---|---|---|
-| 业务支撑层 | 文档解析范式 | 从官文 PDF 抽答复期限/对比文件，正则→大模型→图片 OCR 三级兜底 | `oa/parse_cn_pdf.py`、`oa/parse_us_pdf.py`、`oa/parse_us_refs.py` |
 | 业务支撑层 | 规则引擎 | 客户×官文类型×次数 → 动作(立项/转发/跳过)，规则外置 JSON、多级 fallback | `report/read_email.py`（`_resolve_oa_action`）+ `report/oa_report_rules.json` |
 | 业务支撑层 | 指令(提示词)外置 | 提示词存库、改库即生效、读不到回退默认 | `oa/oa_schemes.py`、`oa/oa_report_ai.py`（读 `zxassist_result_instruction`） |
 | 业务支撑层 | 文档生成器骨架 | "字段映射 ↔ 生成器"分离，按数据生成 PDF/docx 表单 | `report/submission/`（fields_mapping + 各 *_generator） |
