@@ -8,6 +8,7 @@ scripts/reusable/
 ├── foundation/   基础通用层 —— common / email_core / doc_utils
 ├── business/     业务支撑层 —— doc_extract / rule_engine / doc_generator
 ├── integration/  应用集成层 —— llm_client
+├── datasets/     数据资产 —— 模板 / 规则表 / 提示词（归纳副本）
 └── examples/              各模块使用示例
 ```
 
@@ -139,16 +140,16 @@ scripts/reusable/
 
 ## 四、数据资产（模板 / 规则表 / 提示词）
 
-按需求文档 §2.2，数据资产与代码模块**并列管理、不混入代码目录**。下列数据资产被上面的模块消费，是它们成套复用不可少的一半——因仍被在跑的流水线按固定路径引用，此处只登记归纳、指向原位置，不复制进库（避免两份真相）。
+按需求文档 §2.2，数据资产与代码模块**并列管理、不混入代码目录**。已归纳到 `datasets/` 一处（详见 `datasets/README.md`）。
 
-| 类型 | 数据资产 | 被哪个模块消费 | 格式 | 位置 |
+| 类型 | 数据资产 | 被哪个模块消费 | 库内位置 | 真源（流水线仍读这里） |
 |---|---|---|---|---|
-| 模板 | US 递交空白表单（POA / ADS / Transmittal×3 / Declaration×2 / Assignment 共 8 件） | doc_generator 范式（submission 各生成器） | PDF / docx | `report/submission/templates/` |
-| 模板 | 汇报信模板库（CN/US/EP 结项+OA 各类，md + docx） | 汇报信生成（`templates/generate_templates.py`） | md / docx | `scripts/templates/`（md/、docx/） |
-| 规则表 | OA 分派规则（国别×类型×客户码→动作） | rule_engine | JSON | `report/oa_report_rules.json` |
-| 提示词/指令 | 可外部编辑的模型指令（改库即生效） | llm_client 的调用方（指令外置） | DB 表 | atw `zxassist_result_instruction` |
+| 模板 | US 递交空白表单（POA / ADS / Transmittal×3 / Declaration×2 / Assignment 共 8 件） | doc_generator、doc_utils.fill_pdf_form | `datasets/templates/us_filing/` | `report/submission/templates/` |
+| 模板 | 汇报信模板库（CN/US/EP 结项+OA 各类，md + docx） | 汇报信生成 | `datasets/templates/report_letters/` | `scripts/templates/` |
+| 规则表 | OA 分派规则（国别×类型×客户码→动作） | rule_engine | `datasets/rules/oa_report_rules.json` | `report/oa_report_rules.json` |
+| 提示词/指令 | 可外部编辑的模型指令（改库即生效） | llm_client 的调用方（指令外置） | `datasets/prompts/`（说明，非文件） | atw 表 `zxassist_result_instruction` |
 
-> 若需把某套模板随模块一起打包带走（如给别的项目复用 doc_generator），再单独复制到该项目；本库不持有副本。
+> `datasets/` 是**归纳副本**，方便成套查看/打包；在跑的流水线仍从"真源"读取，改副本不生效，真源更新后需刷新副本。
 
 ---
 
