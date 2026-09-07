@@ -295,16 +295,21 @@ def fields_to_case_info(fields: dict, agent_info: dict = None) -> dict:
     _route = _norm(fields.get("filing_route"))
     _pct = fields.get("case_advance_info") or {}
     _pct_no = (_pct.get("pct_app_no") or "").strip()
-    if _pct_no and not parents:
-        # 有 PCT 号且无美国母案 ⇒ 经 PCT 入美（371 / bypass），PCT 即在先申请，本栏必有一行。
-        # 关系标签：含 371→371 国际阶段；否则按 filing_route 里的续案关系词规范
-        # （CIP/DIV/CON 原样、bypass→Continuation of），空则兜底 Continuation of。
-        # 旧逻辑只认字面 "bypass"/"371"，filing_route 存续案关系词（如 "Continuation in part of"）时漏填。
+    if _pct_no:
+        # PCT 作为域内优先权链的“最后一段”接上（不再与美国母案互斥）：
+        #   Application No = 链上一段（最后一个美国母案）的在先号；无母案时=空(本申请)；Prior=PCT 号。
+        # 续案类型：有美国母案链时，底层美国案基本就是 PCT 的 371 国家阶段 → 固定 "a 371 of international"；
+        #   无母案时按 filing_route 推（含 371→371 国际阶段；否则续案词/bypass→Continuation of）。
         _pct_date = (_pct.get("pct_app_date") or "").strip()
-        _ct = "a 371 of international" if "371" in _route else (_continuity_display(_route) or "Continuation of")
-        parents.append({"Application No": "", "Prior Application Number": _pct_no,
+        if parents:
+            _ct = "a 371 of international"
+        else:
+            _ct = "a 371 of international" if "371" in _route else (_continuity_display(_route) or "Continuation of")
+        parents.append({"Application No": _prev_no, "Prior Application Number": _pct_no,
                         "Filing Date": _pct_date, "Continuity Type": _ct,
-                        "Prior Application Status": "Pending"})
+                        "Prior Application Status": "Pending",
+                        "Patent Number": "", "Issue Date": ""})
+        _prev_no = _pct_no
 
     case_info = {
         "Our Ref.": fields.get("case_volume", ""),
