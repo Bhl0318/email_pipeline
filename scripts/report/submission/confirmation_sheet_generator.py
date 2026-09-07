@@ -564,7 +564,8 @@ class PatentApplicationFormGenerator:
                 res_label = f"Residence/Mailing Address for inventors{tag}/发明人{tag}住址"
             data_rows2.append([labor_label, labor_en, labor_cn])
             data_rows2.append([res_label, res_en, res_cn])
-            # 发明人住址明细(Address1/Address2/City/State/Post/Nationality)不再渲染进确认函；
+            data_rows2.append(["Nationality/国家:", app.get("country_en_us", ""), app.get("country_zh_cn", "")])
+            # 其余住址明细(Address1/Address2/City/State/Post)不再渲染进确认函；
             # 值仍存于 fields_json（env2 左侧输入框可编辑保存），仅不体现在文档中。
 
         applicants = case_info.get("applicants", []) or []
@@ -573,7 +574,8 @@ class PatentApplicationFormGenerator:
         for applicant in applicants:
             applicant_index += 1
             data_rows3.append([f'Name{str(applicant_index)}/申请人{str(applicant_index)}:', applicant.get('applicant_name_en', ''), applicant.get('applicant_name_cn', '')])
-            # 申请人住址明细(Address1/Address2/City/State/Post/Nationality)不再渲染进确认函；
+            data_rows3.append(['Nationality/国家:', applicant.get('country_en_us', ''), applicant.get('country_zh_cn', '')])
+            # 其余住址明细(Address1/Address2/City/State/Post)不再渲染进确认函；
             # 值仍存于 fields_json（env2 左侧输入框可编辑保存），仅不体现在文档中。
             data_rows3.append(['Entity/实体', applicant.get('entity_en', ''), applicant.get('entity_cn', '')])
 
@@ -616,11 +618,11 @@ class PatentApplicationFormGenerator:
             for gi, g in enumerate(_groups, 1):                             # 与 data_rows2 构建顺序一致
                 for idx, _inv in g["members"]:
                     ks.append(f"inventor.{idx}.name")
-                ks += [f"inventor.g{gi}.labor", f"inventor.g{gi}.residence"]
-                # 发明人住址明细行已去掉 → 不再分配对应 key（与 data_rows2 行数保持一致）
+                ks += [f"inventor.g{gi}.labor", f"inventor.g{gi}.residence", f"inventor.g{gi}.nationality"]
+                # 其余住址明细行已去掉 → 不再分配对应 key（与 data_rows2 行数保持一致）
             ks.append(None)                                                  # 申请人表头
             for ai in range(1, len(applicants) + 1):
-                ks += [f"applicant.{ai}.{f}" for f in ("name", "entity")]   # 申请人住址明细行已去掉
+                ks += [f"applicant.{ai}.{f}" for f in ("name", "nationality", "entity")]   # 其余住址明细行已去掉
             if data_rows4:                                                   # 优先权
                 ks.append(None)
                 for pi in range(1, len(priorities) + 1):

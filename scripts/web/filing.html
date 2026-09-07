@@ -471,6 +471,16 @@ function _contDisplay(v){
 const _contOpts=(cur)=>{const c=_contDisplay(cur);
   return '<option value=""></option>'+_CONT_LIST.map(s=>`<option ${c===s?"selected":""}>${s}</option>`).join("");};
 
+// 落地方式(filing_route)标准选项；存量非标准值追加保留并选中，空则留空
+const _ROUTE_LIST=["371 Route","By pass continuation","New","Continuation of","Continuation in part of","Division of","Paris"];
+const _routeOpts=(cur)=>{
+  const c=String(cur||"").trim();
+  const matched=_ROUTE_LIST.find(s=>s.toLowerCase()===c.toLowerCase());
+  let html='<option value=""></option>'+_ROUTE_LIST.map(s=>`<option ${matched===s?"selected":""}>${s}</option>`).join("");
+  if (c && !matched) html+=`<option selected>${esc(c)}</option>`;   // 保留存量非标准值
+  return html;
+};
+
 function renderForm(){
   const ci = fields.case_info || {};
   const ap = (fields.applicants||[])[0] || {};
@@ -589,7 +599,7 @@ function renderForm(){
       <div class="grid">
         <div class="field"><label>代理所案号</label><input readonly value="${esc(fields.case_volume||"")}"></div>
         <div class="field"><label>主题(Subject Matter)</label><input readonly value="${esc(fields.subject_matter||"")}"></div>
-        <div class="field"><label>落地方式(filing_route)</label><input id="cf-route" value="${esc(fields.filing_route||"")}" placeholder="371 Route / By pass continuation / New / Continuation of / Continuation in part of / Division of / Paris"></div>
+        <div class="field"><label>落地方式(filing_route)</label><select id="cf-route">${_routeOpts(fields.filing_route)}</select></div>
         <div class="field"><label>申请名称（递交件自动大写）</label><input id="cf-title" value="${esc(ci.case_name_en||"")}"></div>
       </div>
       <div style="margin:10px 0 4px;font-size:11.5px;color:#64748b;">申请人</div>
