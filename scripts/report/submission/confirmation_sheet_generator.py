@@ -692,13 +692,12 @@ class PatentApplicationFormGenerator:
                 self._format_cell(cells[0], row[0], bold=True, valign_center=True)
                 self._format_cell(cells[1], row[1], bold=False, valign_center=True)
                 if _yellow:
-                    self._set_cell_shading(cells[0], "FFFF00")
-                    self._set_cell_shading(cells[1], "FFFF00")
+                    self._set_cell_shading(cells[1], "FFFF00")   # 只标值列，标签列不标
             elif len(row) == 3:
                 for i in range(3):
                     self._format_cell(cells[i], row[i], bold=(i == 0), valign_center=(i == 0))
                 if _yellow:
-                    for i in range(3):
+                    for i in (1, 2):                              # 只标值列（英文/中文），标签列不标
                         self._set_cell_shading(cells[i], "FFFF00")
 
         col_widths = [Cm(3.24), Cm((14.63 - 3.24) / 2), Cm((14.63 - 3.24) / 2)]
