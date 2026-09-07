@@ -137,6 +137,21 @@ scripts/reusable/
 
 ---
 
+## 四、数据资产（模板 / 规则表 / 提示词）
+
+按需求文档 §2.2，数据资产与代码模块**并列管理、不混入代码目录**。下列数据资产被上面的模块消费，是它们成套复用不可少的一半——因仍被在跑的流水线按固定路径引用，此处只登记归纳、指向原位置，不复制进库（避免两份真相）。
+
+| 类型 | 数据资产 | 被哪个模块消费 | 格式 | 位置 |
+|---|---|---|---|---|
+| 模板 | US 递交空白表单（POA / ADS / Transmittal×3 / Declaration×2 / Assignment 共 8 件） | doc_generator 范式（submission 各生成器） | PDF / docx | `report/submission/templates/` |
+| 模板 | 汇报信模板库（CN/US/EP 结项+OA 各类，md + docx） | 汇报信生成（`templates/generate_templates.py`） | md / docx | `scripts/templates/`（md/、docx/） |
+| 规则表 | OA 分派规则（国别×类型×客户码→动作） | rule_engine | JSON | `report/oa_report_rules.json` |
+| 提示词/指令 | 可外部编辑的模型指令（改库即生效） | llm_client 的调用方（指令外置） | DB 表 | atw `zxassist_result_instruction` |
+
+> 若需把某套模板随模块一起打包带走（如给别的项目复用 doc_generator），再单独复制到该项目；本库不持有副本。
+
+---
+
 ## 附：待抽取的模块级资产（已识别）
 
 email_pipeline 中除上述工具型模块外，还有**模块级**可复用能力，与业务规则有耦合、尚未抽为独立模块，先按需求文档层次登记，供后续抽取：
