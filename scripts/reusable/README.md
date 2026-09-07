@@ -6,7 +6,7 @@
 scripts/reusable/
 ├── README.md              ← 本目录（分层索引）
 ├── foundation/   基础通用层 —— common / email_core / doc_utils
-├── business/     业务支撑层 —— doc_extract
+├── business/     业务支撑层 —— doc_extract / rule_engine
 ├── integration/  应用集成层 —— llm_client
 └── examples/              各模块使用示例
 ```
@@ -21,6 +21,7 @@ scripts/reusable/
 | 基础通用层 | email_core | 收发和解析邮件：IMAP 收信、解析正文/附件、按记录增量去重、SMTP 发信 | `foundation/email_core/` | `foundation/email_core/README.md` | `examples/email_core_demo.py` |
 | 基础通用层 | doc_utils | 处理 PDF/Word：填 PDF 表单、转 PDF/A、从 PDF/docx 抽文本并切分说明书 | `foundation/doc_utils/` | `foundation/doc_utils/README.md` | `examples/doc_utils_demo.py` |
 | 业务支撑层 | doc_extract | 从 PDF 抽结构化数据，正则→大模型→图片OCR 三级兜底（组合 doc_utils+llm_client） | `business/doc_extract/` | `business/doc_extract/README.md` | `examples/doc_extract_demo.py` |
+| 业务支撑层 | rule_engine | 规则外置 JSON，按多维键分级查表（通配符→精确→有序兜底）出结论 | `business/rule_engine/` | `business/rule_engine/README.md` | `examples/rule_engine_demo.py` |
 | 应用集成层 | llm_client | 统一调用大模型：一个入口发文本/图片给 DeepSeek/千问，密钥集中配置，出错不中断 | `integration/llm_client.py` | `integration/llm_client.README.md` | `examples/llm_client_basic.py` |
 
 ## 按能力检索（想做什么 → 找哪个）
@@ -36,6 +37,7 @@ scripts/reusable/
 | 填 AcroForm 表单 / 转 PDF/A / 抽文本 / 切说明书 | doc_utils | `fill_pdf_form` / `to_pdfa` / `pdf_text` / `docx_text` / `split_spec` |
 | 调大模型文本（可要 JSON）/ 图片 OCR | llm_client | `chat` / `vision` |
 | 从 PDF 抽结构化数据（正则→大模型→图片 三级兜底） | doc_extract | `extract_from_pdf` |
+| 按多维键查规则表、层层兜底出结论 | rule_engine | `load_rules` / `resolve` |
 
 ---
 
@@ -94,6 +96,16 @@ scripts/reusable/
 
 出处：范式抽象自 `oa/parse_us_pdf.py`、`oa/parse_cn_pdf.py`、`oa/parse_us_refs.py`。
 
+### rule_engine — 分级规则解析引擎
+把规则外置成嵌套 JSON，按多维键逐层查表，最后一层"通配符 → 精确 → 有序兜底"命中。用于任何"按几个维度查规则、层层兜底出结论"的场景。引擎只管查表，维度键怎么算由调用方决定。
+
+| 能力 | 作用 | 入口 |
+|---|---|---|
+| 读规则表 | 加载嵌套规则 JSON（带缓存） | `load_rules` |
+| 分级查表 | 按多维键+通配符+有序兜底命中 | `resolve` |
+
+出处：`report/read_email.py`（`_load_oa_rules`/`_resolve_oa_action`）+ `report/oa_report_rules.json`。
+
 ---
 
 ## 三、应用集成层
@@ -118,7 +130,6 @@ email_pipeline 中除上述工具型模块外，还有**模块级**可复用能�
 
 | 层次 | 资产 | 做什么用 | 现位置 |
 |---|---|---|---|
-| 业务支撑层 | 规则引擎 | 客户×官文类型×次数 → 动作(立项/转发/跳过)，规则外置 JSON、多级 fallback | `report/read_email.py`（`_resolve_oa_action`）+ `report/oa_report_rules.json` |
 | 业务支撑层 | 指令(提示词)外置 | 提示词存库、改库即生效、读不到回退默认 | `oa/oa_schemes.py`、`oa/oa_report_ai.py`（读 `zxassist_result_instruction`） |
 | 业务支撑层 | 文档生成器骨架 | "字段映射 ↔ 生成器"分离，按数据生成 PDF/docx 表单 | `report/submission/`（fields_mapping + 各 *_generator） |
 | 应用集成层 | 单入口扇出编排 | 一封邮件只读一次、只分类一次，按开关扇出多个下游 | `scripts/main.py` |
