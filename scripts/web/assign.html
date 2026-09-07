@@ -193,6 +193,7 @@
             <div class="case-item__main">
               <div class="case-item__top">
                 <span class="case-item__no">{{ c.caseNo }}</span>
+                <span v-if="c.oaSeq" style="font-size:11px;color:#2563eb;background:#eff6ff;border:1px solid #dbeafe;border-radius:4px;padding:0 5px;flex-shrink:0;">OA{{ c.oaSeq }}</span>
               </div>
               <div class="case-item__name">{{ c.name }}</div>
             </div>
@@ -213,7 +214,7 @@
     <div class="case-detail">
       <div class="case-detail__toolbar">
         <span class="case-detail__toolbar-title">
-          {{ selectedCase ? selectedCase.caseNo + ' — 案件情况' : '请从左侧选择案件' }}
+          {{ selectedCase ? selectedCase.caseNo + (selectedCase.oaSeq ? '（第' + selectedCase.oaSeq + '次OA）' : '') + ' — 案件情况' : '请从左侧选择案件' }}
           <span v-if="selectedCase && selectedCase.linkSentAt"
             style="margin-left:8px;font-weight:400;color:#8c8c8c;font-size:12px">
             · 分配链接发送：{{ selectedCase.linkSentAt }}

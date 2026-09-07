@@ -14,6 +14,7 @@
 """
 import json
 import os
+import re
 import sys
 from datetime import datetime
 
@@ -118,12 +119,35 @@ def _store():
         return None
 
 
+_CN_NUM = {"一": 1, "二": 2, "三": 3, "四": 4, "五": 5,
+           "六": 6, "七": 7, "八": 8, "九": 9, "十": 10}
+
+
+def _oa_seq_of(name):
+    """从立项名解析 OA 次数：US/EP「OA{数字}-…」→数字；CN「第N次…」→N；取不到返回 0。"""
+    name = name or ""
+    m = re.search(r'OA(\d+)', name)
+    if m:
+        return int(m.group(1))
+    m = re.search(r'第([一二三四五六七八九十]+)次', name)
+    if m:
+        cn = m.group(1)
+        if cn == "十":
+            return 10
+        if "十" in cn:
+            l, _, rr = cn.partition("十")
+            return (_CN_NUM.get(l, 1) if l else 1) * 10 + (_CN_NUM.get(rr, 0) if rr else 0)
+        return _CN_NUM.get(cn, 0)
+    return 0
+
+
 def _row_to_summary(r):
     """待分配表行 → 前端摘要。"""
     return {
         "id": r.get("id", ""),
         "caseNo": r.get("case_volume", ""),
         "name": r.get("project_name", ""),
+        "oaSeq": _oa_seq_of(r.get("project_name", "")),   # OA 次数（0=无/非答复类）
         "client": r.get("customer", ""),
         "region": r.get("region", ""),
         "legalStatus": "",
