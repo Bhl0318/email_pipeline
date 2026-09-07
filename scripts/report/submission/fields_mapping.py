@@ -274,17 +274,20 @@ def fields_to_case_info(fields: dict, agent_info: dict = None) -> dict:
     small_entity = "1" if _entity in ("small", "micro") else "0"
     drawing_sheets = _opts.get("drawing_sheets", "") or ""
 
-    # Domestic Benefit / National Stage：parent_applications 的 Continuity Type 规范成代码；
-    # 母案按链逐段填（parent_applications 需按「最近母案在前、祖父案在后」排序）：
-    #   每段 Application Number = 该段「较晚一件」的号 = 上一段的在先号；首段=本申请(未分配→空)。
-    #   Prior Application Number = 本段母案号。→ 形成 本申请←父案←祖父案… 的域内优先权链。
+    # Domestic Benefit / National Stage：parent_applications 的 Continuity Type 规范成代码。
+    #   每段一行「本段申请号(This App) 是 在先号(Prior) 的 [续案类型]」：
+    #     Application No(This App) = 该行「较晚一件」的号（子案）；首段=本申请→空。
+    #     Prior Application Number = 该行在先号（父案）。
+    #   本段申请号优先取源行自带的 Application No（filing.html 可编辑）；
+    #   源行未填时才回落线性链推 = 上一段的在先号（单链家族适用，分叉家族会错→需人工在页面上填）。
     parents = []
-    _prev_no = ""   # 首段本申请自己的号（未分配→空）
+    _prev_no = ""   # 链推游标：上一段的在先号（首段=空）
     for p in fields.get("parent_applications") or []:
-        prior_no = (p.get("Prior Application Number") or p.get("Application No") or "").strip()
+        prior_no = (p.get("Prior Application Number") or "").strip()
+        this_app = (p.get("Application No") or "").strip() or _prev_no  # 源行自带优先，否则链推
         parents.append({
-            "Application No": _prev_no,                   # 链式：本段申请号=上一段的在先号
-            "Prior Application Number": prior_no,        # 本段母案号 → Prior Application Number
+            "Application No": this_app,                   # 本段申请号(This App)：源行自带优先
+            "Prior Application Number": prior_no,        # 本段在先号(父案) → Prior Application Number
             "Filing Date": p.get("Filing Date", ""),
             "Continuity Type": _continuity_display(p.get("Continuity Type")),
             "Prior Application Status": (p.get("Prior Application Status") or "").strip() or "Pending",
