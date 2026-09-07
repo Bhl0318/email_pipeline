@@ -15,6 +15,7 @@ from pathlib import Path
 
 from docx import Document
 from docx.enum.table import WD_CELL_VERTICAL_ALIGNMENT
+from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.table import _Cell, _Row
 
@@ -228,6 +229,15 @@ def _preceding_spacer_paragraphs(tbl_el):
     return list(reversed(out))
 
 
+def _set_page_break_before_table(table):
+    """让该签字表从新的一页开始：pageBreakBefore 设在表首格首段（位于表格内，
+    不受正文空段清理影响；LibreOffice/Word 均据此另起一页）。幂等。"""
+    p = table.rows[0].cells[0].paragraphs[0]
+    pPr = p._p.get_or_add_pPr()
+    if pPr.find(qn('w:pageBreakBefore')) is None:
+        pPr.insert(0, OxmlElement('w:pageBreakBefore'))
+
+
 def _fill_inventor_tables(doc, names, addr_lines):
     """个人转公司：按序把发明人填入签字表（含"发明人打印版名字"占位的表）。
 
@@ -275,6 +285,10 @@ def _fill_inventor_tables(doc, names, addr_lines):
         if extra and addr2_row is not None:
             _clone_address_rows(table, addr2_row, extra)
         filled += 1
+    # 每个发明人签字表各占一页：给第 2 个起的已填签字表设 pageBreakBefore（分页显示）
+    used = list(inventor_tables)[:len(names)]
+    for _t in used[1:]:
+        _set_page_break_before_table(_t)
     return filled, added
 
 
@@ -401,25 +415,16 @@ def generate_assignment(fields: dict, assignment: dict, output_dir, seq: int = 1
     return {"file_path": str(file_path), "file_name": file_name, "warnings": warnings}
 
 
-def _inv_file_tag(name: str) -> str:
-    """发明人名 → 文件名安全标签（取姓、去非法字符/空格）。空则回退 INV。"""
-    s = (name or "").split(",")[0].strip()             # "LAST, First" 取姓
-    s = re.sub(r'[\\/:*?"<>|]+', "", s)                 # 去 Windows 文件名非法字符
-    s = re.sub(r"\s+", "", s)
-    return s or "INV"
-
-
 def generate_assignments(fields: dict, output_dir) -> list:
     """按转让段逐段生成，返回结果列表。
 
     转让段取 effective_assignments：发明人有 employer 时按归属公司分组派生个人转公司段
     （与确认函同源，解决"多公司只出一份"），无 employer 时沿用上游 assignments。
-    **个人转公司段按发明人拆：每个发明人各一份**（便于分别发给各发明人签字）；
-    公司转公司段不涉发明人签字，仍一份。派生告警挂到首份结果 warnings。
+    一段转让一份文件：个人转公司段的所有发明人在同一份里、每个发明人签字表**各占一页**
+    （分页显示，见 _fill_inventor_tables）；公司转公司段一份。派生告警挂到首份结果 warnings。
 
-    生成前先清掉 output_dir 里旧的 Assignment 产物（docx/pdf），避免旧「总文件」
-    与新「每发明人份」在预览里混显（份数/命名规则变化时尤甚）。只清 Assignment，
-    不碰同目录 POA/Transmittal/确认函/Declaration。"""
+    生成前先清掉 output_dir 里旧的 Assignment 产物（docx/pdf），避免旧份（如曾按发明人
+    拆成的多份）与新份混显。只清 Assignment，不碰同目录 POA/Transmittal/确认函/Declaration。"""
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     for _old in output_dir.glob("*Assignment*"):
@@ -430,20 +435,10 @@ def generate_assignments(fields: dict, output_dir) -> list:
     assignments, derive_warnings = effective_assignments(fields)
     if not assignments:
         raise ValueError("assignments 为空，无法生成 Assignment")
-    # 展开成「生成单元」：(单段 assignment, 文件名标签)
-    units = []
-    for seg in assignments:
-        if (seg.get("assignment_type") or "") == "个人转公司":
-            seg_names = [str(n).strip() for n in (seg.get("assignor_inventors") or []) if str(n).strip()] \
-                        or inventor_names(fields)
-            for nm in seg_names:                          # 每发明人一份
-                units.append(({**seg, "assignor_inventors": [nm]}, _inv_file_tag(nm)))
-        else:
-            units.append((seg, ""))                       # 公司转公司不拆
-    total = len(units)
+    total = len(assignments)
     results = [
-        generate_assignment(fields, item, output_dir, seq=i, total=total, name_tag=tag)
-        for i, (item, tag) in enumerate(units, start=1)
+        generate_assignment(fields, item, output_dir, seq=i, total=total)
+        for i, item in enumerate(assignments, start=1)
     ]
     if derive_warnings and results:
         results[0]["warnings"] = derive_warnings + (results[0].get("warnings") or [])
