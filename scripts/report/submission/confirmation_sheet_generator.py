@@ -63,6 +63,19 @@ class PatentApplicationFormGenerator:
         shd.set(qn('w:fill'), fill_color)
         tcPr.append(shd)
 
+    def _highlight_cell_runs(self, cell, color="yellow"):
+        """荧光笔式高亮：只给单元格里的文字加高亮（run 级 w:highlight），
+        格子内文字之外的空白区域不着色（区别于整格底纹 _set_cell_shading）。
+        须在文字写入(_format_cell 生成 run)之后调用。"""
+        for para in cell.paragraphs:
+            for run in para.runs:
+                rPr = run._element.get_or_add_rPr()
+                for h in rPr.findall(qn('w:highlight')):
+                    rPr.remove(h)
+                hl = OxmlElement('w:highlight')
+                hl.set(qn('w:val'), color)   # 荧光笔只认预定义色名，yellow=标准荧光黄
+                rPr.append(hl)
+
     def _set_cell_vertical_center(self, cell):
         tc = cell._tc
         tcPr = tc.get_or_add_tcPr()
@@ -692,13 +705,13 @@ class PatentApplicationFormGenerator:
                 self._format_cell(cells[0], row[0], bold=True, valign_center=True)
                 self._format_cell(cells[1], row[1], bold=False, valign_center=True)
                 if _yellow:
-                    self._set_cell_shading(cells[1], "FFFF00")   # 只标值列，标签列不标
+                    self._highlight_cell_runs(cells[1])          # 只高亮值文字，标签列不标
             elif len(row) == 3:
                 for i in range(3):
                     self._format_cell(cells[i], row[i], bold=(i == 0), valign_center=(i == 0))
                 if _yellow:
-                    for i in (1, 2):                              # 只标值列（英文/中文），标签列不标
-                        self._set_cell_shading(cells[i], "FFFF00")
+                    for i in (1, 2):                              # 只高亮值文字（英文/中文），标签列不标
+                        self._highlight_cell_runs(cells[i])
 
         col_widths = [Cm(3.24), Cm((14.63 - 3.24) / 2), Cm((14.63 - 3.24) / 2)]
         for idx, width in enumerate(col_widths):
