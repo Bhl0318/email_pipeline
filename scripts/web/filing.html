@@ -527,7 +527,7 @@ function renderForm(){
     <div style="border:1px solid #e2e8f0;border-radius:6px;padding:8px;margin-bottom:8px;">
       <div class="grid">
         <div class="field"><label>母案${i+1} 本段申请号(This App，可空=本申请)</label><input id="fx-par-${i}-thisapp" value="${esc(p["Application No"] || (i>0 ? ((fields.parent_applications[i-1]||{})["Prior Application Number"]||"") : ""))}" placeholder="该在先件的子案号；首段留空=本申请"></div>
-        <div class="field"><label>在先申请号(Prior，ADS)</label><input id="fx-par-${i}-num" value="${esc(p["Prior Application Number"]||"")}"></div>
+        <div class="field"><label>在先申请号(Prior，ADS)</label><input id="fx-par-${i}-num" value="${esc(p["Prior Application Number"]||p["Application No"]||"")}"></div>
         <div class="field"><label>申请日</label><input id="fx-par-${i}-date" value="${esc(p["Filing Date"]||"")}" placeholder="YYYY-MM-DD"></div>
         <div class="field"><label>在先状态</label><select id="fx-par-${i}-status">${_parStatus(p["Prior Application Status"])}</select></div>
         <div class="field"><label>续案类型</label><select id="fx-par-${i}-cont">${_contOpts(p["Continuity Type"])}</select></div>
