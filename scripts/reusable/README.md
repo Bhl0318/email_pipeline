@@ -5,7 +5,7 @@
 ```text
 scripts/reusable/
 ├── README.md              ← 本目录（分层索引）
-├── foundation/   基础通用层 —— common / email_core / doc_utils / net_clients / db
+├── foundation/   基础通用层 —— common / email_core / doc_utils / net_clients / db / wiki
 ├── business/     业务支撑层 —— doc_extract / rule_engine / doc_generator / db_merge
 ├── integration/  应用集成层 —— llm_client
 ├── datasets/     数据资产 —— 模板 / 规则表 / 提示词（归纳副本）
@@ -23,6 +23,7 @@ scripts/reusable/
 | 基础通用层 | doc_utils | 处理 PDF/Word：填 PDF 表单、转 PDF/A、从 PDF/docx 抽文本并切分说明书 | `foundation/doc_utils/` | `foundation/doc_utils/README.md` | `examples/doc_utils_demo.py` |
 | 基础通用层 | net_clients | 从外部下专利文档：按申请号下 USPTO 官文、按号从 FPO 下专利 PDF | `foundation/net_clients/` | `foundation/net_clients/README.md` | `examples/net_clients_demo.py` |
 | 基础通用层 | db | 查数据库：atw(MySQL) 与唯德 IPEasy(MSSQL) 两个客户端，参数化、统一读 db_config | `foundation/db/` | `foundation/db/README.md` | `examples/db_demo.py` |
+| 基础通用层 | wiki | 读写 Confluence：按标题/ID 读页、搜页、建子页、更新页、传附件 | `foundation/wiki/` | `foundation/wiki/README.md` | `examples/wiki_demo.py` |
 | 业务支撑层 | doc_extract | 从 PDF 抽结构化数据，正则→大模型→图片OCR 三级兜底（组合 doc_utils+llm_client） | `business/doc_extract/` | `business/doc_extract/README.md` | `examples/doc_extract_demo.py` |
 | 业务支撑层 | rule_engine | 规则外置 JSON，按多维键分级查表（通配符→精确→有序兜底）出结论 | `business/rule_engine/` | `business/rule_engine/README.md` | `examples/rule_engine_demo.py` |
 | 业务支撑层 | doc_generator | 按数据生成表单的骨架：字段映射→选模板→编排一组生成器（统一契约+逐个兜底） | `business/doc_generator/` | `business/doc_generator/README.md` | `examples/doc_generator_demo.py` |
@@ -43,6 +44,7 @@ scripts/reusable/
 | 按申请号下 USPTO 官文 / 按号下专利 PDF | net_clients | `USPTOApplication` / `download_patent_pdf` |
 | 查 atw(MySQL) / 唯德 IPEasy(MSSQL) | db | `mysql_query` / `mssql_query` |
 | 查多个库按同一键合并成一条 | db_merge | `merge_by_key` |
+| 读/写 Confluence 页面、传附件 | wiki | `WikiClient` |
 | 调大模型文本（可要 JSON）/ 图片 OCR | llm_client | `chat` / `vision` |
 | 从 PDF 抽结构化数据（正则→大模型→图片 三级兜底） | doc_extract | `extract_from_pdf` |
 | 按多维键查规则表、层层兜底出结论 | rule_engine | `load_rules` / `resolve` |
@@ -109,6 +111,16 @@ scripts/reusable/
 | mssql | 查唯德 IPEasy(SQL Server) | `mssql_query` |
 
 出处：`report/db_query.py`（MySQL）、`report/enrich_report.py`（MSSQL 连接样板）。改动：MySQL 连接由硬编码改走配置；MSSQL 三处重复 connect 归一。
+
+### wiki — Confluence 读写客户端
+读写 Confluence Wiki 页面：按标题/pageId 读页、搜页、建子页、更新页面内容、传附件。地址/账号走配置。
+
+| 能力 | 作用 | 入口 |
+|---|---|---|
+| 读页/搜页 | 按标题或 ID 取页、按标题搜 | `WikiClient.get_page` / `get_page_by_id` / `search_page` |
+| 写页/附件 | 建子页、更新内容、传附件 | `WikiClient.create_child_page` / `update_page` / `upload_attachment` |
+
+出处：`oa/oainfo_cli.py` 的 `WikiClient`。改动：base_url/账号由硬编码改走配置。storage HTML 的拼装（业务）不在此。
 
 ---
 
