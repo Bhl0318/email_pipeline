@@ -415,7 +415,18 @@ def generate_assignments(fields: dict, output_dir) -> list:
     转让段取 effective_assignments：发明人有 employer 时按归属公司分组派生个人转公司段
     （与确认函同源，解决"多公司只出一份"），无 employer 时沿用上游 assignments。
     **个人转公司段按发明人拆：每个发明人各一份**（便于分别发给各发明人签字）；
-    公司转公司段不涉发明人签字，仍一份。派生告警挂到首份结果 warnings。"""
+    公司转公司段不涉发明人签字，仍一份。派生告警挂到首份结果 warnings。
+
+    生成前先清掉 output_dir 里旧的 Assignment 产物（docx/pdf），避免旧「总文件」
+    与新「每发明人份」在预览里混显（份数/命名规则变化时尤甚）。只清 Assignment，
+    不碰同目录 POA/Transmittal/确认函/Declaration。"""
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    for _old in output_dir.glob("*Assignment*"):
+        try:
+            _old.unlink()
+        except OSError:
+            pass
     assignments, derive_warnings = effective_assignments(fields)
     if not assignments:
         raise ValueError("assignments 为空，无法生成 Assignment")
