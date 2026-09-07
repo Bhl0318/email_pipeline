@@ -221,16 +221,3 @@ scripts/reusable/
 | 提示词/指令 | 可外部编辑的模型指令（改库即生效） | llm_client 的调用方（指令外置） | `datasets/prompts/`（说明，非文件） | atw 表 `zxassist_result_instruction` |
 
 > `datasets/` 是**归纳副本**，方便成套查看/打包；在跑的流水线仍从"真源"读取，改副本不生效，真源更新后需刷新副本。
-
----
-
-## 附：待抽取的模块级资产（已识别）
-
-email_pipeline 中除上述工具型模块外，还有**模块级**可复用能力，与业务规则有耦合、尚未抽为独立模块，先按需求文档层次登记，供后续抽取：
-
-| 层次 | 资产 | 做什么用 | 现位置 |
-|---|---|---|---|
-| 业务支撑层 | 指令(提示词)外置 | 提示词存库、改库即生效、读不到回退默认 | `oa/oa_schemes.py`、`oa/oa_report_ai.py`（读 `zxassist_result_instruction`） |
-| 应用集成层 | 单入口扇出编排 | 一封邮件只读一次、只分类一次，按开关扇出多个下游 | `scripts/main.py` |
-| 应用集成层 | 隔离加载 | 让同名模块（oa/ 与 report/）在同进程互不串味 | `scripts/loader.py` |
-| 应用集成层 | 邮件分类引擎 | 按发件域分派 CN/US/EP，抽案号/类型/期限、判断是否立项 | `oa/filter_oa_email.py`、`report/classify_report.py` |
