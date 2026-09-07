@@ -96,5 +96,12 @@
     "base_url": "http://<confluence 主机:端口>",
     "user": "<Wiki 账号>",
     "password": "<Wiki 密码>"
+  },
+
+  "dingtalk": {
+    "_说明": "钉钉应用凭据，供 dingtalk.send 发消息 + dingtalk.receive 用 Stream Mode 收回复。也可用环境变量 DINGTALK_CLIENT_ID/DINGTALK_CLIENT_SECRET/DINGTALK_ROBOT_CODE 覆盖。robot_code 缺省用 client_id。",
+    "client_id": "<钉钉应用 client_id>",
+    "client_secret": "<钉钉应用 client_secret>",
+    "robot_code": "<机器人 robotCode，通常同 client_id>"
   }
 }
