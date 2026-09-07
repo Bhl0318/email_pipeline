@@ -773,8 +773,17 @@ const app = createApp({
       loadData().then(() => {
         if (openId.value) {
           const c = allCases.value.find(x => x.id === openId.value)
-          if (c) selectCase(c)
-          else ElementPlus.ElMessage.warning(`未找到待分配案件：${openId.value}`)
+          if (!c) {
+            ElementPlus.ElMessage.warning(`未找到待分配案件：${openId.value}`)
+          } else if (c.submitted) {
+            // 已分配/已处理：弹窗提示，不显示案件详情
+            const msg = c.statusCode === 2
+              ? `案件「${c.caseNo}」已标记「无需处理」。`
+              : `案件「${c.caseNo}」已分配，无需重复处理。`
+            ElementPlus.ElMessageBox.alert(msg, "该案件已处理", { type: "info", confirmButtonText: "知道了" })
+          } else {
+            selectCase(c)
+          }
         }
       })
       // 新手引导已关闭：不自动弹引导
