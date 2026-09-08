@@ -281,8 +281,12 @@ const SECTIONS = {
     { path: ["case_info", "case_name_en"], label: "发明名称（英文）", req: true, wide: true },
     { path: ["case_info", "case_name"], label: "发明名称（中文）" },
     { path: ["business_type_zh_cn"], label: "业务类型" },
-    { path: ["filing_route"], label: "落地方式", req: true },
-    { path: ["ae_methods"], label: "加速方式", req: true },
+    { path: ["filing_route"], label: "落地方式", req: true,
+      options: ["371 Route", "By pass continuation", "New", "Continuation of", "Continuation in part of", "Division of", "Paris"],
+      unknownHint: "存量值，请核对" },
+    { path: ["ae_methods"], label: "加速方式", req: true,
+      options: ["None", "Track One prioritized examination(Track One)", "Patent Prosecution Highway (PPH)"],
+      unknownHint: "存量值，请核对" },
   ]},
   advance: { title: "PCT 信息", fields: [
     { path: ["case_advance_info", "pct_app_no"], label: "PCT 申请号" },
@@ -640,7 +644,7 @@ function fieldInput(def) {
     control = `<select data-path='${dp}' ${def.readonly ? "disabled" : ""}>
       <option value=""${cur === "" ? " selected" : ""}>（未指定）</option>
       ${def.options.map(o => `<option value="${esc(o)}"${o === cur ? " selected" : ""}>${esc(o)}</option>`).join("")}
-      ${(!known && cur !== "") ? `<option value="${esc(cur)}" selected>${esc(cur)}（不在申请人列表，请核对）</option>` : ""}
+      ${(!known && cur !== "") ? `<option value="${esc(cur)}" selected>${esc(cur)}（${esc(def.unknownHint || "不在申请人列表，请核对")}）</option>` : ""}
     </select>`;
   } else {
     control = `<input data-path='${dp}' value="${esc(val ?? "")}" ${def.maxlength ? `maxlength="${def.maxlength}"` : ""} ${def.readonly ? "readonly" : ""}>`;
