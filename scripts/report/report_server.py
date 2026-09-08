@@ -938,12 +938,20 @@ class SubmissionSaveReq(BaseModel):
     filer_email: str = None       # 递交人邮箱；None=不改，""=清空，值=更新
 
 
+def _uppercase_applicant_names(fields: dict) -> None:
+    """申请人英文名统一转大写（就地改 fields，落库即大写）。"""
+    for a in (fields.get("applicants") or []):
+        if isinstance(a, dict) and a.get("applicant_name_en"):
+            a["applicant_name_en"] = str(a["applicant_name_en"]).upper()
+
+
 @app.post("/api/submission/tasks/{task_id}/save")
 def save_submission_task(task_id: str, req: SubmissionSaveReq):
     row = _load_submission_task(task_id)
     if row["status"] != "pending":
         raise HTTPException(status_code=400, detail=f"任务状态为 {row['status']}，不可编辑")
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    _uppercase_applicant_names(req.fields_json)   # 申请人英文名落库即大写
     contact_email = req.contact_email.strip() or row["contact_email"]
     # filer_email：None=保留原值，否则更新（含清空）
     filer_email = row.get("filer_email") if req.filer_email is None else req.filer_email.strip()
@@ -1418,6 +1426,7 @@ def confirm_submission_task(task_id: str, req: SubmissionConfirmReq):
 
     # 1) 先保存字段（无论发送成功与否）
     if req.fields_json is not None:
+        _uppercase_applicant_names(req.fields_json)   # 申请人英文名落库即大写
         execute_params(
             "UPDATE submission_tasks SET fields_json = %s, updated_at = %s WHERE id = %s",
             (json.dumps(req.fields_json, ensure_ascii=False), now, task_id),
