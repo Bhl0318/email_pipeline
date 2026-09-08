@@ -98,7 +98,7 @@ def build_email_modules(fields: dict, params: dict = None) -> list:
     # 4. 实体确认（首案）
     modules.append({
         "id": "entity_first", "title": "实体确认（适用于首案）", "checked": True,
-        "html": _h("烦请贵方确认所属实体（适用于首案）") +
+        "html": _h("烦请贵方确认所属实体") +
                 _p("大实体：不满足小实体与微实体情况下的其他实体；") +
                 _p("小实体：个人或者相关规定下的小型企业雇员数（包含关联机构）不超500人或者相关规定下的非盈利组织"
                    "（此条包含大学及高等教育机构），但同时，该实体没有将发明的相关权益转移给非小实体的第三方；") +
@@ -117,7 +117,7 @@ def build_email_modules(fields: dict, params: dict = None) -> list:
     repeat_entity = (params.get("repeat_entity") or "").strip() or "大"
     modules.append({
         "id": "entity_repeat", "title": f"{repeat_entity}实体（适用于非首案）", "checked": False,
-        "html": _h(f"{repeat_entity}实体（适用于非首案）") +
+        "html": _h(f"{repeat_entity}实体") +
                 _p(f"贵司之前递交案件时确认实体为{repeat_entity}实体，后续流程中我方将按照贵司所属{repeat_entity}实体进行操作。"
                    "若实体已变，烦请告知。如贵司对此问题有疑问，请随时垂询。"),
         "note": "与「实体确认（首案）」二选一；在右侧选实体类型",
@@ -127,7 +127,7 @@ def build_email_modules(fields: dict, params: dict = None) -> list:
     # 6. POA（首案）
     modules.append({
         "id": "poa_first", "title": "POA 总委（适用于首案）", "checked": True,
-        "html": _h("POA（适用于首案）") +
+        "html": _h("POA") +
                 _p("此案为我司代理贵方在美国递交的第一个案子，需要签署总委（POA），"
                    "表示贵方将处理专利申请等相关事务的权利委托给我司，该文件可重复利用，仅需签署一次。"
                    "签署该文件的人员应为能够明确代表贵方的管理层（如CEO、总裁、副总裁、部门主管等），"
