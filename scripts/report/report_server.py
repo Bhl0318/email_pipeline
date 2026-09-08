@@ -965,23 +965,6 @@ def parse_address(req: ParseAddressReq):
     return parse_address_en(req.raw or "")
 
 
-class QaSeedStateReq(BaseModel):
-    enabled: bool
-
-
-@app.get("/api/submission/qa-seed")
-def get_qa_seed_state():
-    """QA 播种全局开关状态（管理员用；审核页不展示）。"""
-    return {"enabled": _qa_seed_enabled()}
-
-
-@app.post("/api/submission/qa-seed")
-def set_qa_seed_state(req: QaSeedStateReq):
-    """打开/关闭 QA 播种（全局）。关闭后打开确认函页不再播种。"""
-    _set_qa_seed_enabled(req.enabled)
-    return {"enabled": _qa_seed_enabled()}
-
-
 class SubmissionPreviewReq(BaseModel):
     # 可选传入页面当前编辑值（不落库，预览所见即所改）；缺省用库中 fields_json
     fields_json: dict = None
@@ -1355,17 +1338,14 @@ def _qa_seed_label(path):
 
 
 def _qa_seed_enabled() -> bool:
-    """QA 播种全局开关。状态文件不存在 → 默认开。"""
+    """QA 播种全局开关：手动改 qa_seed_state.json 的 "enabled"（true 开 / false 关）。
+    文件不存在或读取异常 → 默认开。"""
     try:
         return bool(json.loads(QA_SEED_STATE_PATH.read_text(encoding="utf-8")).get("enabled", True))
     except FileNotFoundError:
         return True
     except Exception:
         return True
-
-
-def _set_qa_seed_enabled(enabled: bool) -> None:
-    QA_SEED_STATE_PATH.write_text(json.dumps({"enabled": bool(enabled)}, ensure_ascii=False), encoding="utf-8")
 
 
 def _qa_seed_on_open(task_id, row, fields):
