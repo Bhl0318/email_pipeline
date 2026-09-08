@@ -965,6 +965,16 @@ def format_oa_person(responder, qc):
     return "；".join(parts)
 
 
+def _join_remark(*parts):
+    """拼「备注」：分配附言 + 说明，去空 + 去重（附言与说明同为默认「按照此前的人员安排」时不重复）。"""
+    out = []
+    for p in parts:
+        p = (p or "").strip()
+        if p and p not in out:
+            out.append(p)
+    return "；".join(out)
+
+
 def _append_person_inner(inner, person_text):
     """人员分配格：在原内容后追加一行（不覆盖）。原为空则直接写；新文案已存在则不重复。"""
     cur = (inner or "").strip()
@@ -1122,7 +1132,7 @@ def write_oa_assignment(oa_id, responder, qc, project="", postscript="", custom_
             return {"code": 1, "msg": f"页面更新失败 HTTP {status}"}
         logger.info(f"人员分配写入成功 oa_id={oa_id}: {text}")
         # 分配人若配了专属历史页（如薛虹→193786632），额外追加一行（幂等，失败不影响主结果）
-        remark = "；".join([x for x in [(postscript or "").strip(), (custom_note or "").strip()] if x])
+        remark = _join_remark(postscript, custom_note)
         hist = write_assignee_history(assign_person, oa_id, proj, oa_type, deadline, text,
                                       assign_time, remark)
         if hist.get("code") == 0 and "跳过" not in hist.get("msg", ""):
@@ -1173,8 +1183,7 @@ def write_oa_assignments_batch(items):
             body = new_body
             results[oa_id] = {"code": 0, "msg": f"写入成功: {text}"}
             if assign_person in _ASSIGNEE_HISTORY_PAGES:
-                remark = "；".join([x for x in [(it.get("postscript") or "").strip(),
-                                                (it.get("custom_note") or "").strip()] if x])
+                remark = _join_remark(it.get("postscript"), it.get("custom_note"))
                 row_html = _assignee_hist_row_html(assign_person, oa_id, proj, oa_type, deadline,
                                                    text, now, remark)
                 hist_by_person.setdefault(assign_person, []).append((oa_id, row_html))
