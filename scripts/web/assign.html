@@ -552,9 +552,10 @@ const app = createApp({
       return sel.schemeId === 'custom' ? !!(sel.customResponder && sel.customQc) : true
     }
 
+    const DEFAULT_NOTE = '按照此前的人员安排'   // 分配说明/原因默认值（AI方案+自定义方案通用）
     function getOrInitSel(caseId) {
       if (!caseSelections.value[caseId]) {
-        caseSelections.value[caseId] = { schemeId: null, customResponder: '', customQc: '', customNote: '', postscript: '' }
+        caseSelections.value[caseId] = { schemeId: null, customResponder: '', customQc: '', customNote: DEFAULT_NOTE, postscript: '' }
       }
       return caseSelections.value[caseId]
     }
@@ -692,8 +693,10 @@ const app = createApp({
       const sch = (c.schemes || []).find(s => s.id === sel.schemeId)
       const responder = sel.schemeId === 'custom' ? sel.customResponder : (sch?.responder || '')
       const qc = sel.schemeId === 'custom' ? sel.customQc : (sch?.qc || '')
+      // customNote(说明/原因)只在自定义方案时带；AI 方案一/二/三不带这句
+      const customNote = sel.schemeId === 'custom' ? (sel.customNote || '') : ''
       return { caseId: c.id, caseNo: c.caseNo, schemeId: sel.schemeId,
-               responder, qc, postscript: sel.postscript || '', customNote: sel.customNote || '' }
+               responder, qc, postscript: sel.postscript || '', customNote }
     }
 
     // API: POST /api/assignment/submit/batch body: { assignments: [{ caseId, schemeId, responder, qc }] }
