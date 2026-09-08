@@ -874,11 +874,14 @@ async function loadSourceDocsPreview() {
   try {
     const d = await api("GET", `${API}/tasks/${taskId}/source-docs`);
     sourceDocList = (d && d.docs) || [];
+    $("previewFiles").style.display = "block";
     if (!sourceDocList.length) {
-      $("previewPlaceholder").innerHTML = "暂无参考文件<br>（该案号下无文件，或目录未配置）";
+      renderSourceChips(-1);   // 仅上传条
+      $("previewPlaceholder").innerHTML = "暂无参考文件<br>（可点上方「＋ 上传参考文件」添加）";
+      $("previewPlaceholder").style.display = "flex";
       return;
     }
-    $("previewFiles").style.display = "block";
+    $("previewPlaceholder").style.display = "none";
     showSourceDoc(0);
   } catch (e) {
     $("previewPlaceholder").innerHTML = `<div>加载失败：<br>${problemsOf(e).map(esc).join("<br>")}</div>`;
@@ -887,9 +890,36 @@ async function loadSourceDocsPreview() {
 function renderSourceChips(activeIdx) {
   const cur = sourceDocList[activeIdx];
   const dl = cur ? `<a class="dl-link" href="${esc(cur.url)}" download style="margin-left:8px;">下载</a>` : "";
-  $("previewFiles").innerHTML = sourceDocList.map((f, i) =>
-    `<span class="file-chip ${i === activeIdx ? "active" : ""}" onclick="showSourceDoc(${i})" title="${esc(f.filename)}">${esc(f.filename)}</span>`
-  ).join("") + dl;
+  const uploader =
+    `<input type="file" id="srcUploadFile" style="display:none;" onchange="uploadSourceDoc()">` +
+    `<button type="button" onclick="document.getElementById('srcUploadFile').click()" title="上传正确的参考文件（同名覆盖）" style="margin-right:10px;">＋ 上传参考文件</button>`;
+  const chips = sourceDocList.map((f, i) =>
+    `<span class="file-chip ${i === activeIdx ? "active" : ""}" title="${esc(f.filename)}">` +
+    `<span onclick="showSourceDoc(${i})" style="cursor:pointer;">${esc(f.filename)}</span>` +
+    `<a onclick="deleteSourceDoc(${i})" title="删除该参考文件" style="margin-left:6px;color:#b91c1c;cursor:pointer;font-weight:600;">✕</a></span>`
+  ).join("");
+  $("previewFiles").innerHTML = uploader + chips + dl;
+}
+async function uploadSourceDoc() {
+  const inp = $("srcUploadFile");
+  if (!inp || !inp.files || !inp.files.length) return;
+  try {
+    const fd = new FormData(); fd.append("file", inp.files[0]);
+    const r = await fetch(`${API}/tasks/${taskId}/source-doc/upload`, { method: "POST", body: fd });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) { const err = new Error("upload"); err.status = r.status; err.data = data; throw err; }
+    toast("已上传参考文件");
+    renderSourceDocs();
+  } catch (e) { toast("上传失败：" + problemsOf(e).join("；"), 5000); }
+}
+async function deleteSourceDoc(i) {
+  const f = sourceDocList[i]; if (!f) return;
+  if (!confirm(`删除参考文件「${f.filename}」？`)) return;
+  try {
+    await api("DELETE", `${API}/tasks/${taskId}/source-doc?name=${encodeURIComponent(f.filename)}`);
+    toast("已删除");
+    renderSourceDocs();
+  } catch (e) { toast("删除失败：" + problemsOf(e).join("；"), 4000); }
 }
 function mdIframeDoc(html) {
   return `<!doctype html><html><head><meta charset="utf-8"><style>

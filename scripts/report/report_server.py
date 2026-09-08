@@ -932,6 +932,35 @@ def get_submission_source_docs(task_id: str):
     return {"case_volume": case_volume, "docs": docs}
 
 
+def _safe_source_doc(case_volume: str, name: str) -> Path:
+    """校验参考文件名（禁路径穿越/空/. ..），返回 SOURCE_DOC_DIR/<案号>/<name>。"""
+    base = (name or "").strip()
+    if not case_volume or not base or base != Path(base).name or base in (".", ".."):
+        raise HTTPException(400, f"非法文件名：{name!r}")
+    return SOURCE_DOC_DIR / case_volume / base
+
+
+@app.post("/api/submission/tasks/{task_id}/source-doc/upload")
+def upload_submission_source_doc(task_id: str, file: UploadFile = File(...)):
+    """上传参考文件到 P:\\confirmation-intake\\<案号>\\（同名覆盖）。
+    供审核人在确认函页删掉邮箱读来的错误参考文件后、上传正确的。"""
+    row = _load_submission_task(task_id)
+    dest = _safe_source_doc((row.get("case_volume") or "").strip(), Path(file.filename or "").name)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_bytes(file.file.read())
+    return {"ok": True, "name": dest.name}
+
+
+@app.delete("/api/submission/tasks/{task_id}/source-doc")
+def delete_submission_source_doc(task_id: str, name: str):
+    """删除该案某个参考文件（P:\\confirmation-intake\\<案号>\\<name>）。"""
+    row = _load_submission_task(task_id)
+    p = _safe_source_doc((row.get("case_volume") or "").strip(), name)
+    if p.is_file():
+        p.unlink()
+    return {"ok": True, "name": p.name}
+
+
 class SubmissionSaveReq(BaseModel):
     fields_json: dict
     contact_email: str = ""
