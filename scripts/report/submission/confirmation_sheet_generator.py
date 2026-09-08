@@ -588,15 +588,9 @@ class PatentApplicationFormGenerator:
                 data_rows4.append(['Priority No./优先权号', prioritie.get('priority_no') or prioritie.get('priority_num') or ''])
                 data_rows4.append(['Priority Date/优先权日:', prioritie.get('priority_date', '')])
                 data_rows4.append(['DAS code/DAS码', prioritie.get('access_code', '')])
-        # 加速方式单元格：值为 None/none（明确选"无加速"）→ 显示 "None"；
-        # 有具体加速方式 → 显示该值；未选 → 列出可选项供客户勾选。
+        # 加速方式单元格：有具体加速方式 → 显示该值；未指定/None → 显示 "None"（无加速）。
         _ae = (case_info.get('ae_methods') or '').strip()
-        if _ae.lower() == 'none':
-            _ae_cell = 'None'
-        elif _ae:
-            _ae_cell = _ae
-        else:
-            _ae_cell = "None \nTrack One prioritized examination(Track One) \nPatent Prosecution Highway (PPH)"
+        _ae_cell = _ae if (_ae and _ae.lower() != 'none') else 'None'
         data_rows5 = [
             ['Filing Route/落地方式'],
             ['Filing Route/落地方式', case_info.get('filing_route', '')] if case_info.get('filing_route') else ['Filing Route/落地方式', "371 Route (PCT national stage) \nBy pass continuation \nNew \nContinuation of \nContinuation in part of \nDivision of /nParis"],

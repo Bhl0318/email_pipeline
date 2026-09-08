@@ -286,6 +286,7 @@ const SECTIONS = {
       unknownHint: "存量值，请核对" },
     { path: ["ae_methods"], label: "加速方式", req: true,
       options: ["None", "Track One prioritized examination(Track One)", "Patent Prosecution Highway (PPH)"],
+      deriveDefault: () => "None", hintText: "未指定即为 None（无加速）",
       unknownHint: "存量值，请核对" },
   ]},
   advance: { title: "PCT 信息", fields: [
