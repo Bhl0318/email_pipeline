@@ -573,7 +573,7 @@ class PatentApplicationFormGenerator:
         applicant_index = 0
         for applicant in applicants:
             applicant_index += 1
-            data_rows3.append([f'Name{str(applicant_index)}/申请人{str(applicant_index)}:', applicant.get('applicant_name_en', ''), applicant.get('applicant_name_cn', '')])
+            data_rows3.append([f'Name{str(applicant_index)}/申请人{str(applicant_index)}:', (applicant.get('applicant_name_en', '') or '').upper(), applicant.get('applicant_name_cn', '')])
             data_rows3.append(['Nationality/国家:', applicant.get('country_en_us', ''), applicant.get('country_zh_cn', '')])
             # 其余住址明细(Address1/Address2/City/State/Post)不再渲染进确认函；
             # 值仍存于 fields_json（env2 左侧输入框可编辑保存），仅不体现在文档中。
