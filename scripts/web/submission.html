@@ -286,7 +286,7 @@ const SECTIONS = {
       unknownHint: "存量值，请核对" },
     { path: ["ae_methods"], label: "加速方式", req: true,
       options: ["None", "Track One prioritized examination(Track One)", "Patent Prosecution Highway (PPH)"],
-      deriveDefault: () => "None", hintText: "未指定即为 None（无加速）",
+      deriveDefault: () => "None", hintText: "未指定即为 None（无加速）", noEmptyOption: true,
       unknownHint: "存量值，请核对" },
   ]},
   advance: { title: "PCT 信息", fields: [
@@ -643,7 +643,7 @@ function fieldInput(def) {
     const cur = (val ?? "").toString();
     const known = def.options.includes(cur);
     control = `<select data-path='${dp}' ${def.readonly ? "disabled" : ""}>
-      <option value=""${cur === "" ? " selected" : ""}>（未指定）</option>
+      ${def.noEmptyOption ? "" : `<option value=""${cur === "" ? " selected" : ""}>（未指定）</option>`}
       ${def.options.map(o => `<option value="${esc(o)}"${o === cur ? " selected" : ""}>${esc(o)}</option>`).join("")}
       ${(!known && cur !== "") ? `<option value="${esc(cur)}" selected>${esc(cur)}（${esc(def.unknownHint || "不在申请人列表，请核对")}）</option>` : ""}
     </select>`;
