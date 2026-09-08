@@ -774,7 +774,7 @@ function collectExtra(){
   });
   (fields.priorities||[]).forEach((p,i)=>{
     const g=(k)=>{const e=$(`cf-pri-${i}-${k}`);return e?e.value.trim():null;};
-    const no=g("no"); if (no!==null){ p.priority_no=no; p.priority_num=no; }
+    const no=g("no"); if (no!==null){ p.priority_no=no; }
     const c=g("ctry"); if (c!==null) p.priority_country_id=c;
     const d=g("date"); if (d!==null) p.priority_date=d;
     const das=g("das"); if (das!==null) p.access_code=das;

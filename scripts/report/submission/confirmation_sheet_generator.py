@@ -349,9 +349,9 @@ class PatentApplicationFormGenerator:
             for idx, priority in enumerate(priorities):
                 if not (priority.get('priority_no') or priority.get('priority_num')):
                     missing_optional_fields.append({
-                        'field': f'priorities[{idx}].priority_num',
+                        'field': f'priorities[{idx}].priority_no',
                         'field_name': f'优先权号',
-                        'path': f'case_info["priorities"][{idx}]["priority_num"]',
+                        'path': f'case_info["priorities"][{idx}]["priority_no"]',
                         'description': f'可选字段：优先权缺少优先权号'
                     })
                 if not priority.get('priority_date'):

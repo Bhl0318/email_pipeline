@@ -306,7 +306,7 @@ const APPLICANT_FIELDS = [
   ["entity_en", "实体类型（英文）", false], ["entity_cn", "实体类型（中文）", false],
 ];
 const INVENTOR_FIELDS = [["last_name_en", "姓（大写）", true], ["first_name_en", "名", true], ["full_name_en", "全名", false], ["employer", "归属公司", false, "applicantNames"]];
-const PRIORITY_FIELDS = [["priority_no", "优先权号", false], ["priority_num", "国别+号", false], ["priority_country_id", "国别", false], ["priority_date", "优先权日", false], ["access_code", "DAS 码", false]];
+const PRIORITY_FIELDS = [["priority_no", "优先权号", false], ["priority_country_id", "国别", false], ["priority_date", "优先权日", false], ["access_code", "DAS 码", false]];
 const PARENT_FIELDS = [["Application No", "申请号", false], ["Filing Date", "申请日", false]];
 // 公司转公司字段（[key, label, req, maxlength]）。转让方公司地址仿申请人：中英+城市/省/邮编/国家，地址1/2各≤50
 const ASSIGN_QUAD = [
