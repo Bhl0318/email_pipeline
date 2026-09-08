@@ -98,14 +98,19 @@ PERF_ROLE_TABLE = "tip_budgetperformance_role"
 
 
 def _user_id(name, ex):
-    """按中文名查 users.userid；查不到/异常返回 ""。"""
+    """按中文名查 users.userid；查不到/异常返回 ""。名字为「QC,AQC」拼接时用逗号前的 QC 查。"""
     name = (name or "").strip()
     if not name:
         return ""
     rows = ex(f"SELECT userid FROM users WHERE username_zn='{_q(name)}'")
-    if isinstance(rows, str) or not rows:
-        return ""
-    return str(rows[0].get("userid") or "")
+    if not isinstance(rows, str) and rows:
+        return str(rows[0].get("userid") or "")
+    if "," in name:   # 「QC,AQC」→ 用逗号前的 QC 取 uid
+        first = name.split(",")[0].strip()
+        rows = ex(f"SELECT userid FROM users WHERE username_zn='{_q(first)}'")
+        if not isinstance(rows, str) and rows:
+            return str(rows[0].get("userid") or "")
+    return ""
 
 
 def write_perf_roles(oa_id, responder="", qc="", execute=None):

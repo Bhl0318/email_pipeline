@@ -955,13 +955,15 @@ def append_oa_to_wiki(results):
 # ============================================================
 # OA 分配：按 oa_id 回写「测试页面-写入新增OA」人员分配格
 # ============================================================
-def format_oa_person(responder, qc):
-    """人员分配格文案：一行『负责人：X；QC：Y』（缺哪个省哪个）。"""
+def format_oa_person(responder, qc, aqc=""):
+    """人员分配格文案：一行『负责人：X；QC：Y；AQC：Z』（缺哪个省哪个，AQC 单独标）。"""
     parts = []
     if (responder or "").strip():
         parts.append(f"负责人：{responder.strip()}")
     if (qc or "").strip():
         parts.append(f"QC：{qc.strip()}")
+    if (aqc or "").strip():
+        parts.append(f"AQC：{aqc.strip()}")
     return "；".join(parts)
 
 
@@ -1093,14 +1095,14 @@ def _oa_row_project_type(body, oa_id, expected_project=""):
     return proj, otype, deadline
 
 
-def write_oa_assignment(oa_id, responder, qc, project="", postscript="", custom_note=""):
+def write_oa_assignment(oa_id, responder, qc, project="", postscript="", custom_note="", aqc=""):
     """按 oa_id **且案号一致** 找「测试页面-写入新增OA」里的行，回写：
-    人员分配（追加）+ 分配人（=收到分配链接的人，按案号路由）+ 分配时间（当前时间，空则填）。
+    人员分配（追加，负责人/QC/AQC 分开标）+ 分配人（=收到分配链接的人，按案号路由）+ 分配时间（当前时间，空则填）。
     期望案号取自入参 project，否则查 projects（防手动复制导致 class 重复而写错行）。
     返回 {code, msg}。找不到行/异常不抛。"""
     if not oa_id:
         return {"code": 1, "msg": "缺 oa_id"}
-    text = format_oa_person(responder, qc)
+    text = format_oa_person(responder, qc, aqc)
     if not text:
         return {"code": 1, "msg": "负责人/QC 均为空，不写入"}
     try:
@@ -1163,7 +1165,7 @@ def write_oa_assignments_batch(items):
         body = page["body"]
         for it in items:
             oa_id = (it.get("oa_id") or "").strip()
-            text = format_oa_person(it.get("responder", ""), it.get("qc", ""))
+            text = format_oa_person(it.get("responder", ""), it.get("qc", ""), it.get("aqc", ""))
             if not text:
                 results[oa_id] = {"code": 1, "msg": "负责人/QC 均为空，不写入"}
                 continue

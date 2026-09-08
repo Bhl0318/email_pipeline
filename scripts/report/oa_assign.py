@@ -30,8 +30,8 @@ def _log(*a):
     print(f"[{datetime.now():%H:%M:%S}][oa-assign]", *a, file=sys.stderr, flush=True)
 
 
-def _write_back(case_id, responder, qc, postscript="", custom_note=""):
-    """按 case_id(=oa_id) 回写 Wiki 新增OA 人员分配格（+分配人历史页，备注=附言+自定义方案说明）。
+def _write_back(case_id, responder, qc, postscript="", custom_note="", aqc=""):
+    """按 case_id(=oa_id) 回写 Wiki 新增OA 人员分配格（负责人/QC/AQC 分开标；+分配人历史页）。
     best-effort：桩数据/无 Wiki 时返回失败也不抛。"""
     try:
         oa_dir = os.path.join(_DIR, "..", "oa")
@@ -39,7 +39,7 @@ def _write_back(case_id, responder, qc, postscript="", custom_note=""):
             sys.path.insert(0, oa_dir)
         from oainfo_cli import write_oa_assignment
         return write_oa_assignment(case_id, responder, qc,
-                                   postscript=postscript, custom_note=custom_note)
+                                   postscript=postscript, custom_note=custom_note, aqc=aqc)
     except Exception as e:
         return {"code": 1, "msg": f"回写调用失败: {e}"}
 
@@ -51,7 +51,8 @@ def _write_back_batch(assignments):
         if oa_dir not in sys.path:
             sys.path.insert(0, oa_dir)
         from oainfo_cli import write_oa_assignments_batch
-        items = [{"oa_id": a.get("caseId"), "responder": a.get("responder"), "qc": a.get("qc"),
+        items = [{"oa_id": a.get("caseId"), "responder": a.get("responder"),
+                  "qc": a.get("qc"), "aqc": a.get("aqc", ""),   # Wiki 里 QC/AQC 分开标
                   "project": a.get("caseNo", ""),          # 案号用于双重比对（前端 _assignmentOf 已带）
                   "postscript": a.get("postscript", ""), "custom_note": a.get("customNote", "")}
                  for a in assignments]
@@ -75,16 +76,24 @@ def _mark(case_id, responder, qc):
         _log("写 tip_budgetperformance_role 失败：", e)
 
 
-def _invalid_names(responder, qc):
-    """返回 responder/qc 里不在 users.username_zn 的名字列表；DB 不可用则不拦（返回 []）。"""
+def _invalid_names(*names):
+    """返回给定人名里不在 users.username_zn 的名字列表；DB 不可用则不拦（返回 []）。"""
     st = _store()
     if st is None:
         return []
     bad = []
-    for n in [(responder or "").strip(), (qc or "").strip()]:
+    for n in names:
+        n = (n or "").strip()
         if n and not st.user_exists(n):
             bad.append(n)
     return bad
+
+
+def _combine_qc(qc, aqc):
+    """QC 与 AQC 用「,」拼接写库/Wiki（AQC 只自定义方案有）。缺哪个省哪个。"""
+    qc = (qc or "").strip()
+    aqc = (aqc or "").strip()
+    return f"{qc},{aqc}" if (qc and aqc) else (qc or aqc)
 
 
 def _save_submission(body):
@@ -380,12 +389,14 @@ async def assignment_submit(req: Request):
     body = await req.json()
     _log("POST /api/assignment/submit 收到：", json.dumps(body, ensure_ascii=False))
     cid, responder, qc = body.get("caseId"), body.get("responder"), body.get("qc")
-    bad = _invalid_names(responder, qc)                  # 校验人名在 users.username_zn
+    aqc = body.get("aqc", "")
+    bad = _invalid_names(responder, qc, aqc)             # 校验 责任人/QC/AQC 都在 users.username_zn
     if bad:
         return {"ok": False, "caseId": cid,
                 "writeback": {"code": 1, "msg": f"以下人员不在 users 库：{'、'.join(bad)}，请改选"}}
-    wb = _write_back(cid, responder, qc, body.get("postscript", ""), body.get("customNote", ""))  # 回写 Wiki
-    _mark(cid, responder, qc)                            # 待分配表回填结果+置已分配
+    wb = _write_back(cid, responder, qc, body.get("postscript", ""),
+                     body.get("customNote", ""), aqc)    # Wiki: QC/AQC 分开标
+    _mark(cid, responder, _combine_qc(qc, aqc))          # projects/绩效表: QC,AQC 逗号拼
     _save_submission(body)                               # 选中结果+附言(附言/原因)存 oa_assign_report.submit_json
     _log("    回写 Wiki 人员分配：", wb.get("msg"))
     return {"ok": True, "caseId": cid, "writeback": wb}
@@ -436,20 +447,20 @@ async def assignment_submit_batch(req: Request):
     body = await req.json()
     assignments = body.get("assignments", []) or []
     _log(f"POST /api/assignment/submit/batch 收到 {len(assignments)} 件：")
-    # 人名校验：不在 users.username_zn 的案子不写，单独报错
+    # 人名校验（责任人/QC/AQC 都要在 users）：不合格的案子不写，单独报错
     bad_map = {}   # caseId -> [不存在的名字]
     valid = []
     for a in assignments:
-        bad = _invalid_names(a.get("responder"), a.get("qc"))
+        bad = _invalid_names(a.get("responder"), a.get("qc"), a.get("aqc"))
         if bad:
             bad_map[a.get("caseId")] = bad
         else:
             valid.append(a)
-    # Wiki 回写：一次性批量（一次取页一次存页），不再逐案 get/update
+    # Wiki 回写：一次性批量（QC/AQC 分开标；一次取页一次存页）
     wb_map = _write_back_batch(valid)
-    # DB 回写（projects / oa_assign_task / tip_budgetperformance_role）+ submit_json：逐案
+    # DB 回写（projects / oa_assign_task / tip_budgetperformance_role）+ submit_json：逐案，QC 用 QC,AQC 逗号拼
     for a in valid:
-        _mark(a.get("caseId"), a.get("responder"), a.get("qc"))
+        _mark(a.get("caseId"), a.get("responder"), _combine_qc(a.get("qc"), a.get("aqc")))
         _save_submission(a)
     results = []
     for a in assignments:

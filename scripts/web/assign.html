@@ -352,6 +352,16 @@
                       <el-option v-for="n in staffOptions" :key="n" :label="n" :value="n" />
                     </el-select>
                   </div>
+                  <div class="scheme-card__custom-row">
+                    <span class="scheme-card__custom-label">AQC</span>
+                    <el-select
+                      :model-value="currentSelection?.customAqc || ''"
+                      clearable placeholder="选填（AQC）" size="small" style="flex:1"
+                      @change="v => { setCustomAqc(v); selectScheme('custom') }"
+                    >
+                      <el-option v-for="n in AQC_OPTIONS" :key="n" :label="n" :value="n" />
+                    </el-select>
+                  </div>
                   <div class="scheme-card__custom-row" data-guide="custom-note-input" style="align-items:flex-start">
                     <span class="scheme-card__custom-label" style="padding-top:6px">说明</span>
                     <el-input
@@ -553,9 +563,10 @@ const app = createApp({
     }
 
     const DEFAULT_NOTE = '按照此前的人员安排'   // 分配说明/原因默认值（AI方案+自定义方案通用）
+    const AQC_OPTIONS = ['龙翔', '李延', '杜洋州']   // 自定义方案 AQC 固定可选
     function getOrInitSel(caseId) {
       if (!caseSelections.value[caseId]) {
-        caseSelections.value[caseId] = { schemeId: null, customResponder: '', customQc: '', customNote: DEFAULT_NOTE, postscript: DEFAULT_NOTE }
+        caseSelections.value[caseId] = { schemeId: null, customResponder: '', customQc: '', customAqc: '', customNote: DEFAULT_NOTE, postscript: DEFAULT_NOTE }
       }
       return caseSelections.value[caseId]
     }
@@ -658,6 +669,11 @@ const app = createApp({
       getOrInitSel(selectedCaseId.value).customQc = val
     }
 
+    function setCustomAqc(val) {
+      if (!selectedCaseId.value) return
+      getOrInitSel(selectedCaseId.value).customAqc = val
+    }
+
     function setPostscript(val) {
       if (!selectedCaseId.value) return
       getOrInitSel(selectedCaseId.value).postscript = val
@@ -696,8 +712,9 @@ const app = createApp({
       const qc = sel.schemeId === 'custom' ? sel.customQc : (sch?.qc || '')
       // customNote(说明/原因)只在自定义方案时带；AI 方案一/二/三不带这句
       const customNote = sel.schemeId === 'custom' ? (sel.customNote || '') : ''
+      const aqc = sel.schemeId === 'custom' ? (sel.customAqc || '') : ''   // AQC 只自定义方案有
       return { caseId: c.id, caseNo: c.caseNo, schemeId: sel.schemeId,
-               responder, qc, postscript: sel.postscript || '', customNote }
+               responder, qc, aqc, postscript: sel.postscript || '', customNote }
     }
 
     // API: POST /api/assignment/submit/batch body: { assignments: [{ caseId, schemeId, responder, qc }] }
@@ -799,7 +816,7 @@ const app = createApp({
       expandedCards, reanalyzing, analyzing, batchSubmitting, assignee, filterByAssignee, pendingCount,
       filteredCases, selectedCase, displayedSchemes, renderedMarkdown,
       outlineItems, activeSectionIdx, scrollToSection, onMdScroll,
-      selectCase, selectScheme, setCustomResponder, setCustomQc, setPostscript, setCustomNote, queryStaff,
+      selectCase, selectScheme, setCustomResponder, setCustomQc, setCustomAqc, AQC_OPTIONS, setPostscript, setCustomNote, queryStaff,
       staffOptions, staffLoading, remoteStaff,
       toggleCard, canSubmit, batchSubmit, reanalyze,
     }
