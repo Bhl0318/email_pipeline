@@ -31,16 +31,6 @@ def _h(text):
     return _H.format(text)
 
 
-def _hl(text):
-    """固定字段标黄：黄底内联高亮（span，用于段落中的部分文字）。"""
-    return f'<span style="background-color:#FFFF00;">{text}</span>'
-
-
-def _p_hl(text):
-    """整段标黄：黄底加在 <p> 段落本身（块级，Outlook/邮件客户端渲染更可靠）。"""
-    return _P.replace(_FONT + '"', _FONT + 'background-color:#FFFF00;"').format(text)
-
-
 def build_email_modules(fields: dict, params: dict = None) -> list:
     """返回 [{id, title, html, checked, note}]；checked 为推导的默认勾选。
     （自定义正文内容由审核页在模块之间的"插入槽"提供，不在此生成。）"""
@@ -83,7 +73,7 @@ def build_email_modules(fields: dict, params: dict = None) -> list:
         "id": "app_info", "title": "确认申请信息", "checked": True,
         "html": _h("确认申请信息") +
                 _p(f"附件是{case_volume}的申请信息确认函（application information sheet），"
-                   f"{route_sentence}，烦请您确认基本申请信息" + _hl("（高亮部分请重点确认）") + "。"),
+                   f"{route_sentence}，烦请您确认基本申请信息（高亮部分请重点确认）。"),
         "note": "在右侧编辑落地方式话术（默认按落地方式自动生成）",
         "input": "route_phrase", "input_value": route_phrase, "input_default": default_route_phrase,
     })
@@ -96,7 +86,7 @@ def build_email_modules(fields: dict, params: dict = None) -> list:
                    "若Declaration不与申请一起递交，补交则会产生170美元的官费（大实体）。") +
                 _p("Assignment（专利权转让书），是表明发明人将专利权转让的文件。我司根据优先权信息制作了相关转让文件。"
                    "请注意，日期需要签署，签名中英文均可，烦请贵司签署后反馈扫描件。") +
-                _p("⚠️" + _hl("温馨提示：关于签字文件的要求")) +
+                _p("⚠️温馨提示：关于签字文件的要求") +
                 _p("根据美国专利商标局（USPTO）的政策要求，所有提交的文件必须由签字人本人亲自签署，"
                    "不得代签或使用非本人生成的电子签名。") +
                 _p("为确保顺利提交，请提供签字为本人签署的证明材料。建议的证明材料形式："

@@ -546,6 +546,14 @@ function toggleModuleBody(id) {
   openModules[id] = !openModules[id];
   document.getElementById("mod-" + id).classList.toggle("open", openModules[id]);
 }
+// 生成邮件时才标黄的固定文字（拼好整篇后统一处理，覆盖模块正文 + 自定义插入内容里出现的同样文字）
+const EMAIL_HL_PHRASES = ["温馨提示：关于签字文件的要求", "（高亮部分请重点确认）"];
+function highlightEmailPhrases(html) {
+  for (const ph of EMAIL_HL_PHRASES) {
+    html = html.split(ph).join(`<span style="background-color:#FFFF00;">${ph}</span>`);
+  }
+  return html;
+}
 function assembleEmailBody() {
   // 按模块顺序拼装：勾选的模块正文 + 该模块之后插入槽的自定义内容
   const parts = [];
@@ -558,7 +566,7 @@ function assembleEmailBody() {
       parts.push(customToHtml(s));
     }
   }
-  return parts.join("\n");
+  return highlightEmailPhrases(parts.join("\n"));   // 拼好后统一标黄固定文字
 }
 // 字段叶子名 → 中文标签（汇总各字段定义 + SECTIONS）
 const MISSING_LABELS = (() => {
