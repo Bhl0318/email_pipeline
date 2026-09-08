@@ -612,6 +612,7 @@ const app = createApp({
 
     function selectCase(c) {
       selectedCaseId.value = c.id
+      getOrInitSel(c.id)   // 预初始化选择：自定义方案「说明」textarea 立刻预填默认「按照此前的人员安排」
       ensureAnalyzed(c)
     }
 
