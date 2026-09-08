@@ -454,12 +454,16 @@ function invApplicantAddr(inv){
   const asg = (fields.assignments||[]).find(x => norm(x.assigning_company)===emp &&
     ((x.company_address||"").trim() || (x.company_address1||"").trim() || (x.company_address2||"").trim()));
   if (asg){
-    // 优先用结构化公司地址(company_address1/2 等)；无则才回落整串按首逗号硬拆
+    // ① 结构化公司地址(company_address1/2 等)——干净、优先
     if ((asg.company_address1||"").trim() || (asg.company_address2||"").trim())
       return {address1:(asg.company_address1||"").trim(), address2:(asg.company_address2||"").trim(),
               city_en:asg.company_city_en||"", province_city_en_us:asg.company_province_en||"",
               postcode:asg.company_postcode||"", country_en_us:asg.company_country_en||""};
-    const p = asg.company_address.trim().split(/,(.+)/);
+    // ② 无结构化：用发明人自己已拆好的 address1/2（一般即公司地址），避免硬拆
+    if ((inv.address1||"").trim() || (inv.address2||"").trim())
+      return {address1:(inv.address1||"").trim(), address2:(inv.address2||"").trim()};
+    // ③ 实在都没有 → 才按首逗号兜底拆整串
+    const p = (asg.company_address||"").trim().split(/,(.+)/);
     return {address1:(p[0]||"").trim(), address2:(p[1]||"").trim()};
   }
   return apps[0] || {};

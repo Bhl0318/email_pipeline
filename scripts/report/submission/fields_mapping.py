@@ -127,7 +127,7 @@ def _inventor_applicant_addr(inv: dict, applicants: list, assignments: list) -> 
                 (asg.get("company_address") or "").strip()
                 or (asg.get("company_address1") or "").strip()
                 or (asg.get("company_address2") or "").strip()):
-            # 优先用结构化公司地址(company_address1/2 等)；无则才回落整串按首逗号硬拆
+            # ① 结构化公司地址(company_address1/2 等)——干净、优先
             if (asg.get("company_address1") or "").strip() or (asg.get("company_address2") or "").strip():
                 return {"address1": (asg.get("company_address1") or "").strip(),
                         "address2": (asg.get("company_address2") or "").strip(),
@@ -135,7 +135,12 @@ def _inventor_applicant_addr(inv: dict, applicants: list, assignments: list) -> 
                         "province_city_en_us": asg.get("company_province_en") or "",
                         "postcode": asg.get("company_postcode") or "",
                         "country_en_us": asg.get("company_country_en") or ""}
-            parts = [p.strip() for p in asg["company_address"].strip().split(",", 1)]
+            # ② 无结构化：用发明人自己已拆好的 address1/2（一般即公司地址），避免硬拆
+            if (inv.get("address1") or "").strip() or (inv.get("address2") or "").strip():
+                return {"address1": (inv.get("address1") or "").strip(),
+                        "address2": (inv.get("address2") or "").strip()}
+            # ③ 实在都没有 → 才按首逗号兜底拆整串
+            parts = [p.strip() for p in (asg.get("company_address") or "").strip().split(",", 1)]
             return {"address1": parts[0], "address2": parts[1] if len(parts) > 1 else ""}
     return applicants[0] if applicants else {}
 
