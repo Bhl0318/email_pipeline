@@ -123,7 +123,18 @@ def _inventor_applicant_addr(inv: dict, applicants: list, assignments: list) -> 
         if _norm(a.get("applicant_name_en")) == emp:
             return a
     for asg in assignments:
-        if _norm(asg.get("assigning_company")) == emp and (asg.get("company_address") or "").strip():
+        if _norm(asg.get("assigning_company")) == emp and (
+                (asg.get("company_address") or "").strip()
+                or (asg.get("company_address1") or "").strip()
+                or (asg.get("company_address2") or "").strip()):
+            # 优先用结构化公司地址(company_address1/2 等)；无则才回落整串按首逗号硬拆
+            if (asg.get("company_address1") or "").strip() or (asg.get("company_address2") or "").strip():
+                return {"address1": (asg.get("company_address1") or "").strip(),
+                        "address2": (asg.get("company_address2") or "").strip(),
+                        "city_en": asg.get("company_city_en") or "",
+                        "province_city_en_us": asg.get("company_province_en") or "",
+                        "postcode": asg.get("company_postcode") or "",
+                        "country_en_us": asg.get("company_country_en") or ""}
             parts = [p.strip() for p in asg["company_address"].strip().split(",", 1)]
             return {"address1": parts[0], "address2": parts[1] if len(parts) > 1 else ""}
     return applicants[0] if applicants else {}

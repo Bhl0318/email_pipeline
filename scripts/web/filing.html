@@ -451,8 +451,17 @@ function invApplicantAddr(inv){
   if (!emp) return apps[0] || {};
   const hit = apps.find(a => norm(a.applicant_name_en) === emp);
   if (hit) return hit;
-  const asg = (fields.assignments||[]).find(x => norm(x.assigning_company)===emp && (x.company_address||"").trim());
-  if (asg){ const p = asg.company_address.trim().split(/,(.+)/); return {address1:(p[0]||"").trim(), address2:(p[1]||"").trim()}; }
+  const asg = (fields.assignments||[]).find(x => norm(x.assigning_company)===emp &&
+    ((x.company_address||"").trim() || (x.company_address1||"").trim() || (x.company_address2||"").trim()));
+  if (asg){
+    // 优先用结构化公司地址(company_address1/2 等)；无则才回落整串按首逗号硬拆
+    if ((asg.company_address1||"").trim() || (asg.company_address2||"").trim())
+      return {address1:(asg.company_address1||"").trim(), address2:(asg.company_address2||"").trim(),
+              city_en:asg.company_city_en||"", province_city_en_us:asg.company_province_en||"",
+              postcode:asg.company_postcode||"", country_en_us:asg.company_country_en||""};
+    const p = asg.company_address.trim().split(/,(.+)/);
+    return {address1:(p[0]||"").trim(), address2:(p[1]||"").trim()};
+  }
   return apps[0] || {};
 }
 // 发明人全名：姓, 名 中间名（对齐著录项"姓, 名"，中间名并入名后）；三者任一变化实时联动只读全名
