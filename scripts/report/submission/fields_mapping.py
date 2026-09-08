@@ -233,6 +233,9 @@ def fields_to_case_info(fields: dict, agent_info: dict = None) -> dict:
 
     def _nkey(s):
         return "".join(ch for ch in (s or "").lower() if ch.isalnum())
+    # 转让链中"又把权利转出去"的公司（作为某段 assigning_company）＝中间过桥方，不算最终受让人
+    _transferred_out = {_nkey(a.get("assigning_company")) for a in _assignments
+                        if (a.get("assigning_company") or "").strip()}
     _app_by_name = {(ap.get("applicant_name_en") or "").strip().lower(): ap for ap in _raw_apps}
     _app_by_nkey = {_nkey(ap.get("applicant_name_en")): ap for ap in _raw_apps}
 
@@ -265,6 +268,8 @@ def fields_to_case_info(fields: dict, agent_info: dict = None) -> dict:
         if not nm or nm.lower() in _seen:
             continue
         if _assignee_is_applicant(nm):                      # 是申请人 → 已按申请人名登过，跳过其异名
+            continue
+        if _nkey(nm) in _transferred_out:                   # 又把权利转出去了＝转让链中间方，不列
             continue
         _seen.add(nm.lower())
         assignees.append(_assignee_entry(nm, _app_for_assignee(nm), asg.get("company_address", "")))
