@@ -1868,6 +1868,38 @@ def create_filing_task(case_volume: str):
     return _transfer_to_filing(case_volume)
 
 
+# 递交页独有、重新拉取时要保留的键（确认函没有这些）：代理人/发明人地址、递交清单
+_FILING_ONLY_KEYS = ("filing_extra", "transmittal_options")
+
+
+@app.post("/api/submission/filing/{task_id}/resync")
+def resync_filing_from_confirmation(task_id: str):
+    """从同案确认函(filing_confirmation)重新拉取最新数据覆盖本递交任务的共享字段，
+    保留递交页独有的 filing_extra(代理人/通信地址)/transmittal_options(递交清单)。
+    仅 pending(未发美代理)时可用。解决转入后 env2 又改数据、env5 拿不到的问题。"""
+    row = _load_submission_task(task_id)
+    if row["task_type"] != "filing_preparation":
+        raise HTTPException(400, "仅递交准备(filing_preparation)任务可重新拉取")
+    if row["status"] != "pending":
+        raise HTTPException(400, f"任务状态为 {row['status']}，已锁定，不可重新拉取")
+    src = execute_params(
+        "SELECT fields_json FROM submission_tasks "
+        "WHERE task_type='filing_confirmation' AND case_volume=%s ORDER BY created_at DESC LIMIT 1",
+        (row["case_volume"],))
+    if not src or not src[0].get("fields_json"):
+        raise HTTPException(404, f"未找到案号 {row['case_volume']} 的确认函数据，无法拉取")
+    conf = json.loads(src[0]["fields_json"])
+    cur = json.loads(row["fields_json"]) if row["fields_json"] else {}
+    merged = dict(conf)                       # 确认函最新数据为基底
+    for k in _FILING_ONLY_KEYS:               # 保留递交页独有键
+        if k in cur:
+            merged[k] = cur[k]
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    execute_params("UPDATE submission_tasks SET fields_json=%s, updated_at=%s WHERE id=%s",
+                   (json.dumps(merged, ensure_ascii=False), now, task_id))
+    return {"ok": True, "task_id": task_id}
+
+
 @app.get("/api/submission/signatures")
 def list_signature_followups(status: str = "pending"):
     """待回签列表（signature_followup）。附 transferred=该案是否已建 filing_preparation。"""

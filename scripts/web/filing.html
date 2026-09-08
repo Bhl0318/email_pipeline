@@ -105,6 +105,7 @@
         <h1 id="caseTitle">—</h1>
         <span class="badge pending" id="statusBadge">…</span>
         <span class="spacer"></span>
+        <button id="resyncBtn" onclick="resyncFromConfirmation()" disabled title="用确认函最新数据覆盖共享字段（保留代理人/通信地址/递交清单）">⟳ 从确认函重新拉取</button>
         <button onclick="refreshAllPreviews()" title="按当前数据重新生成 POA / Transmittal / ADS">↻ 刷新预览</button>
         <button class="primary" id="saveBtn" onclick="save()" disabled>保存</button>
         <button id="reviewerBtn" onclick="openReviewerModal()" disabled>发送审核人</button>
@@ -251,6 +252,17 @@ async function transferIn(){
   } catch(e){ toast("转入失败: "+e.message); }
 }
 
+// 从确认函(env2)重新拉取最新数据：覆盖共享字段，保留代理人/通信地址/递交清单
+async function resyncFromConfirmation(){
+  if (!taskId) return;
+  if (!confirm("将用确认函(env2)最新数据覆盖本页共享字段（申请人/发明人/受让/母案/落地方式等）；\n代理人、发明人通信地址、递交清单等递交页设置保留。\n\n未保存的手动改动会丢失，确定拉取？")) return;
+  try {
+    await api("POST", `${API}/${taskId}/resync`);
+    toast("已从确认函重新拉取最新数据");
+    await openTask(taskId);   // 重载最新
+  } catch(e){ toast("拉取失败: "+(problemsOf ? problemsOf(e).join("；") : e.message), 4000); }
+}
+
 function closeSignModal(){ $("signModal").classList.remove("show"); }
 async function openSignModal(){
   $("signModal").classList.add("show");
@@ -297,6 +309,7 @@ async function openTask(id){
   const b = $("statusBadge"); b.textContent = data.status; b.className = "badge " + data.status;
   const ro = data.status !== "pending";
   $("saveBtn").disabled = ro; $("sendBtn").disabled = ro;
+  $("resyncBtn").disabled = ro;        // 已锁定(发美代理后)不可重新拉取
   $("reviewerBtn").disabled = false;   // 发送审核人与状态无关（发链接，不改状态）
   renderForm();
   renderSidebar();
