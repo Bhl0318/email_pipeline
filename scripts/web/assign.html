@@ -555,7 +555,7 @@ const app = createApp({
     const DEFAULT_NOTE = '按照此前的人员安排'   // 分配说明/原因默认值（AI方案+自定义方案通用）
     function getOrInitSel(caseId) {
       if (!caseSelections.value[caseId]) {
-        caseSelections.value[caseId] = { schemeId: null, customResponder: '', customQc: '', customNote: DEFAULT_NOTE, postscript: '' }
+        caseSelections.value[caseId] = { schemeId: null, customResponder: '', customQc: '', customNote: DEFAULT_NOTE, postscript: DEFAULT_NOTE }
       }
       return caseSelections.value[caseId]
     }
