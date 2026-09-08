@@ -909,6 +909,10 @@ def _source_doc_preview(case_volume: str, f: Path):
     return None, "none"
 
 
+# 参考文件里不展示的流水线内部文件（邮件正文/元数据/抽取结果等）
+_SOURCE_DOC_HIDDEN = {"body.txt", "email_meta.json", "extracted_fields.json", "result.json"}
+
+
 @app.get("/api/submission/tasks/{task_id}/source-docs")
 def get_submission_source_docs(task_id: str):
     """原始文档列表：系统最初提取数据写入 IPEasy 的源文件（NAS），供审核人对照核对著录项目。
@@ -921,7 +925,7 @@ def get_submission_source_docs(task_id: str):
         case_dir = SOURCE_DOC_DIR / case_volume
         if case_dir.is_dir():
             for f in sorted(case_dir.iterdir()):
-                if f.is_file() and not f.name.startswith("."):
+                if f.is_file() and not f.name.startswith(".") and f.name.lower() not in _SOURCE_DOC_HIDDEN:
                     preview_url, kind = _source_doc_preview(case_volume, f)
                     docs.append({
                         "filename": f.name,
