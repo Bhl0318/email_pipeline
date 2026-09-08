@@ -711,11 +711,11 @@ function renderForm() {
     { path: ["inventor_residence_en"], label: "发明人住址（英文）", wide: true,
       deriveDefault: () => { const a = (fields.applicants || [])[0] || {};
         return [a.address1, a.address2, a.city_en, a.province_city_en_us, a.postcode, a.country_en_us].map(x => (x || "").trim()).filter(Boolean).join(", "); },
-      hintText: "留空＝按申请人地址自动拼接；填了即独立、不再跟随地址（仅单一归属时生效）" },
+      hintText: "留空＝按申请人地址自动拼接；填了即独立、不再跟随地址" },
     { path: ["inventor_residence_cn"], label: "发明人住址（中文）", wide: true,
       deriveDefault: () => { const a = (fields.applicants || [])[0] || {};
         return [a.contact_address_cn, a.contact_address_cn2, a.city_cn, a.province_city_zh_cn, a.country_zh_cn].map(x => (x || "").trim()).filter(Boolean).join(", "); },
-      hintText: "留空＝按申请人地址自动拼接；填了即独立、不再跟随地址（仅单一归属时生效）" },
+      hintText: "留空＝按申请人地址自动拼接；填了即独立、不再跟随地址" },
   ];
   const _suppTitle = "确认函补充（发明地 / 发明人住址）— 住址留空按申请人地址自动拼接、填了即独立；劳动合同归属仍按归属公司分组自动生成";
 

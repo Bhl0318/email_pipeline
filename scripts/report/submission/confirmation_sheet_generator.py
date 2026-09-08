@@ -553,8 +553,9 @@ class PatentApplicationFormGenerator:
             labor_en = (case_info.get("labor_contract_en") if _single else "") or app.get("applicant_name_en", "") or g["emp"]
             labor_cn = (case_info.get("labor_contract_cn") if _single else "") or app.get("applicant_name_cn", "")
             _res_en, _res_cn = _residence(app)
-            res_en = (case_info.get("inventor_residence_en") if _single else "") or _res_en
-            res_cn = (case_info.get("inventor_residence_cn") if _single else "") or _res_cn
+            # 发明人住址：审核页填了值就独立（覆盖所有归属组的住址行），空则各组按地址拼接。不受单/多组限制。
+            res_en = (case_info.get("inventor_residence_en") or "").strip() or _res_en
+            res_cn = (case_info.get("inventor_residence_cn") or "").strip() or _res_cn
             if _single:
                 labor_label = "Labor Contract for all inventors/劳动合同归属:"
                 res_label = "Residence/Mailing Address for all inventors/所有发明人住址"
