@@ -381,7 +381,8 @@ def classify_cn(email_data):
     subject = email_data.get("subject", "")
     sender = email_data.get("from", "")
 
-    if "@metis-ip.com" not in sender:
+    # 汇报信侧 CN 官文转达只会来自 xing.wu@metis-ip.com（收紧发件人，避免其他 metis 邮箱误判）
+    if "xing.wu@metis-ip.com" not in sender:
         return None
 
     # 匹配通知类型
@@ -780,12 +781,12 @@ def classify_email(email_data):
             return ep_result, None
         return None, "EP 邮件但主题未匹配已知通信类型"
 
-    # 3. CN
-    if "@metis-ip.com" in sender:
+    # 3. CN（汇报信侧：官文转达只会来自 xing.wu@metis-ip.com）
+    if "xing.wu@metis-ip.com" in sender:
         cn_result = classify_cn(email_data)
         if cn_result is not None:
             return cn_result, None
-        return None, "内部邮件但主题未匹配 CN 通知类型"
+        return None, "xing.wu 内部邮件但主题未匹配 CN 通知类型"
 
     return None, "发件人不属于已知来源（非 USPTO/Panovision/Metis）"
 
