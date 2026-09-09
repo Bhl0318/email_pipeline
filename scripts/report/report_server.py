@@ -955,9 +955,10 @@ def upload_submission_source_doc(task_id: str, file: UploadFile = File(...)):
     return {"ok": True, "name": dest.name}
 
 
-@app.delete("/api/submission/tasks/{task_id}/source-doc")
+@app.post("/api/submission/tasks/{task_id}/source-doc/delete")
 def delete_submission_source_doc(task_id: str, name: str):
-    """删除该案某个参考文件（P:\\confirmation-intake\\<案号>\\<name>）。"""
+    """删除该案某个参考文件（P:\\confirmation-intake\\<案号>\\<name>）。
+    用 POST（而非 DELETE 方法），避免部分代理/服务器拦 DELETE 导致前端 fetch 被拒。"""
     row = _load_submission_task(task_id)
     p = _safe_source_doc((row.get("case_volume") or "").strip(), name)
     if p.is_file():

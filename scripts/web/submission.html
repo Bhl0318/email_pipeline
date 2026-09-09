@@ -269,7 +269,7 @@ function problemsOf(err) {
   const d = err.data && err.data.detail;
   if (d && d.problems) return d.problems;
   if (typeof d === "string") return [d];
-  return ["请求失败 " + err.status];
+  return ["请求失败 " + (err.status || err.message || "网络错误")];
 }
 
 /* ───────── 字段定义（数据驱动渲染） ───────── */
@@ -916,7 +916,7 @@ async function deleteSourceDoc(i) {
   const f = sourceDocList[i]; if (!f) return;
   if (!confirm(`删除参考文件「${f.filename}」？`)) return;
   try {
-    await api("DELETE", `${API}/tasks/${taskId}/source-doc?name=${encodeURIComponent(f.filename)}`);
+    await api("POST", `${API}/tasks/${taskId}/source-doc/delete?name=${encodeURIComponent(f.filename)}`);
     toast("已删除");
     renderSourceDocs();
   } catch (e) { toast("删除失败：" + problemsOf(e).join("；"), 4000); }
