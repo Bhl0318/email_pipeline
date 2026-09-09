@@ -84,7 +84,7 @@ QA_SEED_STATE_PATH = SCRIPT_DIR / "qa_seed_state.json"   # QA 播种全局开关
 
 sys.path.insert(0, str(SCRIPT_DIR))
 from db_query import execute_params  # noqa: E402
-from submission.common import infer_subject_matter, normalize_parents, validate_for_confirm, parse_address_en  # noqa: E402
+from submission.common import infer_subject_matter, normalize_parents, validate_for_confirm, parse_address_en, effective_assignments  # noqa: E402
 from submission.email_modules import build_email_modules  # noqa: E402
 from submission.confirmation_sheet import generate_confirmation_sheet, list_confirmation_rows  # noqa: E402
 from submission.assignment_generator import generate_assignments  # noqa: E402
@@ -1038,6 +1038,8 @@ def preview_submission_task(task_id: str, req: SubmissionPreviewReq):
             missing_fields = result["missing_fields"]
             missing_optional = result["missing_optional_fields"]
             rows = result.get("rows", [])   # 各行 key/标签/值，供审核页「标黄设置」勾选
+            _, _aw = effective_assignments(fields)   # 转让链断裂等告警也在确认函预览带出
+            warnings.extend(_aw)
             pdf_path = docx_to_pdf(result["file_path"], preview_dir)
             files.append({"name": result["file_name"], "pdf_url": _url(pdf_path),
                           "docx_url": _url(result["file_path"])})
