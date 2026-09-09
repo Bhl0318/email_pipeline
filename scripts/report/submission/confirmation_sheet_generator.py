@@ -602,9 +602,12 @@ class PatentApplicationFormGenerator:
         for applicant in applicants:
             applicant_index += 1
             data_rows3.append([f'Name{str(applicant_index)}/申请人{str(applicant_index)}:', (applicant.get('applicant_name_en', '') or '').upper(), applicant.get('applicant_name_cn', '')])
+            data_rows3.append(['Address1/地址1:', applicant.get('address1', ''), applicant.get('contact_address_cn', '')])
+            data_rows3.append(['Address2/地址2:', applicant.get('address2', ''), ''])
+            data_rows3.append(['City/城市:', applicant.get('city_en', ''), applicant.get('city_cn', '')])
+            data_rows3.append(['State/Province/州/省:', applicant.get('province_city_en_us', ''), applicant.get('province_city_zh_cn', '')])
+            data_rows3.append(['Post/邮编：', applicant.get('postcode', '')])
             data_rows3.append(['Nationality/国家:', applicant.get('country_en_us', ''), applicant.get('country_zh_cn', '')])
-            # 其余住址明细(Address1/Address2/City/State/Post)不再渲染进确认函；
-            # 值仍存于 fields_json（env2 左侧输入框可编辑保存），仅不体现在文档中。
             data_rows3.append(['Entity/实体', applicant.get('entity_en', ''), applicant.get('entity_cn', '')])
 
         # 优先权：无优先权数据则整段不渲染
@@ -644,7 +647,8 @@ class PatentApplicationFormGenerator:
                 # 其余住址明细行已去掉 → 不再分配对应 key（与 data_rows2 行数保持一致）
             ks.append(None)                                                  # 申请人表头
             for ai in range(1, len(applicants) + 1):
-                ks += [f"applicant.{ai}.{f}" for f in ("name", "nationality", "entity")]   # 其余住址明细行已去掉
+                ks += [f"applicant.{ai}.{f}" for f in
+                       ("name", "address1", "address2", "city", "state", "post", "nationality", "entity")]
             if data_rows4:                                                   # 优先权
                 ks.append(None)
                 for pi in range(1, len(priorities) + 1):
