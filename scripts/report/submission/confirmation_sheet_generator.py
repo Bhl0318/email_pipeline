@@ -241,14 +241,7 @@ class PatentApplicationFormGenerator:
                 'description': '必填字段：落地方式不能为空'
             })
 
-        # 6. 验证加速方式
-        if not case_info.get('ae_methods'):
-            missing_fields.append({
-                'field': 'ae_methods',
-                'field_name': '加速方式',
-                'path': 'case_info["加速方式"]',
-                'description': '必填字段：加速方式不能为空'
-            })
+        # 加速方式：未指定即为 None（无加速），是合法状态，不作必填校验。
 
         return missing_fields
 
