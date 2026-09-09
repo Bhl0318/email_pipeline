@@ -721,16 +721,34 @@ function renderForm() {
     if (asg) return { applicant_name_en:asg.assigning_company||emp, applicant_name_cn:"",
       address1:asg.company_address1||"", address2:asg.company_address2||"", city_en:asg.company_city_en||"",
       province_city_en_us:asg.company_province_en||"", postcode:asg.company_postcode||"", country_en_us:asg.company_country_en||"" };
-    return { applicant_name_en: emp };
+    // 匹配不到 → 名字用 employer 本身，地址回落申请人[0]（与后端确认函兜底一致）
+    const a0 = (fields.applicants||[])[0] || {};
+    return { applicant_name_en: emp, applicant_name_cn:"",
+      address1:a0.address1||"", address2:a0.address2||"", city_en:a0.city_en||"",
+      province_city_en_us:a0.province_city_en_us||"", postcode:a0.postcode||"", country_en_us:a0.country_en_us||"",
+      contact_address_cn:a0.contact_address_cn||"", city_cn:a0.city_cn||"",
+      province_city_zh_cn:a0.province_city_zh_cn||"", country_zh_cn:a0.country_zh_cn||"" };
   };
   const _EMP_FIELDS = [["applicant_name_en","公司英文名",true],["applicant_name_cn","公司中文名",false],
     ["address1","地址1（英）",true],["address2","地址2（英）",false],["city_en","城市（英）",false],
     ["province_city_en_us","省/州（英）",false],["postcode","邮编",false],["country_en_us","国别（英）",false],
     ["contact_address_cn","地址（中）",false],["city_cn","城市（中）",false],
     ["province_city_zh_cn","省（中）",false],["country_zh_cn","国别（中）",false]];
+  const _joinAddr = (parts)=>{ const out=[]; for (let p of parts){ p=(p||"").trim();
+    if (p && (!out.length || out[out.length-1].toLowerCase()!==p.toLowerCase())) out.push(p); } return out.join(", "); };
   const _employerBlocks = [...new Set((fields.inventors||[]).map(i=>(i.employer||"").trim()).filter(Boolean))]
     .map(emp=>{ const d=_defEmpInfo(emp);
-      return { emp, defs: _EMP_FIELDS.map(([k,label,wide])=>({ path:["employer_info",emp,k], label, wide, deriveDefault:()=>(d[k]||"") })) }; });
+      fields.employer_info = fields.employer_info || {};
+      const cur = (fields.employer_info[emp] = fields.employer_info[emp] || {});
+      // 住址一次性 materialize：空则按当前地址拼接写入，之后改地址细节不再变（Residence 独立）
+      if (!(cur.residence_en||"").trim())
+        cur.residence_en = _joinAddr([d.address1,d.address2,d.city_en,d.province_city_en_us,d.postcode,d.country_en_us]);
+      if (!(cur.residence_cn||"").trim())
+        cur.residence_cn = _joinAddr([d.contact_address_cn,d.city_cn,d.province_city_zh_cn,d.country_zh_cn]);
+      const defs = _EMP_FIELDS.map(([k,label,wide])=>({ path:["employer_info",emp,k], label, wide, deriveDefault:()=>(d[k]||"") }));
+      defs.push({ path:["employer_info",emp,"residence_en"], label:"住址（英文，独立，改地址不变）", wide:true });
+      defs.push({ path:["employer_info",emp,"residence_cn"], label:"住址（中文，独立，改地址不变）", wide:true });
+      return { emp, defs }; });
 
   $("formSections").innerHTML = `
     ${ro ? `<div class="banner ok">该任务状态为 ${esc(task.status)}，仅可查看。${task.status === "done" ? ` <button class="reopen-btn" onclick="reopenTask()" style="margin-left:8px">退回重编</button>` : ""}</div>` : ""}
