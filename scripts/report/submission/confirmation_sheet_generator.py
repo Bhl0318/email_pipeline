@@ -491,11 +491,18 @@ class PatentApplicationFormGenerator:
 
         # 申请人按英文名索引，供按 employer 取地址
         _app_by_name = {_norm(a.get("applicant_name_en")): a for a in applicants_list}
+        # 审核页为各 employer 手填的归属公司信息（申请人同款结构），按归一名索引，最优先
+        _einfo_by_key = {_norm(k): v for k, v in (case_info.get("employer_info") or {}).items()
+                         if isinstance(v, dict)}
 
         def _app_for_employer(key, emp):
-            """employer 命中申请人则取该申请人；否则（如前雇主，不在申请人列表）从 assignments
-            公司转公司段取其地址：结构化 company_* 字段（中英+城市/省/邮编/国家）优先，
-            缺省回退旧单串 company_address。"""
+            """employer 命中 employer_info（审核页手填）优先；否则命中申请人；再否则从 assignments
+            公司转公司段取地址（结构化 company_* 优先，缺省回退单串 company_address）。"""
+            ei = _einfo_by_key.get(key)
+            if ei and any((ei.get(f) or "").strip() for f in
+                          ("applicant_name_en", "applicant_name_cn", "address1", "city_en",
+                           "country_en_us", "contact_address_cn")):
+                return ei
             app = _app_by_name.get(key)
             if app:
                 return app
@@ -504,6 +511,14 @@ class PatentApplicationFormGenerator:
                     cd = company_addr_dict(a)
                     if any(cd.get(k) for k in ("address1", "city_en", "postcode", "country_en_us", "contact_address_en")):
                         return {**_EMPTY_APP, **cd}
+            # 都取不到 → 默认用申请人[0]的【地址/国别】(住址不空、与 ADS 一致)，但不带名字
+            # (labor 归属名仍回落到 employer 名 g["emp"]，不会被申请人名顶替)
+            if applicants_list:
+                _base = applicants_list[0]
+                return {**_EMPTY_APP, **{k: _base.get(k, "") for k in (
+                    "address1", "address2", "city_en", "city_cn",
+                    "province_city_en_us", "province_city_zh_cn", "postcode",
+                    "country_en_us", "country_zh_cn", "contact_address_cn", "contact_address_cn2")}}
             return _EMPTY_APP
 
         def _residence(app):
@@ -552,10 +567,8 @@ class PatentApplicationFormGenerator:
             # 仅单组时允许审核页全局覆盖（labor_contract_*/inventor_residence_*）
             labor_en = (case_info.get("labor_contract_en") if _single else "") or app.get("applicant_name_en", "") or g["emp"]
             labor_cn = (case_info.get("labor_contract_cn") if _single else "") or app.get("applicant_name_cn", "")
-            _res_en, _res_cn = _residence(app)
-            # 发明人住址：审核页填了值就独立（覆盖所有归属组的住址行），空则各组按地址拼接。不受单/多组限制。
-            res_en = (case_info.get("inventor_residence_en") or "").strip() or _res_en
-            res_cn = (case_info.get("inventor_residence_cn") or "").strip() or _res_cn
+            # 住址按该组 app（employer_info 手填 > 申请人 > 转让公司）的地址拼接
+            res_en, res_cn = _residence(app)
             if _single:
                 labor_label = "Labor Contract for all inventors/劳动合同归属:"
                 res_label = "Residence/Mailing Address for all inventors/所有发明人住址"

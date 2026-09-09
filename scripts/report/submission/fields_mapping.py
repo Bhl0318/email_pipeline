@@ -109,16 +109,22 @@ def _continuity_display(v):
     return _CONTINUITY_DISPLAY.get(key, s)
 
 
-def _inventor_applicant_addr(inv: dict, applicants: list, assignments: list) -> dict:
+def _inventor_applicant_addr(inv: dict, applicants: list, assignments: list, employer_info: dict = None) -> dict:
     """按发明人 employer 取对应申请人的地址（对齐确认函 confirmation_sheet_generator._app_for_employer）。
 
-    无 employer / 单申请人 → applicants[0]；employer 命中申请人英文名 → 该申请人；
-    否则前雇主 → assignments.assigning_company 的 company_address（逗号拆 address1/2）。
+    employer 命中 employer_info（审核页手填，申请人同款结构）优先 → 该记录；
+    无 employer / 单申请人 → applicants[0]；命中申请人英文名 → 该申请人；
+    否则前雇主 → assignments.assigning_company 的公司地址（结构化 company_address1/2 优先）。
     :return: 含 address1/address2/city_en/country_en_us/postcode/province_city_en_us 的申请人 dict（或子集）。
     """
     emp = _norm(inv.get("employer"))
     if not emp:
         return applicants[0] if applicants else {}
+    _einfo = {_norm(k): v for k, v in (employer_info or {}).items() if isinstance(v, dict)}
+    ei = _einfo.get(emp)
+    if ei and any((ei.get(f) or "").strip() for f in
+                  ("applicant_name_en", "address1", "city_en", "country_en_us", "contact_address_cn")):
+        return ei
     for a in applicants:
         if _norm(a.get("applicant_name_en")) == emp:
             return a
@@ -158,13 +164,14 @@ def fields_to_case_info(fields: dict, agent_info: dict = None) -> dict:
     #    filing_extra.inventor_addresses 手填则覆盖 ──
     raw_applicants = fields.get("applicants") or []
     raw_assignments = fields.get("assignments") or []
+    raw_employer_info = fields.get("employer_info") or {}
     inventors = []
     for idx, inv in enumerate(fields.get("inventors") or []):
         first = (inv.get("first_name_en") or "").strip()
         last = (inv.get("last_name_en") or "").strip()
         full = (inv.get("full_name_en") or "").strip() or f"{first} {last}".strip()
         manual = inv_addrs[idx] if idx < len(inv_addrs) else {}
-        app = _inventor_applicant_addr(inv, raw_applicants, raw_assignments)
+        app = _inventor_applicant_addr(inv, raw_applicants, raw_assignments, raw_employer_info)
         # 每项：手填优先，否则取该发明人 employer 对应申请人的地址
         def pick(mk, ak):
             return (manual.get(mk) or "").strip() or (app.get(ak) or "").strip()

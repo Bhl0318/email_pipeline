@@ -449,6 +449,12 @@ function invApplicantAddr(inv){
   const apps = fields.applicants||[];
   const emp = norm(inv.employer);
   if (!emp) return apps[0] || {};
+  // employer_info（审核页手填，申请人同款结构）最优先
+  const ei = fields.employer_info || {};
+  const eiKey = Object.keys(ei).find(k => norm(k) === emp);
+  if (eiKey){ const v = ei[eiKey] || {};
+    if (["applicant_name_en","address1","city_en","country_en_us","contact_address_cn"].some(f => (v[f]||"").trim()))
+      return v; }
   const hit = apps.find(a => norm(a.applicant_name_en) === emp);
   if (hit) return hit;
   const asg = (fields.assignments||[]).find(x => norm(x.assigning_company)===emp &&

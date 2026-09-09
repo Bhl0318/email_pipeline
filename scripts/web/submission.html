@@ -708,16 +708,29 @@ function renderForm() {
   const _suppFields = [
     { path: ["case_info", "location_invention_en"], label: "发明/设计地（英文）", deriveDefault: () => "People's Republic of China (CN)", hintText: "默认 People's Republic of China (CN)" },
     { path: ["case_info", "location_invention_cn"], label: "发明/设计地（中文）", deriveDefault: () => "中国", hintText: "默认 中国" },
-    { path: ["inventor_residence_en"], label: "发明人住址（英文）", wide: true,
-      deriveDefault: () => { const a = (fields.applicants || [])[0] || {};
-        return [a.address1, a.address2, a.city_en, a.province_city_en_us, a.postcode, a.country_en_us].map(x => (x || "").trim()).filter(Boolean).join(", "); },
-      hintText: "留空＝按申请人地址自动拼接；填了即独立、不再跟随地址" },
-    { path: ["inventor_residence_cn"], label: "发明人住址（中文）", wide: true,
-      deriveDefault: () => { const a = (fields.applicants || [])[0] || {};
-        return [a.contact_address_cn, a.contact_address_cn2, a.city_cn, a.province_city_zh_cn, a.country_zh_cn].map(x => (x || "").trim()).filter(Boolean).join(", "); },
-      hintText: "留空＝按申请人地址自动拼接；填了即独立、不再跟随地址" },
   ];
-  const _suppTitle = "确认函补充（发明地 / 发明人住址）— 住址留空按申请人地址自动拼接、填了即独立；劳动合同归属仍按归属公司分组自动生成";
+  const _suppTitle = "确认函补充（发明地）";
+
+  // 发明人归属公司（employer_info，申请人同款结构）：确认函分组住址 / ADS / filing通信地址 共用同一份
+  const _empNorm = s => (s||"").trim().toLowerCase();
+  const _defEmpInfo = (emp) => {
+    const hit = (fields.applicants||[]).find(a=>_empNorm(a.applicant_name_en)===_empNorm(emp));
+    if (hit) return hit;
+    const asg = (fields.assignments||[]).find(x=>_empNorm(x.assigning_company)===_empNorm(emp) &&
+      ((x.company_address1||"").trim()||(x.company_address2||"").trim()||(x.company_address||"").trim()));
+    if (asg) return { applicant_name_en:asg.assigning_company||emp, applicant_name_cn:"",
+      address1:asg.company_address1||"", address2:asg.company_address2||"", city_en:asg.company_city_en||"",
+      province_city_en_us:asg.company_province_en||"", postcode:asg.company_postcode||"", country_en_us:asg.company_country_en||"" };
+    return { applicant_name_en: emp };
+  };
+  const _EMP_FIELDS = [["applicant_name_en","公司英文名",true],["applicant_name_cn","公司中文名",false],
+    ["address1","地址1（英）",true],["address2","地址2（英）",false],["city_en","城市（英）",false],
+    ["province_city_en_us","省/州（英）",false],["postcode","邮编",false],["country_en_us","国别（英）",false],
+    ["contact_address_cn","地址（中）",false],["city_cn","城市（中）",false],
+    ["province_city_zh_cn","省（中）",false],["country_zh_cn","国别（中）",false]];
+  const _employerBlocks = [...new Set((fields.inventors||[]).map(i=>(i.employer||"").trim()).filter(Boolean))]
+    .map(emp=>{ const d=_defEmpInfo(emp);
+      return { emp, defs: _EMP_FIELDS.map(([k,label,wide])=>({ path:["employer_info",emp,k], label, wide, deriveDefault:()=>(d[k]||"") })) }; });
 
   $("formSections").innerHTML = `
     ${ro ? `<div class="banner ok">该任务状态为 ${esc(task.status)}，仅可查看。${task.status === "done" ? ` <button class="reopen-btn" onclick="reopenTask()" style="margin-left:8px">退回重编</button>` : ""}</div>` : ""}
@@ -744,6 +757,12 @@ function renderForm() {
 
     <div class="section">${head("发明人", "inventors", "发明人")}<div class="section-body" id="sec-inventors">
       ${arrayBlock("inventors", "发明人", INVENTOR_FIELDS)}</div></div>
+
+    ${_employerBlocks.length ? `<div class="section">${head("发明人归属公司（归属公司≠申请人时在此补公司名+地址；确认函分组住址 / ADS / 通信地址共用）")}<div class="section-body">
+      ${_employerBlocks.map(b=>`<div style="border:1px solid #e2e8f0;border-radius:6px;padding:8px;margin-bottom:8px;">
+        <div style="font-size:12px;font-weight:600;margin-bottom:6px;">归属公司：${esc(b.emp)}</div>
+        <div class="grid">${b.defs.map(fieldInput).join("")}</div></div>`).join("")}
+    </div></div>` : ""}
 
     <div class="section">${head(_suppTitle)}<div class="section-body"><div class="grid">
       ${_suppFields.map(fieldInput).join("")}
