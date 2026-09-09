@@ -909,7 +909,7 @@ async function uploadSourceDoc() {
     const data = await r.json().catch(() => ({}));
     if (!r.ok) { const err = new Error("upload"); err.status = r.status; err.data = data; throw err; }
     toast("已上传参考文件");
-    renderSourceDocs();
+    loadSourceDocsPreview();
   } catch (e) { toast("上传失败：" + problemsOf(e).join("；"), 5000); }
 }
 async function deleteSourceDoc(i) {
@@ -918,7 +918,7 @@ async function deleteSourceDoc(i) {
   try {
     await api("POST", `${API}/tasks/${taskId}/source-doc/delete?name=${encodeURIComponent(f.filename)}`);
     toast("已删除");
-    renderSourceDocs();
+    loadSourceDocsPreview();
   } catch (e) { toast("删除失败：" + problemsOf(e).join("；"), 4000); }
 }
 function mdIframeDoc(html) {
