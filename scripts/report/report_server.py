@@ -1161,6 +1161,7 @@ def preview_existing_submission(task_id: str, target: str = "confirmation"):
 
 
 @app.get("/api/submission/tasks/{task_id}/final-doc")
+@app.get("/api/submission/filing/{task_id}/final-doc")   # env5 filing.html 按 /filing/ 前缀调，同一处理
 def submission_final_doc(task_id: str, target: str):
     """已发版预览：发美代理后文件已锁定，返回 final/(发送时生成) 中匹配 target 的【已发送】
     文件 URL，不按当前编辑重生成。ADS 为动态 XFA 表单浏览器不内联 → inline=False（下载打开）。"""
