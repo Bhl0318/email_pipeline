@@ -11,5 +11,6 @@
   "oa_test_project_prefix": null,
   "send_email": true,
   "send_assign_link": true,
-  "oa_assign_base_url": "http://10.10.70.88:8501"
+  "oa_assign_base_url": "http://10.10.70.88:8501",
+  "mistral_ocr": { "base": "https://149.248.15.179:8445", "api_key": "" }
 }

@@ -248,7 +248,14 @@ def _split_spec(spec_text):
 
 
 def _ocr_pdf(path, max_pages=6):
-    """扫描件（无文本层）→ 用 qwen-vl 逐页 OCR 成纯文本。失败返回空串。"""
+    """扫描件（无文本层）→ OCR 成纯文本。先用 mistral-ocr 服务(PDF→md,整份不限页)，失败回退 qwen-vl 逐页。"""
+    try:
+        from mistral_ocr import pdf_to_markdown
+        md = pdf_to_markdown(path)
+        if md:
+            return md
+    except Exception as e:
+        print(f"[oa_report_ai] mistral-ocr 失败，回退 qwen-vl: {e}", file=sys.stderr)
     try:
         import base64
         import fitz

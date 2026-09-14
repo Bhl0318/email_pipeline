@@ -712,6 +712,7 @@ def _build_table_row(item, followup=""):
     oa_doc_date = item.get("oa_doc_date", "")
     project_deadline = item.get("project_deadline", "")
     project_name = item.get("project_name", "")
+    other_remark = item.get("其它备注事项", "")   # 立项时审意分析写入（如「涉及新颖性、创造性」）
     oa_id = item.get("oa_id", "")          # 立项唯一 id(=projects.row_id)，供 OA 分配按 id 回写人员分配
     # 埋进 class(Confluence 会清洗 data-* 属性；class 比 data-* 易保留，若也被清则改按可见内容定位)
     tr_open = f'<tr class="oaid-{oa_id}">' if oa_id else "<tr>"
@@ -725,7 +726,7 @@ def _build_table_row(item, followup=""):
         f"<td>{project_deadline}</td>"     # 答复期限
         f"<td>{project_name}</td>"         # OA类别
         f"<td>{followup}</td>"             # 跟进人
-        f"<td></td>"                       # 其它备注事项
+        f"<td>{other_remark}</td>"         # 其它备注事项（审意涉新颖性/创造性时标注）
         f"<td></td>"                       # 人员分配
         f"<td></td>"                       # 分配人（提交分配时回写）
         f"<td></td>"                       # 分配时间（提交分配时回写）

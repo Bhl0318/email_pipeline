@@ -708,7 +708,8 @@ def send_forward_oa(all_results, all_emails=None, dry_run=False):
             print(f"      抄送({len(p['cc'])}): {', '.join(p['cc'])}", file=sys.stderr)
             print(f"      附件({len(atts)}): {', '.join(atts) if atts else '(无)'}", file=sys.stderr)
         print(f"  [dry-run][转OA] 共 {len(plans)} 封待发（未实际发送）", file=sys.stderr)
-        for _nt in build_assign_notifies(plans):
+        # 审意涉新颖性/创造性的案不发分配链接
+        for _nt in build_assign_notifies([p for p in plans if not p["item"].get("_skip_assign")]):
             print(f"  [dry-run][OA分配链接] → {_nt['to']} 抄送 {', '.join(_nt['cc'])}  主题: {_nt['subject']}", file=sys.stderr)
         return fwd_actions
 
@@ -780,7 +781,8 @@ def send_forward_oa(all_results, all_emails=None, dry_run=False):
             print(f"[转OA] {p['item'].get('project')} 发送失败: {e}", file=sys.stderr)
 
     # OA 分配链接：不发流程人员，按案号路由收件人分组发（20608→王志刚、其余→薛虹，均抄送海灵；复用已开 SMTP）
-    for _nt in build_assign_notifies(plans):
+    # 审意涉新颖性/创造性的案不发分配链接（_skip_assign）
+    for _nt in build_assign_notifies([p for p in plans if not p["item"].get("_skip_assign")]):
         try:
             nmsg = MIMEMultipart()
             nmsg["From"] = pa_cfg["user"]
@@ -1314,22 +1316,26 @@ def dispatch_oa(all_results, all_emails=None, dry_run=False, test_project_prefix
                 if r.get("ref_docs"):
                     parsed = r
                     break
+            proj = item.get("project", "")
             if not parsed:
+                _seq = parse_oa_seq(item.get("project_name", "") or "")
+                print(f"[对比文件][CN] {proj} OA{_seq or '?'}：未从审查意见读到对比文件", file=sys.stderr)
                 continue
             # OA 次数：优先用 PDF 里解析到的，其次从立项名称「第N次」推
             oa_seq = parsed.get("oa_seq") or parse_oa_seq(item.get("project_name", "") or "")
             docs = parsed["ref_docs"]
-            print(f"[对比文件] {item.get('project','')} OA{oa_seq}: {docs}", file=sys.stderr)
+            print(f"[对比文件][CN] {proj} OA{oa_seq}：从审查意见读到 {len(docs)} 条对比文件 → "
+                  f"{[d.get('doc_no') for d in docs]}", file=sys.stderr)
             try:
-                title = f"{item.get('project','')}-OA信息记录表"
-                fill_ref_docs_in_oa_row(
-                    title, oa_seq, docs,
+                _r = fill_ref_docs_in_oa_row(
+                    f"{proj}-OA信息记录表", oa_seq, docs,
                     oa_doc_date=item.get("oa_doc_date", ""),      # OA收文日 ← 官文发文日
                     project_deadline=item.get("project_deadline", ""),  # 期限
                     dry_run=dry_run,
                 )
+                print(f"[对比文件][CN] {proj} OA{oa_seq} 写回记录表: {(_r or {}).get('status')}", file=sys.stderr)
             except Exception as e:
-                print(f"[对比文件] {item.get('project','')} 写回失败: {e}", file=sys.stderr)
+                print(f"[对比文件][CN] {proj} OA{oa_seq} 写回失败: {e}", file=sys.stderr)
 
     # 对比文件（US）：从 PTO-892(优先) 或主官文正文抽审查员引用的对比文件，归一化成 Google Patents 号，
     # 与 CN 同样填该案 OA信息记录表页「OA过程」表 OA{N} 行「对比文件链接」列（复用 fill_ref_docs_in_oa_row）。
@@ -1342,26 +1348,74 @@ def dispatch_oa(all_results, all_emails=None, dry_run=False, test_project_prefix
             src = (item.get("us_892_pdf_paths") or [None])[0] or item.get("us_pdf_path")
             if not src:
                 continue
+            proj = item.get("project", "")
+            oa_seq = item.get("oaNum") or 1     # US 用已有的 OA 序号机制
             try:
                 parsed = extract_us_ref_docs(src)
             except Exception as e:
-                print(f"[US-ref] {item.get('project','')} 解析失败: {e}", file=sys.stderr)
+                print(f"[对比文件][US] {proj} OA{oa_seq} 解析失败: {e}", file=sys.stderr)
                 continue
             docs = parsed.get("ref_docs") or []
             if not docs:
+                print(f"[对比文件][US] {proj} OA{oa_seq}：未从审查意见/892 读到对比文件", file=sys.stderr)
                 continue
-            oa_seq = item.get("oaNum") or 1     # US 用已有的 OA 序号机制
-            print(f"[US-ref] {item.get('project','')} OA{oa_seq}: "
+            print(f"[对比文件][US] {proj} OA{oa_seq}：从审查意见/892 读到 {len(docs)} 条对比文件 → "
                   f"{[d['doc_no'] for d in docs]}", file=sys.stderr)
             try:
-                fill_ref_docs_in_oa_row(
-                    f"{item.get('project','')}-OA信息记录表", oa_seq, docs,
+                _r = fill_ref_docs_in_oa_row(
+                    f"{proj}-OA信息记录表", oa_seq, docs,
                     oa_doc_date=item.get("oa_doc_date", ""),
                     project_deadline=item.get("project_deadline", ""),
                     dry_run=dry_run,
                 )
+                print(f"[对比文件][US] {proj} OA{oa_seq} 写回记录表: {(_r or {}).get('status')}", file=sys.stderr)
             except Exception as e:
-                print(f"[US-ref] {item.get('project','')} 写回失败: {e}", file=sys.stderr)
+                print(f"[对比文件][US] {proj} OA{oa_seq} 写回失败: {e}", file=sys.stderr)
+
+    # 审意新颖性/创造性判断（立项时）：读审意全文 → DeepSeek 判是否涉及新颖性(US §102/EPC Art.54)或
+    # 创造性(US §103/EPC Art.56)。命中任一 → 「其它备注事项」列标注 + 该案不进 OA 分配
+    # （不进待分配、不发分配链接；立项/转OA/写Wiki 照常）。
+    # 读不到审意 / DeepSeek 失败默认「无问题」，不误跳过分配（宁可多分一件，不漏分一件）。
+    if all_results and not dry_run:
+        try:
+            from analyze_oa_issue import analyze_novelty_inventiveness
+            from word_to_wiki import _content_pieces
+            from parse_cn_pdf import parse_oa_seq as _parse_seq
+            _mid2pdfs_ni = {}
+            for _acc, _em in (all_emails or []):
+                _m = _em.get("message_id", "")
+                if _m and _em.get("saved_pdfs"):
+                    _mid2pdfs_ni[_m] = _em.get("saved_pdfs", [])
+            for item in all_results:
+                proj = item.get("project", "")
+                _seq = (_parse_seq(item.get("project_name", "") or "")
+                        if item.get("region") == "CN" else item.get("oaNum")) or "?"
+                _src = _official_doc_for_subpage(
+                    item, _mid2pdfs_ni.get(item.get("message_id", ""), []))
+                if not _src:
+                    print(f"[审意分析] {proj} OA{_seq}：未找到审意官文，跳过判断（默认可分配）", file=sys.stderr)
+                    continue
+                try:
+                    _paras, _tb = _content_pieces(_src)
+                    _oa_text = "\n".join(_paras)
+                except Exception as e:
+                    print(f"[审意分析] {proj} OA{_seq}：读审意正文失败，跳过判断: {e}", file=sys.stderr)
+                    continue
+                if not _oa_text.strip():
+                    print(f"[审意分析] {proj} OA{_seq}：审意正文为空，跳过判断（默认可分配）", file=sys.stderr)
+                    continue
+                v = analyze_novelty_inventiveness(_oa_text)
+                if v.get("novelty") or v.get("inventiveness"):
+                    _issues = [n for n, f in (("新颖性", v.get("novelty")),
+                                              ("创造性", v.get("inventiveness"))) if f]
+                    item["其它备注事项"] = v.get("note") or f"涉及{'、'.join(_issues)}"
+                    item["_skip_assign"] = True
+                    print(f"[审意分析] {proj} OA{_seq}：涉及{'、'.join(_issues)} → "
+                          f"其它备注事项标注、不进OA分配", file=sys.stderr)
+                else:
+                    print(f"[审意分析] {proj} OA{_seq}：未见新颖性/创造性 → 正常分配", file=sys.stderr)
+        except Exception as e:
+            print(f"[审意分析] 模块不可用，全部按可分配处理: {e}", file=sys.stderr)
 
     print(f"\n{'='*40}", file=sys.stderr)
     print(f"汇总: {len(all_results)} 条立项结果", file=sys.stderr)
@@ -1475,8 +1529,13 @@ def dispatch_oa(all_results, all_emails=None, dry_run=False, test_project_prefix
     if inserted_items and not dry_run:
         try:
             from oa_assign_store import add_pending
-            n = add_pending(inserted_items)
-            print(f"[待分配] 新增 {n} 件到 OA 分配待分配库", file=sys.stderr)
+            # 审意涉新颖性/创造性的案不进待分配（_skip_assign），不发分配链接
+            _to_pending = [it for it in inserted_items if not it.get("_skip_assign")]
+            _skipped_n = len(inserted_items) - len(_to_pending)
+            n = add_pending(_to_pending) if _to_pending else 0
+            print(f"[待分配] 新增 {n} 件到 OA 分配待分配库"
+                  + (f"（另 {_skipped_n} 件涉新颖性/创造性不进分配）" if _skipped_n else ""),
+                  file=sys.stderr)
         except Exception as e:
             print(f"[待分配] 写入失败: {e}", file=sys.stderr)
 
@@ -1513,6 +1572,8 @@ def dispatch_oa(all_results, all_emails=None, dry_run=False, test_project_prefix
             for item in inserted_items:
                 oa_id = item.get("oa_id", "")
                 if not oa_id:
+                    continue
+                if item.get("_skip_assign"):   # 涉新颖性/创造性不分配 → 无需生成分配报告
                     continue
                 try:
                     _md = build_case_report(item)

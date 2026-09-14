@@ -206,13 +206,27 @@ def extract_cn_ref_docs(pdf_path):
                 print(f"[DeepSeek] 提取到 {len(docs)} 条对比文件", file=sys.stderr)
         result["ref_docs"] = docs
 
-    # 3. 扫描件图片降级
+    # 3. 扫描件降级：先 mistral-ocr(PDF→md) 在其文本上抽；无果再回退 qwen-vl 图片识别
     if not result["ref_docs"] and is_scanned:
-        print("PDF 为扫描件，使用图片识别...", file=sys.stderr)
-        docs = _ai_extract_ref_docs_from_images(pdf_path, max_pages=3)
-        if docs:
-            print(f"[qwen-vl-max] 提取到 {len(docs)} 条对比文件", file=sys.stderr)
-        result["ref_docs"] = docs
+        md = ""
+        try:
+            from mistral_ocr import pdf_to_markdown
+            md = pdf_to_markdown(pdf_path)
+        except Exception as e:
+            print(f"[对比文件] mistral-ocr 失败: {e}", file=sys.stderr)
+        if md:
+            result["oa_seq"] = result["oa_seq"] or parse_oa_seq(md)
+            result["notice_title"] = result["notice_title"] or _notice_title(md)
+            docs = _regex_extract_ref_docs(md) or _ai_extract_ref_docs_from_text(md)
+            if docs:
+                print(f"[mistral-ocr] 提取到 {len(docs)} 条对比文件", file=sys.stderr)
+            result["ref_docs"] = docs
+        if not result["ref_docs"]:
+            print("mistral-ocr 无果，回退 qwen-vl 图片识别...", file=sys.stderr)
+            docs = _ai_extract_ref_docs_from_images(pdf_path, max_pages=3)
+            if docs:
+                print(f"[qwen-vl-max] 提取到 {len(docs)} 条对比文件", file=sys.stderr)
+            result["ref_docs"] = docs
 
     return result
 

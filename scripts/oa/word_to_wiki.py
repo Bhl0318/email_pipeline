@@ -93,7 +93,14 @@ def _pdf_text_paragraphs(pdf_path):
 
 
 def _ocr_pdf_paragraphs(pdf_path, max_pages=OCR_MAX_PAGES):
-    """扫描/图片型 PDF：逐页渲染成图片发 qwen-vl OCR，返回段落列表；失败/空返回 []。"""
+    """扫描/图片型 PDF → OCR 段落列表。先用 mistral-ocr 服务(整份→md)，失败回退 qwen-vl 逐页。空返回 []。"""
+    try:
+        from mistral_ocr import pdf_to_markdown
+        md = pdf_to_markdown(pdf_path)
+        if md:
+            return [ln.strip() for ln in md.split("\n") if ln.strip()]
+    except Exception as e:
+        print(f"[官文OCR] mistral-ocr 失败，回退 qwen-vl: {e}", file=sys.stderr)
     try:
         import base64
         import fitz
