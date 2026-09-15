@@ -5,7 +5,9 @@
     "用法": "TIP结项任务(案号定法域)+combination → region.combinations[combination]=结项类型 → region.rules[结项类型] → 出template+客户分派",
     "默认skip": "combination 不在 region.combinations 里 → 默认 skip 不发",
     "action": "assign=分配给preparer / skip=不分配(转发forward) / ignore=不处理",
-    "template": "md文件名(templates/md/结项通知/);null=无需做或无模板"
+    "template": "md文件名(templates/md/结项通知/);null=无需做或无模板",
+    "attach": "是否随信带附件(递交文件+回执):模板正文写「后续送达」=False,其余True",
+    "附件来源": "待定——接入时定:结项的递交文件+回执在TIP/唯德系统(非邮箱),取法待设计"
   },
   "CN": {
     "combinations": {
@@ -75,6 +77,7 @@
     "rules": {
       "新申请递交": {
         "template": "CN_新申请递交_接口用极简版.md",
+        "attach": false,
         "rules": {
           "20618": {
             "action": "skip",
@@ -140,6 +143,7 @@
       },
       "新申请递交--收到受理通知": {
         "template": "CN_本次无需-受理报告_没有待完成事项版.md",
+        "attach": true,
         "rules": {
           "20618": {
             "action": "skip",
@@ -205,6 +209,7 @@
       },
       "新申请递交-PCT正常落地": {
         "template": "CN_新申请递交-PCT正常落地.md",
+        "attach": true,
         "rules": {
           "20618": {
             "action": "skip",
@@ -264,6 +269,7 @@
       },
       "OA答复": {
         "template": "CN_OA答复递交.md",
+        "attach": true,
         "rules": {
           "20618": {
             "action": "skip",
@@ -330,6 +336,7 @@
       },
       "驳回复审请求答复": {
         "template": "CN_复审请求.md",
+        "attach": true,
         "rules": {
           "20618": {
             "action": "skip",
@@ -396,6 +403,7 @@
       },
       "复审答复": {
         "template": "CN_复审请求.md",
+        "attach": true,
         "rules": {
           "20618": {
             "action": "skip",
@@ -462,6 +470,7 @@
       },
       "补正__审查员主动沟通补正答复_补正权要_补正说明书_补正摘要_补正摘要附图_补正外观设计图片_补正外观设计图片或照片_补正POA": {
         "template": "CN_补正递交.md",
+        "attach": true,
         "rules": {
           "20618": {
             "action": "skip",
@@ -528,6 +537,7 @@
       },
       "著录项目_变更发明人": {
         "template": "CN_变更发明人.md",
+        "attach": true,
         "rules": {
           "20618": {
             "action": "skip",
@@ -594,6 +604,7 @@
       },
       "其他_申请保密审查": {
         "template": "CN_保密审查.md",
+        "attach": true,
         "rules": {
           "20618": {
             "action": "skip",
@@ -660,6 +671,7 @@
       },
       "其他_撤回申请": {
         "template": "CN_撤回申请.md",
+        "attach": true,
         "rules": {
           "20618": {
             "action": "skip",
@@ -726,6 +738,7 @@
       },
       "其他-复审阶段优先审查": {
         "template": "CN_复审阶段优先审查.md",
+        "attach": true,
         "rules": {
           "20618": {
             "action": "skip",
@@ -792,6 +805,7 @@
       },
       "其他_DAS交存": {
         "template": null,
+        "attach": false,
         "rules": {
           "20618": {
             "action": "skip",
@@ -864,6 +878,7 @@
       },
       "缴费_缴纳办登费": {
         "template": null,
+        "attach": false,
         "rules": {
           "20618": {
             "action": "skip",
@@ -936,6 +951,7 @@
       },
       "其他_优先审查": {
         "template": null,
+        "attach": false,
         "rules": {
           "20618": {
             "action": "skip",
@@ -1008,6 +1024,7 @@
       },
       "缴费_缴纳年费": {
         "template": null,
+        "attach": false,
         "rules": {
           "20618": {
             "action": "skip",
@@ -1080,6 +1097,7 @@
       },
       "著录项目_变更申请人": {
         "template": "CN_变更申请人.md",
+        "attach": true,
         "rules": {
           "20618": {
             "action": "skip",
@@ -1152,6 +1170,7 @@
       },
       "其他_放弃专利权": {
         "template": "CN_放弃专利权请求.md",
+        "attach": true,
         "rules": {
           "20618": {
             "action": "skip",
@@ -1224,6 +1243,7 @@
       },
       "其他_实审请求": {
         "template": "CN_实审请求.md",
+        "attach": true,
         "rules": {
           "20618": {
             "action": "skip",
@@ -1334,6 +1354,7 @@
     "rules": {
       "新申请递交": {
         "template": "PCT_新申请递交_无代办事项.md",
+        "attach": true,
         "rules": {
           "20618": {
             "action": "skip",
@@ -1372,6 +1393,7 @@
       },
       "补正_主动补正权利要求以及主动补正说明书": {
         "template": "PCT_主动补正提交.md",
+        "attach": true,
         "rules": {
           "20618": {
             "action": "skip",
@@ -1417,6 +1439,7 @@
       },
       "补正_132表-补正权利要求书和说明书": {
         "template": "PCT_132表补正提交.md",
+        "attach": true,
         "rules": {
           "20618": {
             "action": "skip",
@@ -1462,6 +1485,7 @@
       },
       "补正_106表-补正说明书附图": {
         "template": "PCT_106表补正提交.md",
+        "attach": true,
         "rules": {
           "20618": {
             "action": "skip",
@@ -1507,6 +1531,7 @@
       },
       "补正_206表": {
         "template": "PCT_206表补正提交.md",
+        "attach": true,
         "rules": {
           "20618": {
             "action": "skip",
@@ -1552,6 +1577,7 @@
       },
       "其他_主动撤回": {
         "template": "PCT_撤回申请提交.md",
+        "attach": true,
         "rules": {
           "20618": {
             "action": "skip",
@@ -1597,6 +1623,7 @@
       },
       "补正_补交DAS码": {
         "template": "PCT_补交DAS码.md",
+        "attach": true,
         "rules": {
           "20618": {
             "action": "skip",
@@ -1642,6 +1669,7 @@
       },
       "其他_DAS请求": {
         "template": null,
+        "attach": false,
         "rules": {
           "20618": {
             "action": "skip",
@@ -1686,6 +1714,7 @@
       },
       "其他_递交海外其他保密审查": {
         "template": null,
+        "attach": false,
         "rules": {
           "20618": {
             "action": "skip",
@@ -1730,6 +1759,7 @@
       },
       "补正_补交POA": {
         "template": null,
+        "attach": false,
         "rules": {
           "20618": {
             "action": "skip",
@@ -1774,6 +1804,7 @@
       },
       "其他_PCT总委备案": {
         "template": null,
+        "attach": false,
         "rules": {
           "20618": {
             "action": "skip",
@@ -1818,6 +1849,7 @@
       },
       "其他_办理优先权文件副本": {
         "template": null,
+        "attach": false,
         "rules": {
           "20618": {
             "action": "skip",
@@ -1862,6 +1894,7 @@
       },
       "著录项目_变更申请人": {
         "template": "PCT_变更申请人提交.md",
+        "attach": true,
         "rules": {
           "20618": {
             "action": "skip",
@@ -1907,6 +1940,7 @@
       },
       "著录项目_变更发明人": {
         "template": "PCT_变更发明人提交.md",
+        "attach": true,
         "rules": {
           "20618": {
             "action": "skip",
@@ -1952,6 +1986,7 @@
       },
       "著录项目_申请人更名": {
         "template": "PCT_申请人更名提交.md",
+        "attach": true,
         "rules": {
           "20618": {
             "action": "skip",
@@ -1997,6 +2032,7 @@
       },
       "著录项目_变更申请人和发明人地址": {
         "template": "PCT_变更申请人、发明人地址提交.md",
+        "attach": true,
         "rules": {
           "20618": {
             "action": "skip",
@@ -2042,6 +2078,7 @@
       },
       "著录项目_变更代理机构": {
         "template": null,
+        "attach": false,
         "rules": {
           "20618": {
             "action": "skip",
@@ -2159,6 +2196,7 @@
     "rules": {
       "新申请递交": {
         "template": "US_新申请递交.md",
+        "attach": true,
         "rules": {
           "20618": {
             "action": "skip",
@@ -2204,6 +2242,7 @@
       },
       "新申请递交_续案": {
         "template": "US_续案递交.md",
+        "attach": true,
         "rules": {
           "20618": {
             "action": "skip",
@@ -2249,6 +2288,7 @@
       },
       "新申请递交_部分续案": {
         "template": "US_部分续案递交.md",
+        "attach": true,
         "rules": {
           "20618": {
             "action": "skip",
@@ -2294,6 +2334,7 @@
       },
       "新申请递交_分案": {
         "template": "US_分案递交.md",
+        "attach": true,
         "rules": {
           "20618": {
             "action": "skip",
@@ -2339,6 +2380,7 @@
       },
       "新申请递交_临时申请": {
         "template": "US_临时申请递交.md",
+        "attach": true,
         "rules": {
           "20618": {
             "action": "skip",
@@ -2384,6 +2426,7 @@
       },
       "OA答复递交-Non-final/Final": {
         "template": "US_OA答复递交.md",
+        "attach": true,
         "rules": {
           "20618": {
             "action": "skip",
@@ -2429,6 +2472,7 @@
       },
       "OA答复递交-AA": {
         "template": "US_AA答复递交.md",
+        "attach": true,
         "rules": {
           "20618": {
             "action": "skip",
@@ -2474,6 +2518,7 @@
       },
       "OA答复递交-RR": {
         "template": "US_RR答复递交.md",
+        "attach": true,
         "rules": {
           "20618": {
             "action": "skip",
@@ -2519,6 +2564,7 @@
       },
       "OA答复递交-Ex Parte Quayle Action": {
         "template": "US_ExParteQuayleAction答复递交.md",
+        "attach": true,
         "rules": {
           "20618": {
             "action": "skip",
@@ -2564,6 +2610,7 @@
       },
       "IDS递交": {
         "template": "US_IDS递交.md",
+        "attach": true,
         "rules": {
           "20618": {
             "action": "skip",
@@ -2609,6 +2656,7 @@
       },
       "NOA_NOA缴纳授权费": {
         "template": "US_NOA缴纳授权费.md",
+        "attach": true,
         "rules": {
           "20618": {
             "action": "skip",
@@ -2654,6 +2702,7 @@
       },
       "补正答复": {
         "template": "US_补正答复.md",
+        "attach": true,
         "rules": {
           "20618": {
             "action": "skip",
@@ -2699,6 +2748,7 @@
       },
       "补正_补正PPH": {
         "template": "US_补正PPH答复.md",
+        "attach": true,
         "rules": {
           "20618": {
             "action": "skip",
@@ -2744,6 +2794,7 @@
       },
       "其他递交_变更申请人": {
         "template": "US_变更申请人.md",
+        "attach": true,
         "rules": {
           "20618": {
             "action": "skip",
@@ -2789,6 +2840,7 @@
       },
       "其他递交_申请人更名": {
         "template": "US_申请人更名.md",
+        "attach": true,
         "rules": {
           "20618": {
             "action": "skip",
@@ -2834,6 +2886,7 @@
       },
       "其他递交_变更发明人": {
         "template": "US_变更发明人.md",
+        "attach": true,
         "rules": {
           "20618": {
             "action": "skip",
@@ -2879,6 +2932,7 @@
       },
       "著录项目_POA递交/变更代理机构": {
         "template": "US_补交POA.md",
+        "attach": true,
         "rules": {
           "20618": {
             "action": "skip",
@@ -2924,6 +2978,7 @@
       },
       "附加_+TD": {
         "template": "US_TD提交.md",
+        "attach": true,
         "rules": {
           "20618": {
             "action": "skip",
@@ -2969,6 +3024,7 @@
       },
       "附加_+PPH": {
         "template": "US_PPH提交.md",
+        "attach": true,
         "rules": {
           "20618": {
             "action": "skip",
@@ -3014,6 +3070,7 @@
       },
       "其他递交_递交439表": {
         "template": "US_439表提交.md",
+        "attach": true,
         "rules": {
           "20618": {
             "action": "skip",
@@ -3059,6 +3116,7 @@
       },
       "其他递交_RCE提交": {
         "template": "US_RCE提交.md",
+        "attach": true,
         "rules": {
           "20618": {
             "action": "skip",
@@ -3104,6 +3162,7 @@
       },
       "其他递交_保密审查递交": {
         "template": "US_保密审查递交.md",
+        "attach": true,
         "rules": {
           "20618": {
             "action": "skip",
@@ -3149,6 +3208,7 @@
       },
       "其他递交_翻译提交": {
         "template": "US_翻译提交.md",
+        "attach": true,
         "rules": {
           "20618": {
             "action": "skip",
@@ -3194,6 +3254,7 @@
       },
       "其他递交_补交Declaration": {
         "template": "US_补交Declaration.md",
+        "attach": true,
         "rules": {
           "20618": {
             "action": "skip",
@@ -3239,6 +3300,7 @@
       },
       "其他递交_变更实体": {
         "template": "US_变更实体.md",
+        "attach": true,
         "rules": {
           "20618": {
             "action": "skip",
@@ -3284,6 +3346,7 @@
       },
       "其他递交_Appeal Brief提交": {
         "template": "US_AppealBrief提交.md",
+        "attach": true,
         "rules": {
           "20618": {
             "action": "skip",
@@ -3329,6 +3392,7 @@
       },
       "其他递交_答复 Interview Summary": {
         "template": null,
+        "attach": false,
         "rules": {
           "20618": {
             "action": "skip",
@@ -3373,6 +3437,7 @@
       },
       "年费缴纳": {
         "template": null,
+        "attach": false,
         "rules": {
           "20618": {
             "action": "skip",
@@ -3417,6 +3482,7 @@
       },
       "其他递交_咨询案件进展": {
         "template": null,
+        "attach": false,
         "rules": {
           "20618": {
             "action": "skip",
@@ -3461,6 +3527,7 @@
       },
       "其他递交_案件排查": {
         "template": null,
+        "attach": false,
         "rules": {
           "20618": {
             "action": "skip",
@@ -3505,6 +3572,7 @@
       },
       "其他递交__request for refund(退款)": {
         "template": null,
+        "attach": false,
         "rules": {
           "20618": {
             "action": "skip",
@@ -3549,6 +3617,7 @@
       },
       "其他递交_Amendment after NOA": {
         "template": null,
+        "attach": false,
         "rules": {
           "20618": {
             "action": "skip",
@@ -3593,6 +3662,7 @@
       },
       "其他递交_Preliminary Amendment递交": {
         "template": null,
+        "attach": false,
         "rules": {
           "20618": {
             "action": "skip",
@@ -3637,6 +3707,7 @@
       },
       "其他递交_Streamlined Claim Set Pilot": {
         "template": null,
+        "attach": false,
         "rules": {
           "20618": {
             "action": "skip",
@@ -3681,6 +3752,7 @@
       },
       "其他递交_变更专利权人": {
         "template": null,
+        "attach": false,
         "rules": {
           "20618": {
             "action": "skip",
@@ -3726,6 +3798,7 @@
       },
       "补正_答复Interview summary": {
         "template": null,
+        "attach": false,
         "rules": {
           "20618": {
             "action": "skip",
@@ -3771,6 +3844,7 @@
       },
       "补正官文错误": {
         "template": null,
+        "attach": false,
         "rules": {
           "20618": {
             "action": "skip",
@@ -3815,6 +3889,7 @@
       },
       "其他递交__Assignment登记": {
         "template": null,
+        "attach": false,
         "rules": {
           "20618": {
             "action": "skip",
@@ -3910,6 +3985,7 @@
     "rules": {
       "新申请递交": {
         "template": "EP_新申请递交_巴黎公约.md",
+        "attach": true,
         "rules": {
           "20618": {
             "action": "skip",
@@ -3944,6 +4020,7 @@
       },
       "新申请递交-巴黎公约": {
         "template": "EP_新申请递交_巴黎公约.md",
+        "attach": true,
         "rules": {
           "20618": {
             "action": "skip",
@@ -3978,6 +4055,7 @@
       },
       "新申请递交_分案": {
         "template": "EP_新申请递交_分案.md",
+        "attach": true,
         "rules": {
           "20618": {
             "action": "skip",
@@ -4012,6 +4090,7 @@
       },
       "OA答复": {
         "template": "EP_OA答复.md",
+        "attach": true,
         "rules": {
           "20618": {
             "action": "skip",
@@ -4046,6 +4125,7 @@
       },
       "NOA缴费": {
         "template": "EP_NOA缴费.md",
+        "attach": true,
         "rules": {
           "20618": {
             "action": "skip",
@@ -4080,6 +4160,7 @@
       },
       "其他_撤回": {
         "template": null,
+        "attach": false,
         "rules": {
           "20618": {
             "action": "ignore"
@@ -4097,6 +4178,7 @@
       },
       "其他递交_Early Processing": {
         "template": null,
+        "attach": false,
         "rules": {
           "20618": {
             "action": "ignore"
@@ -4114,6 +4196,7 @@
       },
       "书面答复及口审": {
         "template": "EP_书面答复及口审.md",
+        "attach": true,
         "rules": {
           "20618": {
             "action": "skip",
@@ -4148,6 +4231,7 @@
       },
       "优先权翻译递交": {
         "template": "EP_优先权翻译递交.md",
+        "attach": true,
         "rules": {
           "20618": {
             "action": "skip",
@@ -4182,6 +4266,7 @@
       },
       "PACE递交": {
         "template": "EP_PACE加速请求提交.md",
+        "attach": true,
         "rules": {
           "20618": {
             "action": "skip",
@@ -4216,6 +4301,7 @@
       },
       "著录项目变更": {
         "template": "EP_申请人更名请求.md",
+        "attach": true,
         "rules": {
           "20618": {
             "action": "skip",
