@@ -1,0 +1,4253 @@
+{
+  "_meta": {
+    "说明": "结项类汇报信规则(源: 2026-09-03结项类xlsx + close_task_combinations.json)。以TIP结项combination为准。",
+    "法域判定": "案号含EP→EP / 含US→US / WO(PCT)→PCT / 含CN→CN / 其余(CM/CS/DS/DM/商标等)→skip不发",
+    "用法": "TIP结项任务(案号定法域)+combination → region.combinations[combination]=结项类型 → region.rules[结项类型] → 出template+客户分派",
+    "默认skip": "combination 不在 region.combinations 里 → 默认 skip 不发",
+    "action": "assign=分配给preparer / skip=不分配(转发forward) / ignore=不处理",
+    "template": "md文件名(templates/md/结项通知/);null=无需做或无模板"
+  },
+  "CN": {
+    "combinations": {
+      "新申请递交_发明": "新申请递交",
+      "新申请递交_实用新型": "新申请递交",
+      "新申请递交_外观": "新申请递交",
+      "新申请递交_发明-巴黎公约": "新申请递交",
+      "新申请递交_实用新型-巴黎公约": "新申请递交",
+      "新申请递交_外观-巴黎公约": "新申请递交",
+      "新申请递交_发明-预审": "新申请递交",
+      "新申请递交_实用新型-预审": "新申请递交",
+      "新申请递交_外观-预审": "新申请递交",
+      "新申请递交_分案": "新申请递交",
+      "新申请递交_临时申请": "新申请递交",
+      "PCT落地_发明-PCT正常落地": "新申请递交-PCT正常落地",
+      "PCT落地_实用新型-PCT正常落地": "新申请递交-PCT正常落地",
+      "OA答复_第一次答复": "OA答复",
+      "OA答复_第二次答复": "OA答复",
+      "OA答复_第三次答复": "OA答复",
+      "OA答复_第四次答复": "OA答复",
+      "OA答复_第五次答复": "OA答复",
+      "OA答复_第一次答复-预审": "OA答复",
+      "OA答复_第二次答复-预审": "OA答复",
+      "OA答复_驳回复审请求": "驳回复审请求答复",
+      "OA答复_复审答复": "复审答复",
+      "OA答复_口审答复": "OA答复",
+      "著录项目_变更申请人": "著录项目_变更申请人",
+      "著录项目_变更申请人地址": "著录项目_变更发明人",
+      "著录项目_申请人更名": "著录项目_变更申请人",
+      "著录项目_变更发明人": "著录项目_变更发明人",
+      "著录项目_变更发明人顺序": "著录项目_变更发明人",
+      "著录项目_变更代理机构": "著录项目_变更发明人",
+      "著录项目_变更代理人": "著录项目_变更发明人",
+      "补正_补正说明书": "补正__审查员主动沟通补正答复_补正权要_补正说明书_补正摘要_补正摘要附图_补正外观设计图片_补正外观设计图片或照片_补正POA",
+      "补正_补正权要": "补正__审查员主动沟通补正答复_补正权要_补正说明书_补正摘要_补正摘要附图_补正外观设计图片_补正外观设计图片或照片_补正POA",
+      "补正_补正附图": "补正__审查员主动沟通补正答复_补正权要_补正说明书_补正摘要_补正摘要附图_补正外观设计图片_补正外观设计图片或照片_补正POA",
+      "补正_补正摘要": "补正__审查员主动沟通补正答复_补正权要_补正说明书_补正摘要_补正摘要附图_补正外观设计图片_补正外观设计图片或照片_补正POA",
+      "补正_补正摘要附图": "补正__审查员主动沟通补正答复_补正权要_补正说明书_补正摘要_补正摘要附图_补正外观设计图片_补正外观设计图片或照片_补正POA",
+      "补正_审查员主动沟通补正答复": "补正__审查员主动沟通补正答复_补正权要_补正说明书_补正摘要_补正摘要附图_补正外观设计图片_补正外观设计图片或照片_补正POA",
+      "补正_补正POA": "补正__审查员主动沟通补正答复_补正权要_补正说明书_补正摘要_补正摘要附图_补正外观设计图片_补正外观设计图片或照片_补正POA",
+      "补正_预审答复补正": "补正__审查员主动沟通补正答复_补正权要_补正说明书_补正摘要_补正摘要附图_补正外观设计图片_补正外观设计图片或照片_补正POA",
+      "补正_补正简要说明": "补正__审查员主动沟通补正答复_补正权要_补正说明书_补正摘要_补正摘要附图_补正外观设计图片_补正外观设计图片或照片_补正POA",
+      "补正_补正外观设计图片": "补正__审查员主动沟通补正答复_补正权要_补正说明书_补正摘要_补正摘要附图_补正外观设计图片_补正外观设计图片或照片_补正POA",
+      "补正_补正第1发明人身份证号": "补正__审查员主动沟通补正答复_补正权要_补正说明书_补正摘要_补正摘要附图_补正外观设计图片_补正外观设计图片或照片_补正POA",
+      "补正_补正发明人姓名": "补正__审查员主动沟通补正答复_补正权要_补正说明书_补正摘要_补正摘要附图_补正外观设计图片_补正外观设计图片或照片_补正POA",
+      "其他_DAS交存": "其他_DAS交存",
+      "其他_费用减缴请求": "其他_申请保密审查",
+      "其他_PPH提交": "其他_申请保密审查",
+      "其他_实审请求": "其他_实审请求",
+      "其他_申请保密审查": "其他_申请保密审查",
+      "其他_撤回申请": "其他_撤回申请",
+      "其他_主动修改": "其他_申请保密审查",
+      "其他_撤回提前公开": "其他_申请保密审查",
+      "其他_提前公开": "其他_申请保密审查",
+      "其他_恢复权利请求": "其他_申请保密审查",
+      "其他_答复视为未要求优先权": "其他_申请保密审查",
+      "其他_请款退费": "其他_申请保密审查",
+      "其他_优先审查": "其他-复审阶段优先审查",
+      "其他_延长期限请求": "其他_申请保密审查",
+      "其他_提交优先权副本": "其他_申请保密审查",
+      "其他_单一性恢复费": "其他_申请保密审查",
+      "其他_专利权期限补偿请求": "其他_申请保密审查",
+      "其他_登记财政资助专利声明": "其他_申请保密审查",
+      "缴费_缴纳办登费": "缴费_缴纳办登费",
+      "缴费_缴纳年费": "缴费_缴纳年费"
+    },
+    "rules": {
+      "新申请递交": {
+        "template": "CN_新申请递交_接口用极简版.md",
+        "rules": {
+          "20618": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "ui_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20633": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "patent8@metis-ip.com"
+              ]
+            }
+          },
+          "20615": {
+            "action": "assign",
+            "preparer": "mei.hu@metis-ip.com"
+          },
+          "20608": {
+            "action": "ignore"
+          },
+          "其他": {
+            "action": "ignore"
+          },
+          "20753": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "xin.han@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20963": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "mei.hu@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "5开头": {
+            "action": "ignore"
+          },
+          "20735": {
+            "action": "ignore"
+          }
+        }
+      },
+      "新申请递交--收到受理通知": {
+        "template": "CN_本次无需-受理报告_没有待完成事项版.md",
+        "rules": {
+          "20618": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "ui_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20633": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "patent8@metis-ip.com"
+              ]
+            }
+          },
+          "20615": {
+            "action": "assign",
+            "preparer": "mei.hu@metis-ip.com"
+          },
+          "20608": {
+            "action": "ignore"
+          },
+          "其他": {
+            "action": "ignore"
+          },
+          "20753": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "xin.han@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20963": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "mei.hu@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "5开头": {
+            "action": "ignore"
+          },
+          "20735": {
+            "action": "ignore"
+          }
+        }
+      },
+      "新申请递交-PCT正常落地": {
+        "template": "CN_新申请递交-PCT正常落地.md",
+        "rules": {
+          "20618": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "ui_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20633": {
+            "action": "assign",
+            "preparer": "hui.ren@metis-ip.com"
+          },
+          "20615": {
+            "action": "assign",
+            "preparer": "mei.hu@metis-ip.com"
+          },
+          "20608": {
+            "action": "ignore"
+          },
+          "其他": {
+            "action": "assign",
+            "preparer": "hui.ren@metis-ip.com"
+          },
+          "20753": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "xin.han@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20963": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "mei.hu@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "5开头": {
+            "action": "ignore"
+          },
+          "20735": {
+            "action": "ignore"
+          }
+        }
+      },
+      "OA答复": {
+        "template": "CN_OA答复递交.md",
+        "rules": {
+          "20618": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "ui_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20633": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "patent8@metis-ip.com"
+              ]
+            }
+          },
+          "20615": {
+            "action": "assign",
+            "preparer": "mei.hu@metis-ip.com"
+          },
+          "20608": {
+            "action": "ignore"
+          },
+          "其他": {
+            "action": "assign",
+            "preparer": "hui.ren@metis-ip.com"
+          },
+          "20753": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "xin.han@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20963": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "mei.hu@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "5开头": {
+            "action": "ignore"
+          },
+          "20735": {
+            "action": "ignore"
+          }
+        }
+      },
+      "驳回复审请求答复": {
+        "template": "CN_复审请求.md",
+        "rules": {
+          "20618": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "ui_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20633": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "patent8@metis-ip.com"
+              ]
+            }
+          },
+          "20615": {
+            "action": "assign",
+            "preparer": "mei.hu@metis-ip.com"
+          },
+          "20608": {
+            "action": "ignore"
+          },
+          "其他": {
+            "action": "assign",
+            "preparer": "hui.ren@metis-ip.com"
+          },
+          "20753": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "xin.han@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20963": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "mei.hu@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "5开头": {
+            "action": "ignore"
+          },
+          "20735": {
+            "action": "ignore"
+          }
+        }
+      },
+      "复审答复": {
+        "template": "CN_复审请求.md",
+        "rules": {
+          "20618": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "ui_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20633": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "patent8@metis-ip.com"
+              ]
+            }
+          },
+          "20615": {
+            "action": "assign",
+            "preparer": "mei.hu@metis-ip.com"
+          },
+          "20608": {
+            "action": "ignore"
+          },
+          "其他": {
+            "action": "assign",
+            "preparer": "hui.ren@metis-ip.com"
+          },
+          "20753": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "xin.han@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20963": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "mei.hu@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "5开头": {
+            "action": "ignore"
+          },
+          "20735": {
+            "action": "ignore"
+          }
+        }
+      },
+      "补正__审查员主动沟通补正答复_补正权要_补正说明书_补正摘要_补正摘要附图_补正外观设计图片_补正外观设计图片或照片_补正POA": {
+        "template": "CN_补正递交.md",
+        "rules": {
+          "20618": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "ui_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20633": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "patent8@metis-ip.com"
+              ]
+            }
+          },
+          "20615": {
+            "action": "assign",
+            "preparer": "mei.hu@metis-ip.com"
+          },
+          "20608": {
+            "action": "ignore"
+          },
+          "其他": {
+            "action": "assign",
+            "preparer": "hui.ren@metis-ip.com"
+          },
+          "20753": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "xin.han@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20963": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "mei.hu@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "5开头": {
+            "action": "ignore"
+          },
+          "20735": {
+            "action": "ignore"
+          }
+        }
+      },
+      "著录项目_变更发明人": {
+        "template": "CN_变更发明人.md",
+        "rules": {
+          "20618": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "ui_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20633": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "patent8@metis-ip.com"
+              ]
+            }
+          },
+          "20615": {
+            "action": "assign",
+            "preparer": "mei.hu@metis-ip.com"
+          },
+          "20608": {
+            "action": "ignore"
+          },
+          "其他": {
+            "action": "assign",
+            "preparer": "hui.ren@metis-ip.com"
+          },
+          "20753": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "xin.han@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20963": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "mei.hu@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "5开头": {
+            "action": "ignore"
+          },
+          "20735": {
+            "action": "ignore"
+          }
+        }
+      },
+      "其他_申请保密审查": {
+        "template": "CN_保密审查.md",
+        "rules": {
+          "20618": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "ui_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20633": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "patent8@metis-ip.com"
+              ]
+            }
+          },
+          "20615": {
+            "action": "assign",
+            "preparer": "mei.hu@metis-ip.com"
+          },
+          "20608": {
+            "action": "ignore"
+          },
+          "其他": {
+            "action": "assign",
+            "preparer": "hui.ren@metis-ip.com"
+          },
+          "20753": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "xin.han@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20963": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "mei.hu@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "5开头": {
+            "action": "ignore"
+          },
+          "20735": {
+            "action": "ignore"
+          }
+        }
+      },
+      "其他_撤回申请": {
+        "template": "CN_撤回申请.md",
+        "rules": {
+          "20618": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "ui_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20633": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "patent8@metis-ip.com"
+              ]
+            }
+          },
+          "20615": {
+            "action": "assign",
+            "preparer": "mei.hu@metis-ip.com"
+          },
+          "20608": {
+            "action": "ignore"
+          },
+          "其他": {
+            "action": "assign",
+            "preparer": "hui.ren@metis-ip.com"
+          },
+          "20753": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "xin.han@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20963": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "mei.hu@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "5开头": {
+            "action": "ignore"
+          },
+          "20735": {
+            "action": "ignore"
+          }
+        }
+      },
+      "其他-复审阶段优先审查": {
+        "template": "CN_复审阶段优先审查.md",
+        "rules": {
+          "20618": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "ui_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20633": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "patent8@metis-ip.com"
+              ]
+            }
+          },
+          "20615": {
+            "action": "assign",
+            "preparer": "mei.hu@metis-ip.com"
+          },
+          "20608": {
+            "action": "ignore"
+          },
+          "其他": {
+            "action": "assign",
+            "preparer": "hui.ren@metis-ip.com"
+          },
+          "20753": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "xin.han@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20963": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "mei.hu@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "5开头": {
+            "action": "ignore"
+          },
+          "20735": {
+            "action": "ignore"
+          }
+        }
+      },
+      "其他_DAS交存": {
+        "template": null,
+        "rules": {
+          "20618": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "ui_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20633": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "patent8@metis-ip.com"
+              ]
+            }
+          },
+          "20615": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "mei.hu@metis-ip.com"
+              ]
+            }
+          },
+          "20608": {
+            "action": "ignore"
+          },
+          "其他": {
+            "action": "ignore"
+          },
+          "20753": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "xin.han@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20963": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "mei.hu@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "5开头": {
+            "action": "ignore"
+          },
+          "20735": {
+            "action": "ignore"
+          }
+        }
+      },
+      "缴费_缴纳办登费": {
+        "template": null,
+        "rules": {
+          "20618": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "ui_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20633": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "patent8@metis-ip.com"
+              ]
+            }
+          },
+          "20615": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "mei.hu@metis-ip.com"
+              ]
+            }
+          },
+          "20608": {
+            "action": "ignore"
+          },
+          "其他": {
+            "action": "ignore"
+          },
+          "20753": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "xin.han@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20963": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "mei.hu@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "5开头": {
+            "action": "ignore"
+          },
+          "20735": {
+            "action": "ignore"
+          }
+        }
+      },
+      "其他_优先审查": {
+        "template": null,
+        "rules": {
+          "20618": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "ui_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20633": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "patent8@metis-ip.com"
+              ]
+            }
+          },
+          "20615": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "mei.hu@metis-ip.com"
+              ]
+            }
+          },
+          "20608": {
+            "action": "ignore"
+          },
+          "其他": {
+            "action": "ignore"
+          },
+          "20753": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "xin.han@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20963": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "mei.hu@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "5开头": {
+            "action": "ignore"
+          },
+          "20735": {
+            "action": "ignore"
+          }
+        }
+      },
+      "缴费_缴纳年费": {
+        "template": null,
+        "rules": {
+          "20618": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "ui_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20633": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "patent8@metis-ip.com"
+              ]
+            }
+          },
+          "20615": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "mei.hu@metis-ip.com"
+              ]
+            }
+          },
+          "20608": {
+            "action": "ignore"
+          },
+          "其他": {
+            "action": "ignore"
+          },
+          "20753": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "xin.han@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20963": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "mei.hu@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "5开头": {
+            "action": "ignore"
+          },
+          "20735": {
+            "action": "ignore"
+          }
+        }
+      },
+      "著录项目_变更申请人": {
+        "template": "CN_变更申请人.md",
+        "rules": {
+          "20618": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "ui_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20633": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "patent8@metis-ip.com"
+              ]
+            }
+          },
+          "20615": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "mei.hu@metis-ip.com"
+              ]
+            }
+          },
+          "20608": {
+            "action": "ignore"
+          },
+          "其他": {
+            "action": "ignore"
+          },
+          "20753": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "xin.han@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20963": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "mei.hu@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "5开头": {
+            "action": "ignore"
+          },
+          "20735": {
+            "action": "ignore"
+          }
+        }
+      },
+      "其他_放弃专利权": {
+        "template": "CN_放弃专利权请求.md",
+        "rules": {
+          "20618": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "ui_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20633": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "patent8@metis-ip.com"
+              ]
+            }
+          },
+          "20615": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "mei.hu@metis-ip.com"
+              ]
+            }
+          },
+          "20608": {
+            "action": "ignore"
+          },
+          "其他": {
+            "action": "ignore"
+          },
+          "20753": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "xin.han@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20963": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "mei.hu@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "5开头": {
+            "action": "ignore"
+          },
+          "20735": {
+            "action": "ignore"
+          }
+        }
+      },
+      "其他_实审请求": {
+        "template": "CN_实审请求.md",
+        "rules": {
+          "20618": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "ui_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20633": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "patent8@metis-ip.com"
+              ]
+            }
+          },
+          "20615": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "mei.hu@metis-ip.com"
+              ]
+            }
+          },
+          "20608": {
+            "action": "ignore"
+          },
+          "其他": {
+            "action": "ignore"
+          },
+          "20753": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "xin.han@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20963": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "mei.hu@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "5开头": {
+            "action": "ignore"
+          },
+          "20735": {
+            "action": "ignore"
+          }
+        }
+      }
+    }
+  },
+  "PCT": {
+    "combinations": {
+      "新申请递交_PCT": "新申请递交",
+      "新申请递交_海牙协定": "新申请递交",
+      "其他_请求纸质优先权副本": "其他_主动撤回",
+      "其他_DAS请求": "其他_DAS请求",
+      "其他_办理优先权文件副本": "其他_办理优先权文件副本",
+      "其他_主动撤回": "其他_主动撤回",
+      "其他_缴纳优先权要求费": "其他_主动撤回",
+      "其他_US保密审查": "其他_主动撤回",
+      "其他_专利权期限补偿请求": "其他_主动撤回",
+      "其他_登记财政资助专利声明": "其他_主动撤回",
+      "其他_答复206表": "其他_主动撤回",
+      "其他_递交US保密审查": "其他_主动撤回",
+      "其他_递交海外其他保密审查": "其他_递交海外其他保密审查",
+      "其他_缴纳申请费": "其他_主动撤回",
+      "其他_缴费": "其他_主动撤回",
+      "补正_补交POA": "补正_补交POA",
+      "补正_补交DAS码": "补正_补交DAS码",
+      "补正_106表-补正权利要求": "补正_主动补正权利要求以及主动补正说明书",
+      "补正_106表-补正说明书附图": "补正_106表-补正说明书附图",
+      "补正_106表-申请人及发明人地址": "补正_主动补正权利要求以及主动补正说明书",
+      "补正_132表-补正权利要求书": "补正_132表-补正权利要求书和说明书",
+      "补正_补正发明名称": "补正_主动补正权利要求以及主动补正说明书",
+      "补正_主动补正权利要求": "补正_主动补正权利要求以及主动补正说明书",
+      "补正_19条修改": "补正_主动补正权利要求以及主动补正说明书",
+      "补正_132表-补正申请人及发明人地址": "补正_主动补正权利要求以及主动补正说明书",
+      "著录项目_变更申请人": "著录项目_变更申请人",
+      "著录项目_申请人更名": "著录项目_申请人更名",
+      "著录项目_变更申请人地址": "著录项目_变更申请人",
+      "著录项目_变更发明人": "著录项目_变更发明人",
+      "著录项目_变更发明人地址": "著录项目_变更申请人",
+      "著录项目_变更代理机构": "著录项目_变更代理机构",
+      "著录项目_变更代理机构案号": "著录项目_变更申请人"
+    },
+    "rules": {
+      "新申请递交": {
+        "template": "PCT_新申请递交_无代办事项.md",
+        "rules": {
+          "20618": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "ui_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20633": {
+            "action": "assign",
+            "preparer": "jiao.yang@metis-ip.com"
+          },
+          "20608": {
+            "action": "ignore"
+          },
+          "20753": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "xin.han@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "其他": {
+            "action": "assign",
+            "preparer": "jiao.yang@metis-ip.com"
+          }
+        }
+      },
+      "补正_主动补正权利要求以及主动补正说明书": {
+        "template": "PCT_主动补正提交.md",
+        "rules": {
+          "20618": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "ui_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20633": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "patent8@metis-ip.com"
+              ]
+            }
+          },
+          "20608": {
+            "action": "ignore"
+          },
+          "20753": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "xin.han@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "其他": {
+            "action": "assign",
+            "preparer": "jiao.yang@metis-ip.com"
+          }
+        }
+      },
+      "补正_132表-补正权利要求书和说明书": {
+        "template": "PCT_132表补正提交.md",
+        "rules": {
+          "20618": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "ui_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20633": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "patent8@metis-ip.com"
+              ]
+            }
+          },
+          "20608": {
+            "action": "ignore"
+          },
+          "20753": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "xin.han@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "其他": {
+            "action": "assign",
+            "preparer": "jiao.yang@metis-ip.com"
+          }
+        }
+      },
+      "补正_106表-补正说明书附图": {
+        "template": "PCT_106表补正提交.md",
+        "rules": {
+          "20618": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "ui_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20633": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "patent8@metis-ip.com"
+              ]
+            }
+          },
+          "20608": {
+            "action": "ignore"
+          },
+          "20753": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "xin.han@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "其他": {
+            "action": "assign",
+            "preparer": "jiao.yang@metis-ip.com"
+          }
+        }
+      },
+      "补正_206表": {
+        "template": "PCT_206表补正提交.md",
+        "rules": {
+          "20618": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "ui_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20633": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "patent8@metis-ip.com"
+              ]
+            }
+          },
+          "20608": {
+            "action": "ignore"
+          },
+          "20753": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "xin.han@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "其他": {
+            "action": "assign",
+            "preparer": "jiao.yang@metis-ip.com"
+          }
+        }
+      },
+      "其他_主动撤回": {
+        "template": "PCT_撤回申请提交.md",
+        "rules": {
+          "20618": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "ui_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20633": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "patent8@metis-ip.com"
+              ]
+            }
+          },
+          "20608": {
+            "action": "ignore"
+          },
+          "20753": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "xin.han@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "其他": {
+            "action": "assign",
+            "preparer": "jiao.yang@metis-ip.com"
+          }
+        }
+      },
+      "补正_补交DAS码": {
+        "template": "PCT_补交DAS码.md",
+        "rules": {
+          "20618": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "ui_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20633": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "patent8@metis-ip.com"
+              ]
+            }
+          },
+          "20608": {
+            "action": "ignore"
+          },
+          "20753": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "xin.han@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "其他": {
+            "action": "assign",
+            "preparer": "jiao.yang@metis-ip.com"
+          }
+        }
+      },
+      "其他_DAS请求": {
+        "template": null,
+        "rules": {
+          "20618": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "ui_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20633": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "patent8@metis-ip.com"
+              ]
+            }
+          },
+          "20608": {
+            "action": "ignore"
+          },
+          "20753": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "xin.han@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "其他": {
+            "action": "ignore"
+          }
+        }
+      },
+      "其他_递交海外其他保密审查": {
+        "template": null,
+        "rules": {
+          "20618": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "ui_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20633": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "patent8@metis-ip.com"
+              ]
+            }
+          },
+          "20608": {
+            "action": "ignore"
+          },
+          "20753": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "xin.han@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "其他": {
+            "action": "ignore"
+          }
+        }
+      },
+      "补正_补交POA": {
+        "template": null,
+        "rules": {
+          "20618": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "ui_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20633": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "patent8@metis-ip.com"
+              ]
+            }
+          },
+          "20608": {
+            "action": "ignore"
+          },
+          "20753": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "xin.han@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "其他": {
+            "action": "ignore"
+          }
+        }
+      },
+      "其他_PCT总委备案": {
+        "template": null,
+        "rules": {
+          "20618": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "ui_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20633": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "patent8@metis-ip.com"
+              ]
+            }
+          },
+          "20608": {
+            "action": "ignore"
+          },
+          "20753": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "xin.han@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "其他": {
+            "action": "ignore"
+          }
+        }
+      },
+      "其他_办理优先权文件副本": {
+        "template": null,
+        "rules": {
+          "20618": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "ui_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20633": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "patent8@metis-ip.com"
+              ]
+            }
+          },
+          "20608": {
+            "action": "ignore"
+          },
+          "20753": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "xin.han@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "其他": {
+            "action": "ignore"
+          }
+        }
+      },
+      "著录项目_变更申请人": {
+        "template": "PCT_变更申请人提交.md",
+        "rules": {
+          "20618": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "ui_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20633": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "patent8@metis-ip.com"
+              ]
+            }
+          },
+          "20608": {
+            "action": "ignore"
+          },
+          "20753": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "xin.han@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "其他": {
+            "action": "assign",
+            "preparer": "jiao.yang@metis-ip.com"
+          }
+        }
+      },
+      "著录项目_变更发明人": {
+        "template": "PCT_变更发明人提交.md",
+        "rules": {
+          "20618": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "ui_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20633": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "patent8@metis-ip.com"
+              ]
+            }
+          },
+          "20608": {
+            "action": "ignore"
+          },
+          "20753": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "xin.han@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "其他": {
+            "action": "assign",
+            "preparer": "jiao.yang@metis-ip.com"
+          }
+        }
+      },
+      "著录项目_申请人更名": {
+        "template": "PCT_申请人更名提交.md",
+        "rules": {
+          "20618": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "ui_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20633": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "patent8@metis-ip.com"
+              ]
+            }
+          },
+          "20608": {
+            "action": "ignore"
+          },
+          "20753": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "xin.han@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "其他": {
+            "action": "assign",
+            "preparer": "jiao.yang@metis-ip.com"
+          }
+        }
+      },
+      "著录项目_变更申请人和发明人地址": {
+        "template": "PCT_变更申请人、发明人地址提交.md",
+        "rules": {
+          "20618": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "ui_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20633": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "patent8@metis-ip.com"
+              ]
+            }
+          },
+          "20608": {
+            "action": "ignore"
+          },
+          "20753": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "xin.han@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "其他": {
+            "action": "assign",
+            "preparer": "jiao.yang@metis-ip.com"
+          }
+        }
+      },
+      "著录项目_变更代理机构": {
+        "template": null,
+        "rules": {
+          "20618": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "ui_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20633": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "patent8@metis-ip.com"
+              ]
+            }
+          },
+          "20608": {
+            "action": "ignore"
+          },
+          "20753": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "xin.han@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "其他": {
+            "action": "ignore"
+          }
+        }
+      }
+    }
+  },
+  "US": {
+    "combinations": {
+      "新申请递交_临时申请": "新申请递交_临时申请",
+      "新申请递交_新申请发明": "新申请递交",
+      "新申请递交_新申请外观": "新申请递交",
+      "新申请递交_PCT落地": "新申请递交",
+      "新申请递交_发明-巴黎公约": "新申请递交",
+      "新申请递交_外观-巴黎公约": "新申请递交",
+      "新申请递交_续案/分案/部分续案": "新申请递交_续案",
+      "OA答复_RR": "OA答复递交-RR",
+      "OA答复_Non-final": "OA答复递交-Non-final/Final",
+      "OA答复_Final": "OA答复递交-Non-final/Final",
+      "OA答复_AA": "OA答复递交-AA",
+      "OA答复_Ex Parte Quayle Action": "OA答复递交-Ex Parte Quayle Action",
+      "OA答复_RR Petition": "OA答复递交-Non-final/Final",
+      "著录项目_发明人变更/补正": "著录项目_POA递交/变更代理机构",
+      "著录项目_变更申请人": "其他递交_变更申请人",
+      "著录项目_申请人更名": "其他递交_申请人更名",
+      "著录项目_POA递交/变更代理机构": "著录项目_POA递交/变更代理机构",
+      "NOA_NOA缴纳授权费": "NOA_NOA缴纳授权费",
+      "IDS_IDS-新申请首次排查": "IDS递交",
+      "IDS_IDS-客户提供": "IDS递交",
+      "IDS_QPIDS-来源": "IDS递交",
+      "IDS_IDS排查": "IDS递交",
+      "IDS_答复NFOA前排查IDS": "IDS递交",
+      "IDS_答复RR前排查IDS": "IDS递交",
+      "补正_补正说明书/附图": "补正答复",
+      "补正_补正PPH": "补正_补正PPH",
+      "补正_补正官文错误": "补正官文错误",
+      "补正_答复Interview summary": "补正_答复Interview summary",
+      "补正_补正发明人地址": "补正答复",
+      "补正_补正优先权": "补正答复",
+      "年费_3.5年年费": "年费缴纳",
+      "年费_7.5年年费": "年费缴纳",
+      "年费_11.5年年费": "年费缴纳",
+      "其他递交_DAS/优先权副本递交": "其他递交_变更申请人",
+      "其他递交_Assignment登记": "其他递交__Assignment登记",
+      "其他递交_Declaration递交": "其他递交_变更申请人",
+      "其他递交_request for refund(退款)": "其他递交__request for refund(退款)",
+      "其他递交_补缴费用/只缴费用": "其他递交_变更申请人",
+      "其他递交_递交US保密审查": "其他递交_保密审查递交",
+      "其他递交_递交CN保密审查": "其他递交_变更申请人",
+      "其他递交_Preliminary Amendment递交": "其他递交_Preliminary Amendment递交",
+      "其他递交_Amendment after NOA": "其他递交_Amendment after NOA",
+      "其他递交_petition for revival(复活)": "其他递交_变更申请人",
+      "其他递交_递交439表": "其他递交_递交439表",
+      "其他递交_咨询案件进展": "其他递交_咨询案件进展",
+      "其他递交_Petition to restore恢复优先权": "其他递交_变更申请人",
+      "其他递交_变更实体": "其他递交_变更实体",
+      "其他递交_登记财政资助专利声明": "其他递交_变更申请人",
+      "其他递交_购买申请副本": "其他递交_变更申请人",
+      "其他递交_请求撤案": "其他递交_变更申请人",
+      "其他递交_提交公众意见": "其他递交_变更申请人",
+      "其他递交_案件排查": "其他递交_案件排查",
+      "其他递交_递交confirmation": "其他递交_变更申请人",
+      "其他递交_补缴翻译稿": "附加_+PPH",
+      "其他递交_变更发明人/申请人地址": "其他递交_变更申请人",
+      "其他递交_递交Interview request": "其他递交_变更申请人",
+      "其他递交_Streamlined Claim Set Pilot": "其他递交_Streamlined Claim Set Pilot",
+      "其他递交_补正官文错误": "补正官文错误",
+      "其他递交_RFI_PIER_Pilot答复": "其他递交_变更申请人",
+      "附加_+Tranck one": "附加_+TD",
+      "附加_+TD": "附加_+TD",
+      "附加_+RCE": "OA答复递交-Non-final/Final",
+      "附加_+PPH": "附加_+PPH",
+      "附加_+IDS": "附加_+TD",
+      "附加_+AFCP": "附加_+TD",
+      "附加_+AE加速": "附加_+TD",
+      "附加_+外观加速": "附加_+TD"
+    },
+    "rules": {
+      "新申请递交": {
+        "template": "US_新申请递交.md",
+        "rules": {
+          "20618": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "ui_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20633": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "patent8@metis-ip.com"
+              ]
+            }
+          },
+          "20608": {
+            "action": "ignore"
+          },
+          "20753": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "xin.han@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "其他": {
+            "action": "assign",
+            "preparer": "qiwen.ma@metis-ip.com"
+          }
+        }
+      },
+      "新申请递交_续案": {
+        "template": "US_续案递交.md",
+        "rules": {
+          "20618": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "ui_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20633": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "patent8@metis-ip.com"
+              ]
+            }
+          },
+          "20608": {
+            "action": "ignore"
+          },
+          "20753": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "xin.han@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "其他": {
+            "action": "assign",
+            "preparer": "qiwen.ma@metis-ip.com"
+          }
+        }
+      },
+      "新申请递交_部分续案": {
+        "template": "US_部分续案递交.md",
+        "rules": {
+          "20618": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "ui_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20633": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "patent8@metis-ip.com"
+              ]
+            }
+          },
+          "20608": {
+            "action": "ignore"
+          },
+          "20753": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "xin.han@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "其他": {
+            "action": "assign",
+            "preparer": "qiwen.ma@metis-ip.com"
+          }
+        }
+      },
+      "新申请递交_分案": {
+        "template": "US_分案递交.md",
+        "rules": {
+          "20618": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "ui_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20633": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "patent8@metis-ip.com"
+              ]
+            }
+          },
+          "20608": {
+            "action": "ignore"
+          },
+          "20753": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "xin.han@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "其他": {
+            "action": "assign",
+            "preparer": "qiwen.ma@metis-ip.com"
+          }
+        }
+      },
+      "新申请递交_临时申请": {
+        "template": "US_临时申请递交.md",
+        "rules": {
+          "20618": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "ui_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20633": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "patent8@metis-ip.com"
+              ]
+            }
+          },
+          "20608": {
+            "action": "ignore"
+          },
+          "20753": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "xin.han@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "其他": {
+            "action": "assign",
+            "preparer": "qiwen.ma@metis-ip.com"
+          }
+        }
+      },
+      "OA答复递交-Non-final/Final": {
+        "template": "US_OA答复递交.md",
+        "rules": {
+          "20618": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "ui_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20633": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "patent8@metis-ip.com"
+              ]
+            }
+          },
+          "20608": {
+            "action": "ignore"
+          },
+          "20753": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "xin.han@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "其他": {
+            "action": "assign",
+            "preparer": "qiwen.ma@metis-ip.com"
+          }
+        }
+      },
+      "OA答复递交-AA": {
+        "template": "US_AA答复递交.md",
+        "rules": {
+          "20618": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "ui_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20633": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "patent8@metis-ip.com"
+              ]
+            }
+          },
+          "20608": {
+            "action": "ignore"
+          },
+          "20753": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "xin.han@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "其他": {
+            "action": "assign",
+            "preparer": "qiwen.ma@metis-ip.com"
+          }
+        }
+      },
+      "OA答复递交-RR": {
+        "template": "US_RR答复递交.md",
+        "rules": {
+          "20618": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "ui_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20633": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "patent8@metis-ip.com"
+              ]
+            }
+          },
+          "20608": {
+            "action": "ignore"
+          },
+          "20753": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "xin.han@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "其他": {
+            "action": "assign",
+            "preparer": "qiwen.ma@metis-ip.com"
+          }
+        }
+      },
+      "OA答复递交-Ex Parte Quayle Action": {
+        "template": "US_ExParteQuayleAction答复递交.md",
+        "rules": {
+          "20618": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "ui_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20633": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "patent8@metis-ip.com"
+              ]
+            }
+          },
+          "20608": {
+            "action": "ignore"
+          },
+          "20753": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "xin.han@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "其他": {
+            "action": "assign",
+            "preparer": "qiwen.ma@metis-ip.com"
+          }
+        }
+      },
+      "IDS递交": {
+        "template": "US_IDS递交.md",
+        "rules": {
+          "20618": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "ui_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20633": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "patent8@metis-ip.com"
+              ]
+            }
+          },
+          "20608": {
+            "action": "ignore"
+          },
+          "20753": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "xin.han@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "其他": {
+            "action": "assign",
+            "preparer": "qiwen.ma@metis-ip.com"
+          }
+        }
+      },
+      "NOA_NOA缴纳授权费": {
+        "template": "US_NOA缴纳授权费.md",
+        "rules": {
+          "20618": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "ui_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20633": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "patent8@metis-ip.com"
+              ]
+            }
+          },
+          "20608": {
+            "action": "ignore"
+          },
+          "20753": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "xin.han@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "其他": {
+            "action": "assign",
+            "preparer": "qiwen.ma@metis-ip.com"
+          }
+        }
+      },
+      "补正答复": {
+        "template": "US_补正答复.md",
+        "rules": {
+          "20618": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "ui_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20633": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "patent8@metis-ip.com"
+              ]
+            }
+          },
+          "20608": {
+            "action": "ignore"
+          },
+          "20753": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "xin.han@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "其他": {
+            "action": "assign",
+            "preparer": "qiwen.ma@metis-ip.com"
+          }
+        }
+      },
+      "补正_补正PPH": {
+        "template": "US_补正PPH答复.md",
+        "rules": {
+          "20618": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "ui_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20633": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "patent8@metis-ip.com"
+              ]
+            }
+          },
+          "20608": {
+            "action": "ignore"
+          },
+          "20753": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "xin.han@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "其他": {
+            "action": "assign",
+            "preparer": "qiwen.ma@metis-ip.com"
+          }
+        }
+      },
+      "其他递交_变更申请人": {
+        "template": "US_变更申请人.md",
+        "rules": {
+          "20618": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "ui_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20633": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "patent8@metis-ip.com"
+              ]
+            }
+          },
+          "20608": {
+            "action": "ignore"
+          },
+          "20753": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "xin.han@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "其他": {
+            "action": "assign",
+            "preparer": "qiwen.ma@metis-ip.com"
+          }
+        }
+      },
+      "其他递交_申请人更名": {
+        "template": "US_申请人更名.md",
+        "rules": {
+          "20618": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "ui_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20633": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "patent8@metis-ip.com"
+              ]
+            }
+          },
+          "20608": {
+            "action": "ignore"
+          },
+          "20753": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "xin.han@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "其他": {
+            "action": "assign",
+            "preparer": "qiwen.ma@metis-ip.com"
+          }
+        }
+      },
+      "其他递交_变更发明人": {
+        "template": "US_变更发明人.md",
+        "rules": {
+          "20618": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "ui_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20633": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "patent8@metis-ip.com"
+              ]
+            }
+          },
+          "20608": {
+            "action": "ignore"
+          },
+          "20753": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "xin.han@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "其他": {
+            "action": "assign",
+            "preparer": "qiwen.ma@metis-ip.com"
+          }
+        }
+      },
+      "著录项目_POA递交/变更代理机构": {
+        "template": "US_补交POA.md",
+        "rules": {
+          "20618": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "ui_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20633": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "patent8@metis-ip.com"
+              ]
+            }
+          },
+          "20608": {
+            "action": "ignore"
+          },
+          "20753": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "xin.han@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "其他": {
+            "action": "assign",
+            "preparer": "qiwen.ma@metis-ip.com"
+          }
+        }
+      },
+      "附加_+TD": {
+        "template": "US_TD提交.md",
+        "rules": {
+          "20618": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "ui_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20633": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "patent8@metis-ip.com"
+              ]
+            }
+          },
+          "20608": {
+            "action": "ignore"
+          },
+          "20753": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "xin.han@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "其他": {
+            "action": "assign",
+            "preparer": "qiwen.ma@metis-ip.com"
+          }
+        }
+      },
+      "附加_+PPH": {
+        "template": "US_PPH提交.md",
+        "rules": {
+          "20618": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "ui_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20633": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "patent8@metis-ip.com"
+              ]
+            }
+          },
+          "20608": {
+            "action": "ignore"
+          },
+          "20753": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "xin.han@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "其他": {
+            "action": "assign",
+            "preparer": "qiwen.ma@metis-ip.com"
+          }
+        }
+      },
+      "其他递交_递交439表": {
+        "template": "US_439表提交.md",
+        "rules": {
+          "20618": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "ui_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20633": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "patent8@metis-ip.com"
+              ]
+            }
+          },
+          "20608": {
+            "action": "ignore"
+          },
+          "20753": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "xin.han@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "其他": {
+            "action": "assign",
+            "preparer": "qiwen.ma@metis-ip.com"
+          }
+        }
+      },
+      "其他递交_RCE提交": {
+        "template": "US_RCE提交.md",
+        "rules": {
+          "20618": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "ui_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20633": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "patent8@metis-ip.com"
+              ]
+            }
+          },
+          "20608": {
+            "action": "ignore"
+          },
+          "20753": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "xin.han@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "其他": {
+            "action": "assign",
+            "preparer": "qiwen.ma@metis-ip.com"
+          }
+        }
+      },
+      "其他递交_保密审查递交": {
+        "template": "US_保密审查递交.md",
+        "rules": {
+          "20618": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "ui_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20633": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "patent8@metis-ip.com"
+              ]
+            }
+          },
+          "20608": {
+            "action": "ignore"
+          },
+          "20753": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "xin.han@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "其他": {
+            "action": "assign",
+            "preparer": "qiwen.ma@metis-ip.com"
+          }
+        }
+      },
+      "其他递交_翻译提交": {
+        "template": "US_翻译提交.md",
+        "rules": {
+          "20618": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "ui_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20633": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "patent8@metis-ip.com"
+              ]
+            }
+          },
+          "20608": {
+            "action": "ignore"
+          },
+          "20753": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "xin.han@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "其他": {
+            "action": "assign",
+            "preparer": "qiwen.ma@metis-ip.com"
+          }
+        }
+      },
+      "其他递交_补交Declaration": {
+        "template": "US_补交Declaration.md",
+        "rules": {
+          "20618": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "ui_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20633": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "patent8@metis-ip.com"
+              ]
+            }
+          },
+          "20608": {
+            "action": "ignore"
+          },
+          "20753": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "xin.han@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "其他": {
+            "action": "assign",
+            "preparer": "qiwen.ma@metis-ip.com"
+          }
+        }
+      },
+      "其他递交_变更实体": {
+        "template": "US_变更实体.md",
+        "rules": {
+          "20618": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "ui_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20633": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "patent8@metis-ip.com"
+              ]
+            }
+          },
+          "20608": {
+            "action": "ignore"
+          },
+          "20753": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "xin.han@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "其他": {
+            "action": "assign",
+            "preparer": "qiwen.ma@metis-ip.com"
+          }
+        }
+      },
+      "其他递交_Appeal Brief提交": {
+        "template": "US_AppealBrief提交.md",
+        "rules": {
+          "20618": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "ui_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20633": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "patent8@metis-ip.com"
+              ]
+            }
+          },
+          "20608": {
+            "action": "ignore"
+          },
+          "20753": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "xin.han@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "其他": {
+            "action": "assign",
+            "preparer": "qiwen.ma@metis-ip.com"
+          }
+        }
+      },
+      "其他递交_答复 Interview Summary": {
+        "template": null,
+        "rules": {
+          "20618": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "ui_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20633": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "patent8@metis-ip.com"
+              ]
+            }
+          },
+          "20608": {
+            "action": "ignore"
+          },
+          "20753": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "xin.han@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "其他": {
+            "action": "ignore"
+          }
+        }
+      },
+      "年费缴纳": {
+        "template": null,
+        "rules": {
+          "20618": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "ui_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20633": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "patent8@metis-ip.com"
+              ]
+            }
+          },
+          "20608": {
+            "action": "ignore"
+          },
+          "20753": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "xin.han@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "其他": {
+            "action": "ignore"
+          }
+        }
+      },
+      "其他递交_咨询案件进展": {
+        "template": null,
+        "rules": {
+          "20618": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "ui_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20633": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "patent8@metis-ip.com"
+              ]
+            }
+          },
+          "20608": {
+            "action": "ignore"
+          },
+          "20753": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "xin.han@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "其他": {
+            "action": "ignore"
+          }
+        }
+      },
+      "其他递交_案件排查": {
+        "template": null,
+        "rules": {
+          "20618": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "ui_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20633": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "patent8@metis-ip.com"
+              ]
+            }
+          },
+          "20608": {
+            "action": "ignore"
+          },
+          "20753": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "xin.han@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "其他": {
+            "action": "ignore"
+          }
+        }
+      },
+      "其他递交__request for refund(退款)": {
+        "template": null,
+        "rules": {
+          "20618": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "ui_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20633": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "patent8@metis-ip.com"
+              ]
+            }
+          },
+          "20608": {
+            "action": "ignore"
+          },
+          "20753": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "xin.han@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "其他": {
+            "action": "ignore"
+          }
+        }
+      },
+      "其他递交_Amendment after NOA": {
+        "template": null,
+        "rules": {
+          "20618": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "ui_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20633": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "patent8@metis-ip.com"
+              ]
+            }
+          },
+          "20608": {
+            "action": "ignore"
+          },
+          "20753": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "xin.han@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "其他": {
+            "action": "ignore"
+          }
+        }
+      },
+      "其他递交_Preliminary Amendment递交": {
+        "template": null,
+        "rules": {
+          "20618": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "ui_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20633": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "patent8@metis-ip.com"
+              ]
+            }
+          },
+          "20608": {
+            "action": "ignore"
+          },
+          "20753": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "xin.han@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "其他": {
+            "action": "ignore"
+          }
+        }
+      },
+      "其他递交_Streamlined Claim Set Pilot": {
+        "template": null,
+        "rules": {
+          "20618": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "ui_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20633": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "patent8@metis-ip.com"
+              ]
+            }
+          },
+          "20608": {
+            "action": "ignore"
+          },
+          "20753": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "xin.han@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "其他": {
+            "action": "ignore"
+          }
+        }
+      },
+      "其他递交_变更专利权人": {
+        "template": null,
+        "rules": {
+          "20618": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "ui_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20633": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "patent8@metis-ip.com"
+              ]
+            }
+          },
+          "20608": {
+            "action": "ignore"
+          },
+          "20753": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "xin.han@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "其他": {
+            "action": "assign",
+            "preparer": "qiwen.ma@metis-ip.com"
+          }
+        }
+      },
+      "补正_答复Interview summary": {
+        "template": null,
+        "rules": {
+          "20618": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "ui_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20633": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "patent8@metis-ip.com"
+              ]
+            }
+          },
+          "20608": {
+            "action": "ignore"
+          },
+          "20753": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "xin.han@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "其他": {
+            "action": "assign",
+            "preparer": "qiwen.ma@metis-ip.com"
+          }
+        }
+      },
+      "补正官文错误": {
+        "template": null,
+        "rules": {
+          "20618": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "ui_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20633": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "patent8@metis-ip.com"
+              ]
+            }
+          },
+          "20608": {
+            "action": "ignore"
+          },
+          "20753": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "xin.han@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "其他": {
+            "action": "ignore"
+          }
+        }
+      },
+      "其他递交__Assignment登记": {
+        "template": null,
+        "rules": {
+          "20618": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "ui_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20633": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "patent8@metis-ip.com"
+              ]
+            }
+          },
+          "20608": {
+            "action": "ignore"
+          },
+          "20753": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "xin.han@metis-ip.com"
+              ],
+              "cc": [
+                "patents_pa@metis-ip.com"
+              ]
+            }
+          },
+          "其他": {
+            "action": "assign",
+            "preparer": "qiwen.ma@metis-ip.com"
+          }
+        }
+      }
+    }
+  },
+  "EP": {
+    "combinations": {
+      "新申请递交_发明-PCT正常落地": "新申请递交",
+      "新申请递交_发明-PCT延期落地": "新申请递交",
+      "新申请递交_实用新型-PCT正常落地": "新申请递交",
+      "新申请递交_发明-巴黎公约": "新申请递交-巴黎公约",
+      "新申请递交_外观-巴黎公约": "新申请递交",
+      "新申请递交_实用新型-巴黎公约": "新申请递交",
+      "新申请递交_分案": "新申请递交_分案",
+      "新申请递交_香港第一阶段备案": "新申请递交",
+      "新申请递交_香港第二阶段注册登记": "新申请递交",
+      "新申请递交_临时申请": "新申请递交",
+      "OA答复_OA-实质OA答复": "OA答复",
+      "OA答复_OA-非实质OA答复": "OA答复",
+      "其他_DAS/优先权副本递交": "其他_撤回",
+      "其他_POA递交": "其他_撤回",
+      "其他_Form 1递交": "其他_撤回",
+      "其他_Form 3递交": "其他_撤回",
+      "其他_Assignment登记": "其他_撤回",
+      "其他_Declaration递交": "其他_撤回",
+      "其他_优先权翻译递交": "优先权翻译递交",
+      "其他_译者声明（VET）递交": "其他_撤回",
+      "其他_翻译稿递交": "其他_撤回",
+      "其他_印度申请递交授权后专利使用声明表格（Form 27）": "其他_撤回",
+      "其他_PPH递交": "其他_撤回",
+      "其他_PACE request递交": "其他_撤回",
+      "其他_印度Form 3递交": "其他_撤回",
+      "其他_专利权期限补偿请求": "其他_撤回",
+      "其他_登记财政资助专利声明": "其他_撤回",
+      "其他_海牙外观第二阶段缴费": "其他_撤回",
+      "缴费_缴纳授权前维持费": "NOA缴费",
+      "缴费_缴纳授权后年费": "NOA缴费",
+      "缴费_缴纳公布费": "NOA缴费",
+      "NOA_NOA缴纳授权费": "NOA缴费",
+      "NOA_NOA缴纳授权费+1st年费": "NOA缴费",
+      "NOA_NOA缴纳授权费+3-4th年费": "NOA缴费",
+      "NOA_NOA缴纳授权费+3-5th年费": "NOA缴费",
+      "NOA_NOA缴纳授权费+3-6th年费": "NOA缴费",
+      "NOA_NOA缴纳授权费+3-7th年费": "NOA缴费",
+      "NOA_缴纳超页费": "NOA缴费",
+      "NOA_缴纳超权费": "NOA缴费",
+      "著录项目_发明人变更/补正": "著录项目变更",
+      "著录项目_变更申请人": "著录项目变更",
+      "著录项目_申请人更名": "著录项目变更",
+      "著录项目_申请人更地址": "著录项目变更",
+      "参加口审/听训会_参加口审Oral proceedings": "书面答复及口审"
+    },
+    "rules": {
+      "新申请递交": {
+        "template": "EP_新申请递交_巴黎公约.md",
+        "rules": {
+          "20618": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "ui_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20633": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "patent8@metis-ip.com"
+              ]
+            }
+          },
+          "20608": {
+            "action": "ignore"
+          },
+          "其他": {
+            "action": "assign",
+            "preparer": "jing.wang@metis-ip.com"
+          }
+        }
+      },
+      "新申请递交-巴黎公约": {
+        "template": "EP_新申请递交_巴黎公约.md",
+        "rules": {
+          "20618": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "ui_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20633": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "patent8@metis-ip.com"
+              ]
+            }
+          },
+          "20608": {
+            "action": "ignore"
+          },
+          "其他": {
+            "action": "assign",
+            "preparer": "jing.wang@metis-ip.com"
+          }
+        }
+      },
+      "新申请递交_分案": {
+        "template": "EP_新申请递交_分案.md",
+        "rules": {
+          "20618": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "ui_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20633": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "patent8@metis-ip.com"
+              ]
+            }
+          },
+          "20608": {
+            "action": "ignore"
+          },
+          "其他": {
+            "action": "assign",
+            "preparer": "jing.wang@metis-ip.com"
+          }
+        }
+      },
+      "OA答复": {
+        "template": "EP_OA答复.md",
+        "rules": {
+          "20618": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "ui_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20633": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "patent8@metis-ip.com"
+              ]
+            }
+          },
+          "20608": {
+            "action": "ignore"
+          },
+          "其他": {
+            "action": "assign",
+            "preparer": "jing.wang@metis-ip.com"
+          }
+        }
+      },
+      "NOA缴费": {
+        "template": "EP_NOA缴费.md",
+        "rules": {
+          "20618": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "ui_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20633": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "patent8@metis-ip.com"
+              ]
+            }
+          },
+          "20608": {
+            "action": "ignore"
+          },
+          "其他": {
+            "action": "assign",
+            "preparer": "jing.wang@metis-ip.com"
+          }
+        }
+      },
+      "其他_撤回": {
+        "template": null,
+        "rules": {
+          "20618": {
+            "action": "ignore"
+          },
+          "20633": {
+            "action": "ignore"
+          },
+          "20608": {
+            "action": "ignore"
+          },
+          "其他": {
+            "action": "ignore"
+          }
+        }
+      },
+      "其他递交_Early Processing": {
+        "template": null,
+        "rules": {
+          "20618": {
+            "action": "ignore"
+          },
+          "20633": {
+            "action": "ignore"
+          },
+          "20608": {
+            "action": "ignore"
+          },
+          "其他": {
+            "action": "ignore"
+          }
+        }
+      },
+      "书面答复及口审": {
+        "template": "EP_书面答复及口审.md",
+        "rules": {
+          "20618": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "ui_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20633": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "patent8@metis-ip.com"
+              ]
+            }
+          },
+          "20608": {
+            "action": "ignore"
+          },
+          "其他": {
+            "action": "assign",
+            "preparer": "jing.wang@metis-ip.com"
+          }
+        }
+      },
+      "优先权翻译递交": {
+        "template": "EP_优先权翻译递交.md",
+        "rules": {
+          "20618": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "ui_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20633": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "patent8@metis-ip.com"
+              ]
+            }
+          },
+          "20608": {
+            "action": "ignore"
+          },
+          "其他": {
+            "action": "assign",
+            "preparer": "jing.wang@metis-ip.com"
+          }
+        }
+      },
+      "PACE递交": {
+        "template": "EP_PACE加速请求提交.md",
+        "rules": {
+          "20618": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "ui_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20633": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "patent8@metis-ip.com"
+              ]
+            }
+          },
+          "20608": {
+            "action": "ignore"
+          },
+          "其他": {
+            "action": "assign",
+            "preparer": "jing.wang@metis-ip.com"
+          }
+        }
+      },
+      "著录项目变更": {
+        "template": "EP_申请人更名请求.md",
+        "rules": {
+          "20618": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "ui_pa@metis-ip.com"
+              ]
+            }
+          },
+          "20633": {
+            "action": "skip",
+            "forward": {
+              "to": [
+                "report@metis-ip.com"
+              ],
+              "cc": [
+                "patent8@metis-ip.com"
+              ]
+            }
+          },
+          "20608": {
+            "action": "ignore"
+          },
+          "其他": {
+            "action": "assign",
+            "preparer": "jing.wang@metis-ip.com"
+          }
+        }
+      }
+    }
+  }
+}
