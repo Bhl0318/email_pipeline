@@ -340,6 +340,111 @@ def templates_preview_page():
     return FileResponse(TEMPLATES_PREVIEW_HTML, media_type="text/html; charset=utf-8")
 
 
+# ─── 规则管理页（文件式：UI 读写 oa_report_rules.json / close_report_rules.json）───
+RULES_EDITOR_HTML = WEB_DIR / "rules_editor.html"
+_RULES_FILES = {
+    "oa": SCRIPT_DIR / "oa_report_rules.json",
+    "close": SCRIPT_DIR / "close_report_rules.json",
+}
+_EMAIL_RE = re.compile(r'^[A-Za-z0-9_.+-]+@[A-Za-z0-9_.-]+\.[A-Za-z]{2,}$')
+
+
+def _validate_action(a, path, errs):
+    """校验单条动作 {action, preparer?/forward?}。"""
+    if not isinstance(a, dict):
+        errs.append(f"{path}: 不是对象"); return
+    act = a.get("action")
+    if act not in ("assign", "skip", "ignore"):
+        errs.append(f"{path}: action 须为 assign/skip/ignore（现 {act!r}）"); return
+    if act == "assign":
+        p = a.get("preparer", "")
+        if not _EMAIL_RE.match(p or ""):
+            errs.append(f"{path}: assign 的 preparer 邮箱非法（{p!r}）")
+    if act == "skip":
+        fwd = a.get("forward") or {}
+        for kk in ("to", "cc"):
+            for e in (fwd.get(kk) or []):
+                if e and not e.startswith("对应") and not _EMAIL_RE.match(e):
+                    errs.append(f"{path}: forward.{kk} 邮箱非法（{e!r}）")
+    for sub in ("also_forward",):  # 双动作也校验
+        if a.get(sub):
+            fwd = a[sub]
+            for kk in ("to", "cc"):
+                for e in (fwd.get(kk) or []):
+                    if e and not _EMAIL_RE.match(e):
+                        errs.append(f"{path}: {sub}.{kk} 邮箱非法（{e!r}）")
+
+
+def _validate_rules(kind, data):
+    """基础校验：结构 + action 枚举 + 邮箱。返回错误列表（空=通过）。"""
+    errs = []
+    if not isinstance(data, dict):
+        return ["顶层须为对象"]
+    regions = [k for k in data if not k.startswith("_")]
+    if kind == "oa":
+        for reg in regions:
+            for nt, custs in (data[reg] or {}).items():
+                for code, a in (custs or {}).items():
+                    if code.startswith("_"):
+                        continue
+                    _validate_action(a, f"{reg}/{nt}/{code}", errs)
+    elif kind == "close":
+        for reg in regions:
+            rules = (data[reg] or {}).get("rules", {})
+            for cls, r in rules.items():
+                for code, a in (r.get("rules") or {}).items():
+                    _validate_action(a, f"{reg}/{cls}/{code}", errs)
+    return errs[:50]
+
+
+@app.get("/rules-editor")
+def rules_editor_page():
+    """规则管理页：查看/编辑 OA 与结项 汇报信规则。"""
+    if not RULES_EDITOR_HTML.exists():
+        raise HTTPException(500, "rules_editor.html not found")
+    return FileResponse(RULES_EDITOR_HTML, media_type="text/html; charset=utf-8")
+
+
+@app.get("/api/rules/{kind}")
+def get_rules(kind: str):
+    p = _RULES_FILES.get(kind)
+    if not p:
+        raise HTTPException(404, f"未知规则类型 {kind}")
+    if not p.is_file():
+        raise HTTPException(404, f"{p.name} 不存在")
+    return json.loads(p.read_text(encoding="utf-8"))
+
+
+class RulesSaveReq(BaseModel):
+    data: dict
+
+
+@app.post("/api/rules/{kind}")
+def save_rules(kind: str, req: RulesSaveReq):
+    p = _RULES_FILES.get(kind)
+    if not p:
+        raise HTTPException(404, f"未知规则类型 {kind}")
+    errs = _validate_rules(kind, req.data)
+    if errs:
+        raise HTTPException(400, "校验未通过：\n" + "\n".join(errs))
+    # 备份一份（.bak，覆盖上次）再写
+    try:
+        if p.is_file():
+            (p.parent / (p.name + ".bak")).write_text(p.read_text(encoding="utf-8"), encoding="utf-8")
+    except Exception:
+        pass
+    p.write_text(json.dumps(req.data, ensure_ascii=False, indent=2), encoding="utf-8")
+    # 失效批处理进程的规则缓存（若同进程加载过）；模板层同步重建
+    try:
+        import read_email as _re
+        _re._OA_RULES_CACHE = None
+        if kind == "oa":
+            _re.REPORT_TYPE_TO_TEMPLATE = _re._load_report_templates()
+    except Exception:
+        pass
+    return {"ok": True, "message": "已保存"}
+
+
 # ─── 保存字段 ────────────────────────────────────────────
 
 class SaveReq(BaseModel):

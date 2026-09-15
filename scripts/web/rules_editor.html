@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>汇报信规则管理</title>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;background:#f1f5f9;color:#0f172a;font-size:13px}
+  header{background:#1e293b;color:#fff;padding:10px 18px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:20}
+  header h1{font-size:15px;margin:0;font-weight:600}
+  header .tab{background:#334155;color:#cbd5e1;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:13px}
+  header .tab.on{background:#2563eb;color:#fff}
+  header .spacer{flex:1}
+  header button.save{background:#16a34a;color:#fff;border:none;padding:7px 16px;border-radius:6px;cursor:pointer;font-weight:600}
+  header button.save:hover{background:#15803d}
+  #status{font-size:12px}
+  main{padding:16px 20px;max-width:1200px;margin:0 auto}
+  .search{margin-bottom:12px}
+  .search input{width:320px;padding:7px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px}
+  details{background:#fff;border:1px solid #e2e8f0;border-radius:8px;margin-bottom:10px}
+  details>summary{cursor:pointer;padding:9px 14px;font-weight:600;font-size:14px;background:#f8fafc;border-radius:8px}
+  details[open]>summary{border-bottom:1px solid #eef2f6;border-radius:8px 8px 0 0}
+  .type{padding:8px 14px;border-top:1px solid #f1f5f9}
+  .type h4{margin:2px 0 6px;font-size:13px;color:#334155}
+  .type .meta{display:flex;gap:12px;align-items:center;margin-bottom:6px;flex-wrap:wrap}
+  .type .meta label{font-size:12px;color:#64748b}
+  .type .meta input[type=text]{padding:4px 8px;border:1px solid #cbd5e1;border-radius:5px;font-size:12px;width:260px}
+  table{border-collapse:collapse;width:100%}
+  td,th{border:1px solid #eef2f6;padding:4px 8px;text-align:left;vertical-align:middle}
+  th{background:#f8fafc;font-size:12px;color:#64748b;font-weight:600}
+  .code{white-space:nowrap;font-weight:600;color:#0f172a;width:90px}
+  .aw select{padding:3px 6px;border:1px solid #cbd5e1;border-radius:5px;font-size:12px}
+  .aw input{padding:3px 6px;border:1px solid #cbd5e1;border-radius:5px;font-size:12px;margin-left:4px}
+  .aw .in-prep{width:200px}.aw .in-to,.aw .in-cc{width:210px}
+  .aw .lbl{color:#94a3b8;font-size:11px;margin-left:6px}
+  .ro{background:#0f172a;color:#e2e8f0;padding:12px;border-radius:6px;overflow:auto;font-size:12px;white-space:pre-wrap;max-height:340px}
+  .hint{color:#64748b;font-size:12px;margin:4px 0 10px}
+  .assign{color:#16a34a}.skip{color:#b45309}.ignore{color:#64748b}
+</style>
+</head>
+<body>
+<header>
+  <h1>汇报信规则管理</h1>
+  <button class="tab on" id="tab-oa" onclick="switchTab('oa')">OA 官文规则</button>
+  <button class="tab" id="tab-close" onclick="switchTab('close')">结项规则</button>
+  <span class="spacer"></span>
+  <span id="status"></span>
+  <button class="save" onclick="save()">保存当前 tab</button>
+</header>
+<main>
+  <div class="search"><input id="q" placeholder="过滤：地区/类型/客户码/邮箱…" oninput="applyFilter()"></div>
+  <div class="hint">动作可改：<b class="assign">assign</b>=分配给准备人(填邮箱) · <b class="skip">skip</b>=不分配→转发(填 to/cc) · <b class="ignore">ignore</b>=不处理。改完点右上「保存」（保存前会校验邮箱/枚举，自动备份 .bak）。</div>
+  <div id="view"></div>
+</main>
+
+<script>
+const state = { oa:null, close:null };
+let cur = 'oa';
+function $(id){return document.getElementById(id)}
+function el(tag,cls){const e=document.createElement(tag);if(cls)e.className=cls;return e}
+function splitEmails(v){return v.split(/[,，;；\s]+/).map(x=>x.trim()).filter(Boolean)}
+
+// 动作编辑控件：就地改 actObj
+function actionWidget(actObj){
+  const wrap=el('span','aw');
+  const sel=el('select');['assign','skip','ignore'].forEach(a=>sel.add(new Option(a,a)));
+  sel.value=actObj.action||'ignore';
+  const detail=el('span');
+  function render(){
+    actObj.action=sel.value; detail.innerHTML='';
+    if(sel.value==='assign'){
+      delete actObj.forward;
+      const inp=el('input','in-prep');inp.type='text';inp.placeholder='准备人邮箱';inp.value=actObj.preparer||'';
+      inp.oninput=()=>actObj.preparer=inp.value.trim();
+      detail.append(span('→ 准备人'),inp);
+    }else if(sel.value==='skip'){
+      delete actObj.preparer; actObj.forward=actObj.forward||{to:[],cc:[]};
+      const to=el('input','in-to');to.type='text';to.placeholder='to(逗号分)';to.value=(actObj.forward.to||[]).join(', ');
+      to.oninput=()=>actObj.forward.to=splitEmails(to.value);
+      const cc=el('input','in-cc');cc.type='text';cc.placeholder='cc(逗号分)';cc.value=(actObj.forward.cc||[]).join(', ');
+      cc.oninput=()=>actObj.forward.cc=splitEmails(cc.value);
+      detail.append(span('to'),to,span('cc'),cc);
+    }else{ delete actObj.preparer; delete actObj.forward; }
+  }
+  function span(t){const s=el('span','lbl');s.textContent=t;return s}
+  sel.onchange=render; render();
+  wrap.append(sel,detail); return wrap;
+}
+
+// 客户分派表：custs = {客户码:action}
+function custTable(custs){
+  const t=el('table');
+  const hr=el('tr');['客户码','动作'].forEach(h=>{const th=el('th');th.textContent=h;hr.append(th)});
+  t.append(hr);
+  Object.keys(custs).forEach(code=>{
+    if(code.startsWith('_'))return;
+    const tr=el('tr');tr.dataset.search=(code+' '+JSON.stringify(custs[code])).toLowerCase();
+    const c1=el('td','code');c1.textContent=code;
+    const c2=el('td');c2.append(actionWidget(custs[code]));
+    tr.append(c1,c2);t.append(tr);
+  });
+  return t;
+}
+
+function renderOA(data){
+  const v=$('view');v.innerHTML='';
+  for(const reg of Object.keys(data)){
+    if(reg==='_meta')continue;
+    if(reg==='_templates'){ v.append(roBlock('_templates（模板层，地区→类型→[md, 是否附PDF]）— 只读，改模板改这里的 json', data._templates)); continue; }
+    const d=el('details');d.open=false;
+    const sm=el('summary');sm.textContent=reg+' 官文规则（'+Object.keys(data[reg]).length+' 类）';d.append(sm);
+    for(const nt of Object.keys(data[reg])){
+      const box=el('div','type');box.dataset.search=(reg+' '+nt).toLowerCase();
+      const h=el('h4');h.textContent=nt;box.append(h,custTable(data[reg][nt]));
+      d.append(box);
+    }
+    v.append(d);
+  }
+}
+
+function renderClose(data){
+  const v=$('view');v.innerHTML='';
+  for(const reg of Object.keys(data)){
+    if(reg==='_meta')continue;
+    const d=el('details');const rules=(data[reg].rules)||{};
+    const sm=el('summary');sm.textContent=reg+' 结项规则（'+Object.keys(rules).length+' 类）';d.append(sm);
+    for(const cls of Object.keys(rules)){
+      const r=rules[cls];const box=el('div','type');box.dataset.search=(reg+' '+cls+' '+(r.template||'')).toLowerCase();
+      const h=el('h4');h.textContent=cls;box.append(h);
+      // 模板 + attach
+      const meta=el('div','meta');
+      const l1=el('label');l1.textContent='模板md:';
+      const ti=el('input');ti.type='text';ti.value=r.template||'';ti.oninput=()=>r.template=ti.value.trim()||null;
+      const l2=el('label');const cb=el('input');cb.type='checkbox';cb.checked=!!r.attach;cb.onchange=()=>r.attach=cb.checked;
+      l2.append(cb,document.createTextNode(' 带附件(attach)'));
+      meta.append(l1,ti,l2);box.append(meta);
+      box.append(custTable(r.rules||{}));
+      d.append(box);
+    }
+    // combinations 只读
+    const cb=data[reg].combinations||{};
+    d.append(roBlock('combinations（TIP combination→结项类型，'+Object.keys(cb).length+' 条）— 只读',cb));
+    v.append(d);
+  }
+}
+
+function roBlock(title,obj){
+  const d=el('details');const sm=el('summary');sm.textContent=title;d.append(sm);
+  const pre=el('pre','ro');pre.textContent=JSON.stringify(obj,null,2);d.append(pre);return d;
+}
+
+function switchTab(k){
+  cur=k;$('tab-oa').classList.toggle('on',k==='oa');$('tab-close').classList.toggle('on',k==='close');
+  (k==='oa'?renderOA:renderClose)(state[k]); applyFilter();
+}
+function applyFilter(){
+  const q=$('q').value.trim().toLowerCase();
+  document.querySelectorAll('#view .type').forEach(b=>{
+    let show=!q || (b.dataset.search||'').includes(q);
+    if(!show){ b.querySelectorAll('tr[data-search]').forEach(tr=>{if((tr.dataset.search||'').includes(q))show=true}); }
+    b.style.display=show?'':'none';
+  });
+  document.querySelectorAll('#view details').forEach(d=>{ if(q) d.open=true; });
+}
+
+async function load(){
+  $('status').textContent='加载中…';
+  for(const k of ['oa','close']){
+    const r=await fetch('/api/rules/'+k); state[k]=await r.json();
+  }
+  $('status').textContent='';switchTab('oa');
+}
+async function save(){
+  $('status').style.color='#f59e0b';$('status').textContent='保存中…';
+  try{
+    const r=await fetch('/api/rules/'+cur,{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({data:state[cur]})});
+    if(r.ok){$('status').style.color='#16a34a';$('status').textContent='✅ 已保存 '+cur;}
+    else{const t=await r.text();$('status').style.color='#dc2626';$('status').textContent='❌ '+t.slice(0,300);alert('保存失败:\n'+t);}
+  }catch(e){$('status').style.color='#dc2626';$('status').textContent='❌ '+e.message;}
+}
+load();
+</script>
+</body>
+</html>
