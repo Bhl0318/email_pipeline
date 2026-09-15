@@ -950,8 +950,11 @@ def upload_submission_source_doc(task_id: str, file: UploadFile = File(...)):
     供审核人在确认函页删掉邮箱读来的错误参考文件后、上传正确的。"""
     row = _load_submission_task(task_id)
     dest = _safe_source_doc((row.get("case_volume") or "").strip(), Path(file.filename or "").name)
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    dest.write_bytes(file.file.read())
+    try:
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_bytes(file.file.read())
+    except OSError as e:
+        raise HTTPException(500, f"写入参考文件目录失败（{dest.parent} 无写权限？）：{e}")
     return {"ok": True, "name": dest.name}
 
 
@@ -961,8 +964,11 @@ def delete_submission_source_doc(task_id: str, name: str):
     用 POST（而非 DELETE 方法），避免部分代理/服务器拦 DELETE 导致前端 fetch 被拒。"""
     row = _load_submission_task(task_id)
     p = _safe_source_doc((row.get("case_volume") or "").strip(), name)
-    if p.is_file():
-        p.unlink()
+    try:
+        if p.is_file():
+            p.unlink()
+    except OSError as e:
+        raise HTTPException(500, f"删除参考文件失败（{p.parent} 无写权限？）：{e}")
     return {"ok": True, "name": p.name}
 
 
