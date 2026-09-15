@@ -1390,6 +1390,10 @@ def dispatch_oa(all_results, all_emails=None, dry_run=False, test_project_prefix
                 proj = item.get("project", "")
                 _seq = (_parse_seq(item.get("project_name", "") or "")
                         if item.get("region") == "CN" else item.get("oaNum")) or "?"
+                # 备注含「驳回」（如驳回复审评估）→ 驳回类无需判新颖性/创造性，跳过
+                if "驳回" in (item.get("oa_remark", "") or ""):
+                    print(f"[审意分析] {proj} OA{_seq}：备注含驳回，跳过新颖性/创造性判断", file=sys.stderr)
+                    continue
                 _src = _official_doc_for_subpage(
                     item, _mid2pdfs_ni.get(item.get("message_id", ""), []))
                 if not _src:
@@ -1408,7 +1412,8 @@ def dispatch_oa(all_results, all_emails=None, dry_run=False, test_project_prefix
                 if v.get("novelty") or v.get("inventiveness"):
                     _issues = [n for n, f in (("新颖性", v.get("novelty")),
                                               ("创造性", v.get("inventiveness"))) if f]
-                    item["其它备注事项"] = v.get("note") or f"涉及{'、'.join(_issues)}"
+                    # 只写类型名：有新颖性写「新颖性」、有创造性写「创造性」、都有写「新颖性、创造性」
+                    item["其它备注事项"] = "、".join(_issues)
                     item["_skip_assign"] = True
                     print(f"[审意分析] {proj} OA{_seq}：涉及{'、'.join(_issues)} → "
                           f"其它备注事项标注、不进OA分配", file=sys.stderr)
