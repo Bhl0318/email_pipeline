@@ -1,5 +1,5 @@
-***Privileged and Confidential: Attorney Client Communication***
 ***机密并受律师客户特权保护—律师客户通讯***
+***Privileged and Confidential: Attorney Client Communication***
 
 **关于：中国申请补正通知书**
 
