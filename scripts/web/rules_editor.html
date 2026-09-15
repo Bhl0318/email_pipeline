@@ -46,17 +46,18 @@
   <button class="tab" id="tab-close" onclick="switchTab('close')">结项规则</button>
   <span class="spacer"></span>
   <span id="status"></span>
-  <button class="save" onclick="save()">保存当前 tab</button>
+  <button class="save" id="saveBtn" onclick="save()" style="display:none">保存当前 tab</button>
 </header>
 <main>
   <div class="search"><input id="q" placeholder="过滤：地区/类型/客户码/邮箱…" oninput="applyFilter()"></div>
-  <div class="hint">动作可改：<b class="assign">assign</b>=分配给准备人(填邮箱) · <b class="skip">skip</b>=不分配→转发(填 to/cc) · <b class="ignore">ignore</b>=不处理。改完点右上「保存」（保存前会校验邮箱/枚举，自动备份 .bak）。</div>
+  <div class="hint" id="hint"></div>
   <div id="view"></div>
 </main>
 
 <script>
 const state = { oa:null, close:null };
 let cur = 'oa';
+let READ_ONLY = true;   // 由 /api/rules-config 覆盖
 function $(id){return document.getElementById(id)}
 function el(tag,cls){const e=document.createElement(tag);if(cls)e.className=cls;return e}
 function splitEmails(v){return v.split(/[,，;；\s]+/).map(x=>x.trim()).filter(Boolean)}
@@ -88,6 +89,16 @@ function actionWidget(actObj){
   wrap.append(sel,detail); return wrap;
 }
 
+// 只读渲染动作为文本
+function actionText(a){
+  if(!a) return '';
+  if(a.action==='assign') return '分配→'+(a.preparer||'');
+  if(a.action==='skip'){const f=a.forward||{};let s='转发→'+((f.to||[]).join('+')||'?');if((f.cc||[]).length)s+=' 抄'+f.cc.join('+');
+    if(a.also_forward){const af=a.also_forward;s+=' ＋另转'+((af.to||[]).join('+'))}return s;}
+  return '不处理';
+}
+function actClass(a){return a&&a.action?a.action:'ignore'}
+
 // 客户分派表：custs = {客户码:action}
 function custTable(custs){
   const t=el('table');
@@ -97,7 +108,9 @@ function custTable(custs){
     if(code.startsWith('_'))return;
     const tr=el('tr');tr.dataset.search=(code+' '+JSON.stringify(custs[code])).toLowerCase();
     const c1=el('td','code');c1.textContent=code;
-    const c2=el('td');c2.append(actionWidget(custs[code]));
+    const c2=el('td');
+    if(READ_ONLY){c2.className=actClass(custs[code]);c2.textContent=actionText(custs[code]);}
+    else c2.append(actionWidget(custs[code]));
     tr.append(c1,c2);t.append(tr);
   });
   return t;
@@ -130,11 +143,17 @@ function renderClose(data){
       const h=el('h4');h.textContent=cls;box.append(h);
       // 模板 + attach
       const meta=el('div','meta');
-      const l1=el('label');l1.textContent='模板md:';
-      const ti=el('input');ti.type='text';ti.value=r.template||'';ti.oninput=()=>r.template=ti.value.trim()||null;
-      const l2=el('label');const cb=el('input');cb.type='checkbox';cb.checked=!!r.attach;cb.onchange=()=>r.attach=cb.checked;
-      l2.append(cb,document.createTextNode(' 带附件(attach)'));
-      meta.append(l1,ti,l2);box.append(meta);
+      if(READ_ONLY){
+        const s=el('label');s.innerHTML='模板md: <b>'+(r.template||'—')+'</b> · 带附件: <b>'+(r.attach?'是':'否')+'</b>';
+        meta.append(s);
+      }else{
+        const l1=el('label');l1.textContent='模板md:';
+        const ti=el('input');ti.type='text';ti.value=r.template||'';ti.oninput=()=>r.template=ti.value.trim()||null;
+        const l2=el('label');const cb=el('input');cb.type='checkbox';cb.checked=!!r.attach;cb.onchange=()=>r.attach=cb.checked;
+        l2.append(cb,document.createTextNode(' 带附件(attach)'));
+        meta.append(l1,ti,l2);
+      }
+      box.append(meta);
       box.append(custTable(r.rules||{}));
       d.append(box);
     }
@@ -166,6 +185,11 @@ function applyFilter(){
 
 async function load(){
   $('status').textContent='加载中…';
+  try{ const c=await (await fetch('/api/rules-config')).json(); READ_ONLY=!!c.readonly; }catch(e){}
+  $('saveBtn').style.display=READ_ONLY?'none':'';
+  $('hint').innerHTML=READ_ONLY
+    ? '🔒 <b>只读预览模式</b>：仅供查看，不可编辑。动作图例：<b class="assign">分配→准备人</b> · <b class="skip">转发→to 抄cc</b> · <b class="ignore">不处理</b>。'
+    : '动作可改：<b class="assign">assign</b>=分配准备人(邮箱) · <b class="skip">skip</b>=转发(to/cc) · <b class="ignore">ignore</b>=不处理。改完点右上「保存」（校验+备份.bak）。';
   for(const k of ['oa','close']){
     const r=await fetch('/api/rules/'+k); state[k]=await r.json();
   }

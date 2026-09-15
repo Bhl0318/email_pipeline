@@ -342,6 +342,7 @@ def templates_preview_page():
 
 # ─── 规则管理页（文件式：UI 读写 oa_report_rules.json / close_report_rules.json）───
 RULES_EDITOR_HTML = WEB_DIR / "rules_editor.html"
+_RULES_READONLY = True   # True=只读预览，禁止 UI/API 写入规则；要放开编辑改回 False
 _RULES_FILES = {
     "oa": SCRIPT_DIR / "oa_report_rules.json",
     "close": SCRIPT_DIR / "close_report_rules.json",
@@ -405,6 +406,12 @@ def rules_editor_page():
     return FileResponse(RULES_EDITOR_HTML, media_type="text/html; charset=utf-8")
 
 
+@app.get("/api/rules-config")
+def rules_config():
+    """前端读此判断是否只读预览。"""
+    return {"readonly": _RULES_READONLY}
+
+
 @app.get("/api/rules/{kind}")
 def get_rules(kind: str):
     p = _RULES_FILES.get(kind)
@@ -421,6 +428,8 @@ class RulesSaveReq(BaseModel):
 
 @app.post("/api/rules/{kind}")
 def save_rules(kind: str, req: RulesSaveReq):
+    if _RULES_READONLY:
+        raise HTTPException(403, "规则管理页当前为只读预览模式，暂不支持编辑保存")
     p = _RULES_FILES.get(kind)
     if not p:
         raise HTTPException(404, f"未知规则类型 {kind}")
