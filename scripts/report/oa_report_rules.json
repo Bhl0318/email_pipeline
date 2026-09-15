@@ -23,6 +23,35 @@
       "lei.wang@metis-ip.com": "王磊"
     }
   },
+  "_templates": {
+    "_说明": "OA官文模板层(原代码 REPORT_TYPE_TO_TEMPLATE)：地区→官文类型→[md文件, 是否附PDF]。缺模板的类型不列=不发汇报信。审查意见@1/@2+ 共用基础键『审查意见通知书』，代码按基础类型查此表。",
+    "CN": {
+      "审查意见通知书": ["CN_官方审查意见转达.md", true],
+      "补正通知书": ["CN_补正通知.md", true],
+      "驳回决定": ["CN_驳回决定.md", true],
+      "复审通知书": ["CN_复审通知书.md", true]
+    },
+    "US": {
+      "CTNF": ["US_官方审查意见转达.md", true],
+      "CTFR": ["US_官方审查意见转达.md", true],
+      "CTAV": ["US_官方审查意见转达.md", true],
+      "CTRS": ["US_官方审查意见转达.md", true],
+      "CTEQ": ["US_官方审查意见转达.md", true],
+      "NT.CR.APP.PA": ["US_补正通知转达.md", true],
+      "M327": ["US_补正通知转达.md", true],
+      "NTC.MISS.PRT": ["US_补正通知转达.md", true],
+      "PETDEC": ["US_补正通知转达.md", true]
+    },
+    "EP": {
+      "Communication R.70(2)": ["EP_扩展检索报告.md", true],
+      "Communication A.94(3)": ["EP_官方审查意见转达.md", true],
+      "Communication R.62a(1)": ["EP_官方审查意见转达.md", true],
+      "Further search fee": ["EP_部分检索报告.md", true],
+      "Intention to grant": ["EP_预授权通知.md", true],
+      "Decision to Grant": ["EP_预授权通知.md", true],
+      "Summons to oral proceedings": ["EP_庭审邀请.md", true]
+    }
+  },
   "CN": {
     "补正通知书": {
       "20618": {

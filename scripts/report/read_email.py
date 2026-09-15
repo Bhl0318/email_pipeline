@@ -53,55 +53,9 @@ OUTPUT_INBOX_DIR = os.path.join(OUTPUT_DIR, "_inbox")
 # 压缩包扩展名：20608 汇报信只需从原邮件补带压缩包文件
 _ARCHIVE_EXT = (".zip", ".rar", ".7z")
 
-# 汇报信：(地区, 通知类型) → (模板文件名, 是否附 PDF)
-# 缺模板的类型在字典里留空，写库时会被跳过，等模板补好再加进来。
-# 业务清单 17 类里 8 类附 PDF（如 OA/驳回/复审/办登/公布等），9 类仅正文（如 初审合格/实审中文/视为放弃等）
-REPORT_TYPE_TO_TEMPLATE = {
-    "CN": {
-        "审查意见通知书":  ("CN_官方审查意见转达.md", True),   # OA汇报信
-        "补正通知书":      ("CN_补正通知.md",          True),   # 补正答复
-        "驳回决定":        ("CN_驳回决定.md",          True),   # 驳回汇报信
-        "复审通知书":      ("CN_复审通知书.md",        True),   # 复审通知书转达
-        # TODO: 后续扩展时按业务清单第二列标 True/False:
-        #   "受理通知书":          ("CN_新申请提交受理报告.md",   True),   # 1 提交及受理
-        #   "实审中文报告":        ("CN_递交实审中文报告.md",     False),  # 2 仅正文
-        #   "初审合格通知书":      ("CN_初审合格通知.md",         False),  # 4 仅正文
-        #   "申请公布":            ("CN_公布及进入实审报告.md",   True),   # 5 公布+pdf
-        #   "办理登记手续通知书":  ("CN_办登汇报信.md",           True),   # 10 办登+pdf
-        #   "审查意见答复提交":    ("CN_审查意见答复提交报告.md", False),  # 7 仅正文
-        #   "复审请求受理通知":    ("CN_复审请求受理通知.md",     False),  # 9 仅正文
-        #   "视为未要求优先权":    ("CN_视为未要求优先权.md",     False),  # 11 仅正文
-        #   "代理机构变更提交":    ("CN_代理机构变更.md",         False),  # 12 仅正文
-        #   "手续补正通知书":      ("CN_手续补正通知.md",         False),  # 13 仅正文
-        #   "专利证书":            ("CN_专利证书转达.md",         True),   # 14 证书+pdf
-        #   "无效宣告请求受理":    ("CN_无效宣告请求受理.md",     True),   # 15 无效+pdf
-        #   "视为放弃":            ("CN_视为放弃通知.md",         False),  # 17 仅正文
-    },
-    "US": {
-        "CTNF":          ("US_官方审查意见转达.md", True),   # Non-Final OA
-        "CTFR":          ("US_官方审查意见转达.md", True),   # Final OA
-        "CTAV":          ("US_官方审查意见转达.md", True),   # Advisory Action
-        "CTRS":          ("US_官方审查意见转达.md", True),   # Restriction Election
-        "CTEQ":          ("US_官方审查意见转达.md", True),   # Ex Parte Quayle
-        "NT.CR.APP.PA":  ("US_补正通知转达.md",     True),   # Notice to file corrected papers
-        "M327":          ("US_补正通知转达.md",     True),   # 同上(另一码)
-        "NTC.MISS.PRT":  ("US_补正通知转达.md",     True),   # Notice to file missing parts
-        "PETDEC":        ("US_补正通知转达.md",     True),   # Petition Decision Dismissed
-        # 只立项、不发汇报信：NOA(分案/续案评估)、EXIN(Examiner Interview)、PPH.DECISION
-    },
-    "EP": {
-        # EESR(European search report) 只立项、不发汇报信；等 R.70(2)/70a(2) 下发才发 EESR 汇报信
-        "Communication R.70(2)":       ("EP_扩展检索报告.md",     True),  # EESR 汇报信触发官文
-        "Communication A.94(3)":       ("EP_官方审查意见转达.md", True),
-        "Communication R.62a(1)":      ("EP_官方审查意见转达.md", True),
-        "Further search fee":          ("EP_部分检索报告.md",     True),
-        "Intention to grant":          ("EP_预授权通知.md",       True),  # R.71(3)授权意向/缴费，主题含R.71(3)时规则表判 skip/ignore
-        "Decision to Grant":           ("EP_预授权通知.md",       True),  # A.97(1)授权决定书:所有客户→王晶,只发汇报信不立项(复用预授权模板)
-        "Summons to oral proceedings": ("EP_庭审邀请.md",         True),
-        # R.70(2): 分类时合并到 EESR result，不作独立 task，不发汇报信
-        # TODO: R.161(2)+162 / R.53(3)优先权翻译 待补模板&分类规则
-    },
-}
+# 汇报信模板层 (地区,通知类型)→(模板文件名,是否附PDF)：已挪进 oa_report_rules.json 的 `_templates` 段，
+# 模块级 REPORT_TYPE_TO_TEMPLATE 在 _load_oa_rules 之后由 _load_report_templates() 构建（见下方）。
+# 缺模板的类型不列入 = 不发汇报信；扩展模板改 json 即可，不用动代码。
 REVIEW_BASE_URL = "http://10.10.70.88:8501"
 
 # 每封审核链接通知固定抄送
@@ -140,6 +94,18 @@ def _load_oa_rules():
             print(f"[OA规则] 加载 oa_report_rules.json 失败: {e}", file=sys.stderr)
             _OA_RULES_CACHE = {}
     return _OA_RULES_CACHE
+
+
+def _load_report_templates():
+    """从 oa_report_rules.json 的 `_templates` 段构建 (地区)→(通知类型)→(md文件, 是否附PDF)。
+    列表 [md, bool] 转成元组以兼容原用法。缺失/加载失败时返回空 dict（= 都不发汇报信）。"""
+    raw = _load_oa_rules().get("_templates", {})
+    return {region: {nt: tuple(v) for nt, v in types.items()}
+            for region, types in raw.items() if not region.startswith("_")}
+
+
+# 汇报信模板层（原代码硬编码，现由 oa_report_rules.json 的 _templates 段驱动）
+REPORT_TYPE_TO_TEMPLATE = _load_report_templates()
 
 
 def _oa_ordinal_is_first(item):
