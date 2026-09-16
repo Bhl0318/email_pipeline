@@ -353,7 +353,7 @@ async function openTask(id) {
   const _ems = fields.email_module_state || {};
   emailModules = [];
   moduleChecked = { ...(_ems.checked || {}) };
-  moduleParams = { ...(_ems.params || {}) };   // 恢复下拉决策项（实体类型/延续申请费档位）；自由文本仍现填
+  moduleParams = { ...(_ems.params || {}) };   // 恢复模块参数（下拉决策 + 本任务改过的开场白/落地话术/称呼等）
   openModules = {};
   customSlots = {};
   for (const [sid, sv] of Object.entries(_ems.slots || {}))
@@ -452,19 +452,21 @@ function collectModuleParams() {   // 只收集输入框到 moduleParams，不�
   moduleParams.caf_tier = ($("modCafTier") || {}).value || "";
 }
 function regenerateModules() { collectModuleParams(); loadEmailModules(); }
-// 把模块「勾选」状态 + 非空自定义槽 + 下拉决策项快照进 fields，随「保存」/「确认发送」落库，刷新后恢复。
-// 下拉决策项（实体类型 repeat_entity、延续申请费档位 caf_tier）是明确选择，需持久化，否则保存后复位默认。
-// 自由文本（称呼/开场白/落地话术）仍不持久化：每封现填，避免带出旧称呼；空自定义槽不存，避免刷新后自动展开空槽。
+// 把模块「勾选」状态 + 非空自定义槽 + 模块参数（下拉决策 + 自由文本）快照进 fields，
+// 随「保存」/「确认发送」落库，重开任务后恢复。email_module_state 是按任务存的，
+// 故本任务改过的开场白/落地话术/称呼等都持久化（重开同一任务显示自己的编辑）。空值不存→回落默认。
 function snapshotModules() {
   const slots = {};
   for (const [sid, sv] of Object.entries(customSlots)) {
     const t = ((sv || {}).title || "").trim(), b = ((sv || {}).body || "").trim();
     if (t || b) slots[sid] = { title: (sv || {}).title || "", body: (sv || {}).body || "" };
   }
-  collectModuleParams();   // 先把 DOM 当前值读进 moduleParams，再挑出下拉决策项落库
+  collectModuleParams();   // 先把 DOM 当前值读进 moduleParams
   const params = {};
-  if (moduleParams.repeat_entity) params.repeat_entity = moduleParams.repeat_entity;
-  if (moduleParams.caf_tier) params.caf_tier = moduleParams.caf_tier;
+  for (const k of ["salutation", "opening", "route_phrase", "repeat_entity",
+                   "claims_total", "pages_total", "pages_excess", "caf_tier"]) {
+    if ((moduleParams[k] || "").toString().trim()) params[k] = moduleParams[k];
+  }
   fields.email_module_state = { checked: moduleChecked, slots, params };
 }
 function renderEmailModules() {
