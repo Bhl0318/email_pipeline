@@ -346,11 +346,13 @@ def application_type_words(application_type: str) -> tuple:
 
 def _employer_groups(fields: dict) -> list:
     """按 inventors[].employer 分组，返回 [(employer, [inventor,...]), ...]，保持出现顺序。
-    employer 归一化（去空格/大小写）判同组；空 employer 单独成 '' 组（归属由调用方决定）。"""
+    employer 用 _norm_company 归一（去空格/标点/大小写）判同组——避免同一公司因末尾句点/
+    括号差异（如 "CO., LTD." vs "CO., LTD"）被拆成多组、多生成一份 Assignment。
+    空 employer 单独成 '' 组（归属由调用方决定）。组名取该组首个出现的 employer 原文。"""
     groups, index = [], {}
     for inv in fields.get("inventors") or []:
         emp = (inv.get("employer") or "").strip()
-        key = emp.lower()
+        key = _norm_company(emp)
         if key not in index:
             index[key] = len(groups)
             groups.append((emp, []))
