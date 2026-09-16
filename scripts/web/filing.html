@@ -504,7 +504,7 @@ const _contOpts=(cur)=>{const c=_contDisplay(cur);
   return '<option value=""></option>'+_CONT_LIST.map(s=>`<option ${c===s?"selected":""}>${s}</option>`).join("");};
 
 // 落地方式(filing_route)标准选项；存量非标准值追加保留并选中，空则留空
-const _ROUTE_LIST=["371 Route","By pass continuation","New","Continuation of","Continuation in part of","Division of","Paris"];
+const _ROUTE_LIST=["371 Route","By pass continuation","By pass continuation in part of","New","Continuation of","Continuation in part of","Division of","Paris","Claims benefit of provisional"];
 const _routeOpts=(cur)=>{
   const c=String(cur||"").trim();
   const matched=_ROUTE_LIST.find(s=>s.toLowerCase()===c.toLowerCase());
