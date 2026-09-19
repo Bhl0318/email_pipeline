@@ -708,8 +708,7 @@ def send_forward_oa(all_results, all_emails=None, dry_run=False):
             print(f"      抄送({len(p['cc'])}): {', '.join(p['cc'])}", file=sys.stderr)
             print(f"      附件({len(atts)}): {', '.join(atts) if atts else '(无)'}", file=sys.stderr)
         print(f"  [dry-run][转OA] 共 {len(plans)} 封待发（未实际发送）", file=sys.stderr)
-        # 审意涉新颖性/创造性的案不发分配链接
-        for _nt in build_assign_notifies([p for p in plans if not p["item"].get("_skip_assign")]):
+        for _nt in build_assign_notifies(plans):
             print(f"  [dry-run][OA分配链接] → {_nt['to']} 抄送 {', '.join(_nt['cc'])}  主题: {_nt['subject']}", file=sys.stderr)
         return fwd_actions
 
@@ -781,8 +780,7 @@ def send_forward_oa(all_results, all_emails=None, dry_run=False):
             print(f"[转OA] {p['item'].get('project')} 发送失败: {e}", file=sys.stderr)
 
     # OA 分配链接：不发流程人员，按案号路由收件人分组发（20608→王志刚、其余→薛虹，均抄送海灵；复用已开 SMTP）
-    # 审意涉新颖性/创造性的案不发分配链接（_skip_assign）
-    for _nt in build_assign_notifies([p for p in plans if not p["item"].get("_skip_assign")]):
+    for _nt in build_assign_notifies(plans):
         try:
             nmsg = MIMEMultipart()
             nmsg["From"] = pa_cfg["user"]
@@ -1413,10 +1411,9 @@ def dispatch_oa(all_results, all_emails=None, dry_run=False, test_project_prefix
                     _issues = [n for n, f in (("新颖性", v.get("novelty")),
                                               ("创造性", v.get("inventiveness"))) if f]
                     # 只写类型名：有新颖性写「新颖性」、有创造性写「创造性」、都有写「新颖性、创造性」
+                    # 仅标注，不影响分配（照常进待分配、发分配链接）
                     item["其它备注事项"] = "、".join(_issues)
-                    item["_skip_assign"] = True
-                    print(f"[审意分析] {proj} OA{_seq}：涉及{'、'.join(_issues)} → "
-                          f"其它备注事项标注、不进OA分配", file=sys.stderr)
+                    print(f"[审意分析] {proj} OA{_seq}：涉及{'、'.join(_issues)} → 其它备注事项标注", file=sys.stderr)
                 else:
                     print(f"[审意分析] {proj} OA{_seq}：未见新颖性/创造性 → 正常分配", file=sys.stderr)
         except Exception as e:
@@ -1534,13 +1531,8 @@ def dispatch_oa(all_results, all_emails=None, dry_run=False, test_project_prefix
     if inserted_items and not dry_run:
         try:
             from oa_assign_store import add_pending
-            # 审意涉新颖性/创造性的案不进待分配（_skip_assign），不发分配链接
-            _to_pending = [it for it in inserted_items if not it.get("_skip_assign")]
-            _skipped_n = len(inserted_items) - len(_to_pending)
-            n = add_pending(_to_pending) if _to_pending else 0
-            print(f"[待分配] 新增 {n} 件到 OA 分配待分配库"
-                  + (f"（另 {_skipped_n} 件涉新颖性/创造性不进分配）" if _skipped_n else ""),
-                  file=sys.stderr)
+            n = add_pending(inserted_items)
+            print(f"[待分配] 新增 {n} 件到 OA 分配待分配库", file=sys.stderr)
         except Exception as e:
             print(f"[待分配] 写入失败: {e}", file=sys.stderr)
 
@@ -1577,8 +1569,6 @@ def dispatch_oa(all_results, all_emails=None, dry_run=False, test_project_prefix
             for item in inserted_items:
                 oa_id = item.get("oa_id", "")
                 if not oa_id:
-                    continue
-                if item.get("_skip_assign"):   # 涉新颖性/创造性不分配 → 无需生成分配报告
                     continue
                 try:
                     _md = build_case_report(item)
