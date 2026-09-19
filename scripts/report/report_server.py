@@ -152,6 +152,12 @@ def oa_assign_page(assignee: str = "", oaid: str = ""):
     return RedirectResponse("/static/assign.html")
 
 
+@app.get("/oa-assign/share")
+def oa_assign_share_page(oaid: str = ""):
+    """只读分享页：只显示中栏报告 + 已选人员（前端 assign.html 的 shareView 模式）。"""
+    return RedirectResponse(f"/static/assign.html?shareView=1&oaid={quote(oaid)}")
+
+
 @app.get("/oa-assign/{oa_id}")
 def oa_assign_page_by_id(oa_id: str):
     """按 oa_id 打开分配页：加载完整待分配列表并自动定位到该案（?openId= 由前端读取）。"""

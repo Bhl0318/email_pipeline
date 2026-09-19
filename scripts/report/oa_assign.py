@@ -107,6 +107,7 @@ def _save_submission(body):
             "scheme_id": body.get("schemeId", "") or "",
             "responder": body.get("responder", "") or "",
             "qc": body.get("qc", "") or "",
+            "aqc": body.get("aqc", "") or "",                  # AQC（供分享页展示）
             "postscript": body.get("postscript", "") or "",   # 分配附言
             "reason": body.get("customNote", "") or "",        # 分配原因
             "submitted_at": f"{datetime.now():%Y-%m-%d %H:%M}",
@@ -382,6 +383,112 @@ def staff_list(q: str = "", role: str = ""):
     except Exception as e:
         _log("查 users 失败，返回空：", e)
         return {"role": role, "staff": []}     # DB 异常直接空栏，不回退桩
+
+
+_SHARE_DEFAULT_TO = "yan.li@metis-ip.com"
+
+
+def _send_share_email(to_list, cc_list, subject, body):
+    """用 pa 账号发分享邮件（复用 read_email 的 SMTP + 共享 email_config）。返回 (ok, msg)。"""
+    try:
+        oa_dir = os.path.join(_DIR, "..", "oa")
+        if oa_dir not in sys.path:
+            sys.path.insert(0, oa_dir)
+        import read_email as RE
+        RE.set_config_path(os.path.join(_DIR, "..", "email_config.json"))
+        pa = (RE.load_config().get("accounts", {}) or {}).get("pa")
+        if not pa:
+            return False, "未配置 PA 账号"
+        import smtplib
+        import base64
+        from email.mime.text import MIMEText
+        from email.mime.multipart import MIMEMultipart
+        msg = MIMEMultipart()
+        msg["From"] = pa["user"]
+        msg["To"] = ", ".join(to_list)
+        if cc_list:
+            msg["Cc"] = ", ".join(cc_list)
+        msg["Subject"] = subject
+        msg.attach(MIMEText(body, "plain", "utf-8"))
+        smtp = smtplib.SMTP(pa["smtp_host"], pa["smtp_port"])
+        smtp.ehlo(); smtp.starttls(); smtp.ehlo()
+        token = RE._get_smtp_oauth2_token(pa)
+        if token:
+            auth = f"user={pa['user']}\x01auth=Bearer {token}\x01\x01"
+            try:
+                smtp.docmd("AUTH", "XOAUTH2 " + base64.b64encode(auth.encode()).decode())
+            except smtplib.SMTPAuthenticationError:
+                smtp.login(pa["user"], pa["password"])
+        else:
+            smtp.login(pa["user"], pa["password"])
+        smtp.sendmail(pa["user"], to_list + cc_list, msg.as_string())
+        smtp.quit()
+        return True, "ok"
+    except Exception as e:
+        return False, str(e)
+
+
+@router.post("/api/assignment/share")
+async def assignment_share(req: Request):
+    """分享：先把当前所选人员写库（=提交分配），再发分享邮件到指定邮箱。
+    邮件正文写「案号 分配情况 + 人员 + 只读分享链接」；分享页只显示中栏报告 + 已选人员。"""
+    body = await req.json()
+    cid = body.get("caseId")
+    case_no = body.get("caseNo", "") or ""
+    responder, qc, aqc = body.get("responder"), body.get("qc"), body.get("aqc", "")
+    to_list = [e.strip() for e in (body.get("to") or []) if e and e.strip()] or [_SHARE_DEFAULT_TO]
+    cc_list = [e.strip() for e in (body.get("cc") or []) if e and e.strip()]
+    if not cid:
+        return {"ok": False, "msg": "缺 caseId"}
+    if not (responder and qc):
+        return {"ok": False, "msg": "请先选择分配人员"}
+    bad = _invalid_names(responder, qc, aqc)
+    if bad:
+        return {"ok": False, "msg": f"以下人员不在 users 库：{'、'.join(bad)}，请改选"}
+    # 1. 写库（等同提交分配：回写 Wiki + projects/绩效表 + submit_json）
+    wb = _write_back(cid, responder, qc, body.get("postscript", ""), body.get("customNote", ""), aqc)
+    _mark(cid, responder, _combine_qc(qc, aqc))
+    _save_submission(body)
+    # 2. 只读分享链接（base 优先环境变量，其次 pipeline_config.oa_assign_base_url）
+    base = os.environ.get("OA_ASSIGN_BASE_URL", "").strip().rstrip("/")
+    if not base:
+        try:
+            with open(os.path.join(_DIR, "..", "pipeline_config.json"), encoding="utf-8") as f:
+                base = (json.load(f).get("oa_assign_base_url") or "").strip().rstrip("/")
+        except Exception:
+            base = ""
+    link = f"{base}/oa-assign/share?oaid={cid}"
+    # 3. 发分享邮件
+    ppl = f"负责人：{responder}；QC：{qc}" + (f"；AQC：{aqc}" if aqc else "")
+    subject = f"【OA分配情况】{case_no}"
+    mail_body = (f"{case_no} 分配情况：\n{ppl}\n\n"
+                 f"点击查看案件分析报告及分配人员（只读）：\n{link}\n")
+    ok, msg = _send_share_email(to_list, cc_list, subject, mail_body)
+    _log(f"POST /api/assignment/share caseId={cid} → 写库+发邮件 to={to_list} cc={cc_list} ok={ok}")
+    return {"ok": ok, "caseId": cid, "writeback": wb, "link": link, "mail": msg}
+
+
+@router.get("/api/assignment/shared/{oaid}")
+def assignment_shared(oaid: str):
+    """分享页只读数据：中栏报告(reportMd) + 已选人员(submit_json)。"""
+    st = _store()
+    data = {}
+    if st is not None:
+        try:
+            data = st.get_report(oaid) or {}
+        except Exception as e:
+            _log("分享页读 report 失败：", e)
+    case_no, oa_seq = "", ""
+    try:
+        from db_query import execute as dbx
+        rows = dbx(f"SELECT project, project_name FROM projects WHERE id='{oaid}'")
+        if isinstance(rows, list) and rows:
+            case_no = rows[0].get("project", "") or ""
+            oa_seq = _oa_seq_of(rows[0].get("project_name", "") or "")
+    except Exception as e:
+        _log("分享页读 projects 失败：", e)
+    return {"oaid": oaid, "caseNo": case_no, "oaSeq": oa_seq,
+            "reportMd": data.get("report_md", "") or "", "submit": data.get("submit") or {}}
 
 
 @router.post("/api/assignment/submit")

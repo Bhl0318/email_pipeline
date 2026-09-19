@@ -167,7 +167,27 @@
   </div>
   <!-- /Component: PasHeader -->
 
-  <div class="pas-body">
+  <!-- 只读分享视图：只显示中栏报告 + 已选人员（shareView 模式，隐藏左右栏） -->
+  <div v-if="shareView" style="flex:1;overflow-y:auto;background:#f5f7fa;padding:16px 0">
+    <div style="max-width:860px;margin:0 auto;background:#fff;border:1px solid #ebeef5;border-radius:6px;padding:20px 26px">
+      <div style="font-size:16px;font-weight:700;color:#262626;margin-bottom:4px">
+        {{ shareData.caseNo || '案件' }}{{ shareData.oaSeq ? '（第' + shareData.oaSeq + '次OA）' : '' }} — 分配情况
+      </div>
+      <div style="background:#f0f9eb;border:1px solid #e1f3d8;border-radius:5px;padding:10px 14px;margin:12px 0;font-size:13px;color:#303133;line-height:1.9">
+        <div><strong>答复负责人：</strong>{{ shareData.submit?.responder || '—' }}</div>
+        <div><strong>答复 QC：</strong>{{ shareData.submit?.qc || '—' }}</div>
+        <div v-if="shareData.submit?.aqc"><strong>AQC：</strong>{{ shareData.submit.aqc }}</div>
+        <div v-if="shareData.submit?.postscript"><strong>分配附言：</strong>{{ shareData.submit.postscript }}</div>
+        <div v-if="shareData.submit?.reason"><strong>分配原因：</strong>{{ shareData.submit.reason }}</div>
+        <div v-if="shareData.submit?.submitted_at" style="color:#8c8c8c;font-size:12px;margin-top:2px">分配时间：{{ shareData.submit.submitted_at }}</div>
+      </div>
+      <div v-if="shareLoading" style="color:#8c8c8c;font-size:13px;padding:20px 0;text-align:center">加载中…</div>
+      <div v-else-if="shareData.reportMd" class="md-body" v-html="shareRenderedMd"></div>
+      <div v-else style="color:#c0c4cc;font-size:13px;padding:20px 0;text-align:center">暂无案件报告</div>
+    </div>
+  </div>
+
+  <div class="pas-body" v-if="!shareView">
 
     <!-- Component: CaseList -->
     <div class="case-list" data-guide="case-list">
@@ -227,6 +247,8 @@
           </a>
           <!-- API: POST /api/assignment/analyze body: { caseId } -->
           <el-button size="small" :loading="reanalyzing" @click="reanalyze" data-guide="reanalyze-btn">重新生成</el-button>
+          <!-- 分享：写库(提交分配)+发分享邮件；未选人则提示。API: POST /api/assignment/share -->
+          <el-button size="small" type="success" @click="shareCase" data-guide="share-btn">分享</el-button>
           <a href="http://10.10.70.88:8082/script-debug?module=oaInstruct&name=OA%E5%88%86%E9%85%8D"
             target="_blank">
             <el-button size="small" type="primary" data-guide="edit-ai-btn">编辑 AI 指令</el-button>
@@ -391,7 +413,24 @@
 
   </div>
 
-
+  <!-- 分享对话框：收件人默认 yan.li@metis-ip.com 可改，抄送默认空 -->
+  <el-dialog v-model="shareDialogVisible" title="分享分配情况" width="460px">
+    <div style="font-size:13px;color:#606266;margin-bottom:10px">
+      案号 <strong>{{ selectedCase?.caseNo }}</strong>：将当前所选人员写入分配，并把只读分享链接发到下列邮箱。
+    </div>
+    <div style="margin-bottom:10px">
+      <div style="font-size:12px;color:#8c8c8c;margin-bottom:4px">收件人（多个用逗号/分号分隔）</div>
+      <el-input v-model="shareTo" size="small" placeholder="收件人邮箱" />
+    </div>
+    <div>
+      <div style="font-size:12px;color:#8c8c8c;margin-bottom:4px">抄送（选填，多个用逗号/分号分隔）</div>
+      <el-input v-model="shareCc" size="small" placeholder="抄送邮箱（选填）" />
+    </div>
+    <template #footer>
+      <el-button size="small" @click="shareDialogVisible = false">取消</el-button>
+      <el-button size="small" type="primary" :loading="sharing" @click="doShare">写库并发送</el-button>
+    </template>
+  </el-dialog>
 
 </div>
 
@@ -438,6 +477,30 @@ const app = createApp({
     const assignee = ref(_urlParams.get('assignee') || '')   // 分配人
     const openId = ref(_urlParams.get('openId') || '')        // 直达案件(oaid)；有则过滤到本人，无则汇总
     const filterByAssignee = computed(() => !!(openId.value && assignee.value))
+
+    // ── 只读分享视图（shareView=1&oaid=xxx）：只显示中栏报告 + 已选人员 ──
+    const shareView = ref(_urlParams.get('shareView') === '1')
+    const shareOaid = ref(_urlParams.get('oaid') || '')
+    const shareData = ref({ caseNo: '', oaSeq: '', reportMd: '', submit: {} })
+    const shareLoading = ref(false)
+    const shareRenderedMd = computed(() => shareData.value.reportMd ? marked.parse(shareData.value.reportMd) : '')
+    async function loadShared() {
+      if (!shareOaid.value) return
+      shareLoading.value = true
+      try {
+        shareData.value = await apiGet('/api/assignment/shared/' + encodeURIComponent(shareOaid.value))
+      } catch (e) {
+        ElementPlus.ElMessage.error('加载分享内容失败：' + (e.message || e))
+      } finally {
+        shareLoading.value = false
+      }
+    }
+
+    // ── 分享对话框（写库+发邮件）──
+    const shareDialogVisible = ref(false)
+    const shareTo = ref('yan.li@metis-ip.com')   // 收件人默认，可改
+    const shareCc = ref('')                        // 抄送默认空
+    const sharing = ref(false)
 
     const expandedCards = reactive({
       basic: true, claims: true, tech: true, oa: true, personnel: true
@@ -717,6 +780,45 @@ const app = createApp({
                responder, qc, aqc, postscript: sel.postscript || '', customNote }
     }
 
+    // 分享：先校验是否选了人，未选则提示；选了则弹框填收件人后写库+发邮件
+    function shareCase() {
+      const c = selectedCase.value
+      if (!c) { ElementPlus.ElMessage.warning('请先从左侧选择案件'); return }
+      const sel = currentSelection.value
+      const chosen = sel?.schemeId && sel.schemeId !== 'skip'
+        && (sel.schemeId === 'custom' ? !!(sel.customResponder && sel.customQc) : true)
+      if (!chosen) { ElementPlus.ElMessage.warning('请先选择分配人员'); return }
+      shareDialogVisible.value = true
+    }
+
+    function _splitEmails(s) {
+      return (s || '').split(/[,;，；\s]+/).map(x => x.trim()).filter(Boolean)
+    }
+
+    // API: POST /api/assignment/share body: { ...assignment, to:[], cc:[] }
+    async function doShare() {
+      const c = selectedCase.value
+      if (!c || sharing.value) return
+      const to = _splitEmails(shareTo.value)
+      if (!to.length) { ElementPlus.ElMessage.warning('请填写收件人邮箱'); return }
+      sharing.value = true
+      try {
+        const payload = { ..._assignmentOf(c), to, cc: _splitEmails(shareCc.value) }
+        const r = await apiPost('/api/assignment/share', payload)
+        if (r.ok) {
+          ElementPlus.ElMessage.success('已写入分配并发送分享邮件')
+          shareDialogVisible.value = false
+          c.submitted = true   // 已写库 → 标记，和提交一致
+        } else {
+          ElementPlus.ElMessage.error('分享失败：' + (r.msg || r.mail || '未知错误'))
+        }
+      } catch (e) {
+        ElementPlus.ElMessage.error('分享失败：' + (e.message || e))
+      } finally {
+        sharing.value = false
+      }
+    }
+
     // API: POST /api/assignment/submit/batch body: { assignments: [{ caseId, schemeId, responder, qc }] }
     async function batchSubmit() {
       if (batchSubmitting.value) return          // 防重复点击
@@ -790,6 +892,8 @@ const app = createApp({
     }
 
     onMounted(() => {
+      // 只读分享模式：只拉分享内容（中栏报告+已选人员），不加载待分配列表
+      if (shareView.value) { loadShared(); return }
       // 加载完成后，若 URL 带 openId(=oaid) 则自动定位到该案（列表已按 assignee 过滤）
       loadData().then(() => {
         if (openId.value) {
@@ -819,6 +923,8 @@ const app = createApp({
       selectCase, selectScheme, setCustomResponder, setCustomQc, setCustomAqc, AQC_OPTIONS, setPostscript, setCustomNote, queryStaff,
       staffOptions, staffLoading, remoteStaff,
       toggleCard, canSubmit, batchSubmit, reanalyze,
+      shareCase, doShare, shareDialogVisible, shareTo, shareCc, sharing,
+      shareView, shareData, shareLoading, shareRenderedMd,
     }
   }
 })
