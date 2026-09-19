@@ -50,14 +50,16 @@ def _region_of(project_type, override=""):
     return "CN" if "中国" in (project_type or "") else "US"
 
 
-def _fetch_project_rows(project, db_execute):
-    """查 projects 该案号的全部立项行（一个案号可能有多次 OA 立项）。"""
+def _fetch_latest_project_row(project, db_execute):
+    """查 projects 该案号「最新一次」立项行（按 OA 发文日倒序取第一条）。
+    一个案号历年有多次 OA 立项，补发只针对当前这次 OA（一案号一条分配链接），故只取最新一条。
+    取不到返回 None。"""
     proj = project.replace("'", "\\'")
     rows = db_execute(
         "SELECT id, project, project_name, project_type, customer, oa_doc_date, "
         "project_deadline, oaNum, oa_remark FROM projects "
-        f"WHERE project='{proj}' ORDER BY oa_doc_date")
-    return rows if isinstance(rows, list) else []
+        f"WHERE project='{proj}' ORDER BY oa_doc_date DESC, entrust_date DESC LIMIT 1")
+    return rows[0] if isinstance(rows, list) and rows else None
 
 
 def _already_pending(oa_id, db_execute):
@@ -83,27 +85,28 @@ def _row_to_item(row, region_override=""):
 
 
 def _collect_items(projects, region_override, force, db_execute):
-    """按案号取立项行 → 过滤出要补发的 item。默认只取「未进待分配」的行；force 则全取。"""
+    """每个案号取「最新一次」立项行 → 过滤出要补发的 item（一案号最多一条）。
+    默认：该行已在待分配则跳过（除非 --force）。"""
     items = []
     for proj in projects:
-        rows = _fetch_project_rows(proj, db_execute)
-        if not rows:
+        row = _fetch_latest_project_row(proj, db_execute)
+        if not row:
             print(f"[补发] {proj}：projects 无立项记录，跳过（该案是否已立项？）", file=sys.stderr)
             continue
-        for row in rows:
-            oa_id = row.get("id", "")
-            if not oa_id:
-                continue
-            pending = _already_pending(oa_id, db_execute)
-            if pending and not force:
-                print(f"[补发] {proj} [{row.get('project_name','')}]：已在待分配，跳过"
-                      f"（如需重发加 --force）", file=sys.stderr)
-                continue
-            item = _row_to_item(row, region_override)
-            item["_already_pending"] = pending
-            items.append(item)
-            print(f"[补发] {proj} [{item['project_name']}] region={item['region']} "
-                  f"oa_id={oa_id}{'（重发）' if pending else ''} → 待处理", file=sys.stderr)
+        oa_id = row.get("id", "")
+        if not oa_id:
+            print(f"[补发] {proj}：最新立项行无 id，跳过", file=sys.stderr)
+            continue
+        pending = _already_pending(oa_id, db_execute)
+        if pending and not force:
+            print(f"[补发] {proj} [{row.get('project_name','')}]：最新一次 OA 已在待分配，跳过"
+                  f"（如需重发加 --force）", file=sys.stderr)
+            continue
+        item = _row_to_item(row, region_override)
+        item["_already_pending"] = pending
+        items.append(item)
+        print(f"[补发] {proj} [{item['project_name']}] region={item['region']} "
+              f"oa_id={oa_id}{'（重发）' if pending else ''} → 待处理", file=sys.stderr)
     return items
 
 
