@@ -21,11 +21,16 @@
 """
 import os
 import sys
+import re
 import json
 import argparse
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, SCRIPT_DIR)
+
+# oa_id（=projects.id）形如 Wiki 行 class="oaid-<UUID>" 里的 UUID；传入这种直接按 id 精确定位
+_UUID_RE = re.compile(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-'
+                      r'[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$')
 
 
 def _load_pipeline_env():
@@ -62,6 +67,17 @@ def _fetch_latest_project_row(project, db_execute):
     return rows[0] if isinstance(rows, list) and rows else None
 
 
+def _fetch_project_row_by_id(oa_id, db_execute):
+    """按 oa_id（=projects.id，来自 Wiki 行 class="oaid-<UUID>"）精确取该次 OA 立项行。
+    一案号可能有多次 OA，用 id 才能锁定新增OA页上那一行（不猜日期）。取不到返回 None。"""
+    oid = oa_id.replace("'", "\\'")
+    rows = db_execute(
+        "SELECT id, project, project_name, project_type, customer, oa_doc_date, "
+        "project_deadline, oaNum, oa_remark FROM projects "
+        f"WHERE id='{oid}'")
+    return rows[0] if isinstance(rows, list) and rows else None
+
+
 def _already_pending(oa_id, db_execute):
     """该立项行是否已在待分配表（oa_assign_task）。"""
     oid = (oa_id or "").replace("'", "\\'")
@@ -84,12 +100,25 @@ def _row_to_item(row, region_override=""):
     }
 
 
-def _collect_items(projects, region_override, force, db_execute):
-    """每个案号取「最新一次」立项行 → 过滤出要补发的 item（一案号最多一条）。
-    默认：该行已在待分配则跳过（除非 --force）。"""
+def _collect_items(projects, region_override, force, db_execute, expected_by_id=None):
+    """每个案号/oa_id 取立项行 → 过滤出要补发的 item（一条一件）。
+    默认：该行已在待分配则跳过（除非 --force）。
+    expected_by_id: {oa_id: 期望案号}，按 id 查到行后校验案号一致（防 id 抄错），不一致仅告警不阻断。"""
+    expected_by_id = expected_by_id or {}
     items = []
     for proj in projects:
-        row = _fetch_latest_project_row(proj, db_execute)
+        # 传入 oa_id（UUID）→ 按 id 精确取那一次 OA；否则按案号取最新一次
+        if _UUID_RE.match(proj):
+            row = _fetch_project_row_by_id(proj, db_execute)
+            if not row:
+                print(f"[补发] oa_id={proj}：projects 查无此行，跳过", file=sys.stderr)
+                continue
+            exp = expected_by_id.get(proj)
+            if exp and row.get("project", "") != exp:
+                print(f"[补发][告警] oa_id={proj}：查到案号 {row.get('project','')} ≠ 预期 {exp}，请核对 JSON",
+                      file=sys.stderr)
+        else:
+            row = _fetch_latest_project_row(proj, db_execute)
         if not row:
             print(f"[补发] {proj}：projects 无立项记录，跳过（该案是否已立项？）", file=sys.stderr)
             continue
@@ -200,12 +229,12 @@ def _send_links(items, dry_run):
             pass
 
 
-def reassign(projects, region_override="", force=False, dry_run=False):
-    """主流程：按案号补发分配。"""
+def reassign(projects, region_override="", force=False, dry_run=False, expected_by_id=None):
+    """主流程：按案号/oa_id 补发分配。"""
     _load_pipeline_env()
     from db_query import execute as db_execute
 
-    items = _collect_items(projects, region_override, force, db_execute)
+    items = _collect_items(projects, region_override, force, db_execute, expected_by_id)
     if not items:
         print("[补发] 无待处理案件，结束。", file=sys.stderr)
         return 0
@@ -225,19 +254,46 @@ def reassign(projects, region_override="", force=False, dry_run=False):
     # 3. 发分配链接
     _send_links(items, dry_run)
 
-    print(f"[补发] 完成：处理 {len(items)} 件（案号 {', '.join(projects)}）"
+    print(f"[补发] 完成：处理 {len(items)} 件"
           + ("（dry-run，未写库/未发信）" if dry_run else ""), file=sys.stderr)
     return len(items)
 
 
+def _load_from_json(path):
+    """读 {案号: oa_id} JSON → (oa_id 列表, {oa_id: 案号})。供 --from-json 批量补发。"""
+    with open(path, encoding="utf-8") as f:
+        mapping = json.load(f)
+    ids, expected = [], {}
+    for proj, oid in mapping.items():
+        oid = (oid or "").strip()
+        if not oid:
+            print(f"[补发] {proj}：JSON 中 id 为空，跳过", file=sys.stderr)
+            continue
+        ids.append(oid)
+        expected[oid] = proj
+    return ids, expected
+
+
 def main():
-    ap = argparse.ArgumentParser(description="按案号补发 OA 分配（进待分配 + 生成报告 + 发分配链接）")
-    ap.add_argument("projects", nargs="+", help="案号（可多个）")
+    ap = argparse.ArgumentParser(description="按案号或 oa_id 补发 OA 分配（进待分配 + 生成报告 + 发分配链接）")
+    ap.add_argument("projects", nargs="*",
+                    help="案号 或 oa_id（=Wiki 行 class=\"oaid-<UUID>\" 里的 UUID，精确定位那一次 OA）；可多个混用")
+    ap.add_argument("--from-json", default="",
+                    help="从 {案号: oa_id} 的 JSON 批量补发（按 id 精确定位，并校验案号一致）")
     ap.add_argument("--region", default="", help="覆盖地区判定 CN|US|EP（默认按 project_type 推）")
     ap.add_argument("--force", action="store_true", help="已在待分配/已分配也重新生成报告并再发链接")
     ap.add_argument("--dry-run", action="store_true", help="只打印，不写库不发信")
     args = ap.parse_args()
-    reassign(args.projects, region_override=args.region, force=args.force, dry_run=args.dry_run)
+
+    expected_by_id = None
+    projects = list(args.projects)
+    if args.from_json:
+        ids, expected_by_id = _load_from_json(args.from_json)
+        projects = ids + projects   # JSON 里的 id 在前，命令行额外传的附后
+    if not projects:
+        ap.error("需给出案号/oa_id，或用 --from-json 指定 JSON")
+    reassign(projects, region_override=args.region, force=args.force,
+             dry_run=args.dry_run, expected_by_id=expected_by_id)
 
 
 if __name__ == "__main__":
