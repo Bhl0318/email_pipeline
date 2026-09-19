@@ -200,9 +200,12 @@ def _send_links(items, dry_run):
             print("      正文:\n" + "\n".join("      " + ln for ln in nt["body"].splitlines()),
                   file=sys.stderr)
         return
-    from read_email import load_config
+    from read_email import load_config, set_config_path
     from email.mime.multipart import MIMEMultipart
     from email.mime.text import MIMEText
+    # 独立脚本不经 main.py 注入 config：显式指向共享的 scripts/email_config.json
+    # （read_email 默认找 scripts/oa/email_config.json，不存在）
+    set_config_path(os.path.join(SCRIPT_DIR, "..", "email_config.json"))
     pa_cfg = load_config().get("accounts", {}).get("pa")
     if not pa_cfg:
         print("  [分配链接] 未配置 PA 账号，无法发送", file=sys.stderr)
