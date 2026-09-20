@@ -388,8 +388,15 @@ def staff_list(q: str = "", role: str = ""):
 _SHARE_DEFAULT_TO = "yan.li@metis-ip.com"
 
 
-def _send_share_email(to_list, cc_list, subject, body):
-    """用 pa 账号发分享邮件（复用 read_email 的 SMTP + 共享 email_config）。返回 (ok, msg)。"""
+def _esc(s):
+    """HTML 转义（用于分享邮件 HTML 正文，& 先转）。"""
+    return (str(s or "").replace("&", "&amp;").replace("<", "&lt;")
+            .replace(">", "&gt;").replace('"', "&quot;"))
+
+
+def _send_share_email(to_list, cc_list, subject, body, html_body=None):
+    """用 pa 账号发分享邮件（复用 read_email 的 SMTP + 共享 email_config）。返回 (ok, msg)。
+    传 html_body 时发 multipart/alternative（纯文本 + HTML），链接以真正的 <a> 超链接显示。"""
     try:
         oa_dir = os.path.join(_DIR, "..", "oa")
         if oa_dir not in sys.path:
@@ -403,13 +410,16 @@ def _send_share_email(to_list, cc_list, subject, body):
         import base64
         from email.mime.text import MIMEText
         from email.mime.multipart import MIMEMultipart
-        msg = MIMEMultipart()
+        msg = MIMEMultipart("alternative") if html_body else MIMEMultipart()
         msg["From"] = pa["user"]
         msg["To"] = ", ".join(to_list)
         if cc_list:
             msg["Cc"] = ", ".join(cc_list)
         msg["Subject"] = subject
+        # alternative：纯文本在前、HTML 在后（客户端优先渲染 HTML，纯文本兜底）
         msg.attach(MIMEText(body, "plain", "utf-8"))
+        if html_body:
+            msg.attach(MIMEText(html_body, "html", "utf-8"))
         smtp = smtplib.SMTP(pa["smtp_host"], pa["smtp_port"])
         smtp.ehlo(); smtp.starttls(); smtp.ehlo()
         token = RE._get_smtp_oauth2_token(pa)
@@ -463,7 +473,10 @@ async def assignment_share(req: Request):
     subject = f"【OA分配情况】{case_no}"
     mail_body = (f"{case_no} 分配情况：\n{ppl}\n\n"
                  f"点击查看案件分析报告及分配人员（只读）：\n{link}\n")
-    ok, msg = _send_share_email(to_list, cc_list, subject, mail_body)
+    html_body = (f"<p>{_esc(case_no)} 分配情况：<br>{_esc(ppl)}</p>"
+                 f"<p>点击查看案件分析报告及分配人员（只读）：<br>"
+                 f'<a href="{_esc(link)}">{_esc(link)}</a></p>')
+    ok, msg = _send_share_email(to_list, cc_list, subject, mail_body, html_body)
     _log(f"POST /api/assignment/share caseId={cid} → 写库+发邮件 to={to_list} cc={cc_list} ok={ok}")
     return {"ok": ok, "caseId": cid, "writeback": wb, "link": link, "mail": msg}
 
@@ -490,7 +503,7 @@ async def assignment_share_batch(req: Request):
     to_list = [e.strip() for e in (body.get("to") or []) if e and e.strip()] or [_SHARE_DEFAULT_TO]
     cc_list = [e.strip() for e in (body.get("cc") or []) if e and e.strip()]
     base = _share_base()
-    results, sections = [], []
+    results, sections, html_sections = [], [], []
     for it in items:
         cid = it.get("caseId")
         case_no = it.get("caseNo", "") or ""
@@ -511,13 +524,17 @@ async def assignment_share_batch(req: Request):
         link = f"{base}/oa-assign/share?oaid={cid}"
         ppl = f"负责人：{responder}；QC：{qc}" + (f"；AQC：{aqc}" if aqc else "")
         sections.append(f"{case_no} 分配情况：{ppl}\n  查看（只读）：{link}")
+        html_sections.append(f"<li>{_esc(case_no)} 分配情况：{_esc(ppl)}<br>"
+                             f'查看（只读）：<a href="{_esc(link)}">{_esc(link)}</a></li>')
         results.append({"caseId": cid, "ok": True})
     ok_n = sum(1 for r in results if r["ok"])
     mail = "（无成功案件，未发邮件）"
     if sections:
         subject = f"【OA分配情况】共 {len(sections)} 件"
         mail_body = "以下案件的 OA 分配情况及只读查看链接：\n\n" + "\n\n".join(sections) + "\n"
-        sok, mail = _send_share_email(to_list, cc_list, subject, mail_body)
+        html_body = ("<p>以下案件的 OA 分配情况及只读查看链接：</p><ol>"
+                     + "".join(html_sections) + "</ol>")
+        sok, mail = _send_share_email(to_list, cc_list, subject, mail_body, html_body)
         if not sok:
             _log(f"POST /api/assignment/share/batch 邮件失败：{mail}")
             return {"ok": False, "results": results, "mail": mail, "msg": f"发送失败：{mail}"}
