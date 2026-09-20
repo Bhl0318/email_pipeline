@@ -468,6 +468,63 @@ async def assignment_share(req: Request):
     return {"ok": ok, "caseId": cid, "writeback": wb, "link": link, "mail": msg}
 
 
+def _share_base():
+    """只读分享链接 base：环境变量 OA_ASSIGN_BASE_URL 优先，其次 pipeline_config.oa_assign_base_url。"""
+    base = os.environ.get("OA_ASSIGN_BASE_URL", "").strip().rstrip("/")
+    if not base:
+        try:
+            with open(os.path.join(_DIR, "..", "pipeline_config.json"), encoding="utf-8") as f:
+                base = (json.load(f).get("oa_assign_base_url") or "").strip().rstrip("/")
+        except Exception:
+            base = ""
+    return base
+
+
+@router.post("/api/assignment/share/batch")
+async def assignment_share_batch(req: Request):
+    """批量分享：把每件当前所选人员写库（=提交分配），各案只读链接汇总到「一封」邮件发到指定邮箱。
+    body: { items:[{caseId,caseNo,responder,qc,aqc,postscript,customNote}], to:[], cc:[] }。
+    邮件失败则整体标失败（但写库已完成，不回滚）。"""
+    body = await req.json()
+    items = body.get("items") or []
+    to_list = [e.strip() for e in (body.get("to") or []) if e and e.strip()] or [_SHARE_DEFAULT_TO]
+    cc_list = [e.strip() for e in (body.get("cc") or []) if e and e.strip()]
+    base = _share_base()
+    results, sections = [], []
+    for it in items:
+        cid = it.get("caseId")
+        case_no = it.get("caseNo", "") or ""
+        responder, qc, aqc = it.get("responder"), it.get("qc"), it.get("aqc", "")
+        if not cid:
+            results.append({"caseId": cid, "ok": False, "msg": "缺 caseId"}); continue
+        if not (responder and qc):
+            results.append({"caseId": cid, "ok": False, "msg": "未选分配人员"}); continue
+        bad = _invalid_names(responder, qc, aqc)
+        if bad:
+            results.append({"caseId": cid, "ok": False, "msg": f"人员不在 users 库：{'、'.join(bad)}"}); continue
+        try:
+            _write_back(cid, responder, qc, it.get("postscript", ""), it.get("customNote", ""), aqc)
+            _mark(cid, responder, _combine_qc(qc, aqc))
+            _save_submission(it)
+        except Exception as e:
+            results.append({"caseId": cid, "ok": False, "msg": f"写库失败：{e}"}); continue
+        link = f"{base}/oa-assign/share?oaid={cid}"
+        ppl = f"负责人：{responder}；QC：{qc}" + (f"；AQC：{aqc}" if aqc else "")
+        sections.append(f"{case_no} 分配情况：{ppl}\n  查看（只读）：{link}")
+        results.append({"caseId": cid, "ok": True})
+    ok_n = sum(1 for r in results if r["ok"])
+    mail = "（无成功案件，未发邮件）"
+    if sections:
+        subject = f"【OA分配情况】共 {len(sections)} 件"
+        mail_body = "以下案件的 OA 分配情况及只读查看链接：\n\n" + "\n\n".join(sections) + "\n"
+        sok, mail = _send_share_email(to_list, cc_list, subject, mail_body)
+        if not sok:
+            _log(f"POST /api/assignment/share/batch 邮件失败：{mail}")
+            return {"ok": False, "results": results, "mail": mail, "msg": f"发送失败：{mail}"}
+    _log(f"POST /api/assignment/share/batch 共{len(items)} 成功{ok_n} to={to_list} cc={cc_list}")
+    return {"ok": ok_n > 0, "results": results, "mail": mail}
+
+
 @router.get("/api/assignment/shared/{oaid}")
 def assignment_shared(oaid: str):
     """分享页只读数据：中栏报告(reportMd) + 已选人员(submit_json)。"""

@@ -199,6 +199,10 @@
         <el-button type="primary" style="width:100%" :disabled="assignedCount === 0 || batchSubmitting" @click="batchSubmit">
           提交全部已分配（{{ assignedCount }} 件）
         </el-button>
+        <!-- 批量分享：功能同「分享」，把全部已分配的分享链接汇总到一封邮件。API: POST /api/assignment/share/batch -->
+        <el-button type="success" style="width:100%;margin:8px 0 0" :disabled="assignedCount === 0 || sharing" @click="shareAll" data-guide="share-all-btn">
+          分享全部已分配（{{ assignedCount }} 件）
+        </el-button>
       </div>
       <div class="case-list__search" data-guide="case-search">
         <el-input v-model="searchText" placeholder="搜索案号或发明名称" size="small" clearable>
@@ -414,8 +418,11 @@
   </div>
 
   <!-- 分享对话框：收件人默认 yan.li@metis-ip.com 可改，抄送默认空 -->
-  <el-dialog v-model="shareDialogVisible" title="分享分配情况" width="460px">
-    <div style="font-size:13px;color:#606266;margin-bottom:10px">
+  <el-dialog v-model="shareDialogVisible" :title="shareBatchMode ? '批量分享分配情况' : '分享分配情况'" width="460px">
+    <div v-if="shareBatchMode" style="font-size:13px;color:#606266;margin-bottom:10px">
+      将 <strong>{{ assignedCount }}</strong> 件已分配案件的当前所选人员写入分配，并把各案只读分享链接汇总到一封邮件发到下列邮箱。
+    </div>
+    <div v-else style="font-size:13px;color:#606266;margin-bottom:10px">
       案号 <strong>{{ selectedCase?.caseNo }}</strong>：将当前所选人员写入分配，并把只读分享链接发到下列邮箱。
     </div>
     <div style="margin-bottom:10px">
@@ -498,6 +505,7 @@ const app = createApp({
 
     // ── 分享对话框（写库+发邮件）──
     const shareDialogVisible = ref(false)
+    const shareBatchMode = ref(false)              // true=批量分享全部已分配；false=单个
     const shareTo = ref('yan.li@metis-ip.com')   // 收件人默认，可改
     const shareCc = ref('')                        // 抄送默认空
     const sharing = ref(false)
@@ -780,14 +788,27 @@ const app = createApp({
                responder, qc, aqc, postscript: sel.postscript || '', customNote }
     }
 
+    // 某案是否已选好可分配的人员（有方案、非「无需处理」、自定义则负责人+QC 齐全）
+    function _isAssigned(caseId) {
+      const sel = caseSelections.value[caseId]
+      if (!sel?.schemeId || sel.schemeId === 'skip') return false
+      return sel.schemeId === 'custom' ? !!(sel.customResponder && sel.customQc) : true
+    }
+
     // 分享：先校验是否选了人，未选则提示；选了则弹框填收件人后写库+发邮件
     function shareCase() {
       const c = selectedCase.value
       if (!c) { ElementPlus.ElMessage.warning('请先从左侧选择案件'); return }
-      const sel = currentSelection.value
-      const chosen = sel?.schemeId && sel.schemeId !== 'skip'
-        && (sel.schemeId === 'custom' ? !!(sel.customResponder && sel.customQc) : true)
-      if (!chosen) { ElementPlus.ElMessage.warning('请先选择分配人员'); return }
+      if (!_isAssigned(selectedCaseId.value)) { ElementPlus.ElMessage.warning('请先选择分配人员'); return }
+      shareBatchMode.value = false
+      shareDialogVisible.value = true
+    }
+
+    // 批量分享：全部已分配（当前已选、未提交也可）→ 弹同一个框填收件人 → 汇总一封邮件
+    function shareAll() {
+      const chosen = filteredCases.value.filter(c => _isAssigned(c.id))
+      if (!chosen.length) { ElementPlus.ElMessage.warning('请先选择分配人员'); return }
+      shareBatchMode.value = true
       shareDialogVisible.value = true
     }
 
@@ -795,22 +816,40 @@ const app = createApp({
       return (s || '').split(/[,;，；\s]+/).map(x => x.trim()).filter(Boolean)
     }
 
-    // API: POST /api/assignment/share body: { ...assignment, to:[], cc:[] }
+    // API: 单个 POST /api/assignment/share；批量 POST /api/assignment/share/batch
     async function doShare() {
-      const c = selectedCase.value
-      if (!c || sharing.value) return
+      if (sharing.value) return
       const to = _splitEmails(shareTo.value)
       if (!to.length) { ElementPlus.ElMessage.warning('请填写收件人邮箱'); return }
+      const cc = _splitEmails(shareCc.value)
       sharing.value = true
       try {
-        const payload = { ..._assignmentOf(c), to, cc: _splitEmails(shareCc.value) }
-        const r = await apiPost('/api/assignment/share', payload)
-        if (r.ok) {
-          ElementPlus.ElMessage.success('已写入分配并发送分享邮件')
-          shareDialogVisible.value = false
-          c.submitted = true   // 已写库 → 标记，和提交一致
+        if (shareBatchMode.value) {
+          const chosen = filteredCases.value.filter(c => _isAssigned(c.id))
+          if (!chosen.length) { ElementPlus.ElMessage.warning('请先选择分配人员'); return }
+          const items = chosen.map(c => _assignmentOf(c))
+          const r = await apiPost('/api/assignment/share/batch', { items, to, cc })
+          const ok = (r.results || []).filter(x => x.ok).length
+          const fail = (r.results || []).length - ok
+          if (r.ok !== false && ok) {
+            ElementPlus.ElMessage.success(`已分享 ${ok} 件${fail ? `，${fail} 件失败` : ''}（汇总一封邮件）`)
+            shareDialogVisible.value = false
+            chosen.forEach(c => { if ((r.results || []).find(x => x.caseId === c.id && x.ok)) c.submitted = true })
+          } else {
+            ElementPlus.ElMessage.error('批量分享失败：' + (r.msg || r.mail || '未知错误'))
+          }
         } else {
-          ElementPlus.ElMessage.error('分享失败：' + (r.msg || r.mail || '未知错误'))
+          const c = selectedCase.value
+          if (!c) return
+          const payload = { ..._assignmentOf(c), to, cc }
+          const r = await apiPost('/api/assignment/share', payload)
+          if (r.ok) {
+            ElementPlus.ElMessage.success('已写入分配并发送分享邮件')
+            shareDialogVisible.value = false
+            c.submitted = true   // 已写库 → 标记，和提交一致
+          } else {
+            ElementPlus.ElMessage.error('分享失败：' + (r.msg || r.mail || '未知错误'))
+          }
         }
       } catch (e) {
         ElementPlus.ElMessage.error('分享失败：' + (e.message || e))
@@ -923,7 +962,7 @@ const app = createApp({
       selectCase, selectScheme, setCustomResponder, setCustomQc, setCustomAqc, AQC_OPTIONS, setPostscript, setCustomNote, queryStaff,
       staffOptions, staffLoading, remoteStaff,
       toggleCard, canSubmit, batchSubmit, reanalyze,
-      shareCase, doShare, shareDialogVisible, shareTo, shareCc, sharing,
+      shareCase, shareAll, doShare, shareDialogVisible, shareBatchMode, shareTo, shareCc, sharing,
       shareView, shareData, shareLoading, shareRenderedMd,
     }
   }
