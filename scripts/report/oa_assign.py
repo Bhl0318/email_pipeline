@@ -503,7 +503,7 @@ async def assignment_share_batch(req: Request):
     to_list = [e.strip() for e in (body.get("to") or []) if e and e.strip()] or [_SHARE_DEFAULT_TO]
     cc_list = [e.strip() for e in (body.get("cc") or []) if e and e.strip()]
     base = _share_base()
-    results, sections, html_sections = [], [], []
+    results, sections, html_sections, ok_oaids = [], [], [], []
     for it in items:
         cid = it.get("caseId")
         case_no = it.get("caseNo", "") or ""
@@ -521,25 +521,40 @@ async def assignment_share_batch(req: Request):
             _save_submission(it)
         except Exception as e:
             results.append({"caseId": cid, "ok": False, "msg": f"写库失败：{e}"}); continue
-        link = f"{base}/oa-assign/share?oaid={cid}"
+        ok_oaids.append(cid)
         ppl = f"负责人：{responder}；QC：{qc}" + (f"；AQC：{aqc}" if aqc else "")
-        sections.append(f"{case_no} 分配情况：{ppl}\n  查看（只读）：{link}")
-        html_sections.append(f"<li>{_esc(case_no)} 分配情况：{_esc(ppl)}<br>"
-                             f'查看（只读）：<a href="{_esc(link)}">{_esc(link)}</a></li>')
+        sections.append(f"{case_no}：{ppl}")
+        html_sections.append(f"<li>{_esc(case_no)}：{_esc(ppl)}</li>")
         results.append({"caseId": cid, "ok": True})
-    ok_n = sum(1 for r in results if r["ok"])
+    ok_n = len(ok_oaids)
     mail = "（无成功案件，未发邮件）"
-    if sections:
-        subject = f"【OA分配情况】共 {len(sections)} 件"
-        mail_body = "以下案件的 OA 分配情况及只读查看链接：\n\n" + "\n\n".join(sections) + "\n"
-        html_body = ("<p>以下案件的 OA 分配情况及只读查看链接：</p><ol>"
-                     + "".join(html_sections) + "</ol>")
+    link = ""
+    if ok_oaids:
+        # 一批次一链接：存批次(batch_id→oaid列表+分享时间)，邮件只放这一条链接
+        import uuid
+        batch_id = uuid.uuid4().hex[:12]
+        shared_at = f"{datetime.now():%Y-%m-%d %H:%M}"
+        st = _store()
+        if st is not None:
+            try:
+                st.save_share_batch(batch_id, ok_oaids, shared_at)
+            except Exception as e:
+                _log("保存分享批次失败：", e)
+        link = f"{base}/oa-assign/share?batch={batch_id}"
+        subject = f"【OA分配情况】{shared_at} 共 {ok_n} 件"
+        mail_body = (f"本批次（{shared_at}）共 {ok_n} 件案件的 OA 分配情况：\n\n"
+                     + "\n".join(sections)
+                     + f"\n\n点击查看全部案件分析报告及分配人员（只读，可在左栏切换案件）：\n{link}\n")
+        html_body = (f"<p>本批次（{_esc(shared_at)}）共 {ok_n} 件案件的 OA 分配情况：</p>"
+                     f"<ul>{''.join(html_sections)}</ul>"
+                     f"<p>点击查看全部案件分析报告及分配人员（只读，可在左栏切换案件）：<br>"
+                     f'<a href="{_esc(link)}">{_esc(link)}</a></p>')
         sok, mail = _send_share_email(to_list, cc_list, subject, mail_body, html_body)
         if not sok:
             _log(f"POST /api/assignment/share/batch 邮件失败：{mail}")
-            return {"ok": False, "results": results, "mail": mail, "msg": f"发送失败：{mail}"}
-    _log(f"POST /api/assignment/share/batch 共{len(items)} 成功{ok_n} to={to_list} cc={cc_list}")
-    return {"ok": ok_n > 0, "results": results, "mail": mail}
+            return {"ok": False, "results": results, "mail": mail, "link": link, "msg": f"发送失败：{mail}"}
+    _log(f"POST /api/assignment/share/batch 共{len(items)} 成功{ok_n} to={to_list} cc={cc_list} link={link}")
+    return {"ok": ok_n > 0, "results": results, "mail": mail, "link": link}
 
 
 @router.get("/api/assignment/shared/{oaid}")
@@ -563,6 +578,35 @@ def assignment_shared(oaid: str):
         _log("分享页读 projects 失败：", e)
     return {"oaid": oaid, "caseNo": case_no, "oaSeq": oa_seq,
             "reportMd": data.get("report_md", "") or "", "submit": data.get("submit") or {}}
+
+
+@router.get("/api/assignment/shared-batch/{batch_id}")
+def assignment_shared_batch(batch_id: str):
+    """批量分享只读页：返回该批次的分享时间 + 案件清单（左栏用；每案报告/人员点开时再按 oaid 拉）。"""
+    st = _store()
+    batch = None
+    if st is not None:
+        try:
+            batch = st.get_share_batch(batch_id)
+        except Exception as e:
+            _log("分享批次读取失败：", e)
+    if not batch:
+        return {"batchId": batch_id, "sharedAt": "", "cases": []}
+    oaids = batch.get("oaids") or []
+    cases = []
+    try:
+        from db_query import execute as dbx
+        for oid in oaids:
+            case_no, oa_seq = "", ""
+            rows = dbx(f"SELECT project, project_name FROM projects WHERE id='{oid}'")
+            if isinstance(rows, list) and rows:
+                case_no = rows[0].get("project", "") or ""
+                oa_seq = _oa_seq_of(rows[0].get("project_name", "") or "")
+            cases.append({"oaid": oid, "caseNo": case_no, "oaSeq": oa_seq})
+    except Exception as e:
+        _log("分享批次读 projects 失败：", e)
+        cases = [{"oaid": oid, "caseNo": "", "oaSeq": ""} for oid in oaids]
+    return {"batchId": batch_id, "sharedAt": batch.get("shared_at", "") or "", "cases": cases}
 
 
 @router.post("/api/assignment/submit")

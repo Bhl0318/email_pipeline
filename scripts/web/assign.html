@@ -167,23 +167,46 @@
   </div>
   <!-- /Component: PasHeader -->
 
-  <!-- 只读分享视图：只显示中栏报告 + 已选人员（shareView 模式，隐藏左右栏） -->
-  <div v-if="shareView" style="flex:1;overflow-y:auto;background:#f5f7fa;padding:16px 0">
-    <div style="max-width:860px;margin:0 auto;background:#fff;border:1px solid #ebeef5;border-radius:6px;padding:20px 26px">
-      <div style="font-size:16px;font-weight:700;color:#262626;margin-bottom:4px">
-        {{ shareData.caseNo || '案件' }}{{ shareData.oaSeq ? '（第' + shareData.oaSeq + '次OA）' : '' }} — 分配情况
+  <!-- 只读分享视图（shareView）：单案=仅中栏；批量(batch)=左栏案件列表可切换 + 中栏，标批次时间 -->
+  <div v-if="shareView" style="flex:1;display:flex;overflow:hidden">
+    <!-- 批量：左栏案件列表 -->
+    <div v-if="shareBatch" class="case-list" style="width:260px;flex-shrink:0;border-right:1px solid #ebeef5">
+      <div style="padding:10px 12px;background:#eef4ff;border-bottom:1px solid #dbe6ff;font-size:12px;color:#2b5aa0;line-height:1.7">
+        📦 分享批次：{{ batchSharedAt || '—' }}<br>共 {{ batchCases.length }} 件（点击切换查看）
       </div>
-      <div style="background:#f0f9eb;border:1px solid #e1f3d8;border-radius:5px;padding:10px 14px;margin:12px 0;font-size:13px;color:#303133;line-height:1.9">
-        <div><strong>答复负责人：</strong>{{ shareData.submit?.responder || '—' }}</div>
-        <div><strong>答复 QC：</strong>{{ shareData.submit?.qc || '—' }}</div>
-        <div v-if="shareData.submit?.aqc"><strong>AQC：</strong>{{ shareData.submit.aqc }}</div>
-        <div v-if="shareData.submit?.postscript"><strong>分配附言：</strong>{{ shareData.submit.postscript }}</div>
-        <div v-if="shareData.submit?.reason"><strong>分配原因：</strong>{{ shareData.submit.reason }}</div>
-        <div v-if="shareData.submit?.submitted_at" style="color:#8c8c8c;font-size:12px;margin-top:2px">分配时间：{{ shareData.submit.submitted_at }}</div>
+      <div style="flex:1;overflow-y:auto">
+        <div v-for="bc in batchCases" :key="bc.oaid"
+          :class="['case-item', shareOaid === bc.oaid && 'case-item--active']"
+          @click="openShareCase(bc.oaid)">
+          <div class="case-item__body">
+            <div class="case-item__no">
+              {{ bc.caseNo || bc.oaid }}
+              <span v-if="bc.oaSeq" style="font-size:11px;color:#2563eb;background:#eff6ff;border:1px solid #dbeafe;border-radius:4px;padding:0 5px;margin-left:4px;">OA{{ bc.oaSeq }}</span>
+            </div>
+          </div>
+        </div>
       </div>
-      <div v-if="shareLoading" style="color:#8c8c8c;font-size:13px;padding:20px 0;text-align:center">加载中…</div>
-      <div v-else-if="shareData.reportMd" class="md-body" v-html="shareRenderedMd"></div>
-      <div v-else style="color:#c0c4cc;font-size:13px;padding:20px 0;text-align:center">暂无案件报告</div>
+    </div>
+    <!-- 中栏：报告 + 已选人员 -->
+    <div style="flex:1;overflow-y:auto;background:#f5f7fa;padding:16px 0">
+      <div style="max-width:860px;margin:0 auto;background:#fff;border:1px solid #ebeef5;border-radius:6px;padding:20px 26px">
+        <div style="font-size:16px;font-weight:700;color:#262626;margin-bottom:4px">
+          {{ shareData.caseNo || '案件' }}{{ shareData.oaSeq ? '（第' + shareData.oaSeq + '次OA）' : '' }} — 分配情况
+        </div>
+        <div style="background:#f0f9eb;border:1px solid #e1f3d8;border-radius:5px;padding:10px 14px;margin:12px 0;font-size:13px;color:#303133;line-height:1.9">
+          <div><strong>答复负责人：</strong>{{ shareData.submit?.responder || '—' }}</div>
+          <div><strong>答复 QC：</strong>{{ shareData.submit?.qc || '—' }}</div>
+          <div v-if="shareData.submit?.aqc"><strong>AQC：</strong>{{ shareData.submit.aqc }}</div>
+          <div v-if="shareData.submit?.postscript"><strong>分配附言：</strong>{{ shareData.submit.postscript }}</div>
+          <div v-if="shareData.submit?.reason"><strong>分配原因：</strong>{{ shareData.submit.reason }}</div>
+          <div v-if="shareData.submit?.submitted_at" style="color:#8c8c8c;font-size:12px;margin-top:2px">分配时间：{{ shareData.submit.submitted_at }}</div>
+        </div>
+        <div v-if="shareLoading" style="color:#8c8c8c;font-size:13px;padding:20px 0;text-align:center">加载中…</div>
+        <div v-else-if="shareData.reportMd" class="md-body" v-html="shareRenderedMd"></div>
+        <div v-else style="color:#c0c4cc;font-size:13px;padding:20px 0;text-align:center">
+          {{ shareBatch ? '选择左侧案件查看' : '暂无案件报告' }}
+        </div>
+      </div>
     </div>
   </div>
 
@@ -485,22 +508,47 @@ const app = createApp({
     const openId = ref(_urlParams.get('openId') || '')        // 直达案件(oaid)；有则过滤到本人，无则汇总
     const filterByAssignee = computed(() => !!(openId.value && assignee.value))
 
-    // ── 只读分享视图（shareView=1&oaid=xxx）：只显示中栏报告 + 已选人员 ──
+    // ── 只读分享视图 ──
+    //   单案：?shareView=1&oaid=xxx（仅中栏）
+    //   批量：?shareView=1&batch=xxx（左栏案件列表可切换 + 中栏，标批次时间）
     const shareView = ref(_urlParams.get('shareView') === '1')
+    const shareBatchId = ref(_urlParams.get('batch') || '')
+    const shareBatch = computed(() => !!shareBatchId.value)
     const shareOaid = ref(_urlParams.get('oaid') || '')
+    const batchCases = ref([])        // [{oaid, caseNo, oaSeq}]
+    const batchSharedAt = ref('')     // 批次分享时间（页面头部标记）
     const shareData = ref({ caseNo: '', oaSeq: '', reportMd: '', submit: {} })
     const shareLoading = ref(false)
     const shareRenderedMd = computed(() => shareData.value.reportMd ? marked.parse(shareData.value.reportMd) : '')
-    async function loadShared() {
-      if (!shareOaid.value) return
+
+    // 打开某案的只读内容（中栏）：报告 + 已选人员
+    async function openShareCase(oaid) {
+      if (!oaid) return
+      shareOaid.value = oaid
       shareLoading.value = true
       try {
-        shareData.value = await apiGet('/api/assignment/shared/' + encodeURIComponent(shareOaid.value))
+        shareData.value = await apiGet('/api/assignment/shared/' + encodeURIComponent(oaid))
       } catch (e) {
         ElementPlus.ElMessage.error('加载分享内容失败：' + (e.message || e))
       } finally {
         shareLoading.value = false
       }
+    }
+
+    async function loadShared() {
+      if (shareBatch.value) {
+        // 批量：先拉批次案件清单填左栏，再自动打开第一件
+        try {
+          const b = await apiGet('/api/assignment/shared-batch/' + encodeURIComponent(shareBatchId.value))
+          batchSharedAt.value = b.sharedAt || ''
+          batchCases.value = b.cases || []
+          if (batchCases.value.length) openShareCase(batchCases.value[0].oaid)
+        } catch (e) {
+          ElementPlus.ElMessage.error('加载分享批次失败：' + (e.message || e))
+        }
+        return
+      }
+      if (shareOaid.value) openShareCase(shareOaid.value)
     }
 
     // ── 分享对话框（写库+发邮件）──
@@ -963,7 +1011,8 @@ const app = createApp({
       staffOptions, staffLoading, remoteStaff,
       toggleCard, canSubmit, batchSubmit, reanalyze,
       shareCase, shareAll, doShare, shareDialogVisible, shareBatchMode, shareTo, shareCc, sharing,
-      shareView, shareData, shareLoading, shareRenderedMd,
+      shareView, shareBatch, shareOaid, batchCases, batchSharedAt, openShareCase,
+      shareData, shareLoading, shareRenderedMd,
     }
   }
 })

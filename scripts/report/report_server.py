@@ -153,8 +153,11 @@ def oa_assign_page(assignee: str = "", oaid: str = ""):
 
 
 @app.get("/oa-assign/share")
-def oa_assign_share_page(oaid: str = ""):
-    """只读分享页：只显示中栏报告 + 已选人员（前端 assign.html 的 shareView 模式）。"""
+def oa_assign_share_page(oaid: str = "", batch: str = ""):
+    """只读分享页（assign.html 的 shareView 模式）：
+    单案 ?oaid=..（中栏报告+已选人员）；批量 ?batch=..（左栏案件列表可切换 + 中栏，标批次时间）。"""
+    if batch:
+        return RedirectResponse(f"/static/assign.html?shareView=1&batch={quote(batch)}")
     return RedirectResponse(f"/static/assign.html?shareView=1&oaid={quote(oaid)}")
 
 

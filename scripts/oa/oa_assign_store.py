@@ -14,6 +14,7 @@ execute 可注入(测试用)，默认 db_query.execute（atw）。
 """
 TABLE = "oa_assign_task"
 REPORT_TABLE = "oa_assign_report"
+SHARE_BATCH_TABLE = "oa_assign_share_batch"   # 批量分享：一批次一行（batch_id → oaid 列表 + 分享时间）
 
 
 def _q(v):
@@ -176,6 +177,47 @@ def save_submission(oa_id, submit, execute=None):
     else:
         ex(f"INSERT INTO {REPORT_TABLE} (id, submit_json) VALUES ('{_q(oa_id)}', '{_q(submit_json)}')")
     return True
+
+
+def _ensure_share_batch_table(ex):
+    """建批量分享表（幂等）。best-effort：建不了不报错，交由后续写入自然失败。"""
+    try:
+        ex(f"CREATE TABLE IF NOT EXISTS {SHARE_BATCH_TABLE} ("
+           f"batch_id VARCHAR(32) PRIMARY KEY, oaids_json TEXT, shared_at VARCHAR(32))")
+    except Exception:
+        pass
+
+
+def save_share_batch(batch_id, oaids, shared_at="", execute=None):
+    """存一个分享批次：batch_id → oaid 列表 + 分享时间。返回是否写入。"""
+    ex = _get_execute(execute)
+    if not batch_id or not oaids:
+        return False
+    import json
+    _ensure_share_batch_table(ex)
+    oaids_json = json.dumps(list(oaids), ensure_ascii=False)
+    ex(f"INSERT INTO {SHARE_BATCH_TABLE} (batch_id, oaids_json, shared_at) "
+       f"VALUES ('{_q(batch_id)}', '{_q(oaids_json)}', '{_q(shared_at)}')")
+    return True
+
+
+def get_share_batch(batch_id, execute=None):
+    """按 batch_id 取分享批次。返回 {'oaids': [...], 'shared_at': '...'}；无记录返回 None。"""
+    ex = _get_execute(execute)
+    if not batch_id:
+        return None
+    rows = ex(f"SELECT oaids_json, shared_at FROM {SHARE_BATCH_TABLE} WHERE batch_id='{_q(batch_id)}'")
+    if not rows:
+        return None
+    import json
+    r = rows[0]
+    oaids = []
+    if r.get("oaids_json"):
+        try:
+            oaids = json.loads(r["oaids_json"])
+        except Exception:
+            oaids = []
+    return {"oaids": oaids, "shared_at": r.get("shared_at") or ""}
 
 
 def get_report(oa_id, execute=None):
