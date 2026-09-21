@@ -131,12 +131,29 @@ def analyze_novelty_inventiveness(oa_text):
     }
 
 
+def _read_text(path):
+    """按扩展名取审意全文（与主流程一致）：.pdf/.docx 用 word_to_wiki._content_pieces
+    （PDF 文本层 → 扫描件走 mistral-ocr/qwen-vl OCR），其余按纯文本读。"""
+    ext = os.path.splitext(path)[1].lower()
+    if ext in (".pdf", ".docx"):
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        from word_to_wiki import _content_pieces
+        paras, _tb = _content_pieces(path)
+        return "\n".join(paras)
+    with open(path, encoding="utf-8") as f:
+        return f.read()
+
+
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("用法: python3 analyze_oa_issue.py <审意文本文件>")
+        print("用法: python3 analyze_oa_issue.py <审意PDF/Word/文本文件>")
         sys.exit(1)
-    with open(sys.argv[1], encoding="utf-8") as f:
-        _txt = f.read()
+    _path = sys.argv[1]
+    _txt = _read_text(_path)
+    print(f"[提取] {os.path.basename(_path)} 取到审意正文 {len(_txt)} 字", file=sys.stderr)
+    if not _txt.strip():
+        print("[提取] 审意正文为空（PDF 可能是扫描件且 OCR 失败/未配 mistral key），无法判断", file=sys.stderr)
+        sys.exit(2)
     r = analyze_novelty_inventiveness(_txt)
     print(json.dumps({k: r[k] for k in ("novelty", "inventiveness", "note")},
                      ensure_ascii=False, indent=2))
