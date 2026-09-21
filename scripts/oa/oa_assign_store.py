@@ -119,6 +119,7 @@ def write_perf_roles(oa_id, responder="", qc="", execute=None):
       答复负责人 → wkrole='答复负责人', role='PM'
       答复 QC    → wkrole='答复QC',    role='QC'
       name=人名, perf=0, uid=users.userid(按 username_zn 查)
+    qc 可能是「QC,AQC」逗号拼接（QC 同时选了 AQC）→ **每人各一行**，wkrole 均为「答复QC」。
     幂等/支持重分配：先删该 pid 的答复角色行再插。返回写入条数。best-effort，不抛。"""
     ex = _get_execute(execute)
     if not oa_id:
@@ -126,11 +127,18 @@ def write_perf_roles(oa_id, responder="", qc="", execute=None):
     try:
         ex(f"DELETE FROM {PERF_ROLE_TABLE} WHERE pid='{_q(oa_id)}' "
            f"AND wkrole IN ('答复负责人','答复QC')")
+        # 答复负责人 1 行；QC/AQC 逗号拆开，每人 1 行（wkrole 都为 答复QC）
+        rows = []
+        if (responder or "").strip():
+            rows.append((responder.strip(), "答复负责人", "PM"))
+        seen = set()
+        for name in (qc or "").split(","):
+            name = name.strip()
+            if name and name not in seen:
+                seen.add(name)
+                rows.append((name, "答复QC", "QC"))
         n = 0
-        for name, wkrole, role in ((responder, "答复负责人", "PM"), (qc, "答复QC", "QC")):
-            name = (name or "").strip()
-            if not name:
-                continue
+        for name, wkrole, role in rows:
             uid = _user_id(name, ex)
             ex(f"INSERT INTO {PERF_ROLE_TABLE} (pid, name, wkrole, role, perf, uid) "
                f"VALUES ('{_q(oa_id)}', '{_q(name)}', '{wkrole}', '{role}', 0, '{_q(uid)}')")
