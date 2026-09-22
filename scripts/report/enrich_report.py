@@ -146,12 +146,51 @@ def query_case_interface(project):
     return out
 
 
+def _split_to_cc(rows):
+    """report_recipient 行 → {to:[{name,email}], cc:[...]}：按 send_type 拆、邮箱去重、保持 seq 序。"""
+    out = {"to": [], "cc": []}
+    seen = {"to": set(), "cc": set()}
+    for r in rows:
+        st = "cc" if (r.get("send_type") or "to").strip().lower() == "cc" else "to"
+        e = (r.get("email") or "").strip()
+        k = e.lower()
+        if e and k not in seen[st]:
+            seen[st].add(k)
+            out[st].append({"name": (r.get("contact_name") or "").strip(), "email": e})
+    return out
+
+
 def query_case_recipients(project):
-    """SQL Server IPEasy: 案号 → 客户联系人（汇报信收件人，全取）。
-    链路：p_case_info.case_volume = 案号 → customer_id
-          → c_contact.obj_id = customer_id，排除已离职、排除空邮箱，按 seq 升序。
-    返回**按邮箱去重、保持 seq 顺序**的 [{"name":.., "email":..}]；
-    查不到/未配库/出错返回 []。"""
+    """atw report_recipient：案号 → 汇报信收件人/抄送。
+    族号（案号前10位）有配置则优先用族号那套；否则回退客户号（前5位）默认（family_code 空）。
+    返回 {"to":[{name,email}], "cc":[...]}（send_type 拆、按 seq 序、邮箱去重）；
+    report_recipient 查不到 → 回退 IPEasy c_contact 旧逻辑作兜底。"""
+    if not project:
+        return {"to": [], "cc": []}
+    family, customer = project[:10], project[:5]
+
+    def _fetch(where_sql, params):
+        try:
+            from db_query import execute_params
+            return execute_params(
+                "SELECT contact_name, email, send_type, seq FROM report_recipient "
+                "WHERE status = 1 AND " + where_sql + " ORDER BY send_type, seq", params)
+        except Exception as e:
+            print(f"[enrich] 查 report_recipient 失败 {project}: {e}", file=sys.stderr)
+            return None
+
+    rows = _fetch("family_code = %s", (family,))          # 族号级优先
+    if not rows:                                          # 空/出错 → 回退客户号级默认
+        rows = _fetch("customer_code = %s AND (family_code IS NULL OR family_code = '')", (customer,))
+    if rows:
+        return _split_to_cc(rows)
+    # report_recipient 无数据 → 回退 IPEasy（兜底）
+    return {"to": _query_case_recipients_ipeasy(project), "cc": []}
+
+
+def _query_case_recipients_ipeasy(project):
+    """（兜底）SQL Server IPEasy：案号 → 客户联系人 [{name,email}]（全取，在职、有邮箱）。
+    链路：p_case_info.case_volume = 案号 → customer_id → c_contact.obj_id = customer_id，按 seq。"""
     if not project:
         return []
     cfg = _load_db_config().get("mssql_ipeasy", {})

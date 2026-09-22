@@ -822,22 +822,22 @@ def preview_send(task_id: str, req: PreviewSendReq):
     except Exception as e:
         raise HTTPException(500, f"读 email_config.json 失败: {e}")
 
-    # 收件人：按案号从 IPEasy 查客户联系人（在职、有邮箱，全取），格式化为「姓名 <邮箱>」
-    recipients = []
+    # 收件人/抄送：按案号从 report_recipient 查（族号前10优先→客户号前5回退，IPEasy 兜底）
+    recipients, cc = [], []
     try:
         from enrich_report import query_case_recipients
-        recipients = [
-            (f'{c["name"]} <{c["email"]}>' if c.get("name") else c["email"])
-            for c in query_case_recipients(project)
-        ]
+        _fmt = lambda c: (f'{c["name"]} <{c["email"]}>' if c.get("name") else c["email"])
+        rc = query_case_recipients(project)   # {"to":[...], "cc":[...]}
+        recipients = [_fmt(c) for c in rc.get("to", [])]
+        cc = [_fmt(c) for c in rc.get("cc", [])]
     except Exception as e:
         print(f"[preview-send] 查收件人失败 {project}: {e}", file=sys.stderr)
 
     return {
         "senders": senders,               # [{key,label,from,configured}]
         "default_sender": default_sender, # 按 -H 预选
-        "recipients": recipients,         # 按案号自动带出，弹窗可改
-        "cc": [],                         # 抄送默认空，弹窗手填
+        "recipients": recipients,         # 按案号自动带出(收件人)，弹窗可改
+        "cc": cc,                          # 抄送(report_recipient 的 cc)，弹窗可改
         "subject": subject,
         "report_pdf_filename": (base + ".pdf") if req.attach_pdf else None,
         "source_attachments": [{"path": rel, "filename": rel.rsplit("/", 1)[-1]} for rel in source_attachments],
