@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>汇报信收件人维护</title>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;background:#f1f5f9;color:#0f172a;font-size:13px}
+  header{background:#1e293b;color:#fff;padding:10px 18px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:20}
+  header h1{font-size:15px;margin:0;font-weight:600}
+  header .spacer{flex:1}
+  #status{font-size:12px}
+  main{padding:14px 20px;max-width:1280px;margin:0 auto}
+  .bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+  .bar input{padding:6px 9px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px}
+  .bar input.code{width:110px}.bar input.fam{width:140px}.bar input.q{width:240px}
+  button{border:none;border-radius:6px;cursor:pointer;font-size:13px;padding:6px 13px}
+  .btn-p{background:#2563eb;color:#fff}.btn-p:hover{background:#1d4ed8}
+  .btn-g{background:#16a34a;color:#fff}.btn-g:hover{background:#15803d}
+  .btn-s{background:#e2e8f0;color:#334155}.btn-s:hover{background:#cbd5e1}
+  .btn-d{background:#fee2e2;color:#b91c1c}.btn-d:hover{background:#fecaca}
+  .hint{color:#64748b;font-size:12px;margin-bottom:10px}
+  table{border-collapse:collapse;width:100%;background:#fff;border-radius:8px;overflow:hidden}
+  th,td{border:1px solid #eef2f6;padding:5px 8px;text-align:left;vertical-align:middle}
+  th{background:#f8fafc;font-size:12px;color:#64748b;font-weight:600;white-space:nowrap}
+  td.nowrap{white-space:nowrap}
+  .to{color:#16a34a;font-weight:600}.cc{color:#b45309;font-weight:600}
+  .form{background:#fff;border:1px solid #cbd5e1;border-radius:8px;padding:12px 14px;margin-bottom:14px;display:none}
+  .form.show{display:block}
+  .form h3{margin:0 0 10px;font-size:14px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}
+  .grid label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:#475569}
+  .grid input,.grid select{padding:6px 8px;border:1px solid #cbd5e1;border-radius:5px;font-size:13px}
+  .req::after{content:" *";color:#dc2626}
+  .form .actions{margin-top:12px;display:flex;gap:8px}
+  .muted{color:#94a3b8}
+</style>
+</head>
+<body>
+<header>
+  <h1>汇报信收件人维护</h1>
+  <span class="muted" style="font-size:12px">report_recipient · 族号=案号前10位优先，无则客户号级默认</span>
+  <span class="spacer"></span>
+  <span id="status"></span>
+</header>
+<main>
+  <div class="bar">
+    <input class="code" id="f-code" placeholder="客户号(5位)">
+    <input class="fam"  id="f-fam"  placeholder="族号(可选)">
+    <input class="q"    id="f-q"    placeholder="关键词:客户名/联系人/邮箱/接口人" onkeydown="if(event.key==='Enter')query()">
+    <button class="btn-p" onclick="query()">查询</button>
+    <button class="btn-g" onclick="openForm()">+ 新增</button>
+    <span id="count" class="muted"></span>
+  </div>
+  <div class="hint">类型 <b class="to">to</b>=收件人 · <b class="cc">cc</b>=抄送。删除为软删除(status=0)。</div>
+
+  <div class="form" id="form">
+    <h3 id="form-title">新增收件人</h3>
+    <div class="grid">
+      <label><span class="req">客户号</span><input id="i-code" placeholder="如 20615"></label>
+      <label>族号(空=客户号级默认)<input id="i-fam" placeholder="如 20615-0001"></label>
+      <label>客户名称<input id="i-name"></label>
+      <label>接口人<input id="i-itf"></label>
+      <label>联系人姓名<input id="i-person"></label>
+      <label><span class="req">邮箱</span><input id="i-email"></label>
+      <label>手机<input id="i-phone"></label>
+      <label><span class="req">类型</span><select id="i-type"><option value="to">to 收件人</option><option value="cc">cc 抄送</option></select></label>
+      <label>排序seq<input id="i-seq" type="number" value="0"></label>
+      <label style="grid-column:1/-1">备注<input id="i-remark"></label>
+    </div>
+    <div class="actions">
+      <button class="btn-g" onclick="save()">保存</button>
+      <button class="btn-s" onclick="closeForm()">取消</button>
+    </div>
+  </div>
+
+  <table>
+    <thead><tr>
+      <th>客户号</th><th>族号</th><th>客户名称</th><th>接口人</th><th>联系人</th><th>邮箱</th><th>手机</th><th>类型</th><th>seq</th><th>备注</th><th>操作</th>
+    </tr></thead>
+    <tbody id="rows"><tr><td colspan="11" class="muted">输入条件后点「查询」</td></tr></tbody>
+  </table>
+</main>
+
+<script>
+let editing=null;   // 当前编辑行id;null=新增
+function $(id){return document.getElementById(id)}
+function esc(s){return String(s==null?'':s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}
+function setStatus(t,c){$('status').textContent=t;$('status').style.color=c||'#94a3b8'}
+
+async function query(){
+  setStatus('查询中…','#f59e0b');
+  const p=new URLSearchParams();
+  if($('f-code').value.trim())p.set('customer_code',$('f-code').value.trim());
+  if($('f-fam').value.trim())p.set('family_code',$('f-fam').value.trim());
+  if($('f-q').value.trim())p.set('q',$('f-q').value.trim());
+  try{
+    const r=await fetch('/api/recipients?'+p.toString());
+    if(!r.ok){setStatus('❌ '+(await r.text()).slice(0,200),'#dc2626');return}
+    const d=await r.json();render(d.rows||[]);setStatus('');
+    $('count').textContent=(d.rows||[]).length+' 行';
+  }catch(e){setStatus('❌ '+e.message,'#dc2626')}
+}
+function render(rows){
+  const tb=$('rows');tb.innerHTML='';
+  if(!rows.length){tb.innerHTML='<tr><td colspan="11" class="muted">无数据</td></tr>';return}
+  for(const x of rows){
+    const tr=document.createElement('tr');
+    tr.innerHTML=
+      '<td class="nowrap">'+esc(x.customer_code)+'</td>'+
+      '<td class="nowrap">'+esc(x.family_code||'')+'</td>'+
+      '<td>'+esc(x.customer_name||'')+'</td>'+
+      '<td>'+esc(x.interface||'')+'</td>'+
+      '<td>'+esc(x.contact_name||'')+'</td>'+
+      '<td>'+esc(x.email)+'</td>'+
+      '<td class="nowrap">'+esc(x.phone||'')+'</td>'+
+      '<td class="'+(x.send_type)+'">'+esc(x.send_type)+'</td>'+
+      '<td>'+esc(x.seq)+'</td>'+
+      '<td>'+esc(x.remark||'')+'</td>'+
+      '<td class="nowrap"></td>';
+    const ops=tr.lastChild;
+    const be=document.createElement('button');be.className='btn-s';be.textContent='编辑';be.onclick=()=>openForm(x);
+    const bd=document.createElement('button');bd.className='btn-d';bd.textContent='删除';bd.style.marginLeft='6px';bd.onclick=()=>del(x);
+    ops.append(be,bd);
+    tb.append(tr);
+  }
+}
+function openForm(x){
+  editing=x?x.id:null;
+  $('form-title').textContent=x?('编辑收件人 (id='+x.id+')'):'新增收件人';
+  $('i-code').value=x?x.customer_code:($('f-code').value.trim()||'');
+  $('i-fam').value=x?(x.family_code||''):($('f-fam').value.trim()||'');
+  $('i-name').value=x?(x.customer_name||''):'';
+  $('i-itf').value=x?(x.interface||''):'';
+  $('i-person').value=x?(x.contact_name||''):'';
+  $('i-email').value=x?x.email:'';
+  $('i-phone').value=x?(x.phone||''):'';
+  $('i-type').value=x?x.send_type:'to';
+  $('i-seq').value=x?(x.seq||0):0;
+  $('i-remark').value=x?(x.remark||''):'';
+  $('form').classList.add('show');window.scrollTo(0,0);
+}
+function closeForm(){$('form').classList.remove('show');editing=null}
+async function save(){
+  const body={id:editing||0,customer_code:$('i-code').value.trim(),family_code:$('i-fam').value.trim(),
+    customer_name:$('i-name').value.trim(),interface:$('i-itf').value.trim(),contact_name:$('i-person').value.trim(),
+    email:$('i-email').value.trim(),phone:$('i-phone').value.trim(),send_type:$('i-type').value,
+    seq:parseInt($('i-seq').value||'0',10),remark:$('i-remark').value.trim()};
+  setStatus('保存中…','#f59e0b');
+  const r=await fetch('/api/recipients',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  if(r.ok){setStatus('✅ '+(await r.json()).message,'#16a34a');closeForm();query();}
+  else{const t=await r.text();setStatus('❌ '+t.slice(0,200),'#dc2626');alert('保存失败:\n'+t)}
+}
+async function del(x){
+  if(!confirm('删除该收件人？\n'+x.customer_code+' '+(x.contact_name||'')+' <'+x.email+'>'))return;
+  const r=await fetch('/api/recipients/'+x.id+'/delete',{method:'POST'});
+  if(r.ok){setStatus('✅ 已删除','#16a34a');query();}
+  else{setStatus('❌ 删除失败','#dc2626')}
+}
+</script>
+</body>
+</html>

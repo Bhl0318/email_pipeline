@@ -463,6 +463,110 @@ def save_rules(kind: str, req: RulesSaveReq):
     return {"ok": True, "message": "已保存"}
 
 
+# ─── report_recipient 收件人表 增删改查（Web 维护入口）───
+RECIPIENTS_HTML = WEB_DIR / "recipients_editor.html"
+_RCP_FIELDS = ["customer_code", "family_code", "customer_name", "interface",
+               "contact_name", "email", "phone", "send_type", "seq", "remark"]
+
+
+@app.get("/recipients")
+def recipients_page():
+    """汇报信收件人维护页。"""
+    if not RECIPIENTS_HTML.exists():
+        raise HTTPException(500, "recipients_editor.html not found")
+    return FileResponse(RECIPIENTS_HTML, media_type="text/html; charset=utf-8")
+
+
+@app.get("/api/recipients")
+def list_recipients(customer_code: str = "", family_code: str = "", q: str = "", limit: int = 500):
+    where = ["status = 1"]
+    params = []
+    if customer_code.strip():
+        where.append("customer_code = %s"); params.append(customer_code.strip())
+    if family_code.strip():
+        where.append("family_code = %s"); params.append(family_code.strip())
+    if q.strip():
+        where.append("(customer_name LIKE %s OR contact_name LIKE %s OR email LIKE %s "
+                     "OR interface LIKE %s OR remark LIKE %s)")
+        params += ["%" + q.strip() + "%"] * 5
+    sql = ("SELECT id, " + ", ".join(_RCP_FIELDS) + " FROM report_recipient WHERE "
+           + " AND ".join(where) + " ORDER BY customer_code, family_code, send_type, seq LIMIT %s")
+    params.append(min(int(limit or 500), 2000))
+    try:
+        rows = execute_params(sql, tuple(params))
+    except Exception as e:
+        raise HTTPException(500, f"查询失败: {e}")
+    return {"rows": rows or []}
+
+
+class RecipientReq(BaseModel):
+    id: int = 0
+    customer_code: str = ""
+    family_code: str = ""
+    customer_name: str = ""
+    interface: str = ""
+    contact_name: str = ""
+    email: str = ""
+    phone: str = ""
+    send_type: str = "to"
+    seq: int = 0
+    remark: str = ""
+
+
+def _validate_recipient(r):
+    errs = []
+    if not re.match(r'^\d{5}$', (r.customer_code or "").strip()):
+        errs.append("客户号须5位数字")
+    fam = (r.family_code or "").strip()
+    if fam and not re.match(r'^\d{5}-\w+$', fam):
+        errs.append("族号格式须『客户号-XXXX』或留空")
+    if not _EMAIL_RE.match((r.email or "").strip()):
+        errs.append("邮箱格式非法")
+    if r.send_type not in ("to", "cc"):
+        errs.append("类型须 to(收件人)/cc(抄送)")
+    return errs
+
+
+@app.post("/api/recipients")
+def upsert_recipient(req: RecipientReq):
+    errs = _validate_recipient(req)
+    if errs:
+        raise HTTPException(400, "；".join(errs))
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    fam = (req.family_code or "").strip() or None
+    vals = (req.customer_code.strip(), fam, req.customer_name.strip(), req.interface.strip(),
+            req.contact_name.strip(), req.email.strip(), req.phone.strip(),
+            req.send_type, int(req.seq or 0), req.remark.strip())
+    try:
+        if req.id:
+            execute_params(
+                "UPDATE report_recipient SET customer_code=%s, family_code=%s, customer_name=%s, "
+                "interface=%s, contact_name=%s, email=%s, phone=%s, send_type=%s, seq=%s, remark=%s, "
+                "modifier='web', modification_time=%s WHERE id=%s",
+                vals + (now, req.id))
+            return {"ok": True, "id": req.id, "message": "已更新"}
+        execute_params(
+            "INSERT INTO report_recipient (customer_code, family_code, customer_name, interface, "
+            "contact_name, email, phone, send_type, seq, remark, status, create_by, create_time) "
+            "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,1,'web',%s)",
+            vals + (now,))
+        return {"ok": True, "message": "已新增"}
+    except Exception as e:
+        raise HTTPException(500, f"写入失败: {e}")
+
+
+@app.post("/api/recipients/{rid}/delete")
+def delete_recipient(rid: int):
+    """软删除（status=0）。用 POST 而非 DELETE，避免部分代理拦 DELETE。"""
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    try:
+        execute_params("UPDATE report_recipient SET status=0, modifier='web', modification_time=%s WHERE id=%s",
+                       (now, rid))
+    except Exception as e:
+        raise HTTPException(500, f"删除失败: {e}")
+    return {"ok": True, "message": "已删除"}
+
+
 # ─── 保存字段 ────────────────────────────────────────────
 
 class SaveReq(BaseModel):
