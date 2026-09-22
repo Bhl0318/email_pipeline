@@ -152,10 +152,19 @@ def oa_assign_page(assignee: str = "", oaid: str = ""):
     return RedirectResponse("/static/assign.html")
 
 
+_OA_SHARE_DIR = ROOT / "output" / "oa-share"   # 与 oa_assign._share_dir() 同一目录(scripts/output/oa-share)
+
+
 @app.get("/oa-assign/share")
 def oa_assign_share_page(oaid: str = "", batch: str = ""):
-    """只读分享页（assign.html 的 shareView 模式）：
-    单案 ?oaid=..（中栏报告+已选人员）；批量 ?batch=..（左栏案件列表可切换 + 中栏，标批次时间）。"""
+    """只读分享页：优先返回提交时写死的静态 HTML（output/oa-share/{key}.html，零查库/零 API）；
+    静态文件不存在（老链接）才回退 assign.html 动态 shareView。
+    单案 ?oaid=..；批量 ?batch=..（左栏案件列表可切换 + 中栏，标批次时间）。"""
+    key = batch or oaid
+    if key and "/" not in key and "\\" not in key and ".." not in key:
+        f = _OA_SHARE_DIR / f"{key}.html"
+        if f.is_file():
+            return FileResponse(str(f), media_type="text/html; charset=utf-8")
     if batch:
         return RedirectResponse(f"/static/assign.html?shareView=1&batch={quote(batch)}")
     return RedirectResponse(f"/static/assign.html?shareView=1&oaid={quote(oaid)}")

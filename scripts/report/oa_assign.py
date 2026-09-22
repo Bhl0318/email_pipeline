@@ -459,6 +459,7 @@ async def assignment_share(req: Request):
     wb = _write_back(cid, responder, qc, body.get("postscript", ""), body.get("customNote", ""), aqc)
     _mark(cid, responder, _combine_qc(qc, aqc))
     _save_submission(body)
+    _write_share_file(cid, [cid], batch=False)   # 提交时把内容写死成静态页
     # 2. 只读分享链接（base 优先环境变量，其次 pipeline_config.oa_assign_base_url）
     base = os.environ.get("OA_ASSIGN_BASE_URL", "").strip().rstrip("/")
     if not base:
@@ -491,6 +492,51 @@ def _share_base():
         except Exception:
             base = ""
     return base
+
+
+# ── 只读分享页「静态化」：提交/分享时把内容渲染成一份自包含 HTML 写死到磁盘 ──
+# output/oa-share/{key}.html（单案 key=oaid、批量 key=batch_id）。打开时 report_server
+# 优先返回该文件（零查库/零 API/不依赖 CDN）；文件缺失才回退到 assign.html 动态 shareView。
+def _share_dir():
+    d = os.path.join(_DIR, "..", "output", "oa-share")
+    os.makedirs(d, exist_ok=True)
+    return d
+
+
+def _case_for_share(cid):
+    """从 store 读某案的报告(report_md)+已选人员(submit) + projects 案号/OA次数，拼成静态页所需 dict。"""
+    st = _store()
+    data = {}
+    if st is not None:
+        try:
+            data = st.get_report(cid) or {}
+        except Exception as e:
+            _log("静态分享读 report 失败：", e)
+    case_no, oa_seq = "", 0
+    try:
+        from db_query import execute as dbx
+        rows = dbx(f"SELECT project, project_name FROM projects WHERE id='{cid}'")
+        if isinstance(rows, list) and rows:
+            case_no = rows[0].get("project", "") or ""
+            oa_seq = _oa_seq_of(rows[0].get("project_name", "") or "")
+    except Exception as e:
+        _log("静态分享读 projects 失败：", e)
+    return {"oaid": cid, "caseNo": case_no, "oaSeq": oa_seq,
+            "reportMd": data.get("report_md", "") or "", "submit": data.get("submit") or {}}
+
+
+def _write_share_file(key, oaids, shared_at="", batch=False):
+    """生成并写死静态分享页到 output/oa-share/{key}.html。best-effort，失败返 False（打开时回退动态页）。"""
+    try:
+        import share_html
+        cases = [_case_for_share(c) for c in oaids if c]
+        html = share_html.build_share_html(cases, shared_at=shared_at, batch=batch)
+        with open(os.path.join(_share_dir(), f"{key}.html"), "w", encoding="utf-8") as f:
+            f.write(html)
+        return True
+    except Exception as e:
+        _log("写静态分享页失败：", e)
+        return False
 
 
 @router.post("/api/assignment/share/batch")
@@ -540,6 +586,7 @@ async def assignment_share_batch(req: Request):
                 st.save_share_batch(batch_id, ok_oaids, shared_at)
             except Exception as e:
                 _log("保存分享批次失败：", e)
+        _write_share_file(batch_id, ok_oaids, shared_at=shared_at, batch=True)  # 提交时写死成静态页
         link = f"{base}/oa-assign/share?batch={batch_id}"
         subject = f"【OA分配情况】{shared_at} 共 {ok_n} 件"
         mail_body = (f"本批次（{shared_at}）共 {ok_n} 件案件的 OA 分配情况：\n\n"
