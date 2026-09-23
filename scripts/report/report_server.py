@@ -579,6 +579,300 @@ def delete_recipient(rid: int):
     return {"ok": True, "message": "已删除"}
 
 
+# ═══ 汇报信规则维护（读写四表 report_rule/_template/_map + report_template）═══
+# 页面 web/rules_admin.html 走 /static，入口 /rules-admin。表结构见 DS/汇报信流程/汇报信规则数据表设计.md。
+RULES_ADMIN_HTML = WEB_DIR / "rules_admin.html"
+_RULE_DOMAINS = {"oa": "OA官文规则", "close": "结项规则"}
+_RULE_ACTIONS = {"assign", "skip", "ignore"}
+
+
+def _now_s():
+    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _jload(s):
+    """把库里 forward_to/cc（JSON 数组字符串）解析成 list；空/坏 → []。"""
+    s = (s or "").strip()
+    if not s:
+        return []
+    try:
+        v = json.loads(s)
+        return v if isinstance(v, list) else [v]
+    except Exception:
+        return [x.strip() for x in s.split(",") if x.strip()]
+
+
+@app.get("/rules-admin")
+def rules_admin_page():
+    if not RULES_ADMIN_HTML.exists():
+        raise HTTPException(404, "rules_admin.html 未部署")
+    return FileResponse(RULES_ADMIN_HTML, media_type="text/html; charset=utf-8")
+
+
+@app.get("/api/radmin/keys")
+def radmin_keys(domain: str = "", region: str = "", q: str = ""):
+    """某规则域下的规则键清单（region+规则键，带模板名/attach）。用于左栏切换。"""
+    if domain not in _RULE_DOMAINS:
+        raise HTTPException(400, "domain 需为 oa/close")
+    try:
+        rule_rows = execute_params(
+            "SELECT DISTINCT region, rule_key FROM report_rule WHERE rule_domain=%s AND status=1", (domain,)) or []
+        tpl_rows = execute_params(
+            "SELECT region, rule_key, template, attach_pdf FROM report_rule_template WHERE rule_domain=%s AND status=1",
+            (domain,)) or []
+    except Exception as e:
+        raise HTTPException(500, f"查询失败: {e}")
+    tpl = {(r["region"], r["rule_key"]): r for r in tpl_rows}
+    keys = {(r["region"], r["rule_key"]) for r in rule_rows} | set(tpl.keys())
+    out = []
+    for reg, rk in keys:
+        if region and reg != region:
+            continue
+        if q and q.lower() not in rk.lower():
+            continue
+        t = tpl.get((reg, rk), {})
+        out.append({"region": reg, "rule_key": rk,
+                    "template": t.get("template", ""), "attach_pdf": int(t.get("attach_pdf", 0) or 0)})
+    out.sort(key=lambda x: (x["region"], x["rule_key"]))
+    return {"domain": domain, "keys": out}
+
+
+@app.get("/api/radmin/detail")
+def radmin_detail(domain: str = "", region: str = "", rule_key: str = ""):
+    """某 (域,region,规则键) 的完整维护数据：分派规则行 + 模板映射 + 模板正文 + (结项)组合映射。"""
+    if domain not in _RULE_DOMAINS:
+        raise HTTPException(400, "domain 需为 oa/close")
+    try:
+        rules = execute_params(
+            "SELECT id, rule_variant, customer_code, action, preparer, forward_to, forward_cc, seq, remark "
+            "FROM report_rule WHERE rule_domain=%s AND region=%s AND rule_key=%s AND status=1 "
+            "ORDER BY rule_variant, seq, id", (domain, region, rule_key)) or []
+        tpl = execute_params(
+            "SELECT template, attach_pdf FROM report_rule_template "
+            "WHERE rule_domain=%s AND region=%s AND rule_key=%s AND status=1 LIMIT 1",
+            (domain, region, rule_key)) or []
+        maps = execute_params(
+            "SELECT id, match_key FROM report_rule_map WHERE rule_domain=%s AND region=%s AND rule_key=%s AND status=1 "
+            "ORDER BY match_key", (domain, region, rule_key)) or []
+    except Exception as e:
+        raise HTTPException(500, f"查询失败: {e}")
+    for r in rules:
+        r["forward_to"] = _jload(r.get("forward_to"))
+        r["forward_cc"] = _jload(r.get("forward_cc"))
+    tpl0 = tpl[0] if tpl else {"template": "", "attach_pdf": 0}
+    content = ""
+    tname = (tpl0.get("template") or "").strip()
+    if tname:
+        try:
+            c = execute_params("SELECT content FROM report_template WHERE name=%s AND status=1 LIMIT 1", (tname,))
+            content = (c[0]["content"] if c else "") or ""
+        except Exception as e:
+            raise HTTPException(500, f"查模板正文失败: {e}")
+    return {"domain": domain, "region": region, "rule_key": rule_key,
+            "template": tname, "attach_pdf": int(tpl0.get("attach_pdf", 0) or 0),
+            "content": content, "rules": rules, "maps": maps}
+
+
+@app.get("/api/radmin/templates")
+def radmin_templates():
+    """模板名清单（供模板下拉选择）。"""
+    try:
+        rows = execute_params("SELECT name FROM report_template WHERE status=1 ORDER BY name") or []
+    except Exception as e:
+        raise HTTPException(500, f"查询失败: {e}")
+    return {"names": [r["name"] for r in rows]}
+
+
+@app.get("/api/radmin/content")
+def radmin_content_get(name: str = ""):
+    """按模板名取正文（供下拉切换到任意模板时预览/编辑）。"""
+    name = (name or "").strip()
+    if not name:
+        return {"name": "", "content": ""}
+    try:
+        rows = execute_params("SELECT content FROM report_template WHERE name=%s AND status=1 LIMIT 1", (name,))
+    except Exception as e:
+        raise HTTPException(500, f"查询失败: {e}")
+    return {"name": name, "content": (rows[0]["content"] if rows else "")}
+
+
+class RadminRule(BaseModel):
+    id: int = 0
+    rule_domain: str
+    region: str
+    rule_key: str
+    rule_variant: str = ""
+    customer_code: str
+    action: str
+    preparer: str = ""
+    forward_to: list = []
+    forward_cc: list = []
+    seq: int = 0
+    remark: str = ""
+
+
+def _validate_rule(r: "RadminRule"):
+    errs = []
+    if r.rule_domain not in _RULE_DOMAINS:
+        errs.append("rule_domain 非法")
+    if not r.region:
+        errs.append("region 必填")
+    if not r.rule_key.strip():
+        errs.append("rule_key 必填")
+    if not r.customer_code.strip():
+        errs.append("客户码必填（如 20618/5开头/其他/*）")
+    if r.action not in _RULE_ACTIONS:
+        errs.append("action 需为 assign/skip/ignore")
+    if r.action == "assign" and not _EMAIL_RE.match((r.preparer or "").strip()):
+        errs.append("assign 需填合法准备人邮箱")
+    if r.action == "skip":
+        alle = [e.strip() for e in (list(r.forward_to) + list(r.forward_cc)) if e and e.strip()]
+        if not alle:
+            errs.append("skip 需至少一个 forward 收件/抄送邮箱")
+        for e in alle:
+            if not _EMAIL_RE.match(e):
+                errs.append(f"forward 邮箱非法: {e}")
+    return errs
+
+
+@app.post("/api/radmin/rule")
+def radmin_rule_save(r: RadminRule):
+    errs = _validate_rule(r)
+    if errs:
+        raise HTTPException(400, "；".join(errs))
+    fto = json.dumps([e.strip() for e in r.forward_to if e and e.strip()], ensure_ascii=False) if r.action == "skip" else ""
+    fcc = json.dumps([e.strip() for e in r.forward_cc if e and e.strip()], ensure_ascii=False) if r.action == "skip" else ""
+    preparer = r.preparer.strip() if r.action == "assign" else ""
+    now = _now_s()
+    try:
+        if r.id:
+            execute_params(
+                "UPDATE report_rule SET rule_variant=%s, customer_code=%s, action=%s, preparer=%s, "
+                "forward_to=%s, forward_cc=%s, seq=%s, remark=%s, modifier='web', modification_time=%s WHERE id=%s",
+                (r.rule_variant.strip(), r.customer_code.strip(), r.action, preparer, fto, fcc,
+                 r.seq, r.remark.strip(), now, r.id))
+        else:
+            execute_params(
+                "INSERT INTO report_rule (rule_domain, region, rule_key, rule_variant, customer_code, action, "
+                "preparer, forward_to, forward_cc, seq, status, remark, create_by, create_time) "
+                "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,1,%s,'web',%s)",
+                (r.rule_domain, r.region.strip(), r.rule_key.strip(), r.rule_variant.strip(),
+                 r.customer_code.strip(), r.action, preparer, fto, fcc, r.seq, r.remark.strip(), now))
+    except Exception as e:
+        raise HTTPException(500, f"保存失败（可能与既有 域/region/规则键/变体/客户码 唯一键冲突）: {e}")
+    return {"ok": True, "message": "已保存"}
+
+
+@app.post("/api/radmin/rule/{rid}/delete")
+def radmin_rule_delete(rid: int):
+    try:
+        execute_params("UPDATE report_rule SET status=0, modifier='web', modification_time=%s WHERE id=%s",
+                       (_now_s(), rid))
+    except Exception as e:
+        raise HTTPException(500, f"删除失败: {e}")
+    return {"ok": True, "message": "已删除"}
+
+
+class RadminTpl(BaseModel):
+    rule_domain: str
+    region: str
+    rule_key: str
+    template: str = ""
+    attach_pdf: bool = False
+
+
+@app.post("/api/radmin/template")
+def radmin_template_save(t: RadminTpl):
+    """维护 report_rule_template：某 (域,region,规则键) 用哪个模板 + 是否附 PDF（UPSERT）。"""
+    if t.rule_domain not in _RULE_DOMAINS or not t.region or not t.rule_key.strip():
+        raise HTTPException(400, "域/region/规则键必填")
+    now = _now_s()
+    try:
+        rows = execute_params(
+            "SELECT id FROM report_rule_template WHERE rule_domain=%s AND region=%s AND rule_key=%s LIMIT 1",
+            (t.rule_domain, t.region, t.rule_key.strip()))
+        if rows:
+            execute_params(
+                "UPDATE report_rule_template SET template=%s, attach_pdf=%s, status=1, modifier='web', modification_time=%s WHERE id=%s",
+                (t.template.strip(), 1 if t.attach_pdf else 0, now, rows[0]["id"]))
+        else:
+            execute_params(
+                "INSERT INTO report_rule_template (rule_domain, region, rule_key, template, attach_pdf, status, create_by, create_time) "
+                "VALUES (%s,%s,%s,%s,%s,1,'web',%s)",
+                (t.rule_domain, t.region, t.rule_key.strip(), t.template.strip(), 1 if t.attach_pdf else 0, now))
+    except Exception as e:
+        raise HTTPException(500, f"保存失败: {e}")
+    return {"ok": True, "message": "模板映射已保存"}
+
+
+class RadminMap(BaseModel):
+    id: int = 0
+    rule_domain: str = "close"
+    region: str
+    match_key: str
+    rule_key: str
+
+
+@app.post("/api/radmin/map")
+def radmin_map_save(m: RadminMap):
+    """维护 report_rule_map：结项 组合→结项类型（新增/改）。"""
+    if not m.region or not m.match_key.strip() or not m.rule_key.strip():
+        raise HTTPException(400, "region/组合/规则键必填")
+    now = _now_s()
+    try:
+        if m.id:
+            execute_params("UPDATE report_rule_map SET match_key=%s, rule_key=%s, status=1, modifier='web', modification_time=%s WHERE id=%s",
+                           (m.match_key.strip(), m.rule_key.strip(), now, m.id))
+        else:
+            execute_params("INSERT INTO report_rule_map (rule_domain, region, match_key, rule_key, status, create_by, create_time) "
+                           "VALUES (%s,%s,%s,%s,1,'web',%s)",
+                           (m.rule_domain, m.region, m.match_key.strip(), m.rule_key.strip(), now))
+    except Exception as e:
+        raise HTTPException(500, f"保存失败（组合可能已存在）: {e}")
+    return {"ok": True, "message": "组合映射已保存"}
+
+
+@app.post("/api/radmin/map/{mid}/delete")
+def radmin_map_delete(mid: int):
+    try:
+        execute_params("UPDATE report_rule_map SET status=0, modifier='web', modification_time=%s WHERE id=%s",
+                       (_now_s(), mid))
+    except Exception as e:
+        raise HTTPException(500, f"删除失败: {e}")
+    return {"ok": True, "message": "已删除"}
+
+
+class RadminContent(BaseModel):
+    name: str
+    content: str
+
+
+@app.post("/api/radmin/content")
+def radmin_content_save(c: RadminContent):
+    """编辑模板正文 report_template.content（UPSERT），旧正文写 report_template_history（best-effort）。"""
+    name = (c.name or "").strip()
+    if not name:
+        raise HTTPException(400, "模板名必填")
+    now = _now_s()
+    try:
+        rows = execute_params("SELECT id, content FROM report_template WHERE name=%s LIMIT 1", (name,))
+        if rows:
+            # 旧正文入历史表（表不存在则忽略）
+            try:
+                execute_params("INSERT INTO report_template_history (name, content, modifier, modification_time) VALUES (%s,%s,'web',%s)",
+                               (name, rows[0].get("content") or "", now))
+            except Exception:
+                pass
+            execute_params("UPDATE report_template SET content=%s, status=1, modifier='web', modification_time=%s WHERE id=%s",
+                           (c.content, now, rows[0]["id"]))
+        else:
+            execute_params("INSERT INTO report_template (name, content, format, status, create_by, create_time) "
+                           "VALUES (%s,%s,'md',1,'web',%s)", (name, c.content, now))
+    except Exception as e:
+        raise HTTPException(500, f"保存失败: {e}")
+    return {"ok": True, "message": "模板正文已保存"}
+
+
 # ─── 结项邮件抄送名单（供结项 web 表单页用；派生自 close_report_rules.json，仅 skip 产 cc）───
 import close_cc  # noqa: E402
 

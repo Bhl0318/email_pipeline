@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>汇报信规则维护</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;background:#f1f5f9;color:#0f172a;font-size:13px}
+  header{background:#1e293b;color:#fff;padding:9px 18px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:20}
+  header h1{font-size:15px;margin:0;font-weight:600}
+  .seg{display:flex;border:1px solid #475569;border-radius:7px;overflow:hidden}
+  .seg button{background:transparent;color:#cbd5e1;border:none;padding:5px 14px;cursor:pointer;font-size:13px}
+  .seg button.on{background:#2563eb;color:#fff}
+  header select,header input{padding:5px 9px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px}
+  header .spacer{flex:1}
+  #status{font-size:12px}
+  .wrap{display:flex;height:calc(100vh - 44px);overflow:hidden}
+  .col{overflow-y:auto;height:100%}
+  .left{width:280px;flex-shrink:0;background:#fff;border-right:1px solid #e2e8f0}
+  .mid{flex:1;min-width:380px;padding:14px 16px}
+  .right{width:420px;flex-shrink:0;background:#fff;border-left:1px solid #e2e8f0;padding:14px 16px}
+  .kitem{padding:8px 12px;border-bottom:1px solid #f1f5f9;cursor:pointer}
+  .kitem:hover{background:#f8fafc}
+  .kitem.on{background:#eff6ff}
+  .kitem .rk{font-weight:600}
+  .kitem .meta{color:#94a3b8;font-size:11px;margin-top:2px}
+  .badge{font-size:11px;border-radius:4px;padding:0 5px;margin-right:4px}
+  .b-reg{color:#2563eb;background:#eff6ff;border:1px solid #dbeafe}
+  .b-cn{color:#16a34a;background:#f0fdf4;border:1px solid #dcfce7}
+  h2{font-size:14px;margin:0 0 10px}
+  h3{font-size:13px;margin:16px 0 8px;color:#475569}
+  table{border-collapse:collapse;width:100%;background:#fff;border-radius:8px;overflow:hidden}
+  th,td{border:1px solid #eef2f6;padding:5px 8px;text-align:left;vertical-align:top}
+  th{background:#f8fafc;font-size:12px;color:#64748b;font-weight:600;white-space:nowrap}
+  button{border:none;border-radius:6px;cursor:pointer;font-size:13px;padding:5px 11px}
+  .btn-p{background:#2563eb;color:#fff}.btn-g{background:#16a34a;color:#fff}
+  .btn-s{background:#e2e8f0;color:#334155}.btn-d{background:#fee2e2;color:#b91c1c}
+  .a-assign{color:#16a34a;font-weight:600}.a-skip{color:#b45309;font-weight:600}.a-ignore{color:#94a3b8}
+  .form{background:#fff;border:1px solid #cbd5e1;border-radius:8px;padding:12px;margin:10px 0;display:none}
+  .form.show{display:block}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:9px}
+  .grid label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:#475569}
+  .grid input,.grid select,.grid textarea{padding:5px 7px;border:1px solid #cbd5e1;border-radius:5px;font-size:13px;font-family:inherit}
+  .actions{margin-top:10px;display:flex;gap:8px}
+  .muted{color:#94a3b8}
+  .tplbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
+  .tplbar select{padding:5px 7px;border:1px solid #cbd5e1;border-radius:5px;font-size:13px;flex:1;min-width:160px}
+  .md-prev{border:1px solid #e2e8f0;border-radius:8px;padding:12px 14px;font-size:12px;line-height:1.7;background:#fff;max-height:46vh;overflow:auto}
+  .md-prev h1,.md-prev h2{font-size:13px;border-bottom:1px solid #f0f0f0;padding-bottom:4px}
+  .md-prev table{font-size:11px}
+  .md-prev em{color:#64748b}
+  textarea.code{width:100%;min-height:38vh;font-family:ui-monospace,Consolas,monospace;font-size:12px;line-height:1.6;border:1px solid #cbd5e1;border-radius:8px;padding:10px}
+  .chip{display:inline-block;font-size:11px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:4px;padding:1px 6px;margin:1px}
+  .warn{color:#b91c1c;font-size:12px}
+</style>
+</head>
+<body>
+<header>
+  <h1>汇报信规则维护</h1>
+  <div class="seg" id="seg-domain">
+    <button data-d="oa" class="on" onclick="setDomain('oa')">OA官文规则</button>
+    <button data-d="close" onclick="setDomain('close')">结项规则</button>
+  </div>
+  <select id="f-region" onchange="renderKeys()">
+    <option value="">全部法域</option><option>CN</option><option>US</option><option>EP</option><option>PCT</option>
+  </select>
+  <input id="f-q" placeholder="搜规则键" oninput="renderKeys()" style="width:150px">
+  <span class="spacer"></span>
+  <span id="status"></span>
+</header>
+<div class="wrap">
+  <div class="col left" id="keys"><div class="muted" style="padding:12px">加载中…</div></div>
+  <div class="col mid" id="mid"><div class="muted">← 左侧选择一个规则键</div></div>
+  <div class="col right" id="right"><div class="muted">模板区</div></div>
+</div>
+
+<script>
+let DOMAIN='oa', KEYS=[], CUR=null, TPLNAMES=[];
+function $(id){return document.getElementById(id)}
+function esc(s){return String(s==null?'':s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}
+function setStatus(t,c){$('status').textContent=t||'';$('status').style.color=c||'#94a3b8'}
+async function jget(u){const r=await fetch(u);if(!r.ok)throw new Error((await r.text()).slice(0,200));return r.json()}
+async function jpost(u,b){const r=await fetch(u,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b||{})});
+  const t=await r.text();if(!r.ok)throw new Error(t.slice(0,300));try{return JSON.parse(t)}catch(e){return{}}}
+
+function setDomain(d){
+  DOMAIN=d;CUR=null;
+  for(const b of document.querySelectorAll('#seg-domain button'))b.classList.toggle('on',b.dataset.d===d);
+  $('mid').innerHTML='<div class="muted">← 左侧选择一个规则键</div>';
+  $('right').innerHTML='<div class="muted">模板区</div>';
+  loadKeys();
+}
+async function loadKeys(){
+  setStatus('加载中…','#f59e0b');
+  try{const d=await jget('/api/radmin/keys?domain='+DOMAIN);KEYS=d.keys||[];renderKeys();setStatus('');}
+  catch(e){setStatus('❌ '+e.message,'#dc2626')}
+  try{TPLNAMES=(await jget('/api/radmin/templates')).names||[]}catch(e){}
+}
+function renderKeys(){
+  const reg=$('f-region').value, q=$('f-q').value.trim().toLowerCase();
+  const box=$('keys');box.innerHTML='';
+  const list=KEYS.filter(k=>(!reg||k.region===reg)&&(!q||k.rule_key.toLowerCase().includes(q)));
+  if(!list.length){box.innerHTML='<div class="muted" style="padding:12px">无</div>';return}
+  for(const k of list){
+    const el=document.createElement('div');
+    el.className='kitem'+(CUR&&CUR.region===k.region&&CUR.rule_key===k.rule_key?' on':'');
+    el.innerHTML='<div class="rk"><span class="badge b-reg">'+esc(k.region)+'</span>'+esc(k.rule_key)+'</div>'+
+      '<div class="meta">'+(k.template?('模板 '+esc(k.template)+(k.attach_pdf?' · 附PDF':'')):'（无模板）')+'</div>';
+    el.onclick=()=>openKey(k);box.append(el);
+  }
+}
+async function openKey(k){
+  CUR={region:k.region,rule_key:k.rule_key};renderKeys();
+  setStatus('加载中…','#f59e0b');
+  try{
+    const d=await jget('/api/radmin/detail?domain='+DOMAIN+'&region='+encodeURIComponent(k.region)+'&rule_key='+encodeURIComponent(k.rule_key));
+    CUR.detail=d;renderMid(d);renderRight(d);setStatus('');
+  }catch(e){setStatus('❌ '+e.message,'#dc2626')}
+}
+
+// ── 中栏：分派规则 + (结项)组合映射 ──
+function renderMid(d){
+  let h='<h2><span class="badge b-reg">'+esc(d.region)+'</span>'+esc(d.rule_key)+
+    ' <span class="muted" style="font-weight:400">· '+(DOMAIN==='oa'?'OA官文':'结项')+'规则</span></h2>';
+  h+='<div><button class="btn-g" onclick="ruleForm()">+ 新增分派规则</button></div>';
+  h+='<div class="form" id="rule-form"></div>';
+  h+='<h3>分派规则（客户 → 动作）</h3><table><thead><tr>'+
+     '<th>变体</th><th>客户码</th><th>动作</th><th>准备人/转发</th><th>备注</th><th>操作</th></tr></thead><tbody>';
+  if(!d.rules.length)h+='<tr><td colspan="6" class="muted">暂无，点上方新增</td></tr>';
+  for(const r of d.rules){
+    const detail=r.action==='assign'?esc(r.preparer||''):
+      r.action==='skip'?('to: '+(r.forward_to||[]).map(esc).join(', ')+'<br>cc: '+(r.forward_cc||[]).map(esc).join(', ')):'—';
+    h+='<tr><td>'+esc(r.rule_variant||'')+'</td><td>'+esc(r.customer_code)+'</td>'+
+       '<td class="a-'+r.action+'">'+esc(r.action)+'</td><td>'+detail+'</td><td>'+esc(r.remark||'')+'</td>'+
+       '<td style="white-space:nowrap"><button class="btn-s" onclick=\'ruleForm('+JSON.stringify(r)+')\'>编辑</button> '+
+       '<button class="btn-d" onclick="ruleDel('+r.id+')">删</button></td></tr>';
+  }
+  h+='</tbody></table>';
+  if(DOMAIN==='close'){
+    h+='<h3>组合映射（cls_task_1_cls_task_2 → 本结项类型）</h3>';
+    h+='<div class="tplbar"><input id="new-combo" placeholder="新增组合，如 OA答复_第六次答复" style="flex:1;padding:5px 7px;border:1px solid #cbd5e1;border-radius:5px"><button class="btn-g" onclick="mapAdd()">+ 加映射</button></div>';
+    h+='<div>';
+    if(!d.maps.length)h+='<span class="muted">暂无组合映射</span>';
+    for(const m of d.maps)h+='<span class="chip">'+esc(m.match_key)+' <a href="#" onclick="mapDel('+m.id+');return false" style="color:#b91c1c;text-decoration:none">✕</a></span> ';
+    h+='</div>';
+  }
+  $('mid').innerHTML=h;
+}
+function ruleForm(r){
+  r=r||{};
+  const f=$('rule-form');f.classList.add('show');
+  f.innerHTML=
+    '<div class="grid">'+
+    '<label>变体(OA次数桶,如 1/2+/R71(3);结项留空)<input id="rf-var" value="'+esc(r.rule_variant||'')+'"></label>'+
+    '<label>客户码<input id="rf-code" placeholder="20618/5开头/其他/*" value="'+esc(r.customer_code||'')+'"></label>'+
+    '<label>动作<select id="rf-act" onchange="rfToggle()"><option value="assign">assign 分配</option><option value="skip">skip 转发/抄送</option><option value="ignore">ignore 不处理</option></select></label>'+
+    '<label>排序seq<input id="rf-seq" type="number" value="'+(r.seq||0)+'"></label>'+
+    '<label id="rf-prep-l">准备人邮箱(assign)<input id="rf-prep" value="'+esc(r.preparer||'')+'"></label>'+
+    '<label id="rf-to-l" style="grid-column:1/-1">forward 收件(skip,每行一个)<textarea id="rf-to" rows="2">'+(r.forward_to||[]).join('\n')+'</textarea></label>'+
+    '<label id="rf-cc-l" style="grid-column:1/-1">forward 抄送(skip,每行一个)<textarea id="rf-cc" rows="2">'+(r.forward_cc||[]).join('\n')+'</textarea></label>'+
+    '<label style="grid-column:1/-1">备注<input id="rf-remark" value="'+esc(r.remark||'')+'"></label>'+
+    '</div><div class="actions"><button class="btn-g" onclick="ruleSave('+(r.id||0)+')">保存</button><button class="btn-s" onclick="document.getElementById(\'rule-form\').classList.remove(\'show\')">取消</button></div>';
+  $('rf-act').value=r.action||'assign';rfToggle();
+}
+function rfToggle(){const a=$('rf-act').value;
+  $('rf-prep-l').style.display=a==='assign'?'':'none';
+  $('rf-to-l').style.display=$('rf-cc-l').style.display=a==='skip'?'':'none';}
+function lines(id){return $(id).value.split('\n').map(s=>s.trim()).filter(Boolean)}
+async function ruleSave(id){
+  const body={id:id,rule_domain:DOMAIN,region:CUR.region,rule_key:CUR.rule_key,
+    rule_variant:$('rf-var').value.trim(),customer_code:$('rf-code').value.trim(),action:$('rf-act').value,
+    preparer:$('rf-prep').value.trim(),forward_to:lines('rf-to'),forward_cc:lines('rf-cc'),
+    seq:parseInt($('rf-seq').value||'0',10),remark:$('rf-remark').value.trim()};
+  try{await jpost('/api/radmin/rule',body);setStatus('✅ 已保存','#16a34a');openKey(CUR);}
+  catch(e){setStatus('❌ '+e.message,'#dc2626');alert('保存失败:\n'+e.message)}
+}
+async function ruleDel(id){if(!confirm('删除该分派规则？'))return;
+  try{await jpost('/api/radmin/rule/'+id+'/delete');setStatus('✅ 已删除','#16a34a');openKey(CUR)}catch(e){setStatus('❌ '+e.message,'#dc2626')}}
+async function mapAdd(){const v=$('new-combo').value.trim();if(!v)return;
+  try{await jpost('/api/radmin/map',{rule_domain:'close',region:CUR.region,match_key:v,rule_key:CUR.rule_key});setStatus('✅ 已加','#16a34a');openKey(CUR)}catch(e){alert(e.message)}}
+async function mapDel(id){if(!confirm('删除该组合映射？'))return;
+  try{await jpost('/api/radmin/map/'+id+'/delete');openKey(CUR)}catch(e){alert(e.message)}}
+
+// ── 右栏：模板映射 + 正文预览/编辑 ──
+function renderRight(d){
+  const opts=['<option value="">（无模板）</option>'].concat(
+    TPLNAMES.map(n=>'<option'+(n===d.template?' selected':'')+'>'+esc(n)+'</option>')).join('');
+  let h='<h2>模板</h2><div class="tplbar"><select id="tpl-sel">'+opts+'</select>'+
+    '<label style="font-size:12px"><input type="checkbox" id="tpl-attach"'+(d.attach_pdf?' checked':'')+'> 附PDF</label>'+
+    '<button class="btn-p" onclick="tplSave()">保存映射</button></div>';
+  h+='<div id="tpl-body"></div>';
+  $('right').innerHTML=h;
+  $('tpl-sel').onchange=()=>loadContent($('tpl-sel').value);
+  renderContent(d.template,d.content);
+}
+function renderContent(name,content){
+  const box=$('tpl-body');
+  if(!name){box.innerHTML='<div class="muted">未绑定模板</div>';return}
+  const rendered=(window.marked?marked.parse(content||''):'<pre>'+esc(content||'')+'</pre>');
+  box.innerHTML='<div class="tplbar"><b style="flex:1">'+esc(name)+'</b>'+
+    '<button class="btn-s" onclick="editContent()">编辑正文</button></div>'+
+    '<div class="md-prev" id="prev">'+(content?rendered:'<span class="muted">（正文为空）</span>')+'</div>';
+  box._name=name;box._content=content||'';
+}
+async function loadContent(name){
+  if(!name){renderContent('','');return}
+  try{const d=await jget('/api/radmin/content?name='+encodeURIComponent(name));renderContent(name,d.content||'');}
+  catch(e){setStatus('❌ '+e.message,'#dc2626')}
+}
+function editContent(){
+  const box=$('tpl-body');const name=box._name,content=box._content;
+  box.innerHTML='<div class="tplbar"><b style="flex:1">编辑 '+esc(name)+'</b>'+
+    '<button class="btn-g" onclick="contentSave()">保存正文</button>'+
+    '<button class="btn-s" onclick="renderContent(&quot;'+esc(name)+'&quot;,document.getElementById(\'ta\')?document.getElementById(\'ta\').value:&quot;&quot;)">取消/预览</button></div>'+
+    '<div id="ph-warn" class="warn"></div>'+
+    '<textarea class="code" id="ta">'+esc(content)+'</textarea>';
+  box._name=name;
+  $('ta').addEventListener('input',phCheck);phCheck();
+}
+function phCheck(){
+  const t=$('ta').value;const op=(t.match(/{/g)||[]).length,cl=(t.match(/}/g)||[]).length;
+  $('ph-warn').textContent=(op!==cl)?('⚠ 占位符括号不匹配：{ ×'+op+' } ×'+cl):'';
+}
+async function contentSave(){
+  const name=$('tpl-body')._name,content=$('ta').value;
+  const op=(content.match(/{/g)||[]).length,cl=(content.match(/}/g)||[]).length;
+  if(op!==cl&&!confirm('占位符 { } 数量不匹配（'+op+'/'+cl+'），仍保存？'))return;
+  try{await jpost('/api/radmin/content',{name:name,content:content});setStatus('✅ 正文已保存','#16a34a');
+    CUR.detail.content=content;renderContent(name,content);}
+  catch(e){setStatus('❌ '+e.message,'#dc2626');alert(e.message)}
+}
+async function tplSave(){
+  const name=$('tpl-sel').value,attach=$('tpl-attach').checked;
+  try{await jpost('/api/radmin/template',{rule_domain:DOMAIN,region:CUR.region,rule_key:CUR.rule_key,template:name,attach_pdf:attach});
+    setStatus('✅ 模板映射已保存','#16a34a');openKey(CUR);}
+  catch(e){setStatus('❌ '+e.message,'#dc2626');alert(e.message)}
+}
+loadKeys();
+</script>
+</body>
+</html>
