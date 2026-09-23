@@ -79,7 +79,7 @@
     <thead><tr>
       <th>客户号</th><th>族号</th><th>客户名称</th><th>接口人</th><th>联系人</th><th>邮箱</th><th>手机</th><th>类型</th><th>seq</th><th>备注</th><th>操作</th>
     </tr></thead>
-    <tbody id="rows"><tr><td colspan="11" class="muted">输入条件后点「查询」</td></tr></tbody>
+    <tbody id="rows"><tr><td colspan="11" class="muted">加载中…</td></tr></tbody>
   </table>
 </main>
 
@@ -92,6 +92,7 @@ function setStatus(t,c){$('status').textContent=t;$('status').style.color=c||'#9
 async function query(){
   setStatus('查询中…','#f59e0b');
   const p=new URLSearchParams();
+  p.set('limit','2000');   // 默认展示全部（表总量约 1500 行，一次拉全）
   if($('f-code').value.trim())p.set('customer_code',$('f-code').value.trim());
   if($('f-fam').value.trim())p.set('family_code',$('f-fam').value.trim());
   if($('f-q').value.trim())p.set('q',$('f-q').value.trim());
@@ -158,6 +159,7 @@ async function del(x){
   if(r.ok){setStatus('✅ 已删除','#16a34a');query();}
   else{setStatus('❌ 删除失败','#dc2626')}
 }
+query();   // 进页面默认展示全部
 </script>
 </body>
 </html>
