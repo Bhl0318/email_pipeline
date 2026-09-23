@@ -20,7 +20,8 @@
   .col{overflow-y:auto;height:100%}
   .left{width:280px;flex-shrink:0;background:#fff;border-right:1px solid #e2e8f0}
   .mid{flex:1;min-width:380px;padding:14px 16px}
-  .right{width:420px;flex-shrink:0;background:#fff;border-left:1px solid #e2e8f0;padding:14px 16px}
+  .right{width:560px;flex-shrink:0;background:#fff;border-left:1px solid #e2e8f0;padding:14px 16px}
+  td.fwd{max-width:150px;width:150px;word-break:break-all;font-size:12px;color:#475569}
   .kitem{padding:8px 12px;border-bottom:1px solid #f1f5f9;cursor:pointer}
   .kitem:hover{background:#f8fafc}
   .kitem.on{background:#eff6ff}
@@ -47,7 +48,7 @@
   .muted{color:#94a3b8}
   .tplbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
   .tplbar select{padding:5px 7px;border:1px solid #cbd5e1;border-radius:5px;font-size:13px;flex:1;min-width:160px}
-  .md-prev{border:1px solid #e2e8f0;border-radius:8px;padding:12px 14px;font-size:12px;line-height:1.7;background:#fff;max-height:46vh;overflow:auto}
+  .md-prev{border:1px solid #e2e8f0;border-radius:8px;padding:14px 16px;font-size:13px;line-height:1.8;background:#fff;max-height:66vh;overflow:auto}
   .md-prev h1,.md-prev h2{font-size:13px;border-bottom:1px solid #f0f0f0;padding-bottom:4px}
   .md-prev table{font-size:11px}
   .md-prev em{color:#64748b}
@@ -133,7 +134,7 @@ function renderMid(d){
     const detail=r.action==='assign'?esc(r.preparer||''):
       r.action==='skip'?('to: '+(r.forward_to||[]).map(esc).join(', ')+'<br>cc: '+(r.forward_cc||[]).map(esc).join(', ')):'—';
     h+='<tr><td>'+esc(r.rule_variant||'')+'</td><td>'+esc(r.customer_code)+'</td>'+
-       '<td class="a-'+r.action+'">'+esc(r.action)+'</td><td>'+detail+'</td><td>'+esc(r.remark||'')+'</td>'+
+       '<td class="a-'+r.action+'">'+esc(r.action)+'</td><td class="fwd">'+detail+'</td><td>'+esc(r.remark||'')+'</td>'+
        '<td style="white-space:nowrap"><button class="btn-s" onclick=\'ruleForm('+JSON.stringify(r)+')\'>编辑</button> '+
        '<button class="btn-d" onclick="ruleDel('+r.id+')">删</button></td></tr>';
   }
