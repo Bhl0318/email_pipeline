@@ -86,14 +86,29 @@ _OA_ORDINAL_RE = re.compile(r'第([一二三四五六七八九十百]+)次')
 def _load_oa_rules():
     global _OA_RULES_CACHE
     if _OA_RULES_CACHE is None:
-        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "oa_report_rules.json")
-        try:
-            with open(path, encoding="utf-8") as f:
-                _OA_RULES_CACHE = json.load(f)
-        except Exception as e:
-            print(f"[OA规则] 加载 oa_report_rules.json 失败: {e}", file=sys.stderr)
-            _OA_RULES_CACHE = {}
+        _OA_RULES_CACHE = _load_oa_rules_impl()
     return _OA_RULES_CACHE
+
+
+def _load_oa_rules_impl():
+    """OA 官文规则来源：先从四表(rules_store 重建，与 JSON 完全同形)读；
+    表为空/读库失败 → 回退 oa_report_rules.json（不破坏流水线）。下游解析逻辑不变。"""
+    try:
+        import rules_store
+        d = rules_store.build_oa_rules()
+        if d and any(r in d for r in ("CN", "US", "EP")):
+            print("[OA规则] 已从数据表加载", file=sys.stderr)
+            return d
+        print("[OA规则] 数据表为空，回退 oa_report_rules.json", file=sys.stderr)
+    except Exception as e:
+        print(f"[OA规则] 读表失败，回退 oa_report_rules.json: {e}", file=sys.stderr)
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "oa_report_rules.json")
+    try:
+        with open(path, encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as e:
+        print(f"[OA规则] 加载 oa_report_rules.json 失败: {e}", file=sys.stderr)
+        return {}
 
 
 def _load_report_templates():

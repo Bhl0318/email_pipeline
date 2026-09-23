@@ -99,8 +99,14 @@ def main():
         if action == "skip":
             fwd = act.get("forward") or {}
             fto, fcc = jarr(fwd.get("to")), jarr(fwd.get("cc"))
+        elif action == "assign":
+            # assign+转发(also_forward)：复用 forward_to/cc 两列存额外转发去向（assign 本不用这两列）
+            alsof = act.get("also_forward") or {}
+            if alsof:
+                fto, fcc = jarr(alsof.get("to")), jarr(alsof.get("cc"))
+        remark = act.get("_备注", "") or ""   # 注释保留到 remark 列（逻辑不读）
         L.append("INSERT INTO report_rule (rule_domain, region, rule_key, rule_variant, customer_code, action, preparer, forward_to, forward_cc, seq, status, remark) VALUES ("
-                 + f"{q(domain)}, {q(reg)}, {q(rule_key)}, {q(variant)}, {q(cust)}, {q(action)}, {q(preparer)}, {q(fto)}, {q(fcc)}, {seq}, 1, '');")
+                 + f"{q(domain)}, {q(reg)}, {q(rule_key)}, {q(variant)}, {q(cust)}, {q(action)}, {q(preparer)}, {q(fto)}, {q(fcc)}, {seq}, 1, {q(remark)});")
         n_rule[0] += 1
 
     for reg in ("CN", "US", "EP"):
