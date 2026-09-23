@@ -1123,7 +1123,8 @@
             }
           },
           "其他": {
-            "action": "ignore"
+            "action": "assign",
+            "preparer": "hui.ren@metis-ip.com"
           },
           "20753": {
             "action": "skip",
