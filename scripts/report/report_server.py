@@ -76,6 +76,24 @@ def _resolve_template(name):
     return None
 
 
+def _template_text(name):
+    """模板正文：先读 report_template 表（维护页真源），查不到/读库失败 → 回退 templates/md/ 文件。
+    返回正文字符串；都没有返回 None。"""
+    try:
+        rows = execute_params("SELECT content FROM report_template WHERE name=%s AND status=1 LIMIT 1", (name,))
+        if rows and (rows[0].get("content") or "").strip():
+            return rows[0]["content"]
+    except Exception as e:
+        print(f"[模板] 读 report_template 失败 {name}，回退文件: {e}", file=sys.stderr)
+    p = _resolve_template(name)
+    if p:
+        try:
+            return p.read_text(encoding="utf-8")
+        except Exception:
+            return None
+    return None
+
+
 WEB_DIR = ROOT / "web"
 PROTOTYPE_HTML = WEB_DIR / "prototype.html"
 TEMPLATES_PREVIEW_HTML = WEB_DIR / "templates_preview.html"
@@ -328,13 +346,13 @@ def get_task(task_id: str):
 
 @app.get("/templates/{name}")
 def get_template(name: str):
-    """返回 templates/md/{name} 原文。"""
+    """返回模板 {name} 正文（report_template 表优先，回退 templates/md/ 文件）。审核页取此渲染汇报信。"""
     if "/" in name or "\\" in name or ".." in name:
         raise HTTPException(400, "invalid template name")
-    p = _resolve_template(name)
-    if not p:
+    text = _template_text(name)
+    if text is None:
         raise HTTPException(404, f"template {name} not found")
-    return PlainTextResponse(p.read_text(encoding="utf-8"), media_type="text/plain; charset=utf-8")
+    return PlainTextResponse(text, media_type="text/plain; charset=utf-8")
 
 
 @app.get("/api/templates")
@@ -931,12 +949,8 @@ def _guanyu_type(template, fields):
     取不到（无模板/无关于行）返回 None，调用方回退旧逻辑。"""
     if not template:
         return None
-    p = _resolve_template(template)
-    if not p:
-        return None
-    try:
-        text = p.read_text(encoding="utf-8")
-    except Exception:
+    text = _template_text(template)
+    if text is None:
         return None
     m = re.search(r'关于[：:]\s*(.+)', text)
     if not m:
