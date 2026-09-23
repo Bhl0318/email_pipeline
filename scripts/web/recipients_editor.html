@@ -48,6 +48,9 @@
   <div class="bar">
     <input class="code" id="f-code" placeholder="客户号(5位)">
     <input class="fam"  id="f-fam"  placeholder="族号(可选)">
+    <select id="f-itf" onchange="query()" style="padding:6px 9px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;max-width:180px">
+      <option value="">全部接口人</option>
+    </select>
     <input class="q"    id="f-q"    placeholder="关键词:客户名/联系人/邮箱/接口人" onkeydown="if(event.key==='Enter')query()">
     <button class="btn-p" onclick="query()">查询</button>
     <button class="btn-g" onclick="openForm()">+ 新增</button>
@@ -85,7 +88,17 @@
 
 <script>
 let editing=null;   // 当前编辑行id;null=新增
+const itfSet=new Set();   // 已见接口人（只增，供下拉；首次全量加载即填满）
 function $(id){return document.getElementById(id)}
+function fillItf(rows){
+  let grew=false;
+  for(const x of rows){const v=(x.interface||'').trim();if(v&&!itfSet.has(v)){itfSet.add(v);grew=true}}
+  if(!grew)return;
+  const sel=$('f-itf'),cur=sel.value;
+  sel.innerHTML='<option value="">全部接口人</option>'+
+    [...itfSet].sort((a,b)=>a.localeCompare(b,'zh')).map(v=>'<option>'+esc(v)+'</option>').join('');
+  sel.value=cur;
+}
 function esc(s){return String(s==null?'':s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}
 function setStatus(t,c){$('status').textContent=t;$('status').style.color=c||'#94a3b8'}
 
@@ -95,11 +108,12 @@ async function query(){
   p.set('limit','2000');   // 默认展示全部（表总量约 1500 行，一次拉全）
   if($('f-code').value.trim())p.set('customer_code',$('f-code').value.trim());
   if($('f-fam').value.trim())p.set('family_code',$('f-fam').value.trim());
+  if($('f-itf').value)p.set('interface',$('f-itf').value);
   if($('f-q').value.trim())p.set('q',$('f-q').value.trim());
   try{
     const r=await fetch('/api/recipients?'+p.toString());
     if(!r.ok){setStatus('❌ '+(await r.text()).slice(0,200),'#dc2626');return}
-    const d=await r.json();render(d.rows||[]);setStatus('');
+    const d=await r.json();render(d.rows||[]);fillItf(d.rows||[]);setStatus('');
     $('count').textContent=(d.rows||[]).length+' 行';
   }catch(e){setStatus('❌ '+e.message,'#dc2626')}
 }

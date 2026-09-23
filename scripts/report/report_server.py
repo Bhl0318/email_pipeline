@@ -487,13 +487,16 @@ def recipients_page():
 
 
 @app.get("/api/recipients")
-def list_recipients(customer_code: str = "", family_code: str = "", q: str = "", limit: int = 500):
+def list_recipients(customer_code: str = "", family_code: str = "", interface: str = "",
+                    q: str = "", limit: int = 500):
     where = ["status = 1"]
     params = []
     if customer_code.strip():
         where.append("customer_code = %s"); params.append(customer_code.strip())
     if family_code.strip():
         where.append("family_code = %s"); params.append(family_code.strip())
+    if interface.strip():
+        where.append("interface = %s"); params.append(interface.strip())
     if q.strip():
         where.append("(customer_name LIKE %s OR contact_name LIKE %s OR email LIKE %s "
                      "OR interface LIKE %s OR remark LIKE %s)")
