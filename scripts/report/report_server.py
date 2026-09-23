@@ -579,6 +579,29 @@ def delete_recipient(rid: int):
     return {"ok": True, "message": "已删除"}
 
 
+# ─── 结项邮件抄送名单（供结项 web 表单页用；派生自 close_report_rules.json，仅 skip 产 cc）───
+import close_cc  # noqa: E402
+
+
+@app.get("/api/close-cc")
+def api_close_cc(project: str = "", task1: str = "", task2: str = ""):
+    """单次查：案号 + 结项类型一/二 → 结项邮件抄送名单。
+    返回 {region, combination, closeType, action, cc:[邮箱...]}；查不到/非skip → cc 为空。"""
+    try:
+        return close_cc.resolve_cc(close_cc.load_rules(), project, task1, task2)
+    except Exception as e:
+        raise HTTPException(500, f"查抄送名单失败: {e}")
+
+
+@app.get("/api/close-cc-rules")
+def api_close_cc_rules():
+    """整份派生抄送表 {region:{combination:{客户码/5开头/其他:[cc]}}}（表单页可一次拉全量本地解析）。"""
+    try:
+        return close_cc.build_cc_map(close_cc.load_rules())
+    except Exception as e:
+        raise HTTPException(500, f"读抄送表失败: {e}")
+
+
 # ─── 保存字段 ────────────────────────────────────────────
 
 class SaveReq(BaseModel):
