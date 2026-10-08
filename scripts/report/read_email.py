@@ -1322,8 +1322,8 @@ def dispatch_report(all_results, all_emails, dry_run=False):
                 else:
                     try:
                         execute_params(
-                            "INSERT INTO report_tasks (id, template, attach_pdf, fields_json, source_attachments, status) "
-                            "VALUES (%s, %s, %s, %s, %s, 'pending')",
+                            "INSERT INTO report_tasks (id, template, attach_pdf, fields_json, source_attachments, status, rule_domain) "
+                            "VALUES (%s, %s, %s, %s, %s, 'pending', 'oa')",
                             (row_id, template, 1 if attach_pdf else 0,
                              json.dumps(report_fields, ensure_ascii=False),
                              json.dumps(source_attachments, ensure_ascii=False) if source_attachments else None),
