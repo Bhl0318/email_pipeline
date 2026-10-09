@@ -545,10 +545,10 @@ class RecipientReq(BaseModel):
 
 def _validate_recipient(r):
     errs = []
-    if not re.match(r'^\d{5}$', (r.customer_code or "").strip()):
-        errs.append("客户号须5位数字")
+    if not re.fullmatch(r'\S{5}', (r.customer_code or "").strip()):
+        errs.append("客户号须5位，不能包含空格")
     fam = (r.family_code or "").strip()
-    if fam and not re.match(r'^\d{5}-\w+$', fam):
+    if fam and not re.fullmatch(r'\S{5}-\w+', fam):
         errs.append("族号格式须『客户号-XXXX』或留空")
     if not _EMAIL_RE.match((r.email or "").strip()):
         errs.append("邮箱格式非法")
