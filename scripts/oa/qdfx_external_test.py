@@ -1,4 +1,4 @@
-"""Offline checks for the external OA frontend-analysis handoff."""
+"""外部 OA 前端分析材料提交的离线测试。"""
 
 import os
 import sys

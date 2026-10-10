@@ -1,4 +1,4 @@
-"""Offline checks for the standalone FPO reference downloader."""
+"""独立 FPO 对比文件下载脚本的离线测试。"""
 
 import json
 import os

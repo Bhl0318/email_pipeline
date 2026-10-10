@@ -1,9 +1,8 @@
-"""Submit complete OA materials to the external frontend-analysis service.
+"""将完整的 OA 材料提交到外部前端分析服务。
 
-Set QDFX_API_TOKEN on the pipeline host. Cited patents are downloaded from
-FreePatentsOnline and accepted only when the PDF contains the exact publication
-number and readable description and claims.
-QDFX_API_BASE_URL defaults to the production /assist endpoint.
+在运行邮件流程的服务器上配置 QDFX_API_TOKEN。对比文件从 FreePatentsOnline 下载；
+只有 PDF 中的公开号完全匹配，且说明书和权利要求均可读取时，才会使用该文件。
+QDFX_API_BASE_URL 默认指向正式环境的 /assist 接口。
 """
 
 import os
@@ -25,7 +24,7 @@ def _publication_number(raw):
 
 
 def _fpo_pdf(number, session=None):
-    """Download a cited publication from FPO without discarding its country."""
+    """从 FPO 下载对比文件，查询时保留非美国文献的国别代码。"""
     from download_patent_pdf import _extract_pdf_url, _new_session
 
     fpo = session or _new_session()[0]
@@ -44,7 +43,7 @@ def _fpo_pdf(number, session=None):
 
 
 def _reference_markdown(raw_number, session=None):
-    """Fetch an FPO publication PDF and require matching full text."""
+    """下载 FPO 文献 PDF，校验后转换为 Markdown 正文。"""
     number = _publication_number(raw_number)
     if not number:
         return ""
@@ -54,7 +53,7 @@ def _reference_markdown(raw_number, session=None):
 
 
 def _reference_pdf_text(number, pdf_data):
-    """Verify PDF identity and readable specification before using or saving it."""
+    """使用或保存 PDF 前，核对公开号及说明书、权利要求正文。"""
     import fitz
 
     if not pdf_data.startswith(b"%PDF-") or len(pdf_data) > 32_000_000:
@@ -78,7 +77,7 @@ def _reference_pdf_text(number, pdf_data):
 
 
 def _ep_reference_numbers(oa_text):
-    """Use only D-numbered citation lines; avoid the case's own publication number."""
+    """只提取带 D 编号的引用行，避免误取本案公开号。"""
     pattern = r"\b(?:EP|WO|US|CN|JP|KR)\s*[0-9][0-9\s,./-]{4,17}\s*[A-C]\s*[0-9]?\b"
     lines = (line for line in (oa_text or "").splitlines() if re.search(r"\bD\d+\b", line, re.I))
     return [{"doc_no": n} for line in lines for raw in re.findall(pattern, line, re.I)
@@ -86,7 +85,7 @@ def _ep_reference_numbers(oa_text):
 
 
 def submit_oa_analysis(item, oa_text, ref_docs, session=None):
-    """Submit one newly created OA case; return a small status dict, never raise."""
+    """提交一件新立项 OA 的材料；返回状态字典，不向调用方抛异常。"""
     token = os.environ.get("QDFX_API_TOKEN", "").strip()
     if not token:
         return {"status": "skipped", "reason": "QDFX_API_TOKEN 未配置"}
@@ -129,7 +128,7 @@ def submit_oa_analysis(item, oa_text, ref_docs, session=None):
         except Exception as exc:
             failed.append(number)
             print(f"[前端分析] {project} 对比文件 {number} 获取失败: {exc}", file=sys.stderr)
-    # Do not submit a partial citation set: the scoring result would omit OA evidence.
+    # 对比文件必须齐全；缺件时跳过，避免评分漏掉审查意见引用的证据。
     if failed or len(files) == 2:
         return {"status": "skipped", "reason": f"对比文件正文不齐: {', '.join(failed or numbers)}"}
 
