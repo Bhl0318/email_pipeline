@@ -85,6 +85,19 @@ class ExternalAnalysisTests(unittest.TestCase):
         session.get.assert_not_called()
         session.post.assert_not_called()
 
+    @patch.dict(os.environ, {"QDFX_API_TOKEN": "test-token"})
+    @patch("oa_report_ai.find_application_files", side_effect=AssertionError("不应读取 NAS 申请文件"))
+    @patch("qdfx_external._reference_markdown", return_value="# 对比文件\n全文")
+    def test_manual_application_text_uses_formal_submit(self, ref_text, find_app):
+        session = Mock()
+        session.post.return_value.status_code = 202
+        session.post.return_value.json.return_value = {"code": 202, "data": {"parseId": "parse-manual"}}
+        result = submit_oa_analysis(self.item, "审查意见", self.refs, session=session,
+                                    application_text="手工指定的申请文件正文")
+        self.assertEqual(result["status"], "submitted")
+        find_app.assert_not_called()
+        self.assertIn("手工指定的申请文件正文", session.post.call_args.kwargs["files"][1][1][1].decode())
+
     def test_ep_inline_reference_and_unrecognized_reference(self):
         self.assertEqual(_ep_reference_numbers("D1: EP 1234567 A1; D2: WO2020123456A1"),
                          [{"doc_no": "EP1234567A1"}, {"doc_no": "WO2020123456A1"}])

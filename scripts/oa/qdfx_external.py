@@ -84,7 +84,7 @@ def _ep_reference_numbers(oa_text):
             if (n := _publication_number(raw))]
 
 
-def submit_oa_analysis(item, oa_text, ref_docs, session=None):
+def submit_oa_analysis(item, oa_text, ref_docs, session=None, application_text=None):
     """提交一件新立项 OA 的材料；返回状态字典，不向调用方抛异常。"""
     token = os.environ.get("QDFX_API_TOKEN", "").strip()
     if not token:
@@ -95,10 +95,12 @@ def submit_oa_analysis(item, oa_text, ref_docs, session=None):
     if not (oa_text or "").strip():
         return {"status": "skipped", "reason": "缺审查意见正文"}
 
-    from oa_report_ai import find_application_files, _docx_text
-
-    app_path = find_application_files(project, region=item.get("region", "")).get("spec")
-    app_text = _docx_text(app_path)
+    if application_text is None:
+        from oa_report_ai import find_application_files, _docx_text
+        app_path = find_application_files(project, region=item.get("region", "")).get("spec")
+        app_text = _docx_text(app_path)
+    else:
+        app_text = application_text
     if not app_text.strip():
         return {"status": "skipped", "reason": "未找到可读取的申请文件"}
     refs = list(ref_docs or [])
