@@ -1289,6 +1289,7 @@ def dispatch_oa(all_results, all_emails=None, dry_run=False, test_project_prefix
 
     # 对比文件（仅 CN）：解析审查意见通知书官文 PDF「本通知书引用下列对比文件」表，
     # 填到该案 OA信息记录表页「OA过程」表对应 OA{N} 行的「对比文件链接」列。
+    qdfx_ref_docs = {}
     cn_items = [r for r in all_results if r.get("region") == "CN"]
     if cn_items:
         from parse_cn_pdf import extract_cn_ref_docs, parse_oa_seq
@@ -1322,6 +1323,7 @@ def dispatch_oa(all_results, all_emails=None, dry_run=False, test_project_prefix
             # OA 次数：优先用 PDF 里解析到的，其次从立项名称「第N次」推
             oa_seq = parsed.get("oa_seq") or parse_oa_seq(item.get("project_name", "") or "")
             docs = parsed["ref_docs"]
+            qdfx_ref_docs[id(item)] = docs
             print(f"[对比文件][CN] {proj} OA{oa_seq}：从审查意见读到 {len(docs)} 条对比文件 → "
                   f"{[d.get('doc_no') for d in docs]}", file=sys.stderr)
             try:
@@ -1357,6 +1359,7 @@ def dispatch_oa(all_results, all_emails=None, dry_run=False, test_project_prefix
             if not docs:
                 print(f"[对比文件][US] {proj} OA{oa_seq}：未从审查意见/892 读到对比文件", file=sys.stderr)
                 continue
+            qdfx_ref_docs[id(item)] = docs
             print(f"[对比文件][US] {proj} OA{oa_seq}：从审查意见/892 读到 {len(docs)} 条对比文件 → "
                   f"{[d['doc_no'] for d in docs]}", file=sys.stderr)
             try:
@@ -1370,10 +1373,9 @@ def dispatch_oa(all_results, all_emails=None, dry_run=False, test_project_prefix
             except Exception as e:
                 print(f"[对比文件][US] {proj} OA{oa_seq} 写回失败: {e}", file=sys.stderr)
 
-    # 审意新颖性/创造性判断（立项时）：读审意全文 → DeepSeek 判是否涉及新颖性(US §102/EPC Art.54)或
-    # 创造性(US §103/EPC Art.56)。命中任一 → 「其它备注事项」列标注 + 该案不进 OA 分配
-    # （不进待分配、不发分配链接；立项/转OA/写Wiki 照常）。
-    # 读不到审意 / DeepSeek 失败默认「无问题」，不误跳过分配（宁可多分一件，不漏分一件）。
+    # 审意新颖性/创造性判断（立项时）：命中任一则标注；判断后，材料齐备的案件提交外部前端分析。
+    # 读不到审意 / DeepSeek 失败默认无问题，仍正常进入 OA 分配。
+    qdfx_oa_text = {}
     if all_results and not dry_run:
         try:
             from analyze_oa_issue import analyze_novelty_inventiveness
@@ -1407,6 +1409,7 @@ def dispatch_oa(all_results, all_emails=None, dry_run=False, test_project_prefix
                     print(f"[审意分析] {proj} OA{_seq}：审意正文为空，跳过判断（默认可分配）", file=sys.stderr)
                     continue
                 v = analyze_novelty_inventiveness(_oa_text)
+                qdfx_oa_text[id(item)] = _oa_text
                 if v.get("novelty") or v.get("inventiveness"):
                     _issues = [n for n, f in (("新颖性", v.get("novelty")),
                                               ("创造性", v.get("inventiveness"))) if f]
@@ -1587,7 +1590,22 @@ def dispatch_oa(all_results, all_emails=None, dry_run=False, test_project_prefix
 
     # 转OA：逐案转发给 OA 处理团队（替换原 send_notification 总表→qin.zhang；dry_run 内部处理）
     # 返回本次转OA立项动作 [{message_id, project, action, reason}]，供 main.py 汇总写邮件动作页
-    return send_forward_oa(all_results, all_emails, dry_run=dry_run) or []
+    forward_actions = send_forward_oa(all_results, all_emails, dry_run=dry_run) or []
+
+    # 仅对本次成功立项且审意正文可读的案件提交解析；重复收文不会产生新版本。
+    # 放在转OA之后，避免对比文件下载延迟原有转发邮件。
+    if inserted_items and qdfx_oa_text and not dry_run:
+        try:
+            from qdfx_external import submit_oa_analysis
+            for item in inserted_items:
+                oa_text = qdfx_oa_text.get(id(item))
+                if not oa_text:
+                    continue
+                result = submit_oa_analysis(item, oa_text, qdfx_ref_docs.get(id(item), []))
+                print(f"[前端分析] {item.get('project', '')}: {result}", file=sys.stderr)
+        except Exception as e:
+            print(f"[前端分析] 外部解析调用失败，不影响 OA 立项: {e}", file=sys.stderr)
+    return forward_actions
 
 
 def record_email_actions(all_results, all_emails, oa_actions=None, report_actions=None, dry_run=False):

@@ -3,6 +3,7 @@ uvicorn
 pymysql
 pymssql
 requests
+curl_cffi
 requests-toolbelt
 python-multipart
 openai
