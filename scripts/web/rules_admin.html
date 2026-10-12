@@ -16,11 +16,16 @@
   header select,header input{padding:5px 9px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px}
   header .spacer{flex:1}
   #status{font-size:12px}
-  .wrap{display:flex;height:calc(100vh - 44px);overflow:hidden}
+  .wrap{display:grid;grid-template-columns:240px minmax(380px,700px) minmax(240px,300px) minmax(420px,1fr);min-width:1280px;height:calc(100vh - 44px);overflow:hidden}
   .col{overflow-y:auto;height:100%}
-  .left{width:280px;flex-shrink:0;background:#fff;border-right:1px solid #e2e8f0}
-  .mid{flex:0 1 700px;min-width:340px;padding:14px 16px}
-  .right{flex:1 1 520px;min-width:480px;background:#fff;border-left:1px solid #e2e8f0;padding:14px 16px}
+  .left{background:#fff;border-right:1px solid #e2e8f0}
+  .mid{padding:14px 16px}
+  .fields{padding:14px 16px;background:#f8fafc;border-left:1px solid #e2e8f0}
+  .right{background:#fff;border-left:1px solid #e2e8f0;padding:14px 16px}
+  .trial-field{display:block;margin:0 0 10px;font-size:12px;color:#475569;overflow-wrap:anywhere}
+  .trial-field textarea{display:block;width:100%;min-height:54px;resize:vertical;margin-top:4px;padding:7px;border:1px solid #cbd5e1;border-radius:5px;font-family:inherit;font-size:13px;line-height:1.5;background:#fff}
+  .ph-missing{color:#b91c1c;background:#fef2f2}
+  @media(max-width:1279px){body{min-width:1280px}}
   td.fwd{max-width:150px;width:150px;word-break:break-all;font-size:12px;color:#475569}
   .kitem{padding:8px 12px;border-bottom:1px solid #f1f5f9;cursor:pointer}
   .kitem:hover{background:#f8fafc}
@@ -74,23 +79,25 @@
 <div class="wrap">
   <div class="col left" id="keys"><div class="muted" style="padding:12px">加载中…</div></div>
   <div class="col mid" id="mid"><div class="muted">← 左侧选择一个规则键</div></div>
+  <div class="col fields" id="fields"><div class="muted">试填字段</div></div>
   <div class="col right" id="right"><div class="muted">模板区</div></div>
 </div>
 
 <script>
-let DOMAIN='oa', KEYS=[], CUR=null, TPLNAMES=[];
+let DOMAIN='oa', KEYS=[], CUR=null, TPLNAMES=[], TRIAL_VALUES={};
 function $(id){return document.getElementById(id)}
-function esc(s){return String(s==null?'':s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function setStatus(t,c){$('status').textContent=t||'';$('status').style.color=c||'#94a3b8'}
 async function jget(u){const r=await fetch(u);if(!r.ok)throw new Error((await r.text()).slice(0,200));return r.json()}
 async function jpost(u,b){const r=await fetch(u,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b||{})});
   const t=await r.text();if(!r.ok)throw new Error(t.slice(0,300));try{return JSON.parse(t)}catch(e){return{}}}
 
 function setDomain(d){
-  DOMAIN=d;CUR=null;
+  DOMAIN=d;CUR=null;TRIAL_VALUES={};
   $('f-region').value='';
   for(const b of document.querySelectorAll('#seg-domain button'))b.classList.toggle('on',b.dataset.d===d);
   $('mid').innerHTML='<div class="muted">← 左侧选择一个规则键</div>';
+  $('fields').innerHTML='<div class="muted">试填字段</div>';
   $('right').innerHTML='<div class="muted">模板区</div>';
   loadKeys();
 }
@@ -121,6 +128,7 @@ function renderKeys(){
   }
 }
 async function openKey(k){
+  if(!CUR||CUR.region!==k.region||CUR.rule_key!==k.rule_key)TRIAL_VALUES={};
   CUR={region:k.region,rule_key:k.rule_key};renderKeys();
   setStatus('加载中…','#f59e0b');
   try{
@@ -192,7 +200,42 @@ async function mapAdd(){const v=$('new-combo').value.trim();if(!v)return;
 async function mapDel(id){if(!confirm('删除该组合映射？'))return;
   try{await jpost('/api/radmin/map/'+id+'/delete');openKey(CUR)}catch(e){alert(e.message)}}
 
-// ── 右栏：模板映射 + 正文预览/编辑 ──
+// ── 第三栏：根据当前模板占位符生成试填表单（只在浏览器中保存） ──
+function renderFields(name,content){
+  const box=$('fields');
+  box.innerHTML='<h2>试填字段</h2><div class="muted" style="margin-bottom:12px">填写后右侧即时预览；不会保存到数据库</div>';
+  if(!name||!content){box.innerHTML+='<div class="muted">当前没有模板正文</div>';return}
+  const keys=[...new Set([...content.matchAll(/\{\{\s*([^{}]+?)\s*\}\}/g)].map(m=>m[1].trim()))];
+  if(!keys.length){box.innerHTML+='<div class="muted">当前模板没有需要试填的字段</div>';return}
+  for(const key of keys){
+    const label=document.createElement('label');label.className='trial-field';label.textContent=key;
+    const input=document.createElement('textarea');input.rows=key==='正文事项'?5:2;
+    input.placeholder='填写'+key;input.value=TRIAL_VALUES[key]||'';
+    input.addEventListener('input',()=>{TRIAL_VALUES[key]=input.value;refreshTrialPreview()});
+    label.append(input);box.append(label);
+  }
+  const reset=document.createElement('button');reset.className='btn-s';reset.textContent='清空试填';
+  reset.onclick=()=>{TRIAL_VALUES={};box.querySelectorAll('textarea').forEach(el=>el.value='');refreshTrialPreview()};
+  box.append(reset);
+}
+
+function refreshTrialPreview(){
+  const box=$('tpl-body'),prev=$('prev');
+  if(!prev||!box._content)return;
+  const values=[];
+  const md=box._content.replace(/\{\{\s*([^{}]+?)\s*\}\}/g,(_,key)=>{
+    const token='RADMINFIELD'+values.length+'END';values.push(key.trim());return token;
+  });
+  let html=window.marked?marked.parse(md,{breaks:true}):'<pre>'+esc(md)+'</pre>';
+  for(let i=0;i<values.length;i++){
+    const key=values[i],raw=TRIAL_VALUES[key];
+    const value=raw?esc(raw).replace(/\r?\n/g,'<br>'):'<span class="ph-missing">{{'+esc(key)+'}}</span>';
+    html=html.replaceAll('RADMINFIELD'+i+'END',value);
+  }
+  prev.innerHTML=html;
+}
+
+// ── 第四栏：模板映射 + 正文预览/编辑 ──
 function renderRight(d){
   const opts=['<option value="">（无模板）</option>'].concat(
     TPLNAMES.map(n=>'<option'+(n===d.template?' selected':'')+'>'+esc(n)+'</option>')).join('');
@@ -206,12 +249,12 @@ function renderRight(d){
 }
 function renderContent(name,content){
   const box=$('tpl-body');
-  if(!name){box.innerHTML='<div class="muted">未绑定模板</div>';return}
-  const rendered=(window.marked?marked.parse(content||''):'<pre>'+esc(content||'')+'</pre>');
+  if(!name){box.innerHTML='<div class="muted">未绑定模板</div>';box._name='';box._content='';renderFields('','');return}
   box.innerHTML='<div class="tplbar"><b style="flex:1">'+esc(name)+'</b>'+
     '<button class="btn-s" onclick="editContent()">编辑正文</button></div>'+
-    '<div class="md-prev" id="prev">'+(content?rendered:'<span class="muted">（正文为空）</span>')+'</div>';
+    '<div class="md-prev" id="prev">'+(content?'':'<span class="muted">（正文为空）</span>')+'</div>';
   box._name=name;box._content=content||'';
+  renderFields(name,box._content);refreshTrialPreview();
 }
 async function loadContent(name){
   if(!name){renderContent('','');return}

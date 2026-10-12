@@ -563,6 +563,12 @@
         </div>
       </div>
 
+      <!-- 模板新增占位符：现有专用控件未覆盖的字段自动生成 -->
+      <div class="form-section" id="section-dynamic-fields" style="display:none;">
+        <h3><span class="icon icon-blue">&#9998;</span> 模板补充字段</h3>
+        <div class="form-row" id="dynamic-fields-list"></div>
+      </div>
+
       <!-- 官文附件 -->
       <div class="form-section" id="section-source-attachments" style="display:none;">
         <h3><span class="icon icon-orange">&#128206;</span> 官文附件</h3>
@@ -890,6 +896,46 @@
       if (!el) continue;
       currentFields[field] = el.value;
     }
+    $('dynamic-fields-list').querySelectorAll('[data-template-field]').forEach(el => {
+      currentFields[el.dataset.templateField] = el.value;
+    });
+  }
+
+  // 已有字段沿用专用控件；模板新增字段按 {{字段}} 自动生成并读取 fields_json 默认值。
+  function renderDynamicFields() {
+    const section = $('section-dynamic-fields');
+    const list = $('dynamic-fields-list');
+    list.replaceChildren();
+    if (!templateMd) { section.style.display = 'none'; return; }
+
+    const keys = [...new Set([...templateMd.matchAll(/\{\{\s*([^{}]+?)\s*\}\}/g)].map(m => m[1].trim()))];
+    const extra = keys.filter(key => !(FIELD_TO_INPUT[key] && $(FIELD_TO_INPUT[key])));
+    for (const key of extra) {
+      const group = document.createElement('div');
+      group.className = 'form-group';
+      const label = document.createElement('label');
+      label.textContent = key;
+      const multiline = /内容|事项|说明|描述|备注|意见/.test(key);
+      const input = document.createElement(multiline ? 'textarea' : 'input');
+      if (multiline) input.rows = 3;
+      else input.type = 'text';
+      input.dataset.templateField = key;
+      input.value = currentFields[key] == null || currentFields[key] === '请提供' ? '' : String(currentFields[key]);
+      input.placeholder = '请填写' + key;
+      input.addEventListener('input', () => {
+        currentFields[key] = input.value;
+        renderPreview();
+        if (currentPdfBlobUrl) { URL.revokeObjectURL(currentPdfBlobUrl); currentPdfBlobUrl = null; }
+        currentPdfBase64 = null;
+        renderAttachments();
+      });
+      const source = document.createElement('div');
+      source.className = 'field-source';
+      source.textContent = '模板字段 / 手填';
+      group.append(label, input, source);
+      list.append(group);
+    }
+    section.style.display = extra.length ? '' : 'none';
   }
 
   function updateBodyMatter() {
@@ -1455,6 +1501,7 @@
 
       populateContactSelect();   // 先建下拉选项，fillFormFromFields 才能设中当前值
       fillFormFromFields();
+      renderDynamicFields();
       applyTemplateFieldVisibility();
       updateHeader();
       renderPreview();
