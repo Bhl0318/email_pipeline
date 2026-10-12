@@ -11,6 +11,7 @@
         "CS"
       ],
       "granularity": "仅类型1",
+      "rule_key": "新申请递交",
       "type1": "新申请递交",
       "type2": [
         "发明",
@@ -112,6 +113,7 @@
         "CS"
       ],
       "granularity": "仅类型1",
+      "rule_key": "PCT落地",
       "type1": "PCT落地",
       "type2": [
         "发明-PCT正常落地",
@@ -211,6 +213,7 @@
         "CS"
       ],
       "granularity": "类型1+类型2",
+      "rule_key": "OA答复_第一次答复等7项",
       "type1": "OA答复",
       "type2": [
         "第一次答复",
@@ -315,6 +318,7 @@
         "CS"
       ],
       "granularity": "类型1+类型2",
+      "rule_key": "OA答复_驳回复审请求",
       "type1": "OA答复",
       "type2": [
         "驳回复审请求"
@@ -407,6 +411,7 @@
         "CS"
       ],
       "granularity": "类型1+类型2",
+      "rule_key": "OA答复_复审答复",
       "type1": "OA答复",
       "type2": [
         "复审答复"
@@ -499,6 +504,7 @@
         "CS"
       ],
       "granularity": "类型1+类型2",
+      "rule_key": "OA答复_口审答复",
       "type1": "OA答复",
       "type2": [
         "口审答复"
@@ -591,6 +597,7 @@
         "CS"
       ],
       "granularity": "仅类型1",
+      "rule_key": "补正",
       "type1": "补正",
       "type2": [
         "补正说明书",
@@ -699,6 +706,7 @@
         "CS"
       ],
       "granularity": "仅类型1",
+      "rule_key": "著录项目",
       "type1": "著录项目",
       "type2": [
         "变更申请人",
@@ -804,6 +812,7 @@
         "CS"
       ],
       "granularity": "仅类型1",
+      "rule_key": "缴费",
       "type1": "缴费",
       "type2": [
         "缴纳办登费",
@@ -897,6 +906,7 @@
         "CS"
       ],
       "granularity": "仅类型1",
+      "rule_key": "补正_内部项目结项",
       "type1": "补正_内部项目结项",
       "type2": [
         "补正附图",
@@ -999,6 +1009,7 @@
         "CS"
       ],
       "granularity": "类型1+类型2",
+      "rule_key": "其他_DAS交存等5项",
       "type1": "其他",
       "type2": [
         "DAS交存",
@@ -1098,6 +1109,7 @@
         "CS"
       ],
       "granularity": "类型1+类型2",
+      "rule_key": "其他_PPH提交等17项",
       "type1": "其他",
       "type2": [
         "PPH提交",
@@ -1222,6 +1234,7 @@
         "CS"
       ],
       "granularity": "类型1+类型2",
+      "rule_key": "其他_撤回申请",
       "type1": "其他",
       "type2": [
         "撤回申请"
@@ -1314,6 +1327,7 @@
         "CS"
       ],
       "granularity": "类型1+类型2",
+      "rule_key": "其他_答复视为未要求优先权",
       "type1": "其他",
       "type2": [
         "答复视为未要求优先权"
@@ -1406,6 +1420,7 @@
         "CS"
       ],
       "granularity": "类型1+类型2",
+      "rule_key": "其他_复审优先审查",
       "type1": "其他",
       "type2": [
         "复审优先审查"
@@ -1498,6 +1513,7 @@
         "CS"
       ],
       "granularity": "类型1+类型2",
+      "rule_key": "事务办理_费减备案等2项",
       "type1": "事务办理",
       "type2": [
         "费减备案",
@@ -1591,6 +1607,7 @@
         "CS"
       ],
       "granularity": "类型1+类型2",
+      "rule_key": "事务办理_办理文件副本等8项",
       "type1": "事务办理",
       "type2": [
         "办理文件副本",
@@ -1697,6 +1714,7 @@
         "PR"
       ],
       "granularity": "类型1+类型2",
+      "rule_key": "新申请递交_临时申请",
       "type1": "新申请递交",
       "type2": [
         "临时申请"
@@ -1768,6 +1786,7 @@
         "PR"
       ],
       "granularity": "类型1+类型2",
+      "rule_key": "新申请递交_新申请发明等6项",
       "type1": "新申请递交",
       "type2": [
         "新申请发明",
@@ -1848,6 +1867,7 @@
         "DS"
       ],
       "granularity": "类型1+类型2",
+      "rule_key": "OA答复_Non-final等2项",
       "type1": "OA答复",
       "type2": [
         "Non-final",
@@ -1920,6 +1940,7 @@
         "DS"
       ],
       "granularity": "类型1+类型2",
+      "rule_key": "OA答复_AA",
       "type1": "OA答复",
       "type2": [
         "AA"
@@ -1990,6 +2011,7 @@
         "DS"
       ],
       "granularity": "类型1+类型2",
+      "rule_key": "OA答复_RR",
       "type1": "OA答复",
       "type2": [
         "RR"
@@ -2060,6 +2082,7 @@
         "DS"
       ],
       "granularity": "类型1+类型2",
+      "rule_key": "OA答复_RR Petition",
       "type1": "OA答复",
       "type2": [
         "RR Petition"
@@ -2130,6 +2153,7 @@
         "DS"
       ],
       "granularity": "类型1+类型2",
+      "rule_key": "OA答复_Ex Parte Quayle Action",
       "type1": "OA答复",
       "type2": [
         "Ex Parte Quayle Action"
@@ -2200,6 +2224,7 @@
         "DS"
       ],
       "granularity": "仅类型1",
+      "rule_key": "IDS",
       "type1": "IDS",
       "type2": [
         "IDS-新申请首次排查",
@@ -2277,6 +2302,7 @@
         "DS"
       ],
       "granularity": "仅类型1",
+      "rule_key": "NOA",
       "type1": "NOA",
       "type2": [
         "NOA缴纳授权费"
@@ -2347,6 +2373,7 @@
         "DS"
       ],
       "granularity": "仅类型1",
+      "rule_key": "补正",
       "type1": "补正",
       "type2": [
         "补正说明书/附图",
@@ -2426,6 +2453,7 @@
         "DS"
       ],
       "granularity": "类型1+类型2",
+      "rule_key": "著录项目_变更申请人",
       "type1": "著录项目",
       "type2": [
         "变更申请人"
@@ -2496,6 +2524,7 @@
         "DS"
       ],
       "granularity": "类型1+类型2",
+      "rule_key": "著录项目_申请人更名",
       "type1": "著录项目",
       "type2": [
         "申请人更名"
@@ -2566,6 +2595,7 @@
         "DS"
       ],
       "granularity": "类型1+类型2",
+      "rule_key": "著录项目_变更发明人",
       "type1": "著录项目",
       "type2": [
         "变更发明人"
@@ -2636,6 +2666,7 @@
         "DS"
       ],
       "granularity": "类型1+类型2",
+      "rule_key": "著录项目_POA递交/变更代理机构",
       "type1": "著录项目",
       "type2": [
         "POA递交/变更代理机构"
@@ -2706,6 +2737,7 @@
         "DS"
       ],
       "granularity": "类型1+类型2",
+      "rule_key": "其他递交_DAS/优先权副本递交等13项",
       "type1": "其他递交",
       "type2": [
         "DAS/优先权副本递交",
@@ -2800,6 +2832,7 @@
         "DS"
       ],
       "granularity": "类型1+类型2",
+      "rule_key": "其他递交_Assignment登记等8项",
       "type1": "其他递交",
       "type2": [
         "Assignment登记",
@@ -2883,6 +2916,7 @@
         "DS"
       ],
       "granularity": "类型1+类型2",
+      "rule_key": "其他递交_Declaration递交",
       "type1": "其他递交",
       "type2": [
         "Declaration递交"
@@ -2953,6 +2987,7 @@
         "DS"
       ],
       "granularity": "类型1+类型2",
+      "rule_key": "其他递交_变更实体",
       "type1": "其他递交",
       "type2": [
         "变更实体"
@@ -3023,6 +3058,7 @@
         "DS"
       ],
       "granularity": "类型1+类型2",
+      "rule_key": "其他递交_补交翻译稿",
       "type1": "其他递交",
       "type2": [
         "补交翻译稿"
@@ -3093,6 +3129,7 @@
         "DS"
       ],
       "granularity": "类型1+类型2",
+      "rule_key": "其他递交_TD",
       "type1": "其他递交",
       "type2": [
         "TD"
@@ -3163,6 +3200,7 @@
         "DS"
       ],
       "granularity": "类型1+类型2",
+      "rule_key": "其他递交_PPH",
       "type1": "其他递交",
       "type2": [
         "PPH"
@@ -3233,6 +3271,7 @@
         "DS"
       ],
       "granularity": "类型1+类型2",
+      "rule_key": "Appeal递交_递交Appeal Brief",
       "type1": "Appeal递交",
       "type2": [
         "递交Appeal Brief"
@@ -3303,6 +3342,7 @@
         "DS"
       ],
       "granularity": "类型1+类型2",
+      "rule_key": "Appeal递交_提交Notice of Appeal等3项",
       "type1": "Appeal递交",
       "type2": [
         "提交Notice of Appeal",
@@ -3377,6 +3417,7 @@
         "DS"
       ],
       "granularity": "仅类型1",
+      "rule_key": "补正_内部项目结项",
       "type1": "补正_内部项目结项",
       "type2": [
         "补正说明书/附图",
@@ -3453,6 +3494,7 @@
         "US"
       ],
       "granularity": "仅类型1",
+      "rule_key": "年费",
       "type1": "年费",
       "type2": [
         "3.5年年费",
@@ -3524,6 +3566,7 @@
         "DS"
       ],
       "granularity": "仅类型1",
+      "rule_key": "附加",
       "type1": "附加",
       "type2": [
         "+Track one",
@@ -3599,6 +3642,7 @@
         "PR"
       ],
       "granularity": "仅类型1",
+      "rule_key": "其他递交",
       "type1": "其他递交",
       "type2": [
         "递交US保密审查",
@@ -3671,6 +3715,7 @@
         "DM"
       ],
       "granularity": "类型1+类型2",
+      "rule_key": "新申请递交_PCT新申请递交",
       "type1": "新申请递交",
       "type2": [
         "PCT新申请递交"
@@ -3741,6 +3786,7 @@
         "DM"
       ],
       "granularity": "类型1+类型2",
+      "rule_key": "新申请递交_海牙协定新申请递交",
       "type1": "新申请递交",
       "type2": [
         "海牙协定新申请递交"
@@ -3811,6 +3857,7 @@
         "DM"
       ],
       "granularity": "类型1+类型2",
+      "rule_key": "补正_补交POA",
       "type1": "补正",
       "type2": [
         "补交POA"
@@ -3880,6 +3927,7 @@
         "DM"
       ],
       "granularity": "类型1+类型2",
+      "rule_key": "补正_补交DAS码",
       "type1": "补正",
       "type2": [
         "补交DAS码"
@@ -3950,6 +3998,7 @@
         "DM"
       ],
       "granularity": "类型1+类型2",
+      "rule_key": "补正_106表-补正权利要求等3项",
       "type1": "补正",
       "type2": [
         "106表-补正权利要求",
@@ -4024,6 +4073,7 @@
         "DM"
       ],
       "granularity": "类型1+类型2",
+      "rule_key": "补正_132表-补正权利要求书等2项",
       "type1": "补正",
       "type2": [
         "132表-补正权利要求书",
@@ -4096,6 +4146,7 @@
         "DM"
       ],
       "granularity": "类型1+类型2",
+      "rule_key": "补正_补正发明名称等3项",
       "type1": "补正",
       "type2": [
         "补正发明名称",
@@ -4170,6 +4221,7 @@
         "DM"
       ],
       "granularity": "类型1+类型2",
+      "rule_key": "补正_主动补正权利要求",
       "type1": "补正",
       "type2": [
         "主动补正权利要求"
@@ -4240,6 +4292,7 @@
         "DM"
       ],
       "granularity": "类型1+类型2",
+      "rule_key": "其他_请求纸质优先权副本等5项",
       "type1": "其他",
       "type2": [
         "请求纸质优先权副本",
@@ -4318,6 +4371,7 @@
         "DM"
       ],
       "granularity": "类型1+类型2",
+      "rule_key": "其他_主动撤回",
       "type1": "其他",
       "type2": [
         "主动撤回"
@@ -4388,6 +4442,7 @@
         "DM"
       ],
       "granularity": "类型1+类型2",
+      "rule_key": "其他_缴纳优先权要求费等3项",
       "type1": "其他",
       "type2": [
         "缴纳优先权要求费",
@@ -4461,6 +4516,7 @@
         "DM"
       ],
       "granularity": "类型1+类型2",
+      "rule_key": "其他_答复206表",
       "type1": "其他",
       "type2": [
         "答复206表"
@@ -4531,6 +4587,7 @@
         "DM"
       ],
       "granularity": "类型1+类型2",
+      "rule_key": "著录项目_变更申请人",
       "type1": "著录项目",
       "type2": [
         "变更申请人"
@@ -4601,6 +4658,7 @@
         "DM"
       ],
       "granularity": "类型1+类型2",
+      "rule_key": "著录项目_申请人更名",
       "type1": "著录项目",
       "type2": [
         "申请人更名"
@@ -4671,6 +4729,7 @@
         "DM"
       ],
       "granularity": "类型1+类型2",
+      "rule_key": "著录项目_变更申请人地址等2项",
       "type1": "著录项目",
       "type2": [
         "变更申请人地址",
@@ -4743,6 +4802,7 @@
         "DM"
       ],
       "granularity": "类型1+类型2",
+      "rule_key": "著录项目_变更发明人",
       "type1": "著录项目",
       "type2": [
         "变更发明人"
@@ -4813,6 +4873,7 @@
         "DM"
       ],
       "granularity": "类型1+类型2",
+      "rule_key": "著录项目_变更代理机构等2项",
       "type1": "著录项目",
       "type2": [
         "变更代理机构",

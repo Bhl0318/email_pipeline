@@ -49,8 +49,8 @@ def build(data):
     counts = Counter()
     used = set()
     for record in data["records"]:
-        # 行号唯一且稳定，避免原始匹配键超出 rule_key VARCHAR(128)。
-        rule_key = f"V2_{record['sheet'].rsplit('-', 1)[-1]}_{record['excel_row']:03d}"
+        # 规则键使用结项类型的可读摘要；工作表行号只保留在 remark 中追溯来源。
+        rule_key = record["rule_key"]
         template = _template(record)
         for region in record["regions"]:
             signature = (region, rule_key)

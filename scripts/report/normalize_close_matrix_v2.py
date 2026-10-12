@@ -26,6 +26,17 @@ def _parts(value):
     return [x.strip() for x in re.split(r"[,，]", str(value or "")) if x.strip()]
 
 
+def _rule_key(granularity, type1, type2):
+    """给规则层使用的业务可读名称；完整匹配项仍逐项存 report_rule_map。"""
+    if granularity == "仅类型1":
+        key = type1
+    else:
+        key = f"{type1}_{type2[0]}" + (f"等{len(type2)}项" if len(type2) > 1 else "")
+    if len(key) > 128:
+        raise ValueError(f"规则键超出 report_rule.rule_key 的 128 字符限制：{key}")
+    return key
+
+
 def _customer(header):
     header = str(header or "").strip()
     if header == "其他客户":
@@ -79,6 +90,7 @@ def build(path):
     book = openpyxl.load_workbook(path, read_only=True, data_only=True)
     records = []
     seen = set()
+    seen_rule_keys = set()
     for sheet_name in SHEETS:
         rows = list(book[sheet_name].values)
         header = [str(x or "").strip() for x in rows[0]]
@@ -98,8 +110,13 @@ def build(path):
                 raise ValueError(f"{sheet_name}:{excel_row} 缺类型2")
             match_keys = ([type1] if granularity == "仅类型1"
                           else [f"{type1}_{x}" for x in type2])
+            rule_key = _rule_key(granularity, type1, type2)
             actions = {code: _action(row[i]) for i, code in customer_cols}
             for region in regions:
+                rule_signature = (region, rule_key)
+                if rule_signature in seen_rule_keys:
+                    raise ValueError(f"重复地区+可读规则键：{sheet_name}:{excel_row} {rule_signature}")
+                seen_rule_keys.add(rule_signature)
                 for match_key in match_keys:
                     signature = (region, match_key)
                     if signature in seen:
@@ -111,6 +128,7 @@ def build(path):
                 "excel_row": excel_row,
                 "regions": regions,
                 "granularity": granularity,
+                "rule_key": rule_key,
                 "type1": type1,
                 "type2": type2,
                 "source_match_key": get("匹配键(IT比对此列)"),
