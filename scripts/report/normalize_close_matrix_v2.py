@@ -26,11 +26,11 @@ def _parts(value):
     return [x.strip() for x in re.split(r"[,，]", str(value or "")) if x.strip()]
 
 
-def _rule_key(source_match_key, type1, type2):
-    """优先使用 Excel 匹配键；超 128 字符时压缩成可读摘要。"""
+def _rule_key(source_match_key, type1, type2, granularity):
+    """一个匹配键列出多个类型二时，使用短的规则关联键。"""
     key = source_match_key.strip()
-    if len(key) > 128 and type2:
-        key = f"{type1}｜{type2[0]}等{len(type2)}项"
+    if granularity == "类型1+类型2" and len(type2) > 1:
+        key = f"{type1}｜等多项"
     if not key or len(key) > 128:
         raise ValueError(f"规则键为空或超出 128 字符：{key}")
     return key
@@ -89,7 +89,6 @@ def build(path):
     book = openpyxl.load_workbook(path, read_only=True, data_only=True)
     records = []
     seen = set()
-    seen_rule_keys = set()
     for sheet_name in SHEETS:
         rows = list(book[sheet_name].values)
         header = [str(x or "").strip() for x in rows[0]]
@@ -110,13 +109,9 @@ def build(path):
             match_keys = ([type1] if granularity == "仅类型1"
                           else [f"{type1}_{x}" for x in type2])
             source_match_key = get("匹配键(IT比对此列)")
-            rule_key = _rule_key(source_match_key, type1, type2)
+            rule_key = _rule_key(source_match_key, type1, type2, granularity)
             actions = {code: _action(row[i]) for i, code in customer_cols}
             for region in regions:
-                rule_signature = (region, rule_key)
-                if rule_signature in seen_rule_keys:
-                    raise ValueError(f"重复地区+可读规则键：{sheet_name}:{excel_row} {rule_signature}")
-                seen_rule_keys.add(rule_signature)
                 for match_key in match_keys:
                     signature = (region, match_key)
                     if signature in seen:
@@ -132,12 +127,34 @@ def build(path):
                 "type1": type1,
                 "type2": type2,
                 "source_match_key": source_match_key,
-                "rule_key_shortened": rule_key != source_match_key,
                 "match_keys": match_keys,
                 "template_label": template_label,
                 "template_md": _template_md(sheet_name, template_label),
                 "actions": actions,
             })
+    # 同一 sheet 中可能有多行共享类型1，但模板/客户动作不同，不能合并。
+    # 优先让原先超长的行保留「类型1｜等多项」（例如 PPH提交）；
+    # 其余重名行加第一项作简短区分，原 Excel 匹配键始终留在 source_match_key。
+    groups = {}
+    for record in records:
+        groups.setdefault((record["sheet"], record["rule_key"]), []).append(record)
+    for (_, key), group in groups.items():
+        if len(group) < 2 or not key.endswith("｜等多项"):
+            continue
+        preferred = min(group, key=lambda r: (len(r["source_match_key"]) <= 128, r["excel_row"]))
+        for record in group:
+            if record is not preferred:
+                record["rule_key"] = f"{key}（{record['type2'][0]}）"
+    seen_rule_keys = set()
+    for record in records:
+        record["rule_key_shortened"] = record["rule_key"] != record["source_match_key"]
+        if len(record["rule_key"]) > 128:
+            raise ValueError(f"规则键超过 128 字符：{record['rule_key']}")
+        for region in record["regions"]:
+            signature = (region, record["rule_key"])
+            if signature in seen_rule_keys:
+                raise ValueError(f"重复地区+可读规则键：{record['sheet']}:{record['excel_row']} {signature}")
+            seen_rule_keys.add(signature)
     return {
         "source": str(path.relative_to(ROOT)),
         "scope": "CN/US/PCT 已审核；EP 与海外其他本轮未启用",
