@@ -1332,7 +1332,7 @@ INSERT INTO report_template (name, content, format, status, remark) SELECT '待�
 
 尊敬的{{客户名称}}：
 
-关于题述申请，正文事项需要自己编辑
+{{正文事项}}
 
 对上述事宜倘有任何疑问，欢迎随时垂询。
 

@@ -114,6 +114,7 @@ def main():
                        "unknown_placeholders": unknown, "fixed_dates_in_body": dates})
     generic_word = WORD_DIR / "待填模板-仅表头版-示例.docx"
     generic_body, generic_unknown, generic_dates = _as_md(generic_word)
+    generic_body = generic_body.replace("关于题述申请，正文事项需要自己编辑", "{{正文事项}}")
     (OUT_DIR / "结项_待填模板_V2.md").write_text(generic_body, encoding="utf-8")
     report.append({"template": "结项_待填模板_V2.md",
                    "word": str(generic_word.relative_to(ROOT)),

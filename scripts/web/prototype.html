@@ -551,6 +551,18 @@
         </div>
       </div>
 
+      <!-- 待填模板：人工填写汇报信正文事项 -->
+      <div class="form-section" id="section-body-matter">
+        <h3><span class="icon icon-blue">&#9998;</span> 汇报信正文事项</h3>
+        <div class="form-row full">
+          <div class="form-group">
+            <label>正文事项</label>
+            <textarea id="f-body-matter" rows="7" placeholder="请填写发给客户的正文内容，可换行" oninput="updateBodyMatter()"></textarea>
+            <div class="field-source"><span class="src-manual">&#9679;</span> 手填（待填模板）</div>
+          </div>
+        </div>
+      </div>
+
       <!-- 官文附件 -->
       <div class="form-section" id="section-source-attachments" style="display:none;">
         <h3><span class="icon icon-orange">&#128206;</span> 官文附件</h3>
@@ -646,6 +658,7 @@
     "期限描述":   "f-deadline-desc",
     "指示期限":   "f-instruction-deadline",
     "签名品牌":   "f-brand",
+    "正文事项":   "f-body-matter",
     "联系人":     "f-contact-name",
     "联系人邮箱": "f-contact-email",
     "联系人手机": "f-contact-phone",
@@ -872,10 +885,19 @@
 
   function collectFieldsFromForm() {
     for (const [field, inputId] of Object.entries(FIELD_TO_INPUT)) {
+      if (field === '正文事项' && (!templateMd || !/\{\{\s*正文事项\s*\}\}/.test(templateMd))) continue;
       const el = $(inputId);
       if (!el) continue;
       currentFields[field] = el.value;
     }
+  }
+
+  function updateBodyMatter() {
+    currentFields['正文事项'] = $('f-body-matter').value;
+    renderPreview();
+    if (currentPdfBlobUrl) { URL.revokeObjectURL(currentPdfBlobUrl); currentPdfBlobUrl = null; }
+    currentPdfBase64 = null;
+    renderAttachments();
   }
 
   // 根据模板里用到的 {{占位符}} 动态显示/隐藏对应 input；整段没用到就收起 section
@@ -1055,6 +1077,12 @@
       return;
     }
     collectFieldsFromForm();
+    if (templateMd && /\{\{\s*正文事项\s*\}\}/.test(templateMd) && !String(currentFields['正文事项'] || '').trim()) {
+      showToast('请先填写正文事项', 'error');
+      $('f-body-matter').focus();
+      return;
+    }
+    renderPreview();
     const attachPdf = $('f-attach-pdf').checked;
 
     const cleanEl = buildCleanHtml();
