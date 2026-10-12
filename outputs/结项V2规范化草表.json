@@ -1,0 +1,4889 @@
+{
+  "source": "最新版本/结项决策矩阵-给IT版-V2-20261010-已审核.xlsx",
+  "scope": "CN/US/PCT 已审核；EP 与海外其他本轮未启用",
+  "records": [
+    {
+      "sheet": "结项通知-CN",
+      "excel_row": 2,
+      "regions": [
+        "CN",
+        "CM",
+        "CS"
+      ],
+      "granularity": "仅类型1",
+      "type1": "新申请递交",
+      "type2": [
+        "发明",
+        "实用新型",
+        "外观",
+        "发明-巴黎公约",
+        "实用新型-巴黎公约",
+        "外观-巴黎公约",
+        "发明-预审",
+        "实用新型-预审",
+        "外观-预审",
+        "分案"
+      ],
+      "source_match_key": "新申请递交",
+      "match_keys": [
+        "新申请递交"
+      ],
+      "template_label": "【新申请递交】【接口用极简版】-中国新申请提交报告",
+      "template_md": "CN_新申请递交_接口用极简版.md",
+      "actions": {
+        "20618": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "report@metis-ip.com"
+            ],
+            "cc": [
+              "ui_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20633": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "patent8@metis-ip.com"
+            ],
+            "cc": []
+          }
+        },
+        "20615": {
+          "action": "assign",
+          "preparer": "mei.hu@metis-ip.com"
+        },
+        "20608": {
+          "action": "ignore"
+        },
+        "20753": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "xin.han@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20963": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "mei.hu@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "5开头": {
+          "action": "ignore"
+        },
+        "20735": {
+          "action": "ignore"
+        },
+        "20664": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "zhuqing.sun@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "其他": {
+          "action": "assign",
+          "preparer": "hui.ren@metis-ip.com"
+        }
+      }
+    },
+    {
+      "sheet": "结项通知-CN",
+      "excel_row": 3,
+      "regions": [
+        "CN",
+        "CM",
+        "CS"
+      ],
+      "granularity": "仅类型1",
+      "type1": "PCT落地",
+      "type2": [
+        "发明-PCT正常落地",
+        "发明-PCT延期落地",
+        "实用新型-PCT正常落地",
+        "实用新型-PCT延期落地",
+        "发明-英文PCT正常落地",
+        "发明-英文PCT延期落地",
+        "实用新型-英文PCT正常落地",
+        "实用新型-英文PCT延期落地"
+      ],
+      "source_match_key": "PCT落地",
+      "match_keys": [
+        "PCT落地"
+      ],
+      "template_label": "【新申请递交】【接口用极简版】-中国新申请提交报告",
+      "template_md": "CN_新申请递交_接口用极简版.md",
+      "actions": {
+        "20618": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "report@metis-ip.com"
+            ],
+            "cc": [
+              "ui_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20633": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "patent8@metis-ip.com"
+            ],
+            "cc": []
+          }
+        },
+        "20615": {
+          "action": "assign",
+          "preparer": "mei.hu@metis-ip.com"
+        },
+        "20608": {
+          "action": "ignore"
+        },
+        "20753": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "xin.han@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20963": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "mei.hu@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "5开头": {
+          "action": "ignore"
+        },
+        "20735": {
+          "action": "ignore"
+        },
+        "20664": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "zhuqing.sun@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "其他": {
+          "action": "assign",
+          "preparer": "hui.ren@metis-ip.com"
+        }
+      }
+    },
+    {
+      "sheet": "结项通知-CN",
+      "excel_row": 4,
+      "regions": [
+        "CN",
+        "CM",
+        "CS"
+      ],
+      "granularity": "类型1+类型2",
+      "type1": "OA答复",
+      "type2": [
+        "第一次答复",
+        "第二次答复",
+        "第三次答复",
+        "第四次答复",
+        "第五次答复",
+        "第一次答复-预审",
+        "第二次答复-预审"
+      ],
+      "source_match_key": "OA答复｜第一次答复, 第二次答复, 第三次答复, 第四次答复, 第五次答复, 第一次答复-预审, 第二次答复-预审",
+      "match_keys": [
+        "OA答复_第一次答复",
+        "OA答复_第二次答复",
+        "OA答复_第三次答复",
+        "OA答复_第四次答复",
+        "OA答复_第五次答复",
+        "OA答复_第一次答复-预审",
+        "OA答复_第二次答复-预审"
+      ],
+      "template_label": "【OA答复递交】中国申请审查意见答复提交报告",
+      "template_md": "CN_OA答复递交.md",
+      "actions": {
+        "20618": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "report@metis-ip.com"
+            ],
+            "cc": [
+              "ui_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20633": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "patent8@metis-ip.com"
+            ],
+            "cc": []
+          }
+        },
+        "20615": {
+          "action": "assign",
+          "preparer": "mei.hu@metis-ip.com"
+        },
+        "20608": {
+          "action": "ignore"
+        },
+        "20753": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "xin.han@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20963": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "mei.hu@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "5开头": {
+          "action": "ignore"
+        },
+        "20735": {
+          "action": "ignore"
+        },
+        "20664": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "zhuqing.sun@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "其他": {
+          "action": "assign",
+          "preparer": "hui.ren@metis-ip.com"
+        }
+      }
+    },
+    {
+      "sheet": "结项通知-CN",
+      "excel_row": 5,
+      "regions": [
+        "CN",
+        "CM",
+        "CS"
+      ],
+      "granularity": "类型1+类型2",
+      "type1": "OA答复",
+      "type2": [
+        "驳回复审请求"
+      ],
+      "source_match_key": "OA答复｜驳回复审请求",
+      "match_keys": [
+        "OA答复_驳回复审请求"
+      ],
+      "template_label": "【复审请求】中国申请复审请求提交报告",
+      "template_md": "CN_复审请求.md",
+      "actions": {
+        "20618": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "report@metis-ip.com"
+            ],
+            "cc": [
+              "ui_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20633": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "patent8@metis-ip.com"
+            ],
+            "cc": []
+          }
+        },
+        "20615": {
+          "action": "assign",
+          "preparer": "mei.hu@metis-ip.com"
+        },
+        "20608": {
+          "action": "ignore"
+        },
+        "20753": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "xin.han@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20963": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "mei.hu@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "5开头": {
+          "action": "ignore"
+        },
+        "20735": {
+          "action": "ignore"
+        },
+        "20664": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "zhuqing.sun@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "其他": {
+          "action": "assign",
+          "preparer": "hui.ren@metis-ip.com"
+        }
+      }
+    },
+    {
+      "sheet": "结项通知-CN",
+      "excel_row": 6,
+      "regions": [
+        "CN",
+        "CM",
+        "CS"
+      ],
+      "granularity": "类型1+类型2",
+      "type1": "OA答复",
+      "type2": [
+        "复审答复"
+      ],
+      "source_match_key": "OA答复｜复审答复",
+      "match_keys": [
+        "OA答复_复审答复"
+      ],
+      "template_label": "【复审答复递交】-中国申请复审答复提交报告",
+      "template_md": "CN_复审答复递交.md",
+      "actions": {
+        "20618": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "report@metis-ip.com"
+            ],
+            "cc": [
+              "ui_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20633": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "patent8@metis-ip.com"
+            ],
+            "cc": []
+          }
+        },
+        "20615": {
+          "action": "assign",
+          "preparer": "mei.hu@metis-ip.com"
+        },
+        "20608": {
+          "action": "ignore"
+        },
+        "20753": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "xin.han@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20963": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "mei.hu@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "5开头": {
+          "action": "ignore"
+        },
+        "20735": {
+          "action": "ignore"
+        },
+        "20664": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "zhuqing.sun@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "其他": {
+          "action": "assign",
+          "preparer": "hui.ren@metis-ip.com"
+        }
+      }
+    },
+    {
+      "sheet": "结项通知-CN",
+      "excel_row": 7,
+      "regions": [
+        "CN",
+        "CM",
+        "CS"
+      ],
+      "granularity": "类型1+类型2",
+      "type1": "OA答复",
+      "type2": [
+        "口审答复"
+      ],
+      "source_match_key": "OA答复｜口审答复",
+      "match_keys": [
+        "OA答复_口审答复"
+      ],
+      "template_label": "待填模板（仅表头版）",
+      "template_md": "",
+      "actions": {
+        "20618": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "report@metis-ip.com"
+            ],
+            "cc": [
+              "ui_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20633": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "patent8@metis-ip.com"
+            ],
+            "cc": []
+          }
+        },
+        "20615": {
+          "action": "assign",
+          "preparer": "mei.hu@metis-ip.com"
+        },
+        "20608": {
+          "action": "ignore"
+        },
+        "20753": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "xin.han@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20963": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "mei.hu@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "5开头": {
+          "action": "ignore"
+        },
+        "20735": {
+          "action": "ignore"
+        },
+        "20664": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "zhuqing.sun@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "其他": {
+          "action": "assign",
+          "preparer": "hui.ren@metis-ip.com"
+        }
+      }
+    },
+    {
+      "sheet": "结项通知-CN",
+      "excel_row": 8,
+      "regions": [
+        "CN",
+        "CM",
+        "CS"
+      ],
+      "granularity": "仅类型1",
+      "type1": "补正",
+      "type2": [
+        "补正说明书",
+        "补正权要",
+        "补正附图",
+        "补正摘要",
+        "补正摘要附图",
+        "审查员主动沟通补正答复",
+        "补正POA",
+        "预审答复补正",
+        "补正简要说明",
+        "补正外观设计图片",
+        "补正第1发明人身份证号",
+        "补正发明人姓名",
+        "补正优先权国别",
+        "补正在先申请副本",
+        "补正申请权转让",
+        "补正译文更正",
+        "PPH请求补正"
+      ],
+      "source_match_key": "补正",
+      "match_keys": [
+        "补正"
+      ],
+      "template_label": "【补正递交】-中国申请补正答复提交报告",
+      "template_md": "CN_补正递交.md",
+      "actions": {
+        "20618": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "report@metis-ip.com"
+            ],
+            "cc": [
+              "ui_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20633": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "patent8@metis-ip.com"
+            ],
+            "cc": []
+          }
+        },
+        "20615": {
+          "action": "assign",
+          "preparer": "mei.hu@metis-ip.com"
+        },
+        "20608": {
+          "action": "ignore"
+        },
+        "20753": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "xin.han@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20963": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "mei.hu@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "5开头": {
+          "action": "ignore"
+        },
+        "20735": {
+          "action": "ignore"
+        },
+        "20664": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "zhuqing.sun@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "其他": {
+          "action": "assign",
+          "preparer": "hui.ren@metis-ip.com"
+        }
+      }
+    },
+    {
+      "sheet": "结项通知-CN",
+      "excel_row": 9,
+      "regions": [
+        "CN",
+        "CM",
+        "CS"
+      ],
+      "granularity": "仅类型1",
+      "type1": "著录项目",
+      "type2": [
+        "变更申请人",
+        "变更申请人地址",
+        "申请人更名",
+        "变更发明人",
+        "变更发明人顺序",
+        "变更代理机构",
+        "请求发明人不公布姓名",
+        "变更代理人"
+      ],
+      "source_match_key": "著录项目",
+      "match_keys": [
+        "著录项目"
+      ],
+      "template_label": "无需做",
+      "template_md": "",
+      "actions": {
+        "20618": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "report@metis-ip.com"
+            ],
+            "cc": [
+              "ui_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20633": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "patent8@metis-ip.com"
+            ],
+            "cc": []
+          }
+        },
+        "20615": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "report@metis-ip.com"
+            ],
+            "cc": [
+              "mei.hu@metis-ip.com"
+            ]
+          }
+        },
+        "20608": {
+          "action": "ignore"
+        },
+        "20753": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "xin.han@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20963": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "mei.hu@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "5开头": {
+          "action": "ignore"
+        },
+        "20735": {
+          "action": "ignore"
+        },
+        "20664": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "zhuqing.sun@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "其他": {
+          "action": "ignore"
+        }
+      }
+    },
+    {
+      "sheet": "结项通知-CN",
+      "excel_row": 10,
+      "regions": [
+        "CN",
+        "CM",
+        "CS"
+      ],
+      "granularity": "仅类型1",
+      "type1": "缴费",
+      "type2": [
+        "缴纳办登费",
+        "缴纳年费",
+        "缴纳权要附加费"
+      ],
+      "source_match_key": "缴费",
+      "match_keys": [
+        "缴费"
+      ],
+      "template_label": "无需做",
+      "template_md": "",
+      "actions": {
+        "20618": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "report@metis-ip.com"
+            ],
+            "cc": [
+              "ui_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20633": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "patent8@metis-ip.com"
+            ],
+            "cc": []
+          }
+        },
+        "20615": {
+          "action": "assign",
+          "preparer": "mei.hu@metis-ip.com"
+        },
+        "20608": {
+          "action": "ignore"
+        },
+        "20753": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "xin.han@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20963": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "mei.hu@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "5开头": {
+          "action": "ignore"
+        },
+        "20735": {
+          "action": "ignore"
+        },
+        "20664": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "zhuqing.sun@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "其他": {
+          "action": "ignore"
+        }
+      }
+    },
+    {
+      "sheet": "结项通知-CN",
+      "excel_row": 11,
+      "regions": [
+        "CN",
+        "CM",
+        "CS"
+      ],
+      "granularity": "仅类型1",
+      "type1": "补正_内部项目结项",
+      "type2": [
+        "补正附图",
+        "补正第1发明人身份证号",
+        "补正发明人姓名",
+        "补正优先权国别",
+        "补正译文更正"
+      ],
+      "source_match_key": "补正_内部项目结项",
+      "match_keys": [
+        "补正_内部项目结项"
+      ],
+      "template_label": "无需做",
+      "template_md": "",
+      "actions": {
+        "20618": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "report@metis-ip.com"
+            ],
+            "cc": [
+              "ui_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20633": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "patent8@metis-ip.com"
+            ],
+            "cc": []
+          }
+        },
+        "20615": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "report@metis-ip.com"
+            ],
+            "cc": [
+              "mei.hu@metis-ip.com"
+            ]
+          }
+        },
+        "20608": {
+          "action": "ignore"
+        },
+        "20753": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "xin.han@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20963": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "mei.hu@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "5开头": {
+          "action": "ignore"
+        },
+        "20735": {
+          "action": "ignore"
+        },
+        "20664": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "zhuqing.sun@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "其他": {
+          "action": "ignore"
+        }
+      }
+    },
+    {
+      "sheet": "结项通知-CN",
+      "excel_row": 12,
+      "regions": [
+        "CN",
+        "CM",
+        "CS"
+      ],
+      "granularity": "类型1+类型2",
+      "type1": "其他",
+      "type2": [
+        "DAS交存",
+        "费用减缴请求",
+        "实审请求",
+        "请款退费",
+        "优先审查"
+      ],
+      "source_match_key": "其他｜DAS交存, 费用减缴请求, 实审请求, 请款退费, 优先审查",
+      "match_keys": [
+        "其他_DAS交存",
+        "其他_费用减缴请求",
+        "其他_实审请求",
+        "其他_请款退费",
+        "其他_优先审查"
+      ],
+      "template_label": "无需做",
+      "template_md": "",
+      "actions": {
+        "20618": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "report@metis-ip.com"
+            ],
+            "cc": [
+              "ui_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20633": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "patent8@metis-ip.com"
+            ],
+            "cc": []
+          }
+        },
+        "20615": {
+          "action": "assign",
+          "preparer": "mei.hu@metis-ip.com"
+        },
+        "20608": {
+          "action": "ignore"
+        },
+        "20753": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "xin.han@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20963": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "mei.hu@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "5开头": {
+          "action": "ignore"
+        },
+        "20735": {
+          "action": "ignore"
+        },
+        "20664": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "zhuqing.sun@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "其他": {
+          "action": "ignore"
+        }
+      }
+    },
+    {
+      "sheet": "结项通知-CN",
+      "excel_row": 13,
+      "regions": [
+        "CN",
+        "CM",
+        "CS"
+      ],
+      "granularity": "类型1+类型2",
+      "type1": "其他",
+      "type2": [
+        "PPH提交",
+        "申请保密审查",
+        "主动修改",
+        "撤回提前公开",
+        "提前公开",
+        "恢复权利请求",
+        "延长期限请求",
+        "提交优先权副本",
+        "单一性恢复费",
+        "复审口审回执",
+        "复审口审补交证据",
+        "非正常案件申诉",
+        "分案通知书答复",
+        "分案申请视为未提出",
+        "行政复议请求",
+        "登记财政资助专利声明",
+        "专利权期限补偿请求"
+      ],
+      "source_match_key": "其他｜PPH提交, 申请保密审查, 主动修改, 撤回提前公开, 提前公开, 恢复权利请求, 延长期限请求, 提交优先权副本, 单一性恢复费, 复审口审回执, 复审口审补交证据, 非正常案件申诉, 分案通知书答复, 分案申请视为未提出, 行政复议请求, 登记财政资助专利声明, 专利权期限补偿请求",
+      "match_keys": [
+        "其他_PPH提交",
+        "其他_申请保密审查",
+        "其他_主动修改",
+        "其他_撤回提前公开",
+        "其他_提前公开",
+        "其他_恢复权利请求",
+        "其他_延长期限请求",
+        "其他_提交优先权副本",
+        "其他_单一性恢复费",
+        "其他_复审口审回执",
+        "其他_复审口审补交证据",
+        "其他_非正常案件申诉",
+        "其他_分案通知书答复",
+        "其他_分案申请视为未提出",
+        "其他_行政复议请求",
+        "其他_登记财政资助专利声明",
+        "其他_专利权期限补偿请求"
+      ],
+      "template_label": "待填模板（仅表头版）",
+      "template_md": "",
+      "actions": {
+        "20618": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "report@metis-ip.com"
+            ],
+            "cc": [
+              "ui_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20633": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "patent8@metis-ip.com"
+            ],
+            "cc": []
+          }
+        },
+        "20615": {
+          "action": "assign",
+          "preparer": "mei.hu@metis-ip.com"
+        },
+        "20608": {
+          "action": "ignore"
+        },
+        "20753": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "xin.han@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20963": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "mei.hu@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "5开头": {
+          "action": "ignore"
+        },
+        "20735": {
+          "action": "ignore"
+        },
+        "20664": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "zhuqing.sun@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "其他": {
+          "action": "assign",
+          "preparer": "hui.ren@metis-ip.com"
+        }
+      }
+    },
+    {
+      "sheet": "结项通知-CN",
+      "excel_row": 14,
+      "regions": [
+        "CN",
+        "CM",
+        "CS"
+      ],
+      "granularity": "类型1+类型2",
+      "type1": "其他",
+      "type2": [
+        "撤回申请"
+      ],
+      "source_match_key": "其他｜撤回申请",
+      "match_keys": [
+        "其他_撤回申请"
+      ],
+      "template_label": "【撤回申请】中国申请撤回申请手续合格通知书",
+      "template_md": "CN_撤回申请.md",
+      "actions": {
+        "20618": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "report@metis-ip.com"
+            ],
+            "cc": [
+              "ui_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20633": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "patent8@metis-ip.com"
+            ],
+            "cc": []
+          }
+        },
+        "20615": {
+          "action": "assign",
+          "preparer": "mei.hu@metis-ip.com"
+        },
+        "20608": {
+          "action": "ignore"
+        },
+        "20753": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "xin.han@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20963": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "mei.hu@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "5开头": {
+          "action": "ignore"
+        },
+        "20735": {
+          "action": "ignore"
+        },
+        "20664": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "zhuqing.sun@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "其他": {
+          "action": "assign",
+          "preparer": "hui.ren@metis-ip.com"
+        }
+      }
+    },
+    {
+      "sheet": "结项通知-CN",
+      "excel_row": 15,
+      "regions": [
+        "CN",
+        "CM",
+        "CS"
+      ],
+      "granularity": "类型1+类型2",
+      "type1": "其他",
+      "type2": [
+        "答复视为未要求优先权"
+      ],
+      "source_match_key": "其他｜答复视为未要求优先权",
+      "match_keys": [
+        "其他_答复视为未要求优先权"
+      ],
+      "template_label": "【视为未要求优先权提交】中国申请视为未要求优先权答复提交报告",
+      "template_md": "CN_视为未要求优先权提交.md",
+      "actions": {
+        "20618": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "report@metis-ip.com"
+            ],
+            "cc": [
+              "ui_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20633": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "patent8@metis-ip.com"
+            ],
+            "cc": []
+          }
+        },
+        "20615": {
+          "action": "assign",
+          "preparer": "mei.hu@metis-ip.com"
+        },
+        "20608": {
+          "action": "ignore"
+        },
+        "20753": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "xin.han@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20963": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "mei.hu@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "5开头": {
+          "action": "ignore"
+        },
+        "20735": {
+          "action": "ignore"
+        },
+        "20664": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "zhuqing.sun@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "其他": {
+          "action": "assign",
+          "preparer": "hui.ren@metis-ip.com"
+        }
+      }
+    },
+    {
+      "sheet": "结项通知-CN",
+      "excel_row": 16,
+      "regions": [
+        "CN",
+        "CM",
+        "CS"
+      ],
+      "granularity": "类型1+类型2",
+      "type1": "其他",
+      "type2": [
+        "复审优先审查"
+      ],
+      "source_match_key": "其他｜复审优先审查",
+      "match_keys": [
+        "其他_复审优先审查"
+      ],
+      "template_label": "【复审阶段优先审查】-中国申请复审优先审查提交报告",
+      "template_md": "CN_复审阶段优先审查.md",
+      "actions": {
+        "20618": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "report@metis-ip.com"
+            ],
+            "cc": [
+              "ui_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20633": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "patent8@metis-ip.com"
+            ],
+            "cc": []
+          }
+        },
+        "20615": {
+          "action": "assign",
+          "preparer": "mei.hu@metis-ip.com"
+        },
+        "20608": {
+          "action": "ignore"
+        },
+        "20753": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "xin.han@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20963": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "mei.hu@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "5开头": {
+          "action": "ignore"
+        },
+        "20735": {
+          "action": "ignore"
+        },
+        "20664": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "zhuqing.sun@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "其他": {
+          "action": "assign",
+          "preparer": "hui.ren@metis-ip.com"
+        }
+      }
+    },
+    {
+      "sheet": "结项通知-CN",
+      "excel_row": 17,
+      "regions": [
+        "CN",
+        "CM",
+        "CS"
+      ],
+      "granularity": "类型1+类型2",
+      "type1": "事务办理",
+      "type2": [
+        "费减备案",
+        "总委备案"
+      ],
+      "source_match_key": "事务办理｜费减备案, 总委备案",
+      "match_keys": [
+        "事务办理_费减备案",
+        "事务办理_总委备案"
+      ],
+      "template_label": "无需做",
+      "template_md": "",
+      "actions": {
+        "20618": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "report@metis-ip.com"
+            ],
+            "cc": [
+              "ui_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20633": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "patent8@metis-ip.com"
+            ],
+            "cc": []
+          }
+        },
+        "20615": {
+          "action": "assign",
+          "preparer": "mei.hu@metis-ip.com"
+        },
+        "20608": {
+          "action": "ignore"
+        },
+        "20753": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "xin.han@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20963": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "mei.hu@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "5开头": {
+          "action": "ignore"
+        },
+        "20735": {
+          "action": "ignore"
+        },
+        "20664": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "zhuqing.sun@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "其他": {
+          "action": "ignore"
+        }
+      }
+    },
+    {
+      "sheet": "结项通知-CN",
+      "excel_row": 18,
+      "regions": [
+        "CN",
+        "CM",
+        "CS"
+      ],
+      "granularity": "类型1+类型2",
+      "type1": "事务办理",
+      "type2": [
+        "办理文件副本",
+        "直接提交保密审查请求",
+        "递交US保密审查",
+        "专利权评估报告",
+        "专利文档查询复制",
+        "中止请求",
+        "办理专利登记簿副本",
+        "办理专利说明书"
+      ],
+      "source_match_key": "事务办理｜办理文件副本, 直接提交保密审查请求, 递交US保密审查, 专利权评估报告, 专利文档查询复制, 中止请求, 办理专利登记簿副本, 办理专利说明书",
+      "match_keys": [
+        "事务办理_办理文件副本",
+        "事务办理_直接提交保密审查请求",
+        "事务办理_递交US保密审查",
+        "事务办理_专利权评估报告",
+        "事务办理_专利文档查询复制",
+        "事务办理_中止请求",
+        "事务办理_办理专利登记簿副本",
+        "事务办理_办理专利说明书"
+      ],
+      "template_label": "待填模板（仅表头版）",
+      "template_md": "",
+      "actions": {
+        "20618": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "report@metis-ip.com"
+            ],
+            "cc": [
+              "ui_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20633": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "patent8@metis-ip.com"
+            ],
+            "cc": []
+          }
+        },
+        "20615": {
+          "action": "assign",
+          "preparer": "mei.hu@metis-ip.com"
+        },
+        "20608": {
+          "action": "ignore"
+        },
+        "20753": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "xin.han@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20963": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "mei.hu@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "5开头": {
+          "action": "ignore"
+        },
+        "20735": {
+          "action": "ignore"
+        },
+        "20664": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "zhuqing.sun@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "其他": {
+          "action": "assign",
+          "preparer": "hui.ren@metis-ip.com"
+        }
+      }
+    },
+    {
+      "sheet": "结项通知-US",
+      "excel_row": 2,
+      "regions": [
+        "US",
+        "DS",
+        "PR"
+      ],
+      "granularity": "类型1+类型2",
+      "type1": "新申请递交",
+      "type2": [
+        "临时申请"
+      ],
+      "source_match_key": "新申请递交｜临时申请",
+      "match_keys": [
+        "新申请递交_临时申请"
+      ],
+      "template_label": "【临时申请递交】2026-08-31-美国临时申请递交",
+      "template_md": "US_临时申请递交.md",
+      "actions": {
+        "20618": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "report@metis-ip.com"
+            ],
+            "cc": [
+              "ui_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20633": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "patent8@metis-ip.com"
+            ],
+            "cc": []
+          }
+        },
+        "20608": {
+          "action": "ignore"
+        },
+        "20753": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "xin.han@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20664": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "zhuqing.sun@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "其他": {
+          "action": "assign",
+          "preparer": "zhuqing.sun@metis-ip.com"
+        }
+      }
+    },
+    {
+      "sheet": "结项通知-US",
+      "excel_row": 3,
+      "regions": [
+        "US",
+        "DS",
+        "PR"
+      ],
+      "granularity": "类型1+类型2",
+      "type1": "新申请递交",
+      "type2": [
+        "新申请发明",
+        "新申请外观",
+        "PCT落地",
+        "发明-巴黎公约",
+        "外观-巴黎公约",
+        "续案/分案/部分续案"
+      ],
+      "source_match_key": "新申请递交｜新申请发明, 新申请外观, PCT落地, 发明-巴黎公约, 外观-巴黎公约, 续案/分案/部分续案",
+      "match_keys": [
+        "新申请递交_新申请发明",
+        "新申请递交_新申请外观",
+        "新申请递交_PCT落地",
+        "新申请递交_发明-巴黎公约",
+        "新申请递交_外观-巴黎公约",
+        "新申请递交_续案/分案/部分续案"
+      ],
+      "template_label": "【新申请递交】2026-08-31-美国专利申请递交",
+      "template_md": "US_新申请递交.md",
+      "actions": {
+        "20618": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "report@metis-ip.com"
+            ],
+            "cc": [
+              "ui_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20633": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "patent8@metis-ip.com"
+            ],
+            "cc": []
+          }
+        },
+        "20608": {
+          "action": "ignore"
+        },
+        "20753": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "xin.han@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20664": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "zhuqing.sun@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "其他": {
+          "action": "assign",
+          "preparer": "zhuqing.sun@metis-ip.com"
+        }
+      }
+    },
+    {
+      "sheet": "结项通知-US",
+      "excel_row": 4,
+      "regions": [
+        "US",
+        "DS"
+      ],
+      "granularity": "类型1+类型2",
+      "type1": "OA答复",
+      "type2": [
+        "Non-final",
+        "Final"
+      ],
+      "source_match_key": "OA答复｜Non-final, Final",
+      "match_keys": [
+        "OA答复_Non-final",
+        "OA答复_Final"
+      ],
+      "template_label": "【OA答复递交】2026-08-31-美国申请OA答复提交报告",
+      "template_md": "US_OA答复递交.md",
+      "actions": {
+        "20618": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "report@metis-ip.com"
+            ],
+            "cc": [
+              "ui_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20633": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "patent8@metis-ip.com"
+            ],
+            "cc": []
+          }
+        },
+        "20608": {
+          "action": "ignore"
+        },
+        "20753": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "xin.han@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20664": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "zhuqing.sun@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "其他": {
+          "action": "assign",
+          "preparer": "zhuqing.sun@metis-ip.com"
+        }
+      }
+    },
+    {
+      "sheet": "结项通知-US",
+      "excel_row": 5,
+      "regions": [
+        "US",
+        "DS"
+      ],
+      "granularity": "类型1+类型2",
+      "type1": "OA答复",
+      "type2": [
+        "AA"
+      ],
+      "source_match_key": "OA答复｜AA",
+      "match_keys": [
+        "OA答复_AA"
+      ],
+      "template_label": "【AA答复递交】2026-08-31-美国申请AA答复提交报告",
+      "template_md": "US_AA答复递交.md",
+      "actions": {
+        "20618": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "report@metis-ip.com"
+            ],
+            "cc": [
+              "ui_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20633": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "patent8@metis-ip.com"
+            ],
+            "cc": []
+          }
+        },
+        "20608": {
+          "action": "ignore"
+        },
+        "20753": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "xin.han@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20664": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "zhuqing.sun@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "其他": {
+          "action": "assign",
+          "preparer": "zhuqing.sun@metis-ip.com"
+        }
+      }
+    },
+    {
+      "sheet": "结项通知-US",
+      "excel_row": 6,
+      "regions": [
+        "US",
+        "DS"
+      ],
+      "granularity": "类型1+类型2",
+      "type1": "OA答复",
+      "type2": [
+        "RR"
+      ],
+      "source_match_key": "OA答复｜RR",
+      "match_keys": [
+        "OA答复_RR"
+      ],
+      "template_label": "【RR答复递交】2026-08-31-美国申请RR答复提交报告",
+      "template_md": "US_RR答复递交.md",
+      "actions": {
+        "20618": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "report@metis-ip.com"
+            ],
+            "cc": [
+              "ui_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20633": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "patent8@metis-ip.com"
+            ],
+            "cc": []
+          }
+        },
+        "20608": {
+          "action": "ignore"
+        },
+        "20753": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "xin.han@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20664": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "zhuqing.sun@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "其他": {
+          "action": "assign",
+          "preparer": "zhuqing.sun@metis-ip.com"
+        }
+      }
+    },
+    {
+      "sheet": "结项通知-US",
+      "excel_row": 7,
+      "regions": [
+        "US",
+        "DS"
+      ],
+      "granularity": "类型1+类型2",
+      "type1": "OA答复",
+      "type2": [
+        "RR Petition"
+      ],
+      "source_match_key": "OA答复｜RR Petition",
+      "match_keys": [
+        "OA答复_RR Petition"
+      ],
+      "template_label": "待填模板（仅表头版）",
+      "template_md": "",
+      "actions": {
+        "20618": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "report@metis-ip.com"
+            ],
+            "cc": [
+              "ui_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20633": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "patent8@metis-ip.com"
+            ],
+            "cc": []
+          }
+        },
+        "20608": {
+          "action": "ignore"
+        },
+        "20753": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "xin.han@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20664": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "zhuqing.sun@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "其他": {
+          "action": "assign",
+          "preparer": "zhuqing.sun@metis-ip.com"
+        }
+      }
+    },
+    {
+      "sheet": "结项通知-US",
+      "excel_row": 8,
+      "regions": [
+        "US",
+        "DS"
+      ],
+      "granularity": "类型1+类型2",
+      "type1": "OA答复",
+      "type2": [
+        "Ex Parte Quayle Action"
+      ],
+      "source_match_key": "OA答复｜Ex Parte Quayle Action",
+      "match_keys": [
+        "OA答复_Ex Parte Quayle Action"
+      ],
+      "template_label": "【Ex Parte Quayle Action答复递交】2026-08-31-美国申请Ex Parte Quayle Action答复提交报告",
+      "template_md": "US_ExParteQuayleAction答复递交.md",
+      "actions": {
+        "20618": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "report@metis-ip.com"
+            ],
+            "cc": [
+              "ui_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20633": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "patent8@metis-ip.com"
+            ],
+            "cc": []
+          }
+        },
+        "20608": {
+          "action": "ignore"
+        },
+        "20753": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "xin.han@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20664": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "zhuqing.sun@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "其他": {
+          "action": "assign",
+          "preparer": "zhuqing.sun@metis-ip.com"
+        }
+      }
+    },
+    {
+      "sheet": "结项通知-US",
+      "excel_row": 9,
+      "regions": [
+        "US",
+        "DS"
+      ],
+      "granularity": "仅类型1",
+      "type1": "IDS",
+      "type2": [
+        "IDS-新申请首次排查",
+        "IDS-客户提供",
+        "QPIDS-来源",
+        "IDS排查",
+        "答复NFOA前排查IDS",
+        "答复RR前排查IDS",
+        "答复FOA前排查IDS",
+        "答复AA前排查IDS"
+      ],
+      "source_match_key": "IDS",
+      "match_keys": [
+        "IDS"
+      ],
+      "template_label": "【IDS递交】2026-08-31-IDS递交转达",
+      "template_md": "US_IDS递交.md",
+      "actions": {
+        "20618": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "report@metis-ip.com"
+            ],
+            "cc": [
+              "ui_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20633": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "patent8@metis-ip.com"
+            ],
+            "cc": []
+          }
+        },
+        "20608": {
+          "action": "ignore"
+        },
+        "20753": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "xin.han@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20664": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "zhuqing.sun@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "其他": {
+          "action": "assign",
+          "preparer": "zhuqing.sun@metis-ip.com"
+        }
+      }
+    },
+    {
+      "sheet": "结项通知-US",
+      "excel_row": 10,
+      "regions": [
+        "US",
+        "DS"
+      ],
+      "granularity": "仅类型1",
+      "type1": "NOA",
+      "type2": [
+        "NOA缴纳授权费"
+      ],
+      "source_match_key": "NOA",
+      "match_keys": [
+        "NOA"
+      ],
+      "template_label": "【NOA缴纳授权费】2026-08-31-美国申请缴纳授权费",
+      "template_md": "US_NOA缴纳授权费.md",
+      "actions": {
+        "20618": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "report@metis-ip.com"
+            ],
+            "cc": [
+              "ui_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20633": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "patent8@metis-ip.com"
+            ],
+            "cc": []
+          }
+        },
+        "20608": {
+          "action": "ignore"
+        },
+        "20753": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "xin.han@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20664": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "zhuqing.sun@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "其他": {
+          "action": "assign",
+          "preparer": "zhuqing.sun@metis-ip.com"
+        }
+      }
+    },
+    {
+      "sheet": "结项通知-US",
+      "excel_row": 11,
+      "regions": [
+        "US",
+        "DS"
+      ],
+      "granularity": "仅类型1",
+      "type1": "补正",
+      "type2": [
+        "补正说明书/附图",
+        "补正PPH",
+        "补正官文错误",
+        "答复Interview summary",
+        "补正发明人地址",
+        "补正申请人地址",
+        "补正优先权",
+        "补正发明人",
+        "补正-补正申请人",
+        "补正supplemental response"
+      ],
+      "source_match_key": "补正",
+      "match_keys": [
+        "补正"
+      ],
+      "template_label": "【补正答复】2026-08-31-美国申请补正答复提交报告",
+      "template_md": "US_补正答复.md",
+      "actions": {
+        "20618": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "report@metis-ip.com"
+            ],
+            "cc": [
+              "ui_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20633": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "patent8@metis-ip.com"
+            ],
+            "cc": []
+          }
+        },
+        "20608": {
+          "action": "ignore"
+        },
+        "20753": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "xin.han@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20664": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "zhuqing.sun@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "其他": {
+          "action": "assign",
+          "preparer": "zhuqing.sun@metis-ip.com"
+        }
+      }
+    },
+    {
+      "sheet": "结项通知-US",
+      "excel_row": 12,
+      "regions": [
+        "US",
+        "DS"
+      ],
+      "granularity": "类型1+类型2",
+      "type1": "著录项目",
+      "type2": [
+        "变更申请人"
+      ],
+      "source_match_key": "著录项目｜变更申请人",
+      "match_keys": [
+        "著录项目_变更申请人"
+      ],
+      "template_label": "【变更申请人】2026-08-31-美国申请变更申请人",
+      "template_md": "US_变更申请人.md",
+      "actions": {
+        "20618": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "report@metis-ip.com"
+            ],
+            "cc": [
+              "ui_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20633": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "patent8@metis-ip.com"
+            ],
+            "cc": []
+          }
+        },
+        "20608": {
+          "action": "ignore"
+        },
+        "20753": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "xin.han@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20664": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "zhuqing.sun@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "其他": {
+          "action": "assign",
+          "preparer": "zhuqing.sun@metis-ip.com"
+        }
+      }
+    },
+    {
+      "sheet": "结项通知-US",
+      "excel_row": 13,
+      "regions": [
+        "US",
+        "DS"
+      ],
+      "granularity": "类型1+类型2",
+      "type1": "著录项目",
+      "type2": [
+        "申请人更名"
+      ],
+      "source_match_key": "著录项目｜申请人更名",
+      "match_keys": [
+        "著录项目_申请人更名"
+      ],
+      "template_label": "【申请人更名】2026-08-31-美国申请申请人更名",
+      "template_md": "US_申请人更名.md",
+      "actions": {
+        "20618": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "report@metis-ip.com"
+            ],
+            "cc": [
+              "ui_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20633": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "patent8@metis-ip.com"
+            ],
+            "cc": []
+          }
+        },
+        "20608": {
+          "action": "ignore"
+        },
+        "20753": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "xin.han@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20664": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "zhuqing.sun@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "其他": {
+          "action": "assign",
+          "preparer": "zhuqing.sun@metis-ip.com"
+        }
+      }
+    },
+    {
+      "sheet": "结项通知-US",
+      "excel_row": 14,
+      "regions": [
+        "US",
+        "DS"
+      ],
+      "granularity": "类型1+类型2",
+      "type1": "著录项目",
+      "type2": [
+        "变更发明人"
+      ],
+      "source_match_key": "著录项目｜变更发明人",
+      "match_keys": [
+        "著录项目_变更发明人"
+      ],
+      "template_label": "【变更发明人】2026-08-31-美国申请变更发明人",
+      "template_md": "US_变更发明人.md",
+      "actions": {
+        "20618": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "report@metis-ip.com"
+            ],
+            "cc": [
+              "ui_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20633": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "patent8@metis-ip.com"
+            ],
+            "cc": []
+          }
+        },
+        "20608": {
+          "action": "ignore"
+        },
+        "20753": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "xin.han@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20664": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "zhuqing.sun@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "其他": {
+          "action": "assign",
+          "preparer": "zhuqing.sun@metis-ip.com"
+        }
+      }
+    },
+    {
+      "sheet": "结项通知-US",
+      "excel_row": 15,
+      "regions": [
+        "US",
+        "DS"
+      ],
+      "granularity": "类型1+类型2",
+      "type1": "著录项目",
+      "type2": [
+        "POA递交/变更代理机构"
+      ],
+      "source_match_key": "著录项目｜POA递交/变更代理机构",
+      "match_keys": [
+        "著录项目_POA递交/变更代理机构"
+      ],
+      "template_label": "【补交POA】2026-08-31-美国申请补交POA",
+      "template_md": "US_补交POA.md",
+      "actions": {
+        "20618": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "report@metis-ip.com"
+            ],
+            "cc": [
+              "ui_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20633": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "patent8@metis-ip.com"
+            ],
+            "cc": []
+          }
+        },
+        "20608": {
+          "action": "ignore"
+        },
+        "20753": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "xin.han@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20664": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "zhuqing.sun@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "其他": {
+          "action": "assign",
+          "preparer": "zhuqing.sun@metis-ip.com"
+        }
+      }
+    },
+    {
+      "sheet": "结项通知-US",
+      "excel_row": 16,
+      "regions": [
+        "US",
+        "DS"
+      ],
+      "granularity": "类型1+类型2",
+      "type1": "其他递交",
+      "type2": [
+        "DAS/优先权副本递交",
+        "递交US保密审查",
+        "递交CN保密审查",
+        "Preliminary Amendment递交",
+        "Amendment after NOA",
+        "petition for revival(复活)",
+        "Petition to restore恢复优先权",
+        "请求撤案",
+        "提交公众意见",
+        "递交confirmation",
+        "变更发明人/申请人地址",
+        "Streamlined Claim Set Pilot",
+        "RFI_PIER_Pilot答复"
+      ],
+      "source_match_key": "其他递交｜DAS/优先权副本递交, 递交US保密审查, 递交CN保密审查, Preliminary Amendment递交, Amendment after NOA, petition for revival(复活), Petition to restore恢复优先权, 请求撤案, 提交公众意见, 递交confirmation, 变更发明人/申请人地址, Streamlined Claim Set Pilot, RFI_PIER_Pilot答复",
+      "match_keys": [
+        "其他递交_DAS/优先权副本递交",
+        "其他递交_递交US保密审查",
+        "其他递交_递交CN保密审查",
+        "其他递交_Preliminary Amendment递交",
+        "其他递交_Amendment after NOA",
+        "其他递交_petition for revival(复活)",
+        "其他递交_Petition to restore恢复优先权",
+        "其他递交_请求撤案",
+        "其他递交_提交公众意见",
+        "其他递交_递交confirmation",
+        "其他递交_变更发明人/申请人地址",
+        "其他递交_Streamlined Claim Set Pilot",
+        "其他递交_RFI_PIER_Pilot答复"
+      ],
+      "template_label": "待填模板（仅表头版）",
+      "template_md": "",
+      "actions": {
+        "20618": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "report@metis-ip.com"
+            ],
+            "cc": [
+              "ui_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20633": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "patent8@metis-ip.com"
+            ],
+            "cc": []
+          }
+        },
+        "20608": {
+          "action": "ignore"
+        },
+        "20753": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "xin.han@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20664": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "zhuqing.sun@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "其他": {
+          "action": "assign",
+          "preparer": "zhuqing.sun@metis-ip.com"
+        }
+      }
+    },
+    {
+      "sheet": "结项通知-US",
+      "excel_row": 17,
+      "regions": [
+        "US",
+        "DS"
+      ],
+      "granularity": "类型1+类型2",
+      "type1": "其他递交",
+      "type2": [
+        "Assignment登记",
+        "request for refund(退款)",
+        "补缴费用/只缴费用",
+        "递交439表",
+        "咨询案件进展",
+        "购买申请副本",
+        "案件排查",
+        "递交Interview request"
+      ],
+      "source_match_key": "其他递交｜Assignment登记, request for refund(退款), 补缴费用/只缴费用, 递交439表, 咨询案件进展, 购买申请副本, 案件排查, 递交Interview request",
+      "match_keys": [
+        "其他递交_Assignment登记",
+        "其他递交_request for refund(退款)",
+        "其他递交_补缴费用/只缴费用",
+        "其他递交_递交439表",
+        "其他递交_咨询案件进展",
+        "其他递交_购买申请副本",
+        "其他递交_案件排查",
+        "其他递交_递交Interview request"
+      ],
+      "template_label": "无需做",
+      "template_md": "",
+      "actions": {
+        "20618": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "report@metis-ip.com"
+            ],
+            "cc": [
+              "ui_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20633": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "patent8@metis-ip.com"
+            ],
+            "cc": []
+          }
+        },
+        "20608": {
+          "action": "ignore"
+        },
+        "20753": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "xin.han@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20664": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "zhuqing.sun@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "其他": {
+          "action": "ignore"
+        }
+      }
+    },
+    {
+      "sheet": "结项通知-US",
+      "excel_row": 18,
+      "regions": [
+        "US",
+        "DS"
+      ],
+      "granularity": "类型1+类型2",
+      "type1": "其他递交",
+      "type2": [
+        "Declaration递交"
+      ],
+      "source_match_key": "其他递交｜Declaration递交",
+      "match_keys": [
+        "其他递交_Declaration递交"
+      ],
+      "template_label": "【补交Declaration】2026-08-31-美国申请补交Declaration转达",
+      "template_md": "US_补交Declaration.md",
+      "actions": {
+        "20618": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "report@metis-ip.com"
+            ],
+            "cc": [
+              "ui_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20633": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "patent8@metis-ip.com"
+            ],
+            "cc": []
+          }
+        },
+        "20608": {
+          "action": "ignore"
+        },
+        "20753": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "xin.han@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20664": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "zhuqing.sun@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "其他": {
+          "action": "assign",
+          "preparer": "zhuqing.sun@metis-ip.com"
+        }
+      }
+    },
+    {
+      "sheet": "结项通知-US",
+      "excel_row": 19,
+      "regions": [
+        "US",
+        "DS"
+      ],
+      "granularity": "类型1+类型2",
+      "type1": "其他递交",
+      "type2": [
+        "变更实体"
+      ],
+      "source_match_key": "其他递交｜变更实体",
+      "match_keys": [
+        "其他递交_变更实体"
+      ],
+      "template_label": "【变更实体】2026-08-31-美国申请变更实体",
+      "template_md": "US_变更实体.md",
+      "actions": {
+        "20618": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "report@metis-ip.com"
+            ],
+            "cc": [
+              "ui_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20633": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "patent8@metis-ip.com"
+            ],
+            "cc": []
+          }
+        },
+        "20608": {
+          "action": "ignore"
+        },
+        "20753": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "xin.han@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20664": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "zhuqing.sun@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "其他": {
+          "action": "assign",
+          "preparer": "zhuqing.sun@metis-ip.com"
+        }
+      }
+    },
+    {
+      "sheet": "结项通知-US",
+      "excel_row": 20,
+      "regions": [
+        "US",
+        "DS"
+      ],
+      "granularity": "类型1+类型2",
+      "type1": "其他递交",
+      "type2": [
+        "补交翻译稿"
+      ],
+      "source_match_key": "其他递交｜补交翻译稿",
+      "match_keys": [
+        "其他递交_补交翻译稿"
+      ],
+      "template_label": "【翻译提交】2026-08-31-美国申请翻译文件递交",
+      "template_md": "US_翻译提交.md",
+      "actions": {
+        "20618": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "report@metis-ip.com"
+            ],
+            "cc": [
+              "ui_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20633": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "patent8@metis-ip.com"
+            ],
+            "cc": []
+          }
+        },
+        "20608": {
+          "action": "ignore"
+        },
+        "20753": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "xin.han@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20664": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "zhuqing.sun@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "其他": {
+          "action": "assign",
+          "preparer": "zhuqing.sun@metis-ip.com"
+        }
+      }
+    },
+    {
+      "sheet": "结项通知-US",
+      "excel_row": 21,
+      "regions": [
+        "US",
+        "DS"
+      ],
+      "granularity": "类型1+类型2",
+      "type1": "其他递交",
+      "type2": [
+        "TD"
+      ],
+      "source_match_key": "其他递交｜TD",
+      "match_keys": [
+        "其他递交_TD"
+      ],
+      "template_label": "【TD提交】2026-08-31-美国申请TD提交报告",
+      "template_md": "US_TD提交.md",
+      "actions": {
+        "20618": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "report@metis-ip.com"
+            ],
+            "cc": [
+              "ui_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20633": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "patent8@metis-ip.com"
+            ],
+            "cc": []
+          }
+        },
+        "20608": {
+          "action": "ignore"
+        },
+        "20753": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "xin.han@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20664": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "zhuqing.sun@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "其他": {
+          "action": "assign",
+          "preparer": "zhuqing.sun@metis-ip.com"
+        }
+      }
+    },
+    {
+      "sheet": "结项通知-US",
+      "excel_row": 22,
+      "regions": [
+        "US",
+        "DS"
+      ],
+      "granularity": "类型1+类型2",
+      "type1": "其他递交",
+      "type2": [
+        "PPH"
+      ],
+      "source_match_key": "其他递交｜PPH",
+      "match_keys": [
+        "其他递交_PPH"
+      ],
+      "template_label": "【PPH提交】2026-08-31-PPH递交请求",
+      "template_md": "US_PPH提交.md",
+      "actions": {
+        "20618": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "report@metis-ip.com"
+            ],
+            "cc": [
+              "ui_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20633": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "patent8@metis-ip.com"
+            ],
+            "cc": []
+          }
+        },
+        "20608": {
+          "action": "ignore"
+        },
+        "20753": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "xin.han@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20664": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "zhuqing.sun@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "其他": {
+          "action": "assign",
+          "preparer": "zhuqing.sun@metis-ip.com"
+        }
+      }
+    },
+    {
+      "sheet": "结项通知-US",
+      "excel_row": 23,
+      "regions": [
+        "US",
+        "DS"
+      ],
+      "granularity": "类型1+类型2",
+      "type1": "Appeal递交",
+      "type2": [
+        "递交Appeal Brief"
+      ],
+      "source_match_key": "Appeal递交｜递交Appeal Brief",
+      "match_keys": [
+        "Appeal递交_递交Appeal Brief"
+      ],
+      "template_label": "【Appeal Brief提交】2026-08-31-美国申请Appeal Brief提交报告",
+      "template_md": "US_AppealBrief提交.md",
+      "actions": {
+        "20618": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "report@metis-ip.com"
+            ],
+            "cc": [
+              "ui_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20633": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "patent8@metis-ip.com"
+            ],
+            "cc": []
+          }
+        },
+        "20608": {
+          "action": "ignore"
+        },
+        "20753": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "xin.han@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20664": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "zhuqing.sun@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "其他": {
+          "action": "assign",
+          "preparer": "zhuqing.sun@metis-ip.com"
+        }
+      }
+    },
+    {
+      "sheet": "结项通知-US",
+      "excel_row": 24,
+      "regions": [
+        "US",
+        "DS"
+      ],
+      "granularity": "类型1+类型2",
+      "type1": "Appeal递交",
+      "type2": [
+        "提交Notice of Appeal",
+        "缴纳Appeal forwarding Fee",
+        "答复Patent Board Decision"
+      ],
+      "source_match_key": "Appeal递交｜提交Notice of Appeal, 缴纳Appeal forwarding Fee, 答复Patent Board Decision",
+      "match_keys": [
+        "Appeal递交_提交Notice of Appeal",
+        "Appeal递交_缴纳Appeal forwarding Fee",
+        "Appeal递交_答复Patent Board Decision"
+      ],
+      "template_label": "待填模板（仅表头版）",
+      "template_md": "",
+      "actions": {
+        "20618": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "report@metis-ip.com"
+            ],
+            "cc": [
+              "ui_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20633": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "patent8@metis-ip.com"
+            ],
+            "cc": []
+          }
+        },
+        "20608": {
+          "action": "ignore"
+        },
+        "20753": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "xin.han@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20664": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "zhuqing.sun@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "其他": {
+          "action": "assign",
+          "preparer": "zhuqing.sun@metis-ip.com"
+        }
+      }
+    },
+    {
+      "sheet": "结项通知-US",
+      "excel_row": 25,
+      "regions": [
+        "US",
+        "DS"
+      ],
+      "granularity": "仅类型1",
+      "type1": "补正_内部项目结项",
+      "type2": [
+        "补正说明书/附图",
+        "补正PPH",
+        "补正官文错误",
+        "补正发明人地址",
+        "补正申请人地址",
+        "补正优先权",
+        "补正发明人",
+        "补正-补正申请人",
+        "补正supplemental response"
+      ],
+      "source_match_key": "补正_内部项目结项",
+      "match_keys": [
+        "补正_内部项目结项"
+      ],
+      "template_label": "无需做",
+      "template_md": "",
+      "actions": {
+        "20618": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "report@metis-ip.com"
+            ],
+            "cc": [
+              "ui_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20633": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "patent8@metis-ip.com"
+            ],
+            "cc": []
+          }
+        },
+        "20608": {
+          "action": "ignore"
+        },
+        "20753": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "xin.han@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20664": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "zhuqing.sun@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "其他": {
+          "action": "ignore"
+        }
+      }
+    },
+    {
+      "sheet": "结项通知-US",
+      "excel_row": 26,
+      "regions": [
+        "US"
+      ],
+      "granularity": "仅类型1",
+      "type1": "年费",
+      "type2": [
+        "3.5年年费",
+        "7.5年年费",
+        "11.5年年费"
+      ],
+      "source_match_key": "年费",
+      "match_keys": [
+        "年费"
+      ],
+      "template_label": "无需做",
+      "template_md": "",
+      "actions": {
+        "20618": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "report@metis-ip.com"
+            ],
+            "cc": [
+              "ui_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20633": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "patent8@metis-ip.com"
+            ],
+            "cc": []
+          }
+        },
+        "20608": {
+          "action": "ignore"
+        },
+        "20753": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "xin.han@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20664": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "zhuqing.sun@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "其他": {
+          "action": "ignore"
+        }
+      }
+    },
+    {
+      "sheet": "结项通知-US",
+      "excel_row": 27,
+      "regions": [
+        "US",
+        "DS"
+      ],
+      "granularity": "仅类型1",
+      "type1": "附加",
+      "type2": [
+        "+Track one",
+        "+TD",
+        "+RCE",
+        "+PPH",
+        "+IDS",
+        "+AFCP",
+        "+AE加速",
+        "+外观加速"
+      ],
+      "source_match_key": "附加",
+      "match_keys": [
+        "附加"
+      ],
+      "template_label": "无需做",
+      "template_md": "",
+      "actions": {
+        "20618": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "report@metis-ip.com"
+            ],
+            "cc": [
+              "ui_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20633": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "patent8@metis-ip.com"
+            ],
+            "cc": []
+          }
+        },
+        "20608": {
+          "action": "ignore"
+        },
+        "20753": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "xin.han@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20664": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "zhuqing.sun@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "其他": {
+          "action": "ignore"
+        }
+      }
+    },
+    {
+      "sheet": "结项通知-US",
+      "excel_row": 28,
+      "regions": [
+        "PR"
+      ],
+      "granularity": "仅类型1",
+      "type1": "其他递交",
+      "type2": [
+        "递交US保密审查",
+        "购买申请副本",
+        "补交翻译稿"
+      ],
+      "source_match_key": "PR｜其他递交",
+      "match_keys": [
+        "其他递交"
+      ],
+      "template_label": "待填模板（仅表头版）",
+      "template_md": "",
+      "actions": {
+        "20618": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "report@metis-ip.com"
+            ],
+            "cc": [
+              "ui_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20633": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "patent8@metis-ip.com"
+            ],
+            "cc": []
+          }
+        },
+        "20608": {
+          "action": "ignore"
+        },
+        "20753": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "xin.han@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20664": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "zhuqing.sun@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "其他": {
+          "action": "assign",
+          "preparer": "zhuqing.sun@metis-ip.com"
+        }
+      }
+    },
+    {
+      "sheet": "结项通知-PCT",
+      "excel_row": 2,
+      "regions": [
+        "WO",
+        "DM"
+      ],
+      "granularity": "类型1+类型2",
+      "type1": "新申请递交",
+      "type2": [
+        "PCT新申请递交"
+      ],
+      "source_match_key": "新申请递交｜PCT新申请递交",
+      "match_keys": [
+        "新申请递交_PCT新申请递交"
+      ],
+      "template_label": "【新申请递交】【无代办事项】-国际申请递交事宜",
+      "template_md": "PCT_新申请递交_无代办事项.md",
+      "actions": {
+        "20618": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "report@metis-ip.com"
+            ],
+            "cc": [
+              "ui_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20633": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "patent8@metis-ip.com"
+            ],
+            "cc": []
+          }
+        },
+        "20608": {
+          "action": "ignore"
+        },
+        "20753": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "xin.han@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20664": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "zhuqing.sun@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "其他": {
+          "action": "assign",
+          "preparer": "yuan.wang@metis-ip.com"
+        }
+      }
+    },
+    {
+      "sheet": "结项通知-PCT",
+      "excel_row": 3,
+      "regions": [
+        "WO",
+        "DM"
+      ],
+      "granularity": "类型1+类型2",
+      "type1": "新申请递交",
+      "type2": [
+        "海牙协定新申请递交"
+      ],
+      "source_match_key": "新申请递交｜海牙协定新申请递交",
+      "match_keys": [
+        "新申请递交_海牙协定新申请递交"
+      ],
+      "template_label": "待填模板（仅表头版）",
+      "template_md": "",
+      "actions": {
+        "20618": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "report@metis-ip.com"
+            ],
+            "cc": [
+              "ui_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20633": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "patent8@metis-ip.com"
+            ],
+            "cc": []
+          }
+        },
+        "20608": {
+          "action": "ignore"
+        },
+        "20753": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "xin.han@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20664": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "zhuqing.sun@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "其他": {
+          "action": "assign",
+          "preparer": "yuan.wang@metis-ip.com"
+        }
+      }
+    },
+    {
+      "sheet": "结项通知-PCT",
+      "excel_row": 4,
+      "regions": [
+        "WO",
+        "DM"
+      ],
+      "granularity": "类型1+类型2",
+      "type1": "补正",
+      "type2": [
+        "补交POA"
+      ],
+      "source_match_key": "补正｜补交POA",
+      "match_keys": [
+        "补正_补交POA"
+      ],
+      "template_label": "无需做",
+      "template_md": "",
+      "actions": {
+        "20618": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "report@metis-ip.com"
+            ],
+            "cc": [
+              "ui_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20633": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "patent8@metis-ip.com"
+            ],
+            "cc": []
+          }
+        },
+        "20608": {
+          "action": "ignore"
+        },
+        "20753": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "xin.han@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20664": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "zhuqing.sun@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "其他": {
+          "action": "ignore"
+        }
+      }
+    },
+    {
+      "sheet": "结项通知-PCT",
+      "excel_row": 5,
+      "regions": [
+        "WO",
+        "DM"
+      ],
+      "granularity": "类型1+类型2",
+      "type1": "补正",
+      "type2": [
+        "补交DAS码"
+      ],
+      "source_match_key": "补正｜补交DAS码",
+      "match_keys": [
+        "补正_补交DAS码"
+      ],
+      "template_label": "【补交DAS码】国际申请补交DAS码",
+      "template_md": "PCT_补交DAS码.md",
+      "actions": {
+        "20618": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "report@metis-ip.com"
+            ],
+            "cc": [
+              "ui_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20633": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "patent8@metis-ip.com"
+            ],
+            "cc": []
+          }
+        },
+        "20608": {
+          "action": "ignore"
+        },
+        "20753": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "xin.han@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20664": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "zhuqing.sun@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "其他": {
+          "action": "assign",
+          "preparer": "yuan.wang@metis-ip.com"
+        }
+      }
+    },
+    {
+      "sheet": "结项通知-PCT",
+      "excel_row": 6,
+      "regions": [
+        "WO",
+        "DM"
+      ],
+      "granularity": "类型1+类型2",
+      "type1": "补正",
+      "type2": [
+        "106表-补正权利要求",
+        "106表-补正说明书附图",
+        "106表-申请人及发明人地址"
+      ],
+      "source_match_key": "补正｜106表-补正权利要求, 106表-补正说明书附图, 106表-申请人及发明人地址",
+      "match_keys": [
+        "补正_106表-补正权利要求",
+        "补正_106表-补正说明书附图",
+        "补正_106表-申请人及发明人地址"
+      ],
+      "template_label": "【106表补正提交】106表补正",
+      "template_md": "PCT_106表补正提交.md",
+      "actions": {
+        "20618": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "report@metis-ip.com"
+            ],
+            "cc": [
+              "ui_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20633": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "patent8@metis-ip.com"
+            ],
+            "cc": []
+          }
+        },
+        "20608": {
+          "action": "ignore"
+        },
+        "20753": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "xin.han@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20664": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "zhuqing.sun@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "其他": {
+          "action": "assign",
+          "preparer": "yuan.wang@metis-ip.com"
+        }
+      }
+    },
+    {
+      "sheet": "结项通知-PCT",
+      "excel_row": 7,
+      "regions": [
+        "WO",
+        "DM"
+      ],
+      "granularity": "类型1+类型2",
+      "type1": "补正",
+      "type2": [
+        "132表-补正权利要求书",
+        "132表-补正申请人及发明人地址"
+      ],
+      "source_match_key": "补正｜132表-补正权利要求书, 132表-补正申请人及发明人地址",
+      "match_keys": [
+        "补正_132表-补正权利要求书",
+        "补正_132表-补正申请人及发明人地址"
+      ],
+      "template_label": "【132表补正提交】132表补正",
+      "template_md": "PCT_132表补正提交.md",
+      "actions": {
+        "20618": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "report@metis-ip.com"
+            ],
+            "cc": [
+              "ui_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20633": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "patent8@metis-ip.com"
+            ],
+            "cc": []
+          }
+        },
+        "20608": {
+          "action": "ignore"
+        },
+        "20753": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "xin.han@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20664": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "zhuqing.sun@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "其他": {
+          "action": "assign",
+          "preparer": "yuan.wang@metis-ip.com"
+        }
+      }
+    },
+    {
+      "sheet": "结项通知-PCT",
+      "excel_row": 8,
+      "regions": [
+        "WO",
+        "DM"
+      ],
+      "granularity": "类型1+类型2",
+      "type1": "补正",
+      "type2": [
+        "补正发明名称",
+        "19条修改",
+        "34条修改"
+      ],
+      "source_match_key": "补正｜补正发明名称, 19条修改, 34条修改",
+      "match_keys": [
+        "补正_补正发明名称",
+        "补正_19条修改",
+        "补正_34条修改"
+      ],
+      "template_label": "待填模板（仅表头版）",
+      "template_md": "",
+      "actions": {
+        "20618": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "report@metis-ip.com"
+            ],
+            "cc": [
+              "ui_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20633": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "patent8@metis-ip.com"
+            ],
+            "cc": []
+          }
+        },
+        "20608": {
+          "action": "ignore"
+        },
+        "20753": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "xin.han@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20664": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "zhuqing.sun@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "其他": {
+          "action": "assign",
+          "preparer": "yuan.wang@metis-ip.com"
+        }
+      }
+    },
+    {
+      "sheet": "结项通知-PCT",
+      "excel_row": 9,
+      "regions": [
+        "WO",
+        "DM"
+      ],
+      "granularity": "类型1+类型2",
+      "type1": "补正",
+      "type2": [
+        "主动补正权利要求"
+      ],
+      "source_match_key": "补正｜主动补正权利要求",
+      "match_keys": [
+        "补正_主动补正权利要求"
+      ],
+      "template_label": "【主动补正提交】国际申请主动补正",
+      "template_md": "PCT_主动补正提交.md",
+      "actions": {
+        "20618": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "report@metis-ip.com"
+            ],
+            "cc": [
+              "ui_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20633": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "patent8@metis-ip.com"
+            ],
+            "cc": []
+          }
+        },
+        "20608": {
+          "action": "ignore"
+        },
+        "20753": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "xin.han@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20664": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "zhuqing.sun@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "其他": {
+          "action": "assign",
+          "preparer": "yuan.wang@metis-ip.com"
+        }
+      }
+    },
+    {
+      "sheet": "结项通知-PCT",
+      "excel_row": 10,
+      "regions": [
+        "WO",
+        "DM"
+      ],
+      "granularity": "类型1+类型2",
+      "type1": "其他",
+      "type2": [
+        "请求纸质优先权副本",
+        "DAS请求",
+        "办理优先权文件副本",
+        "递交US保密审查",
+        "递交海外其他保密审查"
+      ],
+      "source_match_key": "其他｜请求纸质优先权副本, DAS请求, 办理优先权文件副本, 递交US保密审查, 递交海外其他保密审查",
+      "match_keys": [
+        "其他_请求纸质优先权副本",
+        "其他_DAS请求",
+        "其他_办理优先权文件副本",
+        "其他_递交US保密审查",
+        "其他_递交海外其他保密审查"
+      ],
+      "template_label": "待填模板（仅表头版）",
+      "template_md": "",
+      "actions": {
+        "20618": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "report@metis-ip.com"
+            ],
+            "cc": [
+              "ui_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20633": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "patent8@metis-ip.com"
+            ],
+            "cc": []
+          }
+        },
+        "20608": {
+          "action": "ignore"
+        },
+        "20753": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "xin.han@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20664": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "zhuqing.sun@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "其他": {
+          "action": "assign",
+          "preparer": "yuan.wang@metis-ip.com"
+        }
+      }
+    },
+    {
+      "sheet": "结项通知-PCT",
+      "excel_row": 11,
+      "regions": [
+        "WO",
+        "DM"
+      ],
+      "granularity": "类型1+类型2",
+      "type1": "其他",
+      "type2": [
+        "主动撤回"
+      ],
+      "source_match_key": "其他｜主动撤回",
+      "match_keys": [
+        "其他_主动撤回"
+      ],
+      "template_label": "【主动撤回】撤回国际申请",
+      "template_md": "PCT_撤回申请提交.md",
+      "actions": {
+        "20618": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "report@metis-ip.com"
+            ],
+            "cc": [
+              "ui_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20633": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "patent8@metis-ip.com"
+            ],
+            "cc": []
+          }
+        },
+        "20608": {
+          "action": "ignore"
+        },
+        "20753": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "xin.han@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20664": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "zhuqing.sun@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "其他": {
+          "action": "assign",
+          "preparer": "yuan.wang@metis-ip.com"
+        }
+      }
+    },
+    {
+      "sheet": "结项通知-PCT",
+      "excel_row": 12,
+      "regions": [
+        "WO",
+        "DM"
+      ],
+      "granularity": "类型1+类型2",
+      "type1": "其他",
+      "type2": [
+        "缴纳优先权要求费",
+        "缴纳申请费",
+        "缴费"
+      ],
+      "source_match_key": "其他｜缴纳优先权要求费, 缴纳申请费, 缴费",
+      "match_keys": [
+        "其他_缴纳优先权要求费",
+        "其他_缴纳申请费",
+        "其他_缴费"
+      ],
+      "template_label": "无需做",
+      "template_md": "",
+      "actions": {
+        "20618": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "report@metis-ip.com"
+            ],
+            "cc": [
+              "ui_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20633": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "patent8@metis-ip.com"
+            ],
+            "cc": []
+          }
+        },
+        "20608": {
+          "action": "ignore"
+        },
+        "20753": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "xin.han@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20664": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "zhuqing.sun@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "其他": {
+          "action": "ignore"
+        }
+      }
+    },
+    {
+      "sheet": "结项通知-PCT",
+      "excel_row": 13,
+      "regions": [
+        "WO",
+        "DM"
+      ],
+      "granularity": "类型1+类型2",
+      "type1": "其他",
+      "type2": [
+        "答复206表"
+      ],
+      "source_match_key": "其他｜答复206表",
+      "match_keys": [
+        "其他_答复206表"
+      ],
+      "template_label": "【206表补正提交】206表补正",
+      "template_md": "PCT_206表补正提交.md",
+      "actions": {
+        "20618": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "report@metis-ip.com"
+            ],
+            "cc": [
+              "ui_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20633": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "patent8@metis-ip.com"
+            ],
+            "cc": []
+          }
+        },
+        "20608": {
+          "action": "ignore"
+        },
+        "20753": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "xin.han@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20664": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "zhuqing.sun@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "其他": {
+          "action": "assign",
+          "preparer": "yuan.wang@metis-ip.com"
+        }
+      }
+    },
+    {
+      "sheet": "结项通知-PCT",
+      "excel_row": 14,
+      "regions": [
+        "WO",
+        "DM"
+      ],
+      "granularity": "类型1+类型2",
+      "type1": "著录项目",
+      "type2": [
+        "变更申请人"
+      ],
+      "source_match_key": "著录项目｜变更申请人",
+      "match_keys": [
+        "著录项目_变更申请人"
+      ],
+      "template_label": "【变更申请人提交】国际申请变更申请人汇报信",
+      "template_md": "PCT_变更申请人提交.md",
+      "actions": {
+        "20618": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "report@metis-ip.com"
+            ],
+            "cc": [
+              "ui_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20633": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "patent8@metis-ip.com"
+            ],
+            "cc": []
+          }
+        },
+        "20608": {
+          "action": "ignore"
+        },
+        "20753": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "xin.han@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20664": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "zhuqing.sun@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "其他": {
+          "action": "assign",
+          "preparer": "yuan.wang@metis-ip.com"
+        }
+      }
+    },
+    {
+      "sheet": "结项通知-PCT",
+      "excel_row": 15,
+      "regions": [
+        "WO",
+        "DM"
+      ],
+      "granularity": "类型1+类型2",
+      "type1": "著录项目",
+      "type2": [
+        "申请人更名"
+      ],
+      "source_match_key": "著录项目｜申请人更名",
+      "match_keys": [
+        "著录项目_申请人更名"
+      ],
+      "template_label": "【申请人更名提交】国际申请申请人更名提交汇报信",
+      "template_md": "PCT_申请人更名提交.md",
+      "actions": {
+        "20618": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "report@metis-ip.com"
+            ],
+            "cc": [
+              "ui_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20633": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "patent8@metis-ip.com"
+            ],
+            "cc": []
+          }
+        },
+        "20608": {
+          "action": "ignore"
+        },
+        "20753": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "xin.han@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20664": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "zhuqing.sun@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "其他": {
+          "action": "assign",
+          "preparer": "yuan.wang@metis-ip.com"
+        }
+      }
+    },
+    {
+      "sheet": "结项通知-PCT",
+      "excel_row": 16,
+      "regions": [
+        "WO",
+        "DM"
+      ],
+      "granularity": "类型1+类型2",
+      "type1": "著录项目",
+      "type2": [
+        "变更申请人地址",
+        "变更发明人地址"
+      ],
+      "source_match_key": "著录项目｜变更申请人地址, 变更发明人地址",
+      "match_keys": [
+        "著录项目_变更申请人地址",
+        "著录项目_变更发明人地址"
+      ],
+      "template_label": "【变更申请人、发明人地址提交】国际申请变更申请人、发明人地址汇报信",
+      "template_md": "PCT_变更申请人、发明人地址提交.md",
+      "actions": {
+        "20618": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "report@metis-ip.com"
+            ],
+            "cc": [
+              "ui_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20633": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "patent8@metis-ip.com"
+            ],
+            "cc": []
+          }
+        },
+        "20608": {
+          "action": "ignore"
+        },
+        "20753": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "xin.han@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20664": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "zhuqing.sun@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "其他": {
+          "action": "assign",
+          "preparer": "yuan.wang@metis-ip.com"
+        }
+      }
+    },
+    {
+      "sheet": "结项通知-PCT",
+      "excel_row": 17,
+      "regions": [
+        "WO",
+        "DM"
+      ],
+      "granularity": "类型1+类型2",
+      "type1": "著录项目",
+      "type2": [
+        "变更发明人"
+      ],
+      "source_match_key": "著录项目｜变更发明人",
+      "match_keys": [
+        "著录项目_变更发明人"
+      ],
+      "template_label": "【变更发明人提交】国际申请变更发明人汇报信",
+      "template_md": "PCT_变更发明人提交.md",
+      "actions": {
+        "20618": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "report@metis-ip.com"
+            ],
+            "cc": [
+              "ui_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20633": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "patent8@metis-ip.com"
+            ],
+            "cc": []
+          }
+        },
+        "20608": {
+          "action": "ignore"
+        },
+        "20753": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "xin.han@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20664": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "zhuqing.sun@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "其他": {
+          "action": "assign",
+          "preparer": "yuan.wang@metis-ip.com"
+        }
+      }
+    },
+    {
+      "sheet": "结项通知-PCT",
+      "excel_row": 18,
+      "regions": [
+        "WO",
+        "DM"
+      ],
+      "granularity": "类型1+类型2",
+      "type1": "著录项目",
+      "type2": [
+        "变更代理机构",
+        "变更代理机构案号"
+      ],
+      "source_match_key": "著录项目｜变更代理机构, 变更代理机构案号",
+      "match_keys": [
+        "著录项目_变更代理机构",
+        "著录项目_变更代理机构案号"
+      ],
+      "template_label": "无需做",
+      "template_md": "",
+      "actions": {
+        "20618": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "report@metis-ip.com"
+            ],
+            "cc": [
+              "ui_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20633": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "patent8@metis-ip.com"
+            ],
+            "cc": []
+          }
+        },
+        "20608": {
+          "action": "ignore"
+        },
+        "20753": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "xin.han@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "20664": {
+          "action": "skip",
+          "forward": {
+            "to": [
+              "zhuqing.sun@metis-ip.com"
+            ],
+            "cc": [
+              "patents_pa@metis-ip.com"
+            ]
+          }
+        },
+        "其他": {
+          "action": "ignore"
+        }
+      }
+    }
+  ],
+  "summary": {
+    "source_rows": 61,
+    "region_match_keys": 326,
+    "actions": {
+      "skip": 263,
+      "assign": 64,
+      "ignore": 107
+    }
+  }
+}

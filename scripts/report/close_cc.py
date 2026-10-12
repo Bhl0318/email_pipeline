@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""结项邮件「抄送名单」规则 —— 从 close_report_rules.json 派生。
+"""结项邮件「抄送名单」规则 —— 从规则表或 close_report_rules.json 派生。
 
 背景：OA 官文规则读原始官文邮件、skip 时转发原始邮件；而结项不是邮件触发，
 而是 web 表单提交（案号 + 结项类型一 cls_task_1 + 结项类型二 cls_task_2），提交后系统
@@ -9,7 +9,7 @@
 - 只有 action=skip 的规则产生抄送：cc = forward.to + forward.cc 合并去重（全进 cc）。
 - assign / ignore 不产生抄送（空）。
 
-法域判定（与 close_report_rules._meta 一致）：案号含 EP→EP / 含 US→US / 含 WO→PCT / 含 CN→CN / 其余→空。
+法域判定：从完整案号的地区位置取两位代码；V2 使用 CN/CM/CS/US/DS/PR/WO/DM。
 客户码解析优先级：精确客户码(前5位) → 「5开头」(客户号以5开头时) → 「其他」兜底。
 
 用法：
@@ -20,18 +20,19 @@
 """
 import json
 import os
+import re
 
 _DIR = os.path.dirname(os.path.abspath(__file__))
 RULES_FILE = os.path.join(_DIR, "close_report_rules.json")
+_PROJECT_RE = re.compile(r"^[A-Z0-9]{5}-[A-Z0-9]{4}([A-Z]{2})[A-Z0-9]{2}$", re.I)
+_REGIONS = {"CN", "CM", "CS", "US", "DS", "PR", "WO", "DM", "EP"}
 
 
 def region_of(project):
-    """案号 → 法域：含 EP→EP / 含 US→US / 含 WO→PCT / 含 CN→CN / 其余→''。"""
-    p = (project or "").upper()
-    for tok, reg in (("EP", "EP"), ("US", "US"), ("WO", "PCT"), ("CN", "CN")):
-        if tok in p:
-            return reg
-    return ""
+    """按案号固定位置提取地区码；兼容数字/字母客户码和 -Hxxx 案号。"""
+    match = _PROJECT_RE.fullmatch((project or "").strip())
+    code = match.group(1).upper() if match else ""
+    return code if code in _REGIONS else ""
 
 
 def _skip_cc(act):
@@ -48,7 +49,20 @@ def _skip_cc(act):
     return cc
 
 
-def load_rules(path=RULES_FILE):
+def load_rules(path=None):
+    """默认优先读结项规则表；表空或查询失败时回退 JSON。
+
+    显式传入 path 时直接读取该文件，便于离线核对规则。
+    """
+    if path is None:
+        try:
+            import rules_store
+            rules = rules_store.build_close_rules()
+            if rules and any(region in rules for region in ("CN", "US", "EP", "PCT")):
+                return rules
+        except Exception:
+            pass
+        path = RULES_FILE
     with open(path, encoding="utf-8") as f:
         return json.load(f)
 
@@ -74,13 +88,19 @@ def build_cc_map(rules):
     return out
 
 
-def resolve_cc(rules, project, task1, task2):
+def resolve_cc(rules, project, task1, task2, region=None):
     """单次查：案号 + 结项类型一/二 → 结项邮件抄送名单。
+    从案号读取 V2 地区码；先按 类型1_类型2，未命中再按 仅类型1。
     返回 {region, combination, closeType, action, cc:[...]}；查不到 → cc 为空。"""
-    region = region_of(project)
-    combo = f"{(task1 or '').strip()}_{(task2 or '').strip()}"
+    explicit_region = (region or "").strip().upper()
+    region = region_of(project) or explicit_region
+    if region == "WO" and region not in (rules or {}) and "PCT" in (rules or {}):
+        region = "PCT"  # 兼容旧 JSON 中 PCT 作为 WO 分组名
+    task1 = (task1 or "").strip()
+    combo = f"{task1}_{(task2 or '').strip()}"
     node = (rules or {}).get(region) or {}
-    close_type = (node.get("combinations") or {}).get(combo, "")
+    combinations = node.get("combinations") or {}
+    close_type = combinations.get(combo) or combinations.get(task1, "")
     crules = ((node.get("rules") or {}).get(close_type) or {}).get("rules") or {}
     code = (project or "")[:5]
     act = crules.get(code)

@@ -891,16 +891,17 @@ def radmin_content_save(c: RadminContent):
     return {"ok": True, "message": "模板正文已保存"}
 
 
-# ─── 结项邮件抄送名单（供结项 web 表单页用；派生自 close_report_rules.json，仅 skip 产 cc）───
+# ─── 结项邮件抄送名单（供结项 web 表单页用；规则表优先、JSON 回退，仅 skip 产 cc）───
 import close_cc  # noqa: E402
 
 
 @app.get("/api/close-cc")
-def api_close_cc(project: str = "", task1: str = "", task2: str = ""):
+def api_close_cc(project: str = "", task1: str = "", task2: str = "", region: str = ""):
     """单次查：案号 + 结项类型一/二 → 结项邮件抄送名单。
+    地区码优先从案号提取；region 仅作为缺失或不规范案号时的兜底参数。
     返回 {region, combination, closeType, action, cc:[邮箱...]}；查不到/非skip → cc 为空。"""
     try:
-        return close_cc.resolve_cc(close_cc.load_rules(), project, task1, task2)
+        return close_cc.resolve_cc(close_cc.load_rules(), project, task1, task2, region=region or None)
     except Exception as e:
         raise HTTPException(500, f"查抄送名单失败: {e}")
 

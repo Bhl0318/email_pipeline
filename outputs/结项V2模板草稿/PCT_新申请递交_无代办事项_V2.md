@@ -1,0 +1,40 @@
+***机密并受律师客户通讯特权保护***
+***Privileged and Confidential; Attorney-Client Communication***
+
+PRIVILEGED AND CONFIDENTIAL; ATTORNEY CLIENT COMMUNICATION
+
+**关于：国际申请递交**
+
+|  |  |
+| --- | --- |
+| 申请号： | {{申请号}} |
+| 申请名称： | {{申请名称}} |
+| 申请日： | {{申请日}} |
+| 委托方案号： | {{客户案号}} |
+| 代理所案号： | {{代理所案号}} |
+
+尊敬的{{客户名称}}：
+
+题述PCT申请已于20XX年XX月XX日向国家知识产权局提交，国际申请号为{{申请号}}，以下为递交相关文件。
+
+1.电子提交收据（Receipt of Electronic Submission）
+
+该收据确认上述国际申请已于20XX年XX月XX日提交至国家知识产权局，并被分配上述申请号。
+
+2. PCT请求书（PCT Request）
+
+PCT请求书中指出上述国际申请的申请人、发明人及优先权等信息。
+
+3.费用清单（Fee Transmittal）
+
+费用清单里列出了收费项目及总额。
+
+4.专利申请文件（Patent Application）
+
+该文件是最终提交的专利申请文件，包括说明书和附图部分。
+
+如题述PCT申请有任何进一步来自官方的消息，我们将随即通知贵方。对上述事宜倘有任何疑问，欢迎随时垂询。
+
+谨致问候
+
+{{签名品牌}}

@@ -65,7 +65,7 @@
     <button data-d="close" onclick="setDomain('close')">结项规则</button>
   </div>
   <select id="f-region" onchange="renderKeys()">
-    <option value="">全部法域</option><option>CN</option><option>US</option><option>EP</option><option>PCT</option>
+    <option value="">全部法域</option>
   </select>
   <input id="f-q" placeholder="搜规则键" oninput="renderKeys()" style="width:150px">
   <span class="spacer"></span>
@@ -88,6 +88,7 @@ async function jpost(u,b){const r=await fetch(u,{method:'POST',headers:{'Content
 
 function setDomain(d){
   DOMAIN=d;CUR=null;
+  $('f-region').value='';
   for(const b of document.querySelectorAll('#seg-domain button'))b.classList.toggle('on',b.dataset.d===d);
   $('mid').innerHTML='<div class="muted">← 左侧选择一个规则键</div>';
   $('right').innerHTML='<div class="muted">模板区</div>';
@@ -95,9 +96,16 @@ function setDomain(d){
 }
 async function loadKeys(){
   setStatus('加载中…','#f59e0b');
-  try{const d=await jget('/api/radmin/keys?domain='+DOMAIN);KEYS=d.keys||[];renderKeys();setStatus('');}
+  try{const d=await jget('/api/radmin/keys?domain='+DOMAIN);KEYS=d.keys||[];renderRegionOptions();renderKeys();setStatus('');}
   catch(e){setStatus('❌ '+e.message,'#dc2626')}
   try{TPLNAMES=(await jget('/api/radmin/templates')).names||[]}catch(e){}
+}
+function renderRegionOptions(){
+  const select=$('f-region'), selected=select.value;
+  const configured=DOMAIN==='oa'?['CN','US','EP']:['CN','CM','CS','US','DS','PR','WO','DM'];
+  const regions=[...new Set([...configured,...KEYS.map(k=>k.region).filter(Boolean)])];
+  select.replaceChildren(new Option('全部法域',''),...regions.map(r=>new Option(r,r)));
+  select.value=regions.includes(selected)?selected:'';
 }
 function renderKeys(){
   const reg=$('f-region').value, q=$('f-q').value.trim().toLowerCase();
