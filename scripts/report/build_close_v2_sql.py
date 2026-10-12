@@ -53,7 +53,7 @@ def _template_source(record):
 def build(data):
     lines = [
         "-- 结项 V2 替换草案（仅 close 域）；本文件默认 ROLLBACK，不会实际替换。",
-        "-- 无需修改现有表结构：rule_key 最长 128 字符，超长 Excel 匹配键用可读摘要。",
+        "-- 无需修改现有表结构：rule_key 最长 128 字符，多项匹配键使用 类型1｜等多项 及必要的区分词。",
         "-- 结项模板键取 Excel「模板」原文；「无需做」不分配汇报信，只随结项邮件抄送。",
         "-- 「待填模板（仅表头版）」正文来自 待填模板-仅表头版-示例.docx。",
         "-- 本草案先为 Excel 模板名补 report_template 正文，再替换 close 域规则。",
@@ -93,7 +93,7 @@ def build(data):
     ]
     used = set()
     for record in data["records"]:
-        # 常规行使用 Excel 原匹配键；仅超长行使用可读摘要，完整匹配逐项见 map。
+        # 多项匹配行用短关联键；完整组合逐项见 map.match_key。
         rule_key = record["rule_key"]
         template = _template(record)
         for region in record["regions"]:
