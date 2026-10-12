@@ -26,6 +26,7 @@
         "分案"
       ],
       "source_match_key": "新申请递交",
+      "rule_key_shortened": false,
       "match_keys": [
         "新申请递交"
       ],
@@ -126,6 +127,7 @@
         "实用新型-英文PCT延期落地"
       ],
       "source_match_key": "PCT落地",
+      "rule_key_shortened": false,
       "match_keys": [
         "PCT落地"
       ],
@@ -213,7 +215,7 @@
         "CS"
       ],
       "granularity": "类型1+类型2",
-      "rule_key": "OA答复_第一次答复等7项",
+      "rule_key": "OA答复｜第一次答复, 第二次答复, 第三次答复, 第四次答复, 第五次答复, 第一次答复-预审, 第二次答复-预审",
       "type1": "OA答复",
       "type2": [
         "第一次答复",
@@ -225,6 +227,7 @@
         "第二次答复-预审"
       ],
       "source_match_key": "OA答复｜第一次答复, 第二次答复, 第三次答复, 第四次答复, 第五次答复, 第一次答复-预审, 第二次答复-预审",
+      "rule_key_shortened": false,
       "match_keys": [
         "OA答复_第一次答复",
         "OA答复_第二次答复",
@@ -318,12 +321,13 @@
         "CS"
       ],
       "granularity": "类型1+类型2",
-      "rule_key": "OA答复_驳回复审请求",
+      "rule_key": "OA答复｜驳回复审请求",
       "type1": "OA答复",
       "type2": [
         "驳回复审请求"
       ],
       "source_match_key": "OA答复｜驳回复审请求",
+      "rule_key_shortened": false,
       "match_keys": [
         "OA答复_驳回复审请求"
       ],
@@ -411,12 +415,13 @@
         "CS"
       ],
       "granularity": "类型1+类型2",
-      "rule_key": "OA答复_复审答复",
+      "rule_key": "OA答复｜复审答复",
       "type1": "OA答复",
       "type2": [
         "复审答复"
       ],
       "source_match_key": "OA答复｜复审答复",
+      "rule_key_shortened": false,
       "match_keys": [
         "OA答复_复审答复"
       ],
@@ -504,12 +509,13 @@
         "CS"
       ],
       "granularity": "类型1+类型2",
-      "rule_key": "OA答复_口审答复",
+      "rule_key": "OA答复｜口审答复",
       "type1": "OA答复",
       "type2": [
         "口审答复"
       ],
       "source_match_key": "OA答复｜口审答复",
+      "rule_key_shortened": false,
       "match_keys": [
         "OA答复_口审答复"
       ],
@@ -619,6 +625,7 @@
         "PPH请求补正"
       ],
       "source_match_key": "补正",
+      "rule_key_shortened": false,
       "match_keys": [
         "补正"
       ],
@@ -719,6 +726,7 @@
         "变更代理人"
       ],
       "source_match_key": "著录项目",
+      "rule_key_shortened": false,
       "match_keys": [
         "著录项目"
       ],
@@ -820,6 +828,7 @@
         "缴纳权要附加费"
       ],
       "source_match_key": "缴费",
+      "rule_key_shortened": false,
       "match_keys": [
         "缴费"
       ],
@@ -916,6 +925,7 @@
         "补正译文更正"
       ],
       "source_match_key": "补正_内部项目结项",
+      "rule_key_shortened": false,
       "match_keys": [
         "补正_内部项目结项"
       ],
@@ -1009,7 +1019,7 @@
         "CS"
       ],
       "granularity": "类型1+类型2",
-      "rule_key": "其他_DAS交存等5项",
+      "rule_key": "其他｜DAS交存, 费用减缴请求, 实审请求, 请款退费, 优先审查",
       "type1": "其他",
       "type2": [
         "DAS交存",
@@ -1019,6 +1029,7 @@
         "优先审查"
       ],
       "source_match_key": "其他｜DAS交存, 费用减缴请求, 实审请求, 请款退费, 优先审查",
+      "rule_key_shortened": false,
       "match_keys": [
         "其他_DAS交存",
         "其他_费用减缴请求",
@@ -1109,7 +1120,7 @@
         "CS"
       ],
       "granularity": "类型1+类型2",
-      "rule_key": "其他_PPH提交等17项",
+      "rule_key": "其他｜PPH提交等17项",
       "type1": "其他",
       "type2": [
         "PPH提交",
@@ -1131,6 +1142,7 @@
         "专利权期限补偿请求"
       ],
       "source_match_key": "其他｜PPH提交, 申请保密审查, 主动修改, 撤回提前公开, 提前公开, 恢复权利请求, 延长期限请求, 提交优先权副本, 单一性恢复费, 复审口审回执, 复审口审补交证据, 非正常案件申诉, 分案通知书答复, 分案申请视为未提出, 行政复议请求, 登记财政资助专利声明, 专利权期限补偿请求",
+      "rule_key_shortened": true,
       "match_keys": [
         "其他_PPH提交",
         "其他_申请保密审查",
@@ -1234,12 +1246,13 @@
         "CS"
       ],
       "granularity": "类型1+类型2",
-      "rule_key": "其他_撤回申请",
+      "rule_key": "其他｜撤回申请",
       "type1": "其他",
       "type2": [
         "撤回申请"
       ],
       "source_match_key": "其他｜撤回申请",
+      "rule_key_shortened": false,
       "match_keys": [
         "其他_撤回申请"
       ],
@@ -1327,12 +1340,13 @@
         "CS"
       ],
       "granularity": "类型1+类型2",
-      "rule_key": "其他_答复视为未要求优先权",
+      "rule_key": "其他｜答复视为未要求优先权",
       "type1": "其他",
       "type2": [
         "答复视为未要求优先权"
       ],
       "source_match_key": "其他｜答复视为未要求优先权",
+      "rule_key_shortened": false,
       "match_keys": [
         "其他_答复视为未要求优先权"
       ],
@@ -1420,12 +1434,13 @@
         "CS"
       ],
       "granularity": "类型1+类型2",
-      "rule_key": "其他_复审优先审查",
+      "rule_key": "其他｜复审优先审查",
       "type1": "其他",
       "type2": [
         "复审优先审查"
       ],
       "source_match_key": "其他｜复审优先审查",
+      "rule_key_shortened": false,
       "match_keys": [
         "其他_复审优先审查"
       ],
@@ -1513,13 +1528,14 @@
         "CS"
       ],
       "granularity": "类型1+类型2",
-      "rule_key": "事务办理_费减备案等2项",
+      "rule_key": "事务办理｜费减备案, 总委备案",
       "type1": "事务办理",
       "type2": [
         "费减备案",
         "总委备案"
       ],
       "source_match_key": "事务办理｜费减备案, 总委备案",
+      "rule_key_shortened": false,
       "match_keys": [
         "事务办理_费减备案",
         "事务办理_总委备案"
@@ -1607,7 +1623,7 @@
         "CS"
       ],
       "granularity": "类型1+类型2",
-      "rule_key": "事务办理_办理文件副本等8项",
+      "rule_key": "事务办理｜办理文件副本, 直接提交保密审查请求, 递交US保密审查, 专利权评估报告, 专利文档查询复制, 中止请求, 办理专利登记簿副本, 办理专利说明书",
       "type1": "事务办理",
       "type2": [
         "办理文件副本",
@@ -1620,6 +1636,7 @@
         "办理专利说明书"
       ],
       "source_match_key": "事务办理｜办理文件副本, 直接提交保密审查请求, 递交US保密审查, 专利权评估报告, 专利文档查询复制, 中止请求, 办理专利登记簿副本, 办理专利说明书",
+      "rule_key_shortened": false,
       "match_keys": [
         "事务办理_办理文件副本",
         "事务办理_直接提交保密审查请求",
@@ -1714,12 +1731,13 @@
         "PR"
       ],
       "granularity": "类型1+类型2",
-      "rule_key": "新申请递交_临时申请",
+      "rule_key": "新申请递交｜临时申请",
       "type1": "新申请递交",
       "type2": [
         "临时申请"
       ],
       "source_match_key": "新申请递交｜临时申请",
+      "rule_key_shortened": false,
       "match_keys": [
         "新申请递交_临时申请"
       ],
@@ -1786,7 +1804,7 @@
         "PR"
       ],
       "granularity": "类型1+类型2",
-      "rule_key": "新申请递交_新申请发明等6项",
+      "rule_key": "新申请递交｜新申请发明, 新申请外观, PCT落地, 发明-巴黎公约, 外观-巴黎公约, 续案/分案/部分续案",
       "type1": "新申请递交",
       "type2": [
         "新申请发明",
@@ -1797,6 +1815,7 @@
         "续案/分案/部分续案"
       ],
       "source_match_key": "新申请递交｜新申请发明, 新申请外观, PCT落地, 发明-巴黎公约, 外观-巴黎公约, 续案/分案/部分续案",
+      "rule_key_shortened": false,
       "match_keys": [
         "新申请递交_新申请发明",
         "新申请递交_新申请外观",
@@ -1867,13 +1886,14 @@
         "DS"
       ],
       "granularity": "类型1+类型2",
-      "rule_key": "OA答复_Non-final等2项",
+      "rule_key": "OA答复｜Non-final, Final",
       "type1": "OA答复",
       "type2": [
         "Non-final",
         "Final"
       ],
       "source_match_key": "OA答复｜Non-final, Final",
+      "rule_key_shortened": false,
       "match_keys": [
         "OA答复_Non-final",
         "OA答复_Final"
@@ -1940,12 +1960,13 @@
         "DS"
       ],
       "granularity": "类型1+类型2",
-      "rule_key": "OA答复_AA",
+      "rule_key": "OA答复｜AA",
       "type1": "OA答复",
       "type2": [
         "AA"
       ],
       "source_match_key": "OA答复｜AA",
+      "rule_key_shortened": false,
       "match_keys": [
         "OA答复_AA"
       ],
@@ -2011,12 +2032,13 @@
         "DS"
       ],
       "granularity": "类型1+类型2",
-      "rule_key": "OA答复_RR",
+      "rule_key": "OA答复｜RR",
       "type1": "OA答复",
       "type2": [
         "RR"
       ],
       "source_match_key": "OA答复｜RR",
+      "rule_key_shortened": false,
       "match_keys": [
         "OA答复_RR"
       ],
@@ -2082,12 +2104,13 @@
         "DS"
       ],
       "granularity": "类型1+类型2",
-      "rule_key": "OA答复_RR Petition",
+      "rule_key": "OA答复｜RR Petition",
       "type1": "OA答复",
       "type2": [
         "RR Petition"
       ],
       "source_match_key": "OA答复｜RR Petition",
+      "rule_key_shortened": false,
       "match_keys": [
         "OA答复_RR Petition"
       ],
@@ -2153,12 +2176,13 @@
         "DS"
       ],
       "granularity": "类型1+类型2",
-      "rule_key": "OA答复_Ex Parte Quayle Action",
+      "rule_key": "OA答复｜Ex Parte Quayle Action",
       "type1": "OA答复",
       "type2": [
         "Ex Parte Quayle Action"
       ],
       "source_match_key": "OA答复｜Ex Parte Quayle Action",
+      "rule_key_shortened": false,
       "match_keys": [
         "OA答复_Ex Parte Quayle Action"
       ],
@@ -2237,6 +2261,7 @@
         "答复AA前排查IDS"
       ],
       "source_match_key": "IDS",
+      "rule_key_shortened": false,
       "match_keys": [
         "IDS"
       ],
@@ -2308,6 +2333,7 @@
         "NOA缴纳授权费"
       ],
       "source_match_key": "NOA",
+      "rule_key_shortened": false,
       "match_keys": [
         "NOA"
       ],
@@ -2388,6 +2414,7 @@
         "补正supplemental response"
       ],
       "source_match_key": "补正",
+      "rule_key_shortened": false,
       "match_keys": [
         "补正"
       ],
@@ -2453,12 +2480,13 @@
         "DS"
       ],
       "granularity": "类型1+类型2",
-      "rule_key": "著录项目_变更申请人",
+      "rule_key": "著录项目｜变更申请人",
       "type1": "著录项目",
       "type2": [
         "变更申请人"
       ],
       "source_match_key": "著录项目｜变更申请人",
+      "rule_key_shortened": false,
       "match_keys": [
         "著录项目_变更申请人"
       ],
@@ -2524,12 +2552,13 @@
         "DS"
       ],
       "granularity": "类型1+类型2",
-      "rule_key": "著录项目_申请人更名",
+      "rule_key": "著录项目｜申请人更名",
       "type1": "著录项目",
       "type2": [
         "申请人更名"
       ],
       "source_match_key": "著录项目｜申请人更名",
+      "rule_key_shortened": false,
       "match_keys": [
         "著录项目_申请人更名"
       ],
@@ -2595,12 +2624,13 @@
         "DS"
       ],
       "granularity": "类型1+类型2",
-      "rule_key": "著录项目_变更发明人",
+      "rule_key": "著录项目｜变更发明人",
       "type1": "著录项目",
       "type2": [
         "变更发明人"
       ],
       "source_match_key": "著录项目｜变更发明人",
+      "rule_key_shortened": false,
       "match_keys": [
         "著录项目_变更发明人"
       ],
@@ -2666,12 +2696,13 @@
         "DS"
       ],
       "granularity": "类型1+类型2",
-      "rule_key": "著录项目_POA递交/变更代理机构",
+      "rule_key": "著录项目｜POA递交/变更代理机构",
       "type1": "著录项目",
       "type2": [
         "POA递交/变更代理机构"
       ],
       "source_match_key": "著录项目｜POA递交/变更代理机构",
+      "rule_key_shortened": false,
       "match_keys": [
         "著录项目_POA递交/变更代理机构"
       ],
@@ -2737,7 +2768,7 @@
         "DS"
       ],
       "granularity": "类型1+类型2",
-      "rule_key": "其他递交_DAS/优先权副本递交等13项",
+      "rule_key": "其他递交｜DAS/优先权副本递交等13项",
       "type1": "其他递交",
       "type2": [
         "DAS/优先权副本递交",
@@ -2755,6 +2786,7 @@
         "RFI_PIER_Pilot答复"
       ],
       "source_match_key": "其他递交｜DAS/优先权副本递交, 递交US保密审查, 递交CN保密审查, Preliminary Amendment递交, Amendment after NOA, petition for revival(复活), Petition to restore恢复优先权, 请求撤案, 提交公众意见, 递交confirmation, 变更发明人/申请人地址, Streamlined Claim Set Pilot, RFI_PIER_Pilot答复",
+      "rule_key_shortened": true,
       "match_keys": [
         "其他递交_DAS/优先权副本递交",
         "其他递交_递交US保密审查",
@@ -2832,7 +2864,7 @@
         "DS"
       ],
       "granularity": "类型1+类型2",
-      "rule_key": "其他递交_Assignment登记等8项",
+      "rule_key": "其他递交｜Assignment登记, request for refund(退款), 补缴费用/只缴费用, 递交439表, 咨询案件进展, 购买申请副本, 案件排查, 递交Interview request",
       "type1": "其他递交",
       "type2": [
         "Assignment登记",
@@ -2845,6 +2877,7 @@
         "递交Interview request"
       ],
       "source_match_key": "其他递交｜Assignment登记, request for refund(退款), 补缴费用/只缴费用, 递交439表, 咨询案件进展, 购买申请副本, 案件排查, 递交Interview request",
+      "rule_key_shortened": false,
       "match_keys": [
         "其他递交_Assignment登记",
         "其他递交_request for refund(退款)",
@@ -2916,12 +2949,13 @@
         "DS"
       ],
       "granularity": "类型1+类型2",
-      "rule_key": "其他递交_Declaration递交",
+      "rule_key": "其他递交｜Declaration递交",
       "type1": "其他递交",
       "type2": [
         "Declaration递交"
       ],
       "source_match_key": "其他递交｜Declaration递交",
+      "rule_key_shortened": false,
       "match_keys": [
         "其他递交_Declaration递交"
       ],
@@ -2987,12 +3021,13 @@
         "DS"
       ],
       "granularity": "类型1+类型2",
-      "rule_key": "其他递交_变更实体",
+      "rule_key": "其他递交｜变更实体",
       "type1": "其他递交",
       "type2": [
         "变更实体"
       ],
       "source_match_key": "其他递交｜变更实体",
+      "rule_key_shortened": false,
       "match_keys": [
         "其他递交_变更实体"
       ],
@@ -3058,12 +3093,13 @@
         "DS"
       ],
       "granularity": "类型1+类型2",
-      "rule_key": "其他递交_补交翻译稿",
+      "rule_key": "其他递交｜补交翻译稿",
       "type1": "其他递交",
       "type2": [
         "补交翻译稿"
       ],
       "source_match_key": "其他递交｜补交翻译稿",
+      "rule_key_shortened": false,
       "match_keys": [
         "其他递交_补交翻译稿"
       ],
@@ -3129,12 +3165,13 @@
         "DS"
       ],
       "granularity": "类型1+类型2",
-      "rule_key": "其他递交_TD",
+      "rule_key": "其他递交｜TD",
       "type1": "其他递交",
       "type2": [
         "TD"
       ],
       "source_match_key": "其他递交｜TD",
+      "rule_key_shortened": false,
       "match_keys": [
         "其他递交_TD"
       ],
@@ -3200,12 +3237,13 @@
         "DS"
       ],
       "granularity": "类型1+类型2",
-      "rule_key": "其他递交_PPH",
+      "rule_key": "其他递交｜PPH",
       "type1": "其他递交",
       "type2": [
         "PPH"
       ],
       "source_match_key": "其他递交｜PPH",
+      "rule_key_shortened": false,
       "match_keys": [
         "其他递交_PPH"
       ],
@@ -3271,12 +3309,13 @@
         "DS"
       ],
       "granularity": "类型1+类型2",
-      "rule_key": "Appeal递交_递交Appeal Brief",
+      "rule_key": "Appeal递交｜递交Appeal Brief",
       "type1": "Appeal递交",
       "type2": [
         "递交Appeal Brief"
       ],
       "source_match_key": "Appeal递交｜递交Appeal Brief",
+      "rule_key_shortened": false,
       "match_keys": [
         "Appeal递交_递交Appeal Brief"
       ],
@@ -3342,7 +3381,7 @@
         "DS"
       ],
       "granularity": "类型1+类型2",
-      "rule_key": "Appeal递交_提交Notice of Appeal等3项",
+      "rule_key": "Appeal递交｜提交Notice of Appeal, 缴纳Appeal forwarding Fee, 答复Patent Board Decision",
       "type1": "Appeal递交",
       "type2": [
         "提交Notice of Appeal",
@@ -3350,6 +3389,7 @@
         "答复Patent Board Decision"
       ],
       "source_match_key": "Appeal递交｜提交Notice of Appeal, 缴纳Appeal forwarding Fee, 答复Patent Board Decision",
+      "rule_key_shortened": false,
       "match_keys": [
         "Appeal递交_提交Notice of Appeal",
         "Appeal递交_缴纳Appeal forwarding Fee",
@@ -3431,6 +3471,7 @@
         "补正supplemental response"
       ],
       "source_match_key": "补正_内部项目结项",
+      "rule_key_shortened": false,
       "match_keys": [
         "补正_内部项目结项"
       ],
@@ -3502,6 +3543,7 @@
         "11.5年年费"
       ],
       "source_match_key": "年费",
+      "rule_key_shortened": false,
       "match_keys": [
         "年费"
       ],
@@ -3579,6 +3621,7 @@
         "+外观加速"
       ],
       "source_match_key": "附加",
+      "rule_key_shortened": false,
       "match_keys": [
         "附加"
       ],
@@ -3642,7 +3685,7 @@
         "PR"
       ],
       "granularity": "仅类型1",
-      "rule_key": "其他递交",
+      "rule_key": "PR｜其他递交",
       "type1": "其他递交",
       "type2": [
         "递交US保密审查",
@@ -3650,6 +3693,7 @@
         "补交翻译稿"
       ],
       "source_match_key": "PR｜其他递交",
+      "rule_key_shortened": false,
       "match_keys": [
         "其他递交"
       ],
@@ -3715,12 +3759,13 @@
         "DM"
       ],
       "granularity": "类型1+类型2",
-      "rule_key": "新申请递交_PCT新申请递交",
+      "rule_key": "新申请递交｜PCT新申请递交",
       "type1": "新申请递交",
       "type2": [
         "PCT新申请递交"
       ],
       "source_match_key": "新申请递交｜PCT新申请递交",
+      "rule_key_shortened": false,
       "match_keys": [
         "新申请递交_PCT新申请递交"
       ],
@@ -3786,12 +3831,13 @@
         "DM"
       ],
       "granularity": "类型1+类型2",
-      "rule_key": "新申请递交_海牙协定新申请递交",
+      "rule_key": "新申请递交｜海牙协定新申请递交",
       "type1": "新申请递交",
       "type2": [
         "海牙协定新申请递交"
       ],
       "source_match_key": "新申请递交｜海牙协定新申请递交",
+      "rule_key_shortened": false,
       "match_keys": [
         "新申请递交_海牙协定新申请递交"
       ],
@@ -3857,12 +3903,13 @@
         "DM"
       ],
       "granularity": "类型1+类型2",
-      "rule_key": "补正_补交POA",
+      "rule_key": "补正｜补交POA",
       "type1": "补正",
       "type2": [
         "补交POA"
       ],
       "source_match_key": "补正｜补交POA",
+      "rule_key_shortened": false,
       "match_keys": [
         "补正_补交POA"
       ],
@@ -3927,12 +3974,13 @@
         "DM"
       ],
       "granularity": "类型1+类型2",
-      "rule_key": "补正_补交DAS码",
+      "rule_key": "补正｜补交DAS码",
       "type1": "补正",
       "type2": [
         "补交DAS码"
       ],
       "source_match_key": "补正｜补交DAS码",
+      "rule_key_shortened": false,
       "match_keys": [
         "补正_补交DAS码"
       ],
@@ -3998,7 +4046,7 @@
         "DM"
       ],
       "granularity": "类型1+类型2",
-      "rule_key": "补正_106表-补正权利要求等3项",
+      "rule_key": "补正｜106表-补正权利要求, 106表-补正说明书附图, 106表-申请人及发明人地址",
       "type1": "补正",
       "type2": [
         "106表-补正权利要求",
@@ -4006,6 +4054,7 @@
         "106表-申请人及发明人地址"
       ],
       "source_match_key": "补正｜106表-补正权利要求, 106表-补正说明书附图, 106表-申请人及发明人地址",
+      "rule_key_shortened": false,
       "match_keys": [
         "补正_106表-补正权利要求",
         "补正_106表-补正说明书附图",
@@ -4073,13 +4122,14 @@
         "DM"
       ],
       "granularity": "类型1+类型2",
-      "rule_key": "补正_132表-补正权利要求书等2项",
+      "rule_key": "补正｜132表-补正权利要求书, 132表-补正申请人及发明人地址",
       "type1": "补正",
       "type2": [
         "132表-补正权利要求书",
         "132表-补正申请人及发明人地址"
       ],
       "source_match_key": "补正｜132表-补正权利要求书, 132表-补正申请人及发明人地址",
+      "rule_key_shortened": false,
       "match_keys": [
         "补正_132表-补正权利要求书",
         "补正_132表-补正申请人及发明人地址"
@@ -4146,7 +4196,7 @@
         "DM"
       ],
       "granularity": "类型1+类型2",
-      "rule_key": "补正_补正发明名称等3项",
+      "rule_key": "补正｜补正发明名称, 19条修改, 34条修改",
       "type1": "补正",
       "type2": [
         "补正发明名称",
@@ -4154,6 +4204,7 @@
         "34条修改"
       ],
       "source_match_key": "补正｜补正发明名称, 19条修改, 34条修改",
+      "rule_key_shortened": false,
       "match_keys": [
         "补正_补正发明名称",
         "补正_19条修改",
@@ -4221,12 +4272,13 @@
         "DM"
       ],
       "granularity": "类型1+类型2",
-      "rule_key": "补正_主动补正权利要求",
+      "rule_key": "补正｜主动补正权利要求",
       "type1": "补正",
       "type2": [
         "主动补正权利要求"
       ],
       "source_match_key": "补正｜主动补正权利要求",
+      "rule_key_shortened": false,
       "match_keys": [
         "补正_主动补正权利要求"
       ],
@@ -4292,7 +4344,7 @@
         "DM"
       ],
       "granularity": "类型1+类型2",
-      "rule_key": "其他_请求纸质优先权副本等5项",
+      "rule_key": "其他｜请求纸质优先权副本, DAS请求, 办理优先权文件副本, 递交US保密审查, 递交海外其他保密审查",
       "type1": "其他",
       "type2": [
         "请求纸质优先权副本",
@@ -4302,6 +4354,7 @@
         "递交海外其他保密审查"
       ],
       "source_match_key": "其他｜请求纸质优先权副本, DAS请求, 办理优先权文件副本, 递交US保密审查, 递交海外其他保密审查",
+      "rule_key_shortened": false,
       "match_keys": [
         "其他_请求纸质优先权副本",
         "其他_DAS请求",
@@ -4371,12 +4424,13 @@
         "DM"
       ],
       "granularity": "类型1+类型2",
-      "rule_key": "其他_主动撤回",
+      "rule_key": "其他｜主动撤回",
       "type1": "其他",
       "type2": [
         "主动撤回"
       ],
       "source_match_key": "其他｜主动撤回",
+      "rule_key_shortened": false,
       "match_keys": [
         "其他_主动撤回"
       ],
@@ -4442,7 +4496,7 @@
         "DM"
       ],
       "granularity": "类型1+类型2",
-      "rule_key": "其他_缴纳优先权要求费等3项",
+      "rule_key": "其他｜缴纳优先权要求费, 缴纳申请费, 缴费",
       "type1": "其他",
       "type2": [
         "缴纳优先权要求费",
@@ -4450,6 +4504,7 @@
         "缴费"
       ],
       "source_match_key": "其他｜缴纳优先权要求费, 缴纳申请费, 缴费",
+      "rule_key_shortened": false,
       "match_keys": [
         "其他_缴纳优先权要求费",
         "其他_缴纳申请费",
@@ -4516,12 +4571,13 @@
         "DM"
       ],
       "granularity": "类型1+类型2",
-      "rule_key": "其他_答复206表",
+      "rule_key": "其他｜答复206表",
       "type1": "其他",
       "type2": [
         "答复206表"
       ],
       "source_match_key": "其他｜答复206表",
+      "rule_key_shortened": false,
       "match_keys": [
         "其他_答复206表"
       ],
@@ -4587,12 +4643,13 @@
         "DM"
       ],
       "granularity": "类型1+类型2",
-      "rule_key": "著录项目_变更申请人",
+      "rule_key": "著录项目｜变更申请人",
       "type1": "著录项目",
       "type2": [
         "变更申请人"
       ],
       "source_match_key": "著录项目｜变更申请人",
+      "rule_key_shortened": false,
       "match_keys": [
         "著录项目_变更申请人"
       ],
@@ -4658,12 +4715,13 @@
         "DM"
       ],
       "granularity": "类型1+类型2",
-      "rule_key": "著录项目_申请人更名",
+      "rule_key": "著录项目｜申请人更名",
       "type1": "著录项目",
       "type2": [
         "申请人更名"
       ],
       "source_match_key": "著录项目｜申请人更名",
+      "rule_key_shortened": false,
       "match_keys": [
         "著录项目_申请人更名"
       ],
@@ -4729,13 +4787,14 @@
         "DM"
       ],
       "granularity": "类型1+类型2",
-      "rule_key": "著录项目_变更申请人地址等2项",
+      "rule_key": "著录项目｜变更申请人地址, 变更发明人地址",
       "type1": "著录项目",
       "type2": [
         "变更申请人地址",
         "变更发明人地址"
       ],
       "source_match_key": "著录项目｜变更申请人地址, 变更发明人地址",
+      "rule_key_shortened": false,
       "match_keys": [
         "著录项目_变更申请人地址",
         "著录项目_变更发明人地址"
@@ -4802,12 +4861,13 @@
         "DM"
       ],
       "granularity": "类型1+类型2",
-      "rule_key": "著录项目_变更发明人",
+      "rule_key": "著录项目｜变更发明人",
       "type1": "著录项目",
       "type2": [
         "变更发明人"
       ],
       "source_match_key": "著录项目｜变更发明人",
+      "rule_key_shortened": false,
       "match_keys": [
         "著录项目_变更发明人"
       ],
@@ -4873,13 +4933,14 @@
         "DM"
       ],
       "granularity": "类型1+类型2",
-      "rule_key": "著录项目_变更代理机构等2项",
+      "rule_key": "著录项目｜变更代理机构, 变更代理机构案号",
       "type1": "著录项目",
       "type2": [
         "变更代理机构",
         "变更代理机构案号"
       ],
       "source_match_key": "著录项目｜变更代理机构, 变更代理机构案号",
+      "rule_key_shortened": false,
       "match_keys": [
         "著录项目_变更代理机构",
         "著录项目_变更代理机构案号"

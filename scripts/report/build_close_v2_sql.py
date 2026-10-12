@@ -38,7 +38,8 @@ def _template(record):
 def build(data):
     lines = [
         "-- 结项 V2 替换草案（仅 close 域）；本文件默认 ROLLBACK，不会实际替换。",
-        "-- 地区码直接取自案号地区位；使用前确认 TIP 类型1回退匹配、新版 Word 模板正文、待填模板编辑能力。",
+        "-- 无需修改现有表结构：rule_key 最长 128 字符，超长 Excel 匹配键用可读摘要。",
+        "-- 地区码取自案号；完整 Excel 原键在规范化草表中；仍需确认 TIP 类型1回退匹配和模板正文。",
         "-- 规则表清理范围：report_rule / report_rule_map / report_rule_template 的 close 域。",
         "-- 不删除 report_template、report_tasks 或 OA 域数据。",
         "START TRANSACTION;",
@@ -49,7 +50,7 @@ def build(data):
     counts = Counter()
     used = set()
     for record in data["records"]:
-        # 规则键使用结项类型的可读摘要；工作表行号只保留在 remark 中追溯来源。
+        # 常规行使用 Excel 原匹配键；仅超长行使用可读摘要，完整匹配逐项见 map。
         rule_key = record["rule_key"]
         template = _template(record)
         for region in record["regions"]:

@@ -26,14 +26,13 @@ def _parts(value):
     return [x.strip() for x in re.split(r"[,，]", str(value or "")) if x.strip()]
 
 
-def _rule_key(granularity, type1, type2):
-    """给规则层使用的业务可读名称；完整匹配项仍逐项存 report_rule_map。"""
-    if granularity == "仅类型1":
-        key = type1
-    else:
-        key = f"{type1}_{type2[0]}" + (f"等{len(type2)}项" if len(type2) > 1 else "")
-    if len(key) > 128:
-        raise ValueError(f"规则键超出 report_rule.rule_key 的 128 字符限制：{key}")
+def _rule_key(source_match_key, type1, type2):
+    """优先使用 Excel 匹配键；超 128 字符时压缩成可读摘要。"""
+    key = source_match_key.strip()
+    if len(key) > 128 and type2:
+        key = f"{type1}｜{type2[0]}等{len(type2)}项"
+    if not key or len(key) > 128:
+        raise ValueError(f"规则键为空或超出 128 字符：{key}")
     return key
 
 
@@ -110,7 +109,8 @@ def build(path):
                 raise ValueError(f"{sheet_name}:{excel_row} 缺类型2")
             match_keys = ([type1] if granularity == "仅类型1"
                           else [f"{type1}_{x}" for x in type2])
-            rule_key = _rule_key(granularity, type1, type2)
+            source_match_key = get("匹配键(IT比对此列)")
+            rule_key = _rule_key(source_match_key, type1, type2)
             actions = {code: _action(row[i]) for i, code in customer_cols}
             for region in regions:
                 rule_signature = (region, rule_key)
@@ -131,7 +131,8 @@ def build(path):
                 "rule_key": rule_key,
                 "type1": type1,
                 "type2": type2,
-                "source_match_key": get("匹配键(IT比对此列)"),
+                "source_match_key": source_match_key,
+                "rule_key_shortened": rule_key != source_match_key,
                 "match_keys": match_keys,
                 "template_label": template_label,
                 "template_md": _template_md(sheet_name, template_label),
