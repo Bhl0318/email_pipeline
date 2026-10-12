@@ -26,7 +26,9 @@ TIP 应在“结项成功”这个业务事件上提供以下输入；未完成/
 1. 从案号识别法域：含 `EP`→EP，含 `US`→US，含 `WO`→PCT，含 `CN`→CN；其他案号直接不创建任务。
 2. 在 `report_rule_map` 按 `rule_domain='close' + region + match_key=组合值` 找结项规则键 `rule_key`。**组合不存在即跳过，不做模糊匹配**。
 3. 在 `report_rule` 按该 `rule_key` 匹配客户号（案号前 5 位）：精确客户号 → `5开头`（仅客户号以 5 开头）→ `其他`。未命中则不创建任务。
-4. 仅 `action='assign'` 且 `report_rule_template` 中存在**非空模板文件名**时创建任务；该文件名还须能在 `report_template` 中找到有效正文，或在汇报信服务的同名 MD 文件中找到正文，否则任务虽可写入却无法预览。`skip` / `ignore` / 无模板均不写 `report_tasks`。`skip` 规则的 `forward.to + forward.cc` **不是转发原邮件**，应由 TIP 按既定结项邮件流程合并到抄送名单；此动作与创建汇报信任务互不替代。
+4. 仅 `action='assign'` 且 `report_rule_template` 中存在**非空模板名称**时创建任务；结项 V2 规则使用 Excel「模板」列原文作为名称，须在 `report_template.name` 中有同名有效正文，否则任务虽可写入却无法预览。`skip` / `ignore` / 无模板均不写 `report_tasks`。`skip` 规则的 `forward.to + forward.cc` **不是转发原邮件**，应由 TIP 按既定结项邮件流程合并到抄送名单；此动作与创建汇报信任务互不替代。
+   - V2「无需做」行一律不创建汇报信任务；原表中 CN 20615 的 3 个「分配→胡梅」按最新口径转成 `skip`，将胡梅并入结项邮件抄送。
+   - 「待填模板（仅表头版）」要创建汇报信任务；`report_template.name` 使用该名称，正文来自 `最新版本/模板/待填模板-仅表头版-示例.docx` 转换并校对后的内容。
 5. `assign` 规则中的 `preparer` 是汇报信准备人，但现有 `report_tasks` **没有准备人列**。第一阶段只创建任务；入库本身不会自动把 `/review/{id}` 邮件发给准备人，通知需另做对接。
 
 规则表到本仓库规则对象的对应关系可核对 `scripts/report/rules_store.py` 的 `build_close_rules()`；结项抄送语义可核对 `scripts/report/close_cc.py` 的 `resolve_cc()`。
@@ -37,7 +39,7 @@ TIP 应在“结项成功”这个业务事件上提供以下输入；未完成/
 | --- | --- | --- |
 | `id` | 新 UUID，重试时复用 | 汇报信任务 ID，也是 `/review/{id}` 的路径参数；不要取 `projects.id` |
 | `rule_domain` | **`close`** | OA 任务写 `oa`，结项必须显式写 `close` |
-| `template` | 命中的 `report_rule_template.template` | 仅写模板**文件名**，例如 `CN_OA答复递交.md`，不要写磁盘路径或 MD 正文 |
+| `template` | 命中的 `report_rule_template.template` | 原样写模板**名称**，例如 Excel 的 `【IDS递交】2026-08-31-IDS递交转达`；不要写 MD 文件名、磁盘路径或正文 |
 | `attach_pdf` | 第一阶段建议 **`0`** | 此列控制是否生成/随信附上“汇报信 PDF”；**不能直接映射**结项规则的 `attach_pdf`：结项规则的该值目前表达“递交文件/回执是否随信”，语义不同；审核人可在页面勾选汇报信 PDF |
 | `fields_json` | UTF-8 JSON 对象 | 至少包含下节必需键；不得是空字符串、数组或未转义的 JSON 文本 |
 | `source_attachments` | 第一阶段建议 `NULL` | 当前审核页只接受相对 `scripts/output/` 的本机文件路径数组；TIP 系统本地路径/URL 不能直接写入。后续文件上传对接或审核人手动上传后再带附件 |

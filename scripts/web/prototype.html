@@ -813,6 +813,11 @@
     return '?';
   }
 
+  function regionFromProject(project) {
+    const match = String(project || '').toUpperCase().match(/(?:CN|CM|CS|US|DS|PR|WO|DM|EP)(?=[A-Z0-9]*$)/);
+    return match ? match[0] : '?';
+  }
+
   function typeFromTemplate(t) {
     return (t || '').replace(/^(CN|US|EP|PCT)_/, '').replace(/\.md$/, '');
   }
@@ -902,7 +907,8 @@
 
   // ───────────── Header ─────────────
   function updateHeader() {
-    $('hd-region').textContent = regionFromTemplate(currentTemplate);
+    const templateRegion = regionFromTemplate(currentTemplate);
+    $('hd-region').textContent = templateRegion === '?' ? regionFromProject(currentFields['代理所案号']) : templateRegion;
     $('hd-project').textContent = currentFields['代理所案号'] || '—';
     $('hd-type').textContent = typeFromTemplate(currentTemplate) || '—';
     $('hd-customer').textContent = currentFields['客户名称'] || '—';

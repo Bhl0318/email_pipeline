@@ -23,22 +23,22 @@ def q(value):
 
 
 def _template(record):
-    """新规则采用独立 V2 名称，避免覆盖历史任务的同名模板。"""
-    if record["template_md"]:
-        old_name = record["template_md"]
-        if old_name.startswith("CN_"):
-            # 本批没有新版 CN Word，仍沿用现有 CN 模板正文。
-            return old_name
-        return old_name[:-3] + "_V2.md"
-    if any(a["action"] == "assign" for a in record["actions"].values()):
-        return "结项_待填模板_V2.md"
-    return ""
+    """结项模板键使用 Excel「模板」原文，并由 report_template.name 关联正文。"""
+    label = record["template_label"].strip()
+    if label == "无需做":
+        return ""
+    if not label or len(label) > 128:
+        raise ValueError(f"模板键为空或超出 128 字符：{record['sheet']} 第{record['excel_row']}行")
+    return label
 
 
 def build(data):
     lines = [
         "-- 结项 V2 替换草案（仅 close 域）；本文件默认 ROLLBACK，不会实际替换。",
         "-- 无需修改现有表结构：rule_key 最长 128 字符，超长 Excel 匹配键用可读摘要。",
+        "-- 结项模板键取 Excel「模板」原文；「无需做」不分配汇报信，只随结项邮件抄送。",
+        "-- 「待填模板（仅表头版）」正文来自 待填模板-仅表头版-示例.docx。",
+        "-- 启用前须将同名正文导入 report_template.name。",
         "-- 地区码取自案号；完整 Excel 原键在规范化草表中；仍需确认 TIP 类型1回退匹配和模板正文。",
         "-- 规则表清理范围：report_rule / report_rule_map / report_rule_template 的 close 域。",
         "-- 不删除 report_template、report_tasks 或 OA 域数据。",
@@ -81,6 +81,12 @@ def build(data):
                 kind = action["action"]
                 preparer = action.get("preparer", "")
                 forward = action.get("forward") or {}
+                if record["template_label"] == "无需做" and kind == "assign":
+                    # 矩阵中 CN 20615 的三行写了「分配→胡梅」；业务确认
+                    # 「无需做」只转发结项邮件，因此将原准备人转成抄送目标。
+                    kind = "skip"
+                    forward = {"to": [preparer], "cc": []}
+                    preparer = ""
                 fto = json.dumps(forward.get("to", []), ensure_ascii=False) if kind == "skip" else ""
                 fcc = json.dumps(forward.get("cc", []), ensure_ascii=False) if kind == "skip" else ""
                 lines.append(
