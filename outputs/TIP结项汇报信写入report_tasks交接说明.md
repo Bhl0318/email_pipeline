@@ -29,6 +29,7 @@ TIP 应在“结项成功”这个业务事件上提供以下输入；未完成/
 4. 仅 `action='assign'` 且 `report_rule_template` 中存在**非空模板名称**时创建任务；结项 V2 规则使用 Excel「模板」列原文作为名称，须在 `report_template.name` 中有同名有效正文，否则任务虽可写入却无法预览。`skip` / `ignore` / 无模板均不写 `report_tasks`。`skip` 规则的 `forward.to + forward.cc` **不是转发原邮件**，应由 TIP 按既定结项邮件流程合并到抄送名单；此动作与创建汇报信任务互不替代。
    - V2「无需做」行一律不创建汇报信任务；原表中 CN 20615 的 3 个「分配→胡梅」按最新口径转成 `skip`，将胡梅并入结项邮件抄送。
    - 「待填模板（仅表头版）」要创建汇报信任务；`report_template.name` 使用该名称，正文来自 `最新版本/模板/待填模板-仅表头版-示例.docx` 转换并校对后的内容。
+   - `outputs/结项V2规则替换草案.sql` 已包含按上述名称补 `report_template` 正文的语句；目前仍是 `ROLLBACK` 校对草案，模板正文须经审核后才能启用。
 5. `assign` 规则中的 `preparer` 是汇报信准备人，但现有 `report_tasks` **没有准备人列**。第一阶段只创建任务；入库本身不会自动把 `/review/{id}` 邮件发给准备人，通知需另做对接。
 
 规则表到本仓库规则对象的对应关系可核对 `scripts/report/rules_store.py` 的 `build_close_rules()`；结项抄送语义可核对 `scripts/report/close_cc.py` 的 `resolve_cc()`。
