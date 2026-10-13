@@ -33,7 +33,17 @@ def _fpo_pdf(number, session=None):
     page_url = f"https://www.freepatentsonline.com/{slug}.pdf"
     page = fpo.get(page_url, timeout=30)
     page.raise_for_status()
+    # FPO 有时先返回设置 fpo_ck 的 JavaScript 页面，浏览器会写入 Cookie 后重载。
+    # curl_cffi/requests 不执行 JavaScript，这里只处理该页面明确给出的两个值。
+    challenge = re.search(r"var\s+a='([A-Fa-f0-9]+)',b='([A-Fa-f0-9]+)'", page.text)
+    if challenge and "document.cookie='fpo_ck='" in page.text:
+        fpo.cookies.set("fpo_ck", challenge.group(2) + challenge.group(1),
+                        domain="www.freepatentsonline.com", path="/")
+        page = fpo.get(page_url, timeout=30)
+        page.raise_for_status()
     url = _extract_pdf_url(page.text)
+    if not url:
+        raise ValueError("FPO 页面没有 PDF 下载链接，可能仍需浏览器验证")
     parsed = urlsplit(url)
     if parsed.scheme != "https" or parsed.hostname != "s3.amazonaws.com" or not parsed.path.startswith("/pdf.sumobrain.com/"):
         raise ValueError("FPO 未提供可信的PDF下载地址")

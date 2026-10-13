@@ -48,6 +48,21 @@ class ExternalAnalysisTests(unittest.TestCase):
         self.assertEqual(session.get.call_args_list[1].args[0],
                          "https://s3.amazonaws.com/pdf.sumobrain.com/110693604.pdf?X-Amz-Date=1")
 
+    def test_fpo_cookie_challenge_reloads_pdf_page(self):
+        session = Mock()
+        challenge = Mock(text=("<script>var a='ABC123',b='DEF456';"
+                               "document.cookie='fpo_ck='+b+a+';path=/'</script>"))
+        page = Mock(text='<iframe src="https://s3.amazonaws.com/pdf.sumobrain.com/123.pdf?X-Amz-Date=1"></iframe>')
+        pdf = Mock(content=b"%PDF-1.7")
+        session.get.side_effect = [challenge, page, pdf]
+        content, _ = _fpo_pdf("US20250150762A1", session)
+        self.assertEqual(content, b"%PDF-1.7")
+        session.cookies.set.assert_called_once_with(
+            "fpo_ck", "DEF456ABC123", domain="www.freepatentsonline.com", path="/"
+        )
+        self.assertEqual(session.get.call_args_list[0].args[0],
+                         session.get.call_args_list[1].args[0])
+
     @patch.dict(os.environ, {"QDFX_API_TOKEN": "test-token", "QDFX_API_BASE_URL": "http://example.test/assist"})
     @patch("oa_report_ai.find_application_files", return_value={"spec": "/tmp/spec.docx"})
     @patch("oa_report_ai._docx_text", return_value="Application text")
