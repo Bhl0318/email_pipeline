@@ -984,7 +984,7 @@
     $('hd-project').textContent = currentFields['代理所案号'] || '—';
     const close = currentRuleDomain === 'close';
     $('hd-close-match').style.display = close ? '' : 'none';
-    $('hd-close-match').textContent = close ? (currentCloseMatchKey || '命中组合待核对') : '';
+    $('hd-close-match').textContent = close ? (currentCloseMatchKey || '—') : '';
     $('hd-type-sep').style.display = close ? 'none' : '';
     $('hd-type').style.display = close ? 'none' : '';
     if (!close) $('hd-type').textContent = typeFromTemplate(currentTemplate) || '—';
