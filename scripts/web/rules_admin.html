@@ -23,7 +23,8 @@
   .fields{padding:14px 16px;background:#f8fafc;border-left:1px solid #e2e8f0}
   .right{background:#fff;border-left:1px solid #e2e8f0;padding:14px 16px}
   .trial-field{display:block;margin:0 0 10px;font-size:12px;color:#475569;overflow-wrap:anywhere}
-  .trial-field textarea{display:block;width:100%;min-height:54px;resize:vertical;margin-top:4px;padding:7px;border:1px solid #cbd5e1;border-radius:5px;font-family:inherit;font-size:13px;line-height:1.5;background:#fff}
+  .trial-field textarea,.trial-field select{display:block;width:100%;margin-top:4px;padding:7px;border:1px solid #cbd5e1;border-radius:5px;font-family:inherit;font-size:13px;line-height:1.5;background:#fff}
+  .trial-field textarea{min-height:54px;resize:vertical}
   .ph-missing{color:#b91c1c;background:#fef2f2}
   @media(max-width:1279px){body{min-width:1280px}}
   td.fwd{max-width:150px;width:150px;word-break:break-all;font-size:12px;color:#475569}
@@ -208,14 +209,25 @@ function renderFields(name,content){
   const keys=[...new Set([...content.matchAll(/\{\{\s*([^{}]+?)\s*\}\}/g)].map(m=>m[1].trim()))];
   if(!keys.length){box.innerHTML+='<div class="muted">当前模板没有需要试填的字段</div>';return}
   for(const key of keys){
-    const label=document.createElement('label');label.className='trial-field';label.textContent=key;
-    const input=document.createElement('textarea');input.rows=key==='正文事项'?5:2;
-    input.placeholder='填写'+key;input.value=TRIAL_VALUES[key]||'';
-    input.addEventListener('input',()=>{TRIAL_VALUES[key]=input.value;refreshTrialPreview()});
+    const choices=key.includes('/')?key.split('/').map(x=>x.trim()):[];
+    const isChoice=choices.length===2&&choices.every(Boolean);
+    const label=document.createElement('label');label.className='trial-field';label.textContent=isChoice?choices.join(' / '):key;
+    const input=document.createElement(isChoice?'select':'textarea');
+    if(isChoice){
+      choices.forEach(choice=>input.add(new Option(choice,choice)));
+      input.value=choices.includes(TRIAL_VALUES[key])?TRIAL_VALUES[key]:choices[0];
+      TRIAL_VALUES[key]=input.value;
+    }else{
+      input.rows=key==='正文事项'?5:2;
+      input.placeholder='填写'+key;input.value=TRIAL_VALUES[key]||'';
+    }
+    input.dataset.trialKey=key;
+    input.addEventListener(isChoice?'change':'input',()=>{TRIAL_VALUES[key]=input.value;refreshTrialPreview()});
     label.append(input);box.append(label);
   }
   const reset=document.createElement('button');reset.className='btn-s';reset.textContent='清空试填';
-  reset.onclick=()=>{TRIAL_VALUES={};box.querySelectorAll('textarea').forEach(el=>el.value='');refreshTrialPreview()};
+  reset.onclick=()=>{TRIAL_VALUES={};box.querySelectorAll('textarea').forEach(el=>el.value='');
+    box.querySelectorAll('select').forEach(el=>{el.selectedIndex=0;TRIAL_VALUES[el.dataset.trialKey]=el.value});refreshTrialPreview()};
   box.append(reset);
 }
 

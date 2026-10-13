@@ -941,6 +941,13 @@
     });
   }
 
+  function templateChoiceOptions(key) {
+    if (!key.includes('/')) return [];
+    const options = key.split('/').map(x => x.trim());
+    // 仅一个斜杠表示二选一；PCT/RO/132 表这类字段名保持原样。
+    return options.length === 2 && options.every(Boolean) ? options : [];
+  }
+
   // 已有字段沿用专用控件；模板新增字段按 {{字段}} 自动生成并读取 fields_json 默认值。
   function renderDynamicFields() {
     const section = $('section-dynamic-fields');
@@ -954,15 +961,24 @@
       const group = document.createElement('div');
       group.className = 'form-group';
       const label = document.createElement('label');
-      label.textContent = key;
+      const choices = templateChoiceOptions(key);
+      label.textContent = choices.length ? choices.join(' / ') : key;
       const multiline = /内容|事项|说明|描述|备注|意见/.test(key);
-      const input = document.createElement(multiline ? 'textarea' : 'input');
-      if (multiline) input.rows = 3;
-      else input.type = 'text';
+      const input = document.createElement(choices.length ? 'select' : multiline ? 'textarea' : 'input');
+      if (!choices.length && multiline) input.rows = 3;
+      else if (!choices.length) input.type = 'text';
       input.dataset.templateField = key;
-      input.value = currentFields[key] == null || currentFields[key] === '请提供' ? '' : String(currentFields[key]);
-      input.placeholder = '请填写' + key;
-      input.addEventListener('input', () => {
+      if (choices.length) {
+        choices.forEach(choice => input.add(new Option(choice, choice)));
+        const saved = currentFields[key];
+        const oldLabel = currentFields['申请日标签'];
+        input.value = choices.includes(saved) ? saved : choices.includes(oldLabel) ? oldLabel : choices[0];
+        currentFields[key] = input.value;
+      } else {
+        input.value = currentFields[key] == null || currentFields[key] === '请提供' ? '' : String(currentFields[key]);
+        input.placeholder = '请填写' + key;
+      }
+      input.addEventListener(choices.length ? 'change' : 'input', () => {
         currentFields[key] = input.value;
         renderPreview();
         if (currentPdfBlobUrl) { URL.revokeObjectURL(currentPdfBlobUrl); currentPdfBlobUrl = null; }
@@ -971,7 +987,7 @@
       });
       const source = document.createElement('div');
       source.className = 'field-source';
-      source.textContent = '模板字段 / 手填';
+      source.textContent = choices.length ? '模板选项 / 手选' : '模板字段 / 手填';
       group.append(label, input, source);
       list.append(group);
     }
