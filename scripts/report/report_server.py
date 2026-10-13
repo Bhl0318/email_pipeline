@@ -250,6 +250,35 @@ def list_tasks(status: str = "pending,skipped"):
 
 # ─── 任务数据 ────────────────────────────────────────────
 
+def _close_task_match_key(fields, project):
+    """结项审核页显示实际命中的 match_key，优先使用 TIP 在任务里记录的值。"""
+    stored = str(fields.get("结项匹配键") or "").strip()
+    if stored:
+        return stored
+
+    task1 = str(fields.get("结项类型一") or "").strip()
+    task2 = str(fields.get("结项类型二") or "").strip()
+    rule_key = str(fields.get("通知类型") or "").strip()
+    region = close_cc.region_of(project)
+    if not (task1 and rule_key and region):
+        return ""
+
+    # 旧任务未保存 match_key：以创建任务时保存的 rule_key 限定映射，先精确再回退。
+    candidates = [f"{task1}_{task2}", task1] if task2 else [task1]
+    try:
+        for match_key in candidates:
+            rows = execute_params(
+                "SELECT match_key FROM report_rule_map "
+                "WHERE rule_domain='close' AND region=%s AND match_key=%s "
+                "AND rule_key=%s AND status=1 LIMIT 1",
+                (region, match_key, rule_key),
+            )
+            if rows:
+                return match_key
+    except Exception as e:
+        print(f"[review] 查结项匹配键失败 {project}: {e}", file=sys.stderr)
+    return ""
+
 @app.get("/api/tasks/{task_id}")
 def get_task(task_id: str):
     """
@@ -257,7 +286,7 @@ def get_task(task_id: str):
     projects 字段作为默认值，被 fields_json 里同名键覆盖。
     """
     sql = """
-        SELECT t.id, t.template, t.attach_pdf, t.fields_json, t.source_attachments, t.status, t.reviewer,
+        SELECT t.id, t.template, t.attach_pdf, t.fields_json, t.source_attachments, t.status, t.reviewer, t.rule_domain,
                p.project          AS p_project,
                p.project_name     AS p_project_name,
                p.oa_doc_date      AS p_oa_doc_date,
@@ -331,6 +360,8 @@ def get_task(task_id: str):
 
     return {
         "id": row["id"],
+        "rule_domain": row.get("rule_domain") or "oa",
+        "matched_close_key": _close_task_match_key(user_fields, project) if row.get("rule_domain") == "close" else "",
         "template": row["template"],
         "attach_pdf": bool(row.get("attach_pdf", 1)),
         "source_attachments": source_attachments,

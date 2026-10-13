@@ -14,6 +14,8 @@
   .header { background: #1a1a2e; color: #fff; padding: 0 24px; height: 52px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
   .header h1 { font-size: 16px; font-weight: 600; letter-spacing: 1px; }
   .header-case { font-size: 13px; display: flex; align-items: center; gap: 8px; opacity: .85; }
+  .header-case-ref { display: flex; flex-direction: column; gap: 1px; }
+  .header-case-match { font-size: 11px; color: #cbd5e1; max-width: 420px; overflow-wrap: anywhere; }
   .header-badge { background: #3b82f6; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
   .header-sep { opacity: .4; }
 
@@ -180,8 +182,8 @@
   <h1>汇报信审核</h1>
   <div class="header-case">
     <span class="header-badge" id="hd-region">—</span>
-    <span id="hd-project">—</span>
-    <span class="header-sep">|</span>
+    <span class="header-case-ref"><span id="hd-project">—</span><span class="header-case-match" id="hd-close-match" style="display:none;"></span></span>
+    <span class="header-sep" id="hd-type-sep">|</span>
     <span id="hd-type">—</span>
     <span class="header-sep">|</span>
     <span id="hd-customer">—</span>
@@ -708,6 +710,8 @@
 
   // ───────────── 状态 ─────────────
   let currentTaskId = null;
+  let currentRuleDomain = 'oa';
+  let currentCloseMatchKey = '';
   let currentTemplate = null;
   let templateMd = null;
   let currentFields = {};
@@ -978,7 +982,12 @@
     const templateRegion = regionFromTemplate(currentTemplate);
     $('hd-region').textContent = templateRegion === '?' ? regionFromProject(currentFields['代理所案号']) : templateRegion;
     $('hd-project').textContent = currentFields['代理所案号'] || '—';
-    $('hd-type').textContent = typeFromTemplate(currentTemplate) || '—';
+    const close = currentRuleDomain === 'close';
+    $('hd-close-match').style.display = close ? '' : 'none';
+    $('hd-close-match').textContent = close ? (currentCloseMatchKey || '命中组合待核对') : '';
+    $('hd-type-sep').style.display = close ? 'none' : '';
+    $('hd-type').style.display = close ? 'none' : '';
+    if (!close) $('hd-type').textContent = typeFromTemplate(currentTemplate) || '—';
     $('hd-customer').textContent = currentFields['客户名称'] || '—';
   }
 
@@ -1438,10 +1447,15 @@
     currentPdfBase64 = null;
     currentTaskId = taskId;
     if (!currentTaskId) {
+      currentRuleDomain = 'oa';
+      currentCloseMatchKey = '';
       $('emailBody').innerHTML = '<p style="color:#64748b;">请从左侧待办列表选择一条任务。</p>';
       $('hd-region').textContent = '—';
       $('hd-project').textContent = '—';
       $('hd-type').textContent = '—';
+      $('hd-type').style.display = '';
+      $('hd-type-sep').style.display = '';
+      $('hd-close-match').style.display = 'none';
       $('hd-customer').textContent = '—';
       $('hd-status').textContent = '—';
       $('hint').textContent = '';
@@ -1466,6 +1480,8 @@
       }
 
       currentTemplate = task.template;
+      currentRuleDomain = task.rule_domain || 'oa';
+      currentCloseMatchKey = task.matched_close_key || '';
       currentFields = task.fields || {};
       currentInterfaceContacts = task.interface_contacts || [];   // 接口人[{name,email}]，供联系人下拉
       $('hd-status').textContent = task.status || 'pending';
