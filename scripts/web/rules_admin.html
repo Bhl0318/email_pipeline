@@ -233,6 +233,21 @@ function refreshTrialPreview(){
     html=html.replaceAll('RADMINFIELD'+i+'END',value);
   }
   prev.innerHTML=html;
+  formatTrialDates(prev);
+}
+
+function formatTrialDates(root){
+  const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);
+  const nodes=[];
+  while(walker.nextNode())nodes.push(walker.currentNode);
+  nodes.forEach(node=>{
+    node.nodeValue=node.nodeValue.replace(/(^|[^\d])((?:19|20)\d{2})[-/.](0?[1-9]|1[0-2])[-/.](0?[1-9]|[12]\d|3[01])(?=$|[^\d])/g,
+      (match,prefix,year,month,day)=>{
+        const d=new Date(Date.UTC(Number(year),Number(month)-1,Number(day)));
+        if(d.getUTCFullYear()!==Number(year)||d.getUTCMonth()+1!==Number(month)||d.getUTCDate()!==Number(day))return match;
+        return `${prefix}${year}年${Number(month)}月${Number(day)}日`;
+      });
+  });
 }
 
 // ── 第四栏：模板映射 + 正文预览/编辑 ──

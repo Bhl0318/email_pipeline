@@ -726,9 +726,26 @@
   function formatDateCN(s) {
     if (!s) return '';
     if (String(s).includes('年')) return s;
-    const d = new Date(s);
-    if (isNaN(d)) return s;
-    return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
+    const raw = String(s);
+    const iso = raw.match(/^((?:19|20)\d{2}[-/.]\d{1,2}[-/.]\d{1,2})(?:[T ]\d{2}:\d{2}.*)?$/);
+    return formatBodyDateText(iso ? iso[1] : raw);
+  }
+
+  // 只转换完整的公历日期；保留案号、申请号、期限描述等其他数字内容。
+  function formatBodyDateText(value) {
+    return value.replace(/(^|[^\d])((?:19|20)\d{2})[-/.](0?[1-9]|1[0-2])[-/.](0?[1-9]|[12]\d|3[01])(?=$|[^\d])/g,
+      (match, prefix, year, month, day) => {
+        const d = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)));
+        if (d.getUTCFullYear() !== Number(year) || d.getUTCMonth() + 1 !== Number(month) || d.getUTCDate() !== Number(day)) return match;
+        return `${prefix}${year}年${Number(month)}月${Number(day)}日`;
+      });
+  }
+
+  function formatBodyDates(root) {
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    const nodes = [];
+    while (walker.nextNode()) nodes.push(walker.currentNode);
+    nodes.forEach(node => { node.nodeValue = formatBodyDateText(node.nodeValue); });
   }
 
   function extractOrdinal(notifType) {
@@ -813,9 +830,15 @@
   }
 
   function formatAppNo(input) {
-    let v = (input.value || '').replace(/\./g, '');
-    if (v.length > 1) v = v.slice(0, -1) + '.' + v.slice(-1);
-    input.value = v;
+    const raw = input.value || '';
+    const compact = raw.replace(/\./g, '');
+    // 旧逻辑曾把「暂无」误写成「暂.无」；加载旧任务时顺手恢复。
+    if (compact === '暂无') { input.value = '暂无'; return; }
+    // 仅给中国申请号加校验位前的点（旧号 8+1 位，新号 12+1 位）。
+    // US/EP 号码及「暂无」等文字保持原样。
+    if (/^(?:\d{8}|\d{12})[\dXx]$/.test(compact)) {
+      input.value = compact.slice(0, -1) + '.' + compact.slice(-1);
+    }
   }
 
   function escapeHTML(s) {
@@ -1038,6 +1061,7 @@
     $('emailBody').innerHTML = html;
     // 移除表头行（模板空占位表头，不显示）
     $('emailBody').querySelectorAll('table thead').forEach(t => t.remove());
+    formatBodyDates($('emailBody'));
   }
 
   // ───────────── 操作 ─────────────
