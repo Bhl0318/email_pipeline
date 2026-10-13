@@ -399,7 +399,7 @@
           </div>
           <div class="form-group">
             <label>案号字段名</label>
-            <select id="f-ref-label">
+            <select id="f-ref-label" onchange="updateRefLabel()">
               <option value="委托方案号">委托方案号</option>
               <option value="贵方案号">贵方案号</option>
             </select>
@@ -902,6 +902,11 @@
       const el = $(inputId);
       if (!el) continue;
       const val = currentFields[field];
+      if (field === '案号字段名' && !Array.from(el.options).some(o => o.value === val)) {
+        el.value = '委托方案号';
+        currentFields[field] = el.value;
+        continue;
+      }
       if (val === undefined || val === null || val === '请提供') {
         el.value = '';
         if (val === '请提供') el.placeholder = '请提供';
@@ -914,6 +919,14 @@
     // select 无匹配值时回退到第一个 option
     const labelEl = $('f-app-date-label');
     if (labelEl && !labelEl.value) labelEl.selectedIndex = 0;
+  }
+
+  function updateRefLabel() {
+    currentFields['案号字段名'] = $('f-ref-label').value;
+    renderPreview();
+    if (currentPdfBlobUrl) { URL.revokeObjectURL(currentPdfBlobUrl); currentPdfBlobUrl = null; }
+    currentPdfBase64 = null;
+    renderAttachments();
   }
 
   function collectFieldsFromForm() {
