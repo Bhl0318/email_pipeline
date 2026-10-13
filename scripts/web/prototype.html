@@ -942,10 +942,10 @@
   }
 
   function templateChoiceOptions(key) {
-    if (!key.includes('/')) return [];
+    if (!key.includes('/') || /^PCT\/RO\/\d+\s*表$/i.test(key)) return [];
     const options = key.split('/').map(x => x.trim());
-    // 仅一个斜杠表示二选一；PCT/RO/132 表这类字段名保持原样。
-    return options.length === 2 && options.every(Boolean) ? options : [];
+    // {{选项一/选项二/选项三}} 可多选一；PCT/RO/132 表是官文编号字段。
+    return options.length > 1 && options.every(Boolean) ? options : [];
   }
 
   // 已有字段沿用专用控件；模板新增字段按 {{字段}} 自动生成并读取 fields_json 默认值。

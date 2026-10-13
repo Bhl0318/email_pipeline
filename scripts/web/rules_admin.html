@@ -209,8 +209,8 @@ function renderFields(name,content){
   const keys=[...new Set([...content.matchAll(/\{\{\s*([^{}]+?)\s*\}\}/g)].map(m=>m[1].trim()))];
   if(!keys.length){box.innerHTML+='<div class="muted">当前模板没有需要试填的字段</div>';return}
   for(const key of keys){
-    const choices=key.includes('/')?key.split('/').map(x=>x.trim()):[];
-    const isChoice=choices.length===2&&choices.every(Boolean);
+    const choices=key.includes('/')&&!/^PCT\/RO\/\d+\s*表$/i.test(key)?key.split('/').map(x=>x.trim()):[];
+    const isChoice=choices.length>1&&choices.every(Boolean);
     const label=document.createElement('label');label.className='trial-field';label.textContent=isChoice?choices.join(' / '):key;
     const input=document.createElement(isChoice?'select':'textarea');
     if(isChoice){
