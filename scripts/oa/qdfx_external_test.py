@@ -51,6 +51,26 @@ class ExternalAnalysisTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "公开号与请求不符"):
             _reference_markdown("US20250150762A1")
 
+    @patch("qdfx_external._connection_config", return_value=("test-token", "http://example.test/assist"))
+    @patch("mistral_ocr.fpo_reference_to_markdown", side_effect=AssertionError("不应重新下载"))
+    def test_manual_reference_markdown_is_validated_and_submitted_without_redownload(self, remote, config):
+        number = "US20250150762A1"
+        body = (number + "\n" + "说明书内容。" * 200 + "\n# CLAIMS\n" + "Claim text. " * 30)
+        session = Mock()
+        session.post.return_value.status_code = 202
+        session.post.return_value.json.return_value = {"code": 202, "data": {"parseId": "p1"}}
+        result = submit_oa_analysis(self.item, "审查意见", self.refs, session=session,
+                                    application_text="申请文件", reference_markdowns={number: (body, "本地文件.md")})
+        self.assertEqual(result["status"], "submitted")
+        self.assertEqual(len(session.post.call_args.kwargs["files"]), 3)
+        remote.assert_not_called()
+
+        wrong = body.replace(number, "US20250150762B2")
+        failed = submit_oa_analysis(self.item, "审查意见", self.refs, session=session,
+                                    application_text="申请文件", reference_markdowns={number: (wrong, "本地文件.md")})
+        self.assertEqual(failed["status"], "skipped")
+        self.assertEqual(session.post.call_count, 1)
+
     def test_fpo_is_direct_source_and_country_is_kept(self):
         session = Mock()
         page = Mock(text='<iframe src="https://s3.amazonaws.com/pdf.sumobrain.com/110693604.pdf?X-Amz-Date=1"></iframe>')

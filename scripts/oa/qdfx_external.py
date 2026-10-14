@@ -68,13 +68,16 @@ def _fpo_pdf(number, session=None):
     return pdf.content, page_url
 
 
-def _reference_markdown(raw_number, session=None):
-    """请 OCR VPS 下载文献并转为 Markdown；本机只校验返回的正文。"""
+def _reference_markdown(raw_number, session=None, *, raw_markdown=None, source=""):
+    """获取或复用文献 Markdown，统一校验公开号、说明书和权利要求。"""
     number = _publication_number(raw_number)
     if not number:
         return ""
-    from mistral_ocr import fpo_reference_to_markdown
-    body, url = fpo_reference_to_markdown(number)
+    if raw_markdown is None:
+        from mistral_ocr import fpo_reference_to_markdown
+        body, url = fpo_reference_to_markdown(number)
+    else:
+        body, url = raw_markdown, source
     compact = re.sub(r"[^A-Z0-9]", "", body.upper())
     if number not in compact:
         raise ValueError("文献正文中的公开号与请求不符")
@@ -117,7 +120,8 @@ def _ep_reference_numbers(oa_text):
             if (n := _publication_number(raw))]
 
 
-def submit_oa_analysis(item, oa_text, ref_docs, session=None, application_text=None):
+def submit_oa_analysis(item, oa_text, ref_docs, session=None, application_text=None,
+                       reference_markdowns=None):
     """提交一件新立项 OA 的材料；返回状态字典，不向调用方抛异常。"""
     try:
         token, base = _connection_config()
@@ -158,7 +162,11 @@ def submit_oa_analysis(item, oa_text, ref_docs, session=None, application_text=N
     failed = []
     for number in numbers:
         try:
-            md = _reference_markdown(number)
+            if reference_markdowns and number in reference_markdowns:
+                body, source = reference_markdowns[number]
+                md = _reference_markdown(number, raw_markdown=body, source=source)
+            else:
+                md = _reference_markdown(number)
             if md:
                 files.append(("dbwj", (f"{number}.md", md.encode("utf-8"), "text/markdown")))
             else:

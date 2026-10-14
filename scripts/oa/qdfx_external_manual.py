@@ -4,8 +4,9 @@
 只需修改下方四项配置，然后运行：
   python scripts/oa/qdfx_external_manual.py
 
-流程会提取审查意见中的对比文件号、从 FPO 获取并校验全文，最后调用
-POST /assist/qdfx/external/parse。需在环境中配置 QDFX_API_TOKEN；
+流程会提取审查意见中的对比文件号；若 outputs/fpo_check 下已有同公开号
+Markdown，则校验后复用，否则由 OCR VPS 下载。最后调用
+POST /assist/qdfx/external/parse。需配置 QDFX_API_TOKEN；
 本脚本不会执行 OA 立项、写入本地数据库或发送邮件。
 """
 
@@ -22,6 +23,7 @@ CASE_NO = ""
 OA_FILE = ""
 APPLICATION_FILE = ""
 REFERENCE_NUMBERS = []
+REFERENCE_MD_DIR = Path(__file__).resolve().parents[2] / "outputs" / "fpo_check"
 
 
 def _read_text(path):
@@ -80,11 +82,21 @@ def run_case(case_no, oa_file, application_file, reference_numbers=()):
 
     print(f"案号：{project}")
     print("对比文件：" + ", ".join(str(doc.get("doc_no", "")) for doc in ref_docs))
+    reference_markdowns = {}
+    for doc in ref_docs:
+        number = _publication_number(doc.get("doc_no"))
+        if not number:
+            continue
+        md_path = REFERENCE_MD_DIR / f"{number}.md"
+        if md_path.is_file():
+            reference_markdowns[number] = (md_path.read_text(encoding="utf-8-sig"), str(md_path))
+            print(f"复用本地对比文件：{md_path}")
     return submit_oa_analysis(
         {"project": project, "region": match.group(1)},
         oa_text,
         ref_docs,
         application_text=app_text,
+        reference_markdowns=reference_markdowns,
     )
 
 

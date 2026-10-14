@@ -25,6 +25,20 @@ class ManualSubmitTests(unittest.TestCase):
         self.assertEqual(args[2], [{"no": "1", "doc_no": "CN110693604A", "pub_date": "2019-11-19"}])
         self.assertEqual(kwargs["application_text"], "申请文件正文")
 
+    @patch("qdfx_external_manual.submit_oa_analysis", return_value={"status": "submitted", "parseId": "p1"})
+    def test_saved_reference_markdown_is_forwarded_to_formal_submit(self, submit):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            oa, app = root / "oa.md", root / "spec.md"
+            oa.write_text("引用 CN115089896A", encoding="utf-8")
+            app.write_text("申请文件正文", encoding="utf-8")
+            saved = root / "CN115089896A.md"
+            saved.write_text("CN115089896A\n说明书\n权利要求", encoding="utf-8")
+            with patch("qdfx_external_manual.REFERENCE_MD_DIR", root):
+                run_case("90009-0001US00", str(oa), str(app), ["CN115089896A"])
+        self.assertEqual(submit.call_args.kwargs["reference_markdowns"],
+                         {"CN115089896A": ("CN115089896A\n说明书\n权利要求", str(saved))})
+
 
 if __name__ == "__main__":
     unittest.main()
