@@ -170,6 +170,8 @@ def submit_oa_analysis(item, oa_text, ref_docs, session=None, application_text=N
     if failed or len(files) == 2:
         return {"status": "skipped", "reason": f"对比文件正文不齐: {', '.join(failed or numbers)}"}
 
+    print(f"[前端分析] {project} 开始调用 POST {base}/qdfx/external/parse；"
+          f"上传审查意见、申请文件及 {len(files) - 2} 份对比文件", file=sys.stderr)
     try:
         response = session.post(
             f"{base}/qdfx/external/parse",
@@ -178,6 +180,7 @@ def submit_oa_analysis(item, oa_text, ref_docs, session=None, application_text=N
             files=files,
             timeout=90,
         )
+        print(f"[前端分析] {project} 接口已返回 HTTP {response.status_code}", file=sys.stderr)
         payload = response.json()
         code = payload.get("code")
         if response.status_code == 409 and code == 409:
@@ -187,4 +190,5 @@ def submit_oa_analysis(item, oa_text, ref_docs, session=None, application_text=N
         data = payload.get("data") or {}
         return {"status": "submitted", "parseId": data.get("parseId"), "version": data.get("version")}
     except Exception as exc:
+        print(f"[前端分析] {project} 请求异常，无法确认服务端是否收到: {exc}", file=sys.stderr)
         return {"status": "failed", "reason": str(exc)}

@@ -1542,17 +1542,20 @@ def dispatch_oa(all_results, all_emails=None, dry_run=False, test_project_prefix
     # 只对新颖性或创造性命中、且本次成功立项的案件调用外部前端分析接口。
     # 审意判断时已取得官文正文；成功立项后立即把材料交给外部接口。
     # 本地只准备所需 Markdown，不判断文献章节是否符合外部服务的规范。
-    if inserted_items and qdfx_oa_text and not dry_run:
-        try:
-            from qdfx_external import submit_oa_analysis
-            for item in inserted_items:
-                oa_text = qdfx_oa_text.get(id(item))
-                if not oa_text:
-                    continue
+    if inserted_items and not dry_run:
+        for item in inserted_items:
+            oa_text = qdfx_oa_text.get(id(item))
+            if not oa_text:
+                print(f"[前端分析] {item.get('project', '')} 未调用外部接口："
+                      "未命中新颖性或创造性，或缺少审查意见正文", file=sys.stderr)
+                continue
+            try:
+                from qdfx_external import submit_oa_analysis
                 result = submit_oa_analysis(item, oa_text, qdfx_ref_docs.get(id(item), []))
                 print(f"[前端分析] {item.get('project', '')}: {result}", file=sys.stderr)
-        except Exception as e:
-            print(f"[前端分析] 外部解析调用失败，不影响 OA 立项: {e}", file=sys.stderr)
+            except Exception as e:
+                print(f"[前端分析] {item.get('project', '')} 外部解析调用异常，"
+                      f"不影响 OA 立项: {e}", file=sys.stderr)
 
     # AI 案件报告：立项即生成（见下方「分配报告」块）；分配页打开时先读 oa_assign_report 缓存，
     #     没有才现场懒生成（report/oa_assign.py analyze）。两处 save_report 为 UPSERT，不冲突。
