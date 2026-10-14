@@ -4,10 +4,10 @@ import os
 import sys
 import unittest
 from unittest.mock import Mock, patch
-import fitz
 
 sys.path.insert(0, os.path.dirname(__file__))
 from qdfx_external import _ep_reference_numbers, _fpo_pdf, _reference_markdown, submit_oa_analysis
+from mistral_ocr import fpo_reference_to_markdown
 
 
 class ExternalAnalysisTests(unittest.TestCase):
@@ -15,24 +15,33 @@ class ExternalAnalysisTests(unittest.TestCase):
         self.item = {"project": "20615-0011US00", "region": "US"}
         self.refs = [{"doc_no": "US20250150762A1"}]
 
-    @patch("qdfx_external._fpo_pdf")
-    def test_reference_must_match_full_publication_number_and_contain_full_text(self, fpo):
-        def pdf_bytes(number):
-            doc = fitz.open()
-            page = doc.new_page()
-            page.insert_text((40, 40), f"{number}\n" +
-                             ("Specification text. Specification text.\n" * 35) +
-                             "CLAIMS\n" + ("Claim text. Claim text.\n" * 12))
-            data = doc.tobytes()
-            doc.close()
-            return data
-        fpo.return_value = (pdf_bytes("US20250150762A1"), "https://www.freepatentsonline.com/20250150762.pdf")
+    @patch("mistral_ocr._config", return_value=("https://ocr.example", "test-key"))
+    @patch("requests.post")
+    def test_reference_client_sends_number_to_ocr_vps(self, post, config):
+        post.return_value.json.return_value = {
+            "publication_number": "US20250150762A1", "source": "https://www.freepatentsonline.com/20250150762.pdf",
+            "markdown": "US 2025/0150762 A1\n# CLAIMS\n1. test",
+        }
+        md, source = fpo_reference_to_markdown("US20250150762A1")
+        self.assertIn("CLAIMS", md)
+        self.assertIn("freepatentsonline", source)
+        post.assert_called_once()
+        self.assertEqual(post.call_args.args[0], "https://ocr.example/fpo-reference")
+        self.assertEqual(post.call_args.kwargs["json"], {"publication_number": "US20250150762A1"})
+
+    @patch("mistral_ocr.fpo_reference_to_markdown")
+    def test_reference_must_match_full_publication_number_and_contain_full_text(self, remote):
+        def markdown(number):
+            return (f"{number}\n" +
+                    ("Specification text. Specification text.\n" * 35) +
+                    "# CLAIMS\n" + ("Claim text. Claim text.\n" * 12))
+        remote.return_value = (markdown("US20250150762A1"), "https://www.freepatentsonline.com/20250150762.pdf")
         md = _reference_markdown("US 2025/0150762 A1")
         self.assertIn("Specification", md)
         self.assertIn("Claim text", md)
-        fpo.assert_called_once_with("US20250150762A1", None)
+        remote.assert_called_once_with("US20250150762A1")
 
-        fpo.return_value = (pdf_bytes("US20250150762B2"), "https://www.freepatentsonline.com/20250150762.pdf")
+        remote.return_value = (markdown("US20250150762B2"), "https://www.freepatentsonline.com/20250150762.pdf")
         with self.assertRaisesRegex(ValueError, "公开号与请求不符"):
             _reference_markdown("US20250150762A1")
 

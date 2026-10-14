@@ -95,6 +95,31 @@ def pdf_to_markdown(pdf_path, timeout=360, retries=3, backoff=3):
     return ""
 
 
+def fpo_reference_to_markdown(publication_number, timeout=420):
+    """请 OCR 服务在其所在 VPS 下载 FPO 对比文件，返回 OCR Markdown。"""
+    base, key = _config()
+    if not key:
+        raise ValueError("未配置 MISTRAL_OCR_KEY 或 mistral_ocr.api_key")
+    import requests
+    import urllib3
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+    response = requests.post(
+        f"{base}/fpo-reference",
+        headers={"X-API-Key": key},
+        json={"publication_number": publication_number},
+        verify=False,
+        timeout=timeout,
+    )
+    response.raise_for_status()
+    payload = response.json()
+    if payload.get("publication_number") != publication_number:
+        raise ValueError("OCR 服务返回的公开号与请求不符")
+    markdown = (payload.get("markdown") or "").strip()
+    if not markdown:
+        raise ValueError("OCR 服务未返回对比文件正文")
+    return markdown, payload.get("source", "")
+
+
 if __name__ == "__main__":
     if len(sys.argv) < 2:
         print("用法: python3 mistral_ocr.py <pdf路径> [输出.md]")
