@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""调用 VPS 的 FPO 对比文件接口，保存返回的 Markdown。
+"""调用 VPS 的对比文件接口（FPO 优先，Google Patents 回退），保存返回的 Markdown。
 
 用法：
     python scripts/oa/check_fpo_remote.py US20250150762A1
@@ -58,21 +58,21 @@ def fetch_reference(raw_number, output_path=None):
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(markdown + "\n", encoding="utf-8")
     print(f"公开号：{number}")
-    print(f"FPO 来源：{payload.get('source', '')}")
+    print(f"PDF 来源：{payload.get('source', '')}")
     print(f"PDF 页数：{payload.get('pages', '未知')}；服务耗时：{payload.get('elapsed', '未知')} 秒")
     print(f"Markdown：{target.resolve()}（{len(markdown)} 字符）")
     return target
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description="调用 OCR VPS 的 FPO 下载及 Markdown 转换接口")
+    parser = argparse.ArgumentParser(description="调用 OCR VPS 的专利 PDF 下载及 Markdown 转换接口")
     parser.add_argument("publication_number", help="完整专利公开号，例如 US20250150762A1")
     parser.add_argument("--output", help="输出 .md 路径，默认 outputs/fpo_check/<公开号>.md")
     args = parser.parse_args(argv)
     try:
         fetch_reference(args.publication_number, args.output)
     except Exception as exc:
-        print(f"FPO 远程解析失败：{exc}", file=sys.stderr)
+        print(f"对比文件远程解析失败：{exc}", file=sys.stderr)
         return 1
     return 0
 

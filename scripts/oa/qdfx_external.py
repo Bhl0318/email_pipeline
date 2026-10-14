@@ -1,7 +1,8 @@
 """将完整的 OA 材料提交到外部前端分析服务。
 
 在运行邮件流程的服务器上配置 QDFX_API_TOKEN（或不入库的 qdfx_config.local.json）
-及 MISTRAL_OCR_KEY。对比文件由 OCR VPS 从 FreePatentsOnline 下载；
+及 MISTRAL_OCR_KEY。对比文件由 OCR VPS 从 FreePatentsOnline 下载，失败时
+尝试 Google Patents；
 只有 PDF 中的公开号完全匹配，且说明书和权利要求均可读取时，才会使用该文件。
 QDFX_API_BASE_URL 默认指向正式环境的 /assist 接口。
 """
@@ -68,7 +69,7 @@ def _fpo_pdf(number, session=None):
 
 
 def _reference_markdown(raw_number, session=None):
-    """请 OCR VPS 从 FPO 下载文献并转为 Markdown；本机只校验返回的正文。"""
+    """请 OCR VPS 下载文献并转为 Markdown；本机只校验返回的正文。"""
     number = _publication_number(raw_number)
     if not number:
         return ""

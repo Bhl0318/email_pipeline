@@ -96,7 +96,7 @@ def pdf_to_markdown(pdf_path, timeout=360, retries=3, backoff=3):
 
 
 def fpo_reference_to_markdown(publication_number, timeout=420):
-    """请 OCR 服务在其所在 VPS 下载 FPO 对比文件，返回 OCR Markdown。"""
+    """请 OCR 服务在其所在 VPS 下载对比文件（FPO 优先），返回 OCR Markdown。"""
     base, key = _config()
     if not key:
         raise ValueError("未配置 MISTRAL_OCR_KEY 或 mistral_ocr.api_key")
