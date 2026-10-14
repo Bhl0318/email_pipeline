@@ -1,0 +1,4 @@
+{
+  "base_url": "http://10.10.70.88:8082/assist",
+  "api_token": "<在本机 qdfx_config.local.json 填写接口 token；不要提交到 Git>"
+}

@@ -1,10 +1,12 @@
 """将完整的 OA 材料提交到外部前端分析服务。
 
-在运行邮件流程的服务器上配置 QDFX_API_TOKEN 和 MISTRAL_OCR_KEY。对比文件由 OCR VPS 从 FreePatentsOnline 下载；
+在运行邮件流程的服务器上配置 QDFX_API_TOKEN（或不入库的 qdfx_config.local.json）
+及 MISTRAL_OCR_KEY。对比文件由 OCR VPS 从 FreePatentsOnline 下载；
 只有 PDF 中的公开号完全匹配，且说明书和权利要求均可读取时，才会使用该文件。
 QDFX_API_BASE_URL 默认指向正式环境的 /assist 接口。
 """
 
+import json
 import os
 import re
 import sys
@@ -15,7 +17,20 @@ import requests
 
 
 DEFAULT_BASE_URL = "http://10.10.70.88:8088/assist"
+LOCAL_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "..", "qdfx_config.local.json")
 _PUBLICATION_RE = re.compile(r"^(?:CN|US|EP|WO|JP|KR|DE|GB|FR|CA|AU)\d{5,15}[A-Z]\d?$", re.I)
+
+
+def _connection_config():
+    """环境变量优先，其次读取本机不入库的接口配置。"""
+    try:
+        with open(LOCAL_CONFIG_PATH, encoding="utf-8") as f:
+            local = json.load(f)
+    except FileNotFoundError:
+        local = {}
+    token = (os.environ.get("QDFX_API_TOKEN") or local.get("api_token") or "").strip()
+    base = (os.environ.get("QDFX_API_BASE_URL") or local.get("base_url") or DEFAULT_BASE_URL).strip().rstrip("/")
+    return token, base
 
 
 def _publication_number(raw):
@@ -103,9 +118,12 @@ def _ep_reference_numbers(oa_text):
 
 def submit_oa_analysis(item, oa_text, ref_docs, session=None, application_text=None):
     """提交一件新立项 OA 的材料；返回状态字典，不向调用方抛异常。"""
-    token = os.environ.get("QDFX_API_TOKEN", "").strip()
+    try:
+        token, base = _connection_config()
+    except (OSError, ValueError, TypeError) as exc:
+        return {"status": "failed", "reason": f"前端分析接口配置读取失败: {exc}"}
     if not token:
-        return {"status": "skipped", "reason": "QDFX_API_TOKEN 未配置"}
+        return {"status": "skipped", "reason": "QDFX_API_TOKEN 或 qdfx_config.local.json 未配置"}
     project = (item.get("project") or "").strip()
     if not re.search(r"(?:CN|US|EP)\d{2}$", project):
         return {"status": "skipped", "reason": "案号地区格式不支持"}
@@ -151,7 +169,6 @@ def submit_oa_analysis(item, oa_text, ref_docs, session=None, application_text=N
     if failed or len(files) == 2:
         return {"status": "skipped", "reason": f"对比文件正文不齐: {', '.join(failed or numbers)}"}
 
-    base = os.environ.get("QDFX_API_BASE_URL", DEFAULT_BASE_URL).rstrip("/")
     try:
         response = session.post(
             f"{base}/qdfx/external/parse",

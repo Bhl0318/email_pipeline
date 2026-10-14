@@ -3,10 +3,10 @@
 import os
 import sys
 import unittest
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, mock_open, patch
 
 sys.path.insert(0, os.path.dirname(__file__))
-from qdfx_external import _ep_reference_numbers, _fpo_pdf, _reference_markdown, submit_oa_analysis
+from qdfx_external import _connection_config, _ep_reference_numbers, _fpo_pdf, _reference_markdown, submit_oa_analysis
 from mistral_ocr import fpo_reference_to_markdown
 
 
@@ -14,6 +14,12 @@ class ExternalAnalysisTests(unittest.TestCase):
     def setUp(self):
         self.item = {"project": "20615-0011US00", "region": "US"}
         self.refs = [{"doc_no": "US20250150762A1"}]
+
+    @patch("qdfx_external.LOCAL_CONFIG_PATH", "/dev/null")
+    @patch.dict(os.environ, {"QDFX_API_TOKEN": "env-token", "QDFX_API_BASE_URL": "http://example.test/assist/"})
+    def test_environment_overrides_local_connection_settings(self):
+        with patch("builtins.open", mock_open(read_data='{"api_token":"file-token","base_url":"http://other.test"}')):
+            self.assertEqual(_connection_config(), ("env-token", "http://example.test/assist"))
 
     @patch("mistral_ocr._config", return_value=("https://ocr.example", "test-key"))
     @patch("requests.post")
