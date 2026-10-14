@@ -3,6 +3,7 @@
 import os
 import sys
 import unittest
+from pathlib import Path
 from unittest.mock import Mock, mock_open, patch
 
 sys.path.insert(0, os.path.dirname(__file__))
@@ -36,24 +37,22 @@ class ExternalAnalysisTests(unittest.TestCase):
         self.assertEqual(post.call_args.kwargs["json"], {"publication_number": "US20250150762A1"})
 
     @patch("mistral_ocr.fpo_reference_to_markdown")
-    def test_reference_must_match_full_publication_number_and_contain_full_text(self, remote):
+    def test_reference_markdown_is_forwarded_without_local_splitting(self, remote):
         def markdown(number):
             return (f"{number}\n" +
                     ("Specification text. Specification text.\n" * 35) +
                     "# CLAIMS\n" + ("Claim text. Claim text.\n" * 12))
         remote.return_value = (markdown("US20250150762A1"), "https://www.freepatentsonline.com/20250150762.pdf")
         md = _reference_markdown("US 2025/0150762 A1")
-        self.assertIn("Specification", md)
-        self.assertIn("Claim text", md)
+        self.assertEqual(md, markdown("US20250150762A1"))
         remote.assert_called_once_with("US20250150762A1")
 
         remote.return_value = (markdown("US20250150762B2"), "https://www.freepatentsonline.com/20250150762.pdf")
-        with self.assertRaisesRegex(ValueError, "公开号与请求不符"):
-            _reference_markdown("US20250150762A1")
+        self.assertEqual(_reference_markdown("US20250150762A1"), markdown("US20250150762B2"))
 
     @patch("qdfx_external._connection_config", return_value=("test-token", "http://example.test/assist"))
     @patch("mistral_ocr.fpo_reference_to_markdown", side_effect=AssertionError("不应重新下载"))
-    def test_manual_reference_markdown_is_validated_and_submitted_without_redownload(self, remote, config):
+    def test_manual_reference_markdown_is_submitted_without_redownload(self, remote, config):
         number = "US20250150762A1"
         body = (number + "\n" + "说明书内容。" * 200 + "\n# CLAIMS\n" + "Claim text. " * 30)
         session = Mock()
@@ -63,13 +62,28 @@ class ExternalAnalysisTests(unittest.TestCase):
                                     application_text="申请文件", reference_markdowns={number: (body, "本地文件.md")})
         self.assertEqual(result["status"], "submitted")
         self.assertEqual(len(session.post.call_args.kwargs["files"]), 3)
+        self.assertEqual(session.post.call_args.kwargs["files"][2][1][1].decode("utf-8"), body)
         remote.assert_not_called()
 
         wrong = body.replace(number, "US20250150762B2")
-        failed = submit_oa_analysis(self.item, "审查意见", self.refs, session=session,
+        second = submit_oa_analysis(self.item, "审查意见", self.refs, session=session,
                                     application_text="申请文件", reference_markdowns={number: (wrong, "本地文件.md")})
-        self.assertEqual(failed["status"], "skipped")
-        self.assertEqual(session.post.call_count, 1)
+        self.assertEqual(second["status"], "submitted")
+        self.assertEqual(session.post.call_count, 2)
+
+    @patch("qdfx_external._connection_config", return_value=("test-token", "http://example.test/assist"))
+    def test_cn_reference_markdown_is_uploaded_without_section_validation(self, config):
+        path = Path(__file__).resolve().parents[2] / "outputs/fpo_check/CN115089896A.md"
+        body = path.read_text(encoding="utf-8")
+        session = Mock()
+        session.post.return_value.status_code = 202
+        session.post.return_value.json.return_value = {"code": 202, "data": {"parseId": "p1"}}
+        result = submit_oa_analysis(
+            {"project": "90009-0001CN00", "region": "CN"}, "审查意见", [{"doc_no": "CN115089896A"}],
+            session=session, application_text="申请文件", reference_markdowns={"CN115089896A": (body, str(path))},
+        )
+        self.assertEqual(result["parseId"], "p1")
+        self.assertEqual(session.post.call_args.kwargs["files"][2][1][1], body.encode("utf-8"))
 
     def test_fpo_is_direct_source_and_country_is_kept(self):
         session = Mock()

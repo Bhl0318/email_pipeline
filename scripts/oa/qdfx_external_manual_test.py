@@ -1,43 +1,35 @@
-"""手工参数入口调用正式 OA 前端分析流程的离线测试。"""
+"""手工上传 Markdown 到外部前端分析接口的离线测试。"""
 
 import os
 import sys
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 sys.path.insert(0, os.path.dirname(__file__))
-from qdfx_external_manual import run_case
+from qdfx_external_manual import submit_markdown_files
 
 
 class ManualSubmitTests(unittest.TestCase):
-    @patch("qdfx_external_manual.submit_oa_analysis", return_value={"status": "submitted", "parseId": "p1"})
-    def test_hardcoded_inputs_reach_formal_submit(self, submit):
+    @patch("qdfx_external_manual._connection_config", return_value=("test-token", "http://example.test/assist"))
+    def test_uploads_original_markdown_files_and_returns_parse_id(self, config):
         with tempfile.TemporaryDirectory() as tmp:
-            oa, app = Path(tmp) / "oa.md", Path(tmp) / "spec.md"
-            oa.write_text("本通知书引用下列对比文件\n1 CN110693604A 2019-11-19", encoding="utf-8")
-            app.write_text("申请文件正文", encoding="utf-8")
-            result = run_case("20618-0001CN00", str(oa), str(app))
-        self.assertEqual(result["status"], "submitted")
-        args, kwargs = submit.call_args
-        self.assertEqual(args[0], {"project": "20618-0001CN00", "region": "CN"})
-        self.assertEqual(args[2], [{"no": "1", "doc_no": "CN110693604A", "pub_date": "2019-11-19"}])
-        self.assertEqual(kwargs["application_text"], "申请文件正文")
+            paths = [Path(tmp) / name for name in ("oa.md", "application.md", "ref1.md", "ref2.md")]
+            for path in paths:
+                path.write_text(f"# {path.stem}\n原始内容", encoding="utf-8")
 
-    @patch("qdfx_external_manual.submit_oa_analysis", return_value={"status": "submitted", "parseId": "p1"})
-    def test_saved_reference_markdown_is_forwarded_to_formal_submit(self, submit):
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            oa, app = root / "oa.md", root / "spec.md"
-            oa.write_text("引用 CN115089896A", encoding="utf-8")
-            app.write_text("申请文件正文", encoding="utf-8")
-            saved = root / "CN115089896A.md"
-            saved.write_text("CN115089896A\n说明书\n权利要求", encoding="utf-8")
-            with patch("qdfx_external_manual.REFERENCE_MD_DIR", root):
-                run_case("90009-0001US00", str(oa), str(app), ["CN115089896A"])
-        self.assertEqual(submit.call_args.kwargs["reference_markdowns"],
-                         {"CN115089896A": ("CN115089896A\n说明书\n权利要求", str(saved))})
+            def post(url, *, files, data, headers, timeout):
+                self.assertEqual(url, "http://example.test/assist/qdfx/external/parse")
+                self.assertEqual([field for field, _ in files], ["scyj", "sqwj", "dbwj", "dbwj"])
+                self.assertEqual([entry[1].read().decode("utf-8") for _, entry in files],
+                                 [path.read_text(encoding="utf-8") for path in paths])
+                self.assertEqual(data, {"caseNo": "90009-0001CN00", "createdBy": "writeSYS"})
+                self.assertEqual(headers, {"X-Api-Token": "test-token"})
+                return Mock(status_code=202, json=lambda: {"code": 202, "data": {"parseId": "p1"}})
+
+            result = submit_markdown_files("90009-0001CN00", *paths[:2], paths[2:], post=post)
+        self.assertEqual(result["parseId"], "p1")
 
 
 if __name__ == "__main__":

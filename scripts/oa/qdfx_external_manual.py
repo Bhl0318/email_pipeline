@@ -1,116 +1,65 @@
 #!/usr/bin/env python3
-"""用手工指定的案件和文件，直接调用正式 OA 前端分析提交流程。
+"""将已经准备好的 Markdown 文件直接上传至外部前端分析接口。
 
-只需修改下方四项配置，然后运行：
-  python scripts/oa/qdfx_external_manual.py
-
-流程会提取审查意见中的对比文件号；若 outputs/fpo_check 下已有同公开号
-Markdown，则校验后复用，否则由 OCR VPS 下载。最后调用
-POST /assist/qdfx/external/parse。需配置 QDFX_API_TOKEN；
-本脚本不会执行 OA 立项、写入本地数据库或发送邮件。
+填写下方案号和文件路径后运行：python scripts/oa/qdfx_external_manual.py
+接口地址及令牌从 QDFX_API_BASE_URL、QDFX_API_TOKEN 读取；
+未配置地址时使用正式环境 http://10.10.70.88:8088/assist。
 """
 
 import json
-import re
 import sys
+from contextlib import ExitStack
 from pathlib import Path
 
-from qdfx_external import _ep_reference_numbers, _publication_number, submit_oa_analysis
+import requests
+
+from qdfx_external import _connection_config
 
 
-# 在这里填写真实参数。REFERENCE_NUMBERS 留空时从审查意见自动提取。
 CASE_NO = ""
-OA_FILE = ""
-APPLICATION_FILE = ""
-REFERENCE_NUMBERS = []
-REFERENCE_MD_DIR = Path(__file__).resolve().parents[2] / "outputs" / "fpo_check"
+OA_MD = ""
+APPLICATION_MD = ""
+REFERENCE_MDS = []
 
 
-def _read_text(path):
-    if not path.is_file():
-        raise FileNotFoundError(path)
-    suffix = path.suffix.lower()
-    if suffix in (".md", ".txt"):
-        return path.read_text(encoding="utf-8-sig")
-    if suffix == ".docx":
-        from oa_report_ai import _docx_text
-        return _docx_text(str(path)) or ""
-    if suffix == ".pdf":
-        import fitz
-        with fitz.open(path) as pdf:
-            text = "\n".join(page.get_text() for page in pdf)
-        if text.strip():
-            return text
-        from mistral_ocr import pdf_to_markdown
-        return pdf_to_markdown(str(path)) or ""
-    raise ValueError(f"不支持的文件格式: {path.suffix}")
+def submit_markdown_files(case_no, oa_md, application_md, reference_mds, *, post=requests.post):
+    """仅上传指定文件并返回接口的 data；不解析、改写或下载文件。"""
+    token, base = _connection_config()
+    if not token:
+        raise ValueError("未配置 QDFX_API_TOKEN")
+    if not case_no or not oa_md or not application_md or not reference_mds:
+        raise ValueError("请填写案号、审查意见、申请文件和至少一份对比文件")
 
+    paths = [("scyj", Path(oa_md)), ("sqwj", Path(application_md))]
+    paths.extend(("dbwj", Path(path)) for path in reference_mds)
+    for _, path in paths:
+        if path.suffix.lower() != ".md" or not path.is_file():
+            raise ValueError(f"Markdown 文件不存在：{path}")
 
-def _extract_ref_docs(region, oa_path, oa_text):
-    if region == "CN":
-        from parse_cn_pdf import _regex_extract_ref_docs, extract_cn_ref_docs
-        docs = (extract_cn_ref_docs(str(oa_path)).get("ref_docs", []) if oa_path.suffix.lower() == ".pdf"
-                else _regex_extract_ref_docs(oa_text))
-    elif region == "US":
-        from parse_us_refs import _regex_extract, extract_us_ref_docs
-        docs = (extract_us_ref_docs(str(oa_path)).get("ref_docs", []) if oa_path.suffix.lower() == ".pdf"
-                else _regex_extract(oa_text))
-    else:
-        docs = _ep_reference_numbers(oa_text)
-    return docs
-
-
-def run_case(case_no, oa_file, application_file, reference_numbers=()):
-    project = case_no.strip().upper()
-    match = re.fullmatch(r"[A-Z0-9-]+(CN|US|EP)\d{2}", project)
-    if not match:
-        raise ValueError("请填写以 CN/US/EP 加两位数字结尾的案号")
-    oa_path, app_path = Path(oa_file), Path(application_file)
-    oa_text, app_text = _read_text(oa_path), _read_text(app_path)
-    if not oa_text.strip() or not app_text.strip():
-        raise ValueError("审查意见或申请文件未能读取为文本")
-
-    if reference_numbers:
-        numbers = [_publication_number(raw) for raw in reference_numbers]
-        if not all(numbers):
-            raise ValueError("REFERENCE_NUMBERS 中有无法识别的专利公开号")
-        ref_docs = [{"doc_no": number} for number in dict.fromkeys(numbers)]
-    else:
-        ref_docs = _extract_ref_docs(match.group(1), oa_path, oa_text)
-    if not ref_docs:
-        raise ValueError("未提取到对比文件号；请检查审查意见，或手工填写 REFERENCE_NUMBERS")
-
-    print(f"案号：{project}")
-    print("对比文件：" + ", ".join(str(doc.get("doc_no", "")) for doc in ref_docs))
-    reference_markdowns = {}
-    for doc in ref_docs:
-        number = _publication_number(doc.get("doc_no"))
-        if not number:
-            continue
-        md_path = REFERENCE_MD_DIR / f"{number}.md"
-        if md_path.is_file():
-            reference_markdowns[number] = (md_path.read_text(encoding="utf-8-sig"), str(md_path))
-            print(f"复用本地对比文件：{md_path}")
-    return submit_oa_analysis(
-        {"project": project, "region": match.group(1)},
-        oa_text,
-        ref_docs,
-        application_text=app_text,
-        reference_markdowns=reference_markdowns,
-    )
+    with ExitStack() as stack:
+        files = [(field, (path.name, stack.enter_context(path.open("rb")), "text/markdown"))
+                 for field, path in paths]
+        response = post(
+            f"{base}/qdfx/external/parse",
+            headers={"X-Api-Token": token},
+            files=files,
+            data={"caseNo": case_no, "createdBy": "writeSYS"},
+            timeout=90,
+        )
+    payload = response.json()
+    if response.status_code not in (200, 202) or payload.get("code") not in (200, 202):
+        raise RuntimeError(payload.get("msg") or f"HTTP {response.status_code}")
+    return payload["data"]
 
 
 def main():
-    if not CASE_NO or not OA_FILE or not APPLICATION_FILE:
-        print("请先在脚本开头填写 CASE_NO、OA_FILE、APPLICATION_FILE", file=sys.stderr)
-        return 2
     try:
-        result = run_case(CASE_NO, OA_FILE, APPLICATION_FILE, REFERENCE_NUMBERS)
+        data = submit_markdown_files(CASE_NO, OA_MD, APPLICATION_MD, REFERENCE_MDS)
     except Exception as exc:
-        print(f"测试失败：{exc}", file=sys.stderr)
-        return 2
-    print(json.dumps(result, ensure_ascii=False, indent=2))
-    return 0 if result.get("status") in ("submitted", "processing") else 1
+        print(f"提交失败：{exc}", file=sys.stderr)
+        return 1
+    print(json.dumps(data, ensure_ascii=False, indent=2))
+    return 0
 
 
 if __name__ == "__main__":

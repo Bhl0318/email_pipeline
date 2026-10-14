@@ -2,8 +2,7 @@
 
 在运行邮件流程的服务器上配置 QDFX_API_TOKEN（或不入库的 qdfx_config.local.json）
 及 MISTRAL_OCR_KEY。对比文件由 OCR VPS 从 FreePatentsOnline 下载，失败时
-尝试 Google Patents；
-只有 PDF 中的公开号完全匹配，且说明书和权利要求均可读取时，才会使用该文件。
+尝试 Google Patents；取得的 Markdown 原文直接作为 dbwj 上传。
 QDFX_API_BASE_URL 默认指向正式环境的 /assist 接口。
 """
 
@@ -69,23 +68,16 @@ def _fpo_pdf(number, session=None):
 
 
 def _reference_markdown(raw_number, session=None, *, raw_markdown=None, source=""):
-    """获取或复用文献 Markdown，统一校验公开号、说明书和权利要求。"""
+    """获取或复用文献 Markdown 原文，交由外部接口处理。"""
     number = _publication_number(raw_number)
     if not number:
         return ""
     if raw_markdown is None:
         from mistral_ocr import fpo_reference_to_markdown
-        body, url = fpo_reference_to_markdown(number)
+        body, _ = fpo_reference_to_markdown(number)
     else:
-        body, url = raw_markdown, source
-    compact = re.sub(r"[^A-Z0-9]", "", body.upper())
-    if number not in compact:
-        raise ValueError("文献正文中的公开号与请求不符")
-    from oa_report_ai import _split_spec
-    description, claims = _split_spec(re.sub(r"(?m)^#{1,6}\s*", "", body))
-    if len(description.strip()) < 500 or len(claims.strip()) < 100:
-        raise ValueError("文献缺少说明书或权利要求全文")
-    return f"# {number}\n\n来源：{url}\n\n## 说明书\n\n{description}\n\n## 权利要求\n\n{claims}\n"
+        body = raw_markdown
+    return body
 
 
 def _reference_pdf_text(number, pdf_data):

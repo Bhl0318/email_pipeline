@@ -1373,7 +1373,7 @@ def dispatch_oa(all_results, all_emails=None, dry_run=False, test_project_prefix
             except Exception as e:
                 print(f"[对比文件][US] {proj} OA{oa_seq} 写回失败: {e}", file=sys.stderr)
 
-    # 审意新颖性/创造性判断（立项时）：命中任一则标注；判断后，材料齐备的案件提交外部前端分析。
+    # 审意新颖性/创造性判断（立项时）：命中任一则标注，并记录外部前端分析的提交材料。
     # 读不到审意 / DeepSeek 失败默认无问题，仍正常进入 OA 分配。
     qdfx_oa_text = {}
     if all_results and not dry_run:
@@ -1409,8 +1409,8 @@ def dispatch_oa(all_results, all_emails=None, dry_run=False, test_project_prefix
                     print(f"[审意分析] {proj} OA{_seq}：审意正文为空，跳过判断（默认可分配）", file=sys.stderr)
                     continue
                 v = analyze_novelty_inventiveness(_oa_text)
-                qdfx_oa_text[id(item)] = _oa_text
                 if v.get("novelty") or v.get("inventiveness"):
+                    qdfx_oa_text[id(item)] = _oa_text
                     _issues = [n for n, f in (("新颖性", v.get("novelty")),
                                               ("创造性", v.get("inventiveness"))) if f]
                     # 只写类型名：有新颖性写「新颖性」、有创造性写「创造性」、都有写「新颖性、创造性」
@@ -1539,6 +1539,21 @@ def dispatch_oa(all_results, all_emails=None, dry_run=False, test_project_prefix
         except Exception as e:
             print(f"[待分配] 写入失败: {e}", file=sys.stderr)
 
+    # 只对新颖性或创造性命中、且本次成功立项的案件调用外部前端分析接口。
+    # 审意判断时已取得官文正文；成功立项后立即把材料交给外部接口。
+    # 本地只准备所需 Markdown，不判断文献章节是否符合外部服务的规范。
+    if inserted_items and qdfx_oa_text and not dry_run:
+        try:
+            from qdfx_external import submit_oa_analysis
+            for item in inserted_items:
+                oa_text = qdfx_oa_text.get(id(item))
+                if not oa_text:
+                    continue
+                result = submit_oa_analysis(item, oa_text, qdfx_ref_docs.get(id(item), []))
+                print(f"[前端分析] {item.get('project', '')}: {result}", file=sys.stderr)
+        except Exception as e:
+            print(f"[前端分析] 外部解析调用失败，不影响 OA 立项: {e}", file=sys.stderr)
+
     # AI 案件报告：立项即生成（见下方「分配报告」块）；分配页打开时先读 oa_assign_report 缓存，
     #     没有才现场懒生成（report/oa_assign.py analyze）。两处 save_report 为 UPSERT，不冲突。
     # CN/EP 审意官文是邮件附件（存在 _inbox，事后随邮件归档消失），故立项此刻复制到
@@ -1592,19 +1607,6 @@ def dispatch_oa(all_results, all_emails=None, dry_run=False, test_project_prefix
     # 返回本次转OA立项动作 [{message_id, project, action, reason}]，供 main.py 汇总写邮件动作页
     forward_actions = send_forward_oa(all_results, all_emails, dry_run=dry_run) or []
 
-    # 仅对本次成功立项且审意正文可读的案件提交解析；重复收文不会产生新版本。
-    # 放在转OA之后，避免对比文件下载延迟原有转发邮件。
-    if inserted_items and qdfx_oa_text and not dry_run:
-        try:
-            from qdfx_external import submit_oa_analysis
-            for item in inserted_items:
-                oa_text = qdfx_oa_text.get(id(item))
-                if not oa_text:
-                    continue
-                result = submit_oa_analysis(item, oa_text, qdfx_ref_docs.get(id(item), []))
-                print(f"[前端分析] {item.get('project', '')}: {result}", file=sys.stderr)
-        except Exception as e:
-            print(f"[前端分析] 外部解析调用失败，不影响 OA 立项: {e}", file=sys.stderr)
     return forward_actions
 
 
