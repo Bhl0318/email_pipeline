@@ -127,8 +127,33 @@ def _user_attrs(name, ex, cache):
     return a
 
 
+def _historical_formal_roles(rows, ex):
+    """按历史项目 ID 和姓名找明确标成形式、且没有实质角色的承办记录。"""
+    ids = {str(r.get("id") or "").strip() for r in rows if r.get("id")}
+    if not ids:
+        return set()
+    try:
+        values = ",".join(f"'{_q(pid)}'" for pid in sorted(ids))
+        perf = ex(f"SELECT proid, person, wkrole FROM tip_budgetperformance "
+                  f"WHERE proid IN ({values}) "
+                  f"AND (wkrole LIKE '%形式%' OR wkrole LIKE '%实质%')") or []
+        if not isinstance(perf, list):
+            return set()
+    except Exception as e:
+        print(f"[oa_personnel] 历史承办角色查询失败，保留原候选池: {e}", file=sys.stderr)
+        return set()
+    roles = {}
+    for row in perf:
+        key = (str(row.get("proid") or "").strip(), (row.get("person") or "").strip())
+        if key[0] and key[1]:
+            roles.setdefault(key, set()).add((row.get("wkrole") or "").strip())
+    return {key for key, values in roles.items()
+            if any("形式" in role for role in values)
+            and not any("实质" in role for role in values)}
+
+
 def collect_candidates(project, execute=None):
-    """收集候选人库供人员安排建议用：本案撰写/历史OA承办人 + 同族OA参与者，带职务/职级/在职/来源。
+    """收集本案撰写/历史OA/同族OA候选人；历史中仅有形式角色的承办记录不计入。
     返回 [{name, duty, level, status, sources:[本案撰写|本案历史OA|同族OA...]}]，去重。"""
     try:
         ex = _get_execute(execute)
@@ -139,10 +164,12 @@ def collect_candidates(project, execute=None):
     cache = {}
     cands = {}
 
-    def _add(names, source):
+    def _add(names, source, project_id="", formal_only=None):
         for p in re.split(r"[、,，/]+", names or ""):
             p = p.strip()
             if not p:
+                continue
+            if source != "本案撰写" and (str(project_id or "").strip(), p) in (formal_only or set()):
                 continue
             a = _user_attrs(p, ex, cache)
             if not a:
@@ -151,18 +178,20 @@ def collect_candidates(project, execute=None):
             c["sources"].add(source)
 
     try:
-        own = ex(f"SELECT project_name, project_type, project_leader, project_qc FROM projects "
+        own = ex(f"SELECT id, project_name, project_type, project_leader, project_qc FROM projects "
                  f"WHERE project='{_q(project)}'") or []
+        fam = ex(f"SELECT id, project_name, project_type, project_leader, project_qc FROM projects "
+                 f"WHERE project LIKE '{_q(zu)}%' AND project <> '{_q(project)}'") or []
+        formal_only = _historical_formal_roles(
+            [r for r in own + fam if _is_oa_type(r.get("project_type", ""))], ex)
         for r in own:
             src = "本案历史OA" if _is_oa_type(r.get("project_type", "")) else "本案撰写"
-            _add(r.get("project_leader", ""), src)
-            _add(r.get("project_qc", ""), src)
-        fam = ex(f"SELECT project_name, project_type, project_leader, project_qc FROM projects "
-                 f"WHERE project LIKE '{_q(zu)}%' AND project <> '{_q(project)}'") or []
+            _add(r.get("project_leader", ""), src, r.get("id"), formal_only)
+            _add(r.get("project_qc", ""), src, r.get("id"), formal_only)
         for r in fam:
             if _is_oa_type(r.get("project_type", "")):
-                _add(r.get("project_leader", ""), "同族OA")
-                _add(r.get("project_qc", ""), "同族OA")
+                _add(r.get("project_leader", ""), "同族OA", r.get("id"), formal_only)
+                _add(r.get("project_qc", ""), "同族OA", r.get("id"), formal_only)
     except Exception as e:
         print(f"[oa_personnel] 候选池收集出错: {e}", file=sys.stderr)
 

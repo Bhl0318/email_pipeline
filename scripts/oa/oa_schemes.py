@@ -92,15 +92,17 @@ def _deepseek(prompt):
     return None
 
 
-def _deepseek_schemes(candidates, tech_field=""):
+def _deepseek_schemes(candidates, tech_field="", restricted_responders=None):
     """无白名单时的兜底：仅候选池 + 规则。"""
     prompt = (_schemes_instruction().rstrip() + "\n\n"
               f"【本案技术领域】\n{tech_field or '（未提供）'}\n\n"
+              "【不可担任答复负责人（可担任 QC）】\n"
+              + "、".join(sorted(restricted_responders or [])) + "\n\n"
               "【候选人库（只能从这里选，禁止编造库外姓名）】\n" + _cand_block(candidates))
     return _deepseek(prompt)
 
 
-def _deepseek_schemes_wl(candidates, whitelist, grade, report_md):
+def _deepseek_schemes_wl(candidates, whitelist, grade, report_md, restricted_responders=None):
     """有白名单：先判领域→从该领域白名单选人；连续性候选(本案/同族承办)优先、梯队1优先。"""
     cont = {c["name"] for c in candidates}
     by_field = {}
@@ -137,7 +139,9 @@ def _deepseek_schemes_wl(candidates, whitelist, grade, report_md):
         "  1) **优先取【连续性候选】里在职的人**（即上次OA/本案·同族承办人；即使其不在本案判定领域的白名单，也应优先，以保证承办连续性）；\n"
         "  2) 连续性候选无在职合适人 → 从**本案判定领域**的白名单选，梯队1→2→3；\n"
         "QC 选人：优先取【连续性候选】里适合任 QC 的在职人员，否则取该领域白名单 QC 档；同一人不得兼两角色。\n"
-        "报告的「历史 OA 记录」标明了上次的答复负责人/QC，请据此还原承办组合（负责人对负责人、QC 对 QC）。\n"
+        "【负责人资格限制】users.cls=SPM 或 users.type=CQC/AQC 的人员不得担任答复负责人，但可担任 QC。\n"
+        "【本案不可担任答复负责人的人员】" + "、".join(sorted(restricted_responders or [])) + "\n"
+        "报告的「历史 OA 记录」可能包含形式答复人员；仅以【连续性候选】里的实质承办人员还原承办组合，形式答复经历不产生连续性优先权。\n"
         "**推荐人必须出自【连续性候选】或【白名单】，禁止编造库外姓名。**\n"
         "每组方案的 JSON 里额外带一个字段 \"field\"，值为你判定的技术领域（通用/结构/生化）。\n\n"
         "【案件报告（判领域 + 看历史OA承办人用，节选）】\n" + (report_md or "")[:4000] + "\n\n"
@@ -170,6 +174,29 @@ def _existing_usernames(names, execute=None):
         return names
 
 
+def _restricted_responders(names, execute=None):
+    """users.cls=SPM 或 users.type=CQC/AQC 的人不参与负责人推荐。"""
+    names = {(n or "").strip() for n in names if (n or "").strip()}
+    if not names:
+        return set()
+    try:
+        ex = execute
+        if ex is None:
+            from db_query import execute as ex
+        vals = ",".join("'" + n.replace("'", "\\'") + "'" for n in sorted(names))
+        rows = ex(f"SELECT username_zn, cls, `type` AS user_type FROM users "
+                  f"WHERE username_zn IN ({vals})")
+        if not isinstance(rows, list):
+            print("[oa_schemes] 负责人资格查询未返回列表，暂停负责人推荐", file=sys.stderr)
+            return names
+        return {(r.get("username_zn") or "").strip() for r in rows
+                if (str(r.get("cls") or "").strip().upper() == "SPM"
+                    or str(r.get("user_type") or "").strip().upper() in {"CQC", "AQC"})}
+    except Exception as e:
+        print(f"[oa_schemes] 负责人资格查询失败，暂停负责人推荐: {e}", file=sys.stderr)
+        return names
+
+
 def build_assignment_schemes(project, region="", report_md="", execute=None):
     """生成本次 OA 人员安排建议（≥3 组）。绝不抛异常，失败返回 []。
     白名单可用时按 档位(案号/地区)×领域(DeepSeek判) 选人；否则退回候选池逻辑。
@@ -197,10 +224,12 @@ def build_assignment_schemes(project, region="", report_md="", execute=None):
     _valid_users = _existing_usernames(_names, execute)
     whitelist = [w for w in whitelist if w.get("name") in _valid_users]
     candidates = [c for c in candidates if c.get("name") in _valid_users]
+    restricted_responders = _restricted_responders(_valid_users, execute)
 
     if whitelist:
         print(f"[oa_schemes] {project} 候选人和白名单已读取；开始生成方案", file=sys.stderr)
-        raw = _deepseek_schemes_wl(candidates, whitelist, grade, report_md)
+        raw = _deepseek_schemes_wl(candidates, whitelist, grade, report_md,
+                                   restricted_responders=restricted_responders)
         # 合法名单 = 白名单 ∪ 连续性候选(本案/同族承办人)：后者是 projects 查出的真人，
         # 虽未必在白名单该格内，但连续性规则允许选，故不清空（只清真正编造的库外名）。
         valid_names = {w["name"] for w in whitelist} | {c["name"] for c in candidates}
@@ -210,7 +239,7 @@ def build_assignment_schemes(project, region="", report_md="", execute=None):
             print(f"[oa_schemes] {project} 无白名单且无候选人，跳过", file=sys.stderr)
             return []
         print(f"[oa_schemes] {project} 候选人已读取；开始生成方案", file=sys.stderr)
-        raw = _deepseek_schemes(candidates)   # 兜底：候选池
+        raw = _deepseek_schemes(candidates, restricted_responders=restricted_responders)   # 兜底：候选池
         valid_names = {c["name"] for c in candidates}
         print(f"[oa_schemes] {project} 无白名单(档位={grade or '未知'})，退回候选池", file=sys.stderr)
 
@@ -226,10 +255,13 @@ def build_assignment_schemes(project, region="", report_md="", execute=None):
         # 只保留候选库内的姓名，杜绝编造（库外名清空）
         responder = responder if responder in valid_names else ""
         qc = qc if qc in valid_names else ""
+        if responder in restricted_responders:
+            responder = ""
         field = (s.get("field") or "").strip()   # DeepSeek 判定的技术领域，供兜底补人
         # 兜底：角色空 → 先从连续性候选(在职)补，再从同技术领域白名单补（同领域补不到再跨领域）
-        if whitelist and (not responder or not qc):
-            responder, qc = _fallback_fill(whitelist, field, responder, qc, candidates)
+        if not responder or not qc:
+            responder, qc = _fallback_fill(whitelist, field, responder, qc, candidates,
+                                           restricted_responders=restricted_responders)
         if not responder and not qc:
             continue
         schemes.append({
@@ -242,10 +274,11 @@ def build_assignment_schemes(project, region="", report_md="", execute=None):
     return schemes
 
 
-def _fallback_fill(whitelist, field, responder, qc, candidates=None):
+def _fallback_fill(whitelist, field, responder, qc, candidates=None, restricted_responders=None):
     """角色空时补人：**先从连续性候选(在职)补**（不受领域限制，落实规则②/④），
     再从白名单补（负责人梯队1→2→3、QC 取 QC 档；优先同 field，补不到跨 field）；避开同人。"""
     cont = [c["name"] for c in (candidates or []) if c.get("name") and c.get("status") != "离职"]
+    restricted_responders = restricted_responders or set()
 
     def pool(is_qc, fld):
         rows = [w for w in whitelist
@@ -253,7 +286,7 @@ def _fallback_fill(whitelist, field, responder, qc, candidates=None):
         return [w["name"] for w in sorted(rows, key=lambda x: x.get("tier_level", 99))]
     if not responder:
         for n in cont + pool(False, field) + (pool(False, "") if field else []):
-            if n and n != qc:
+            if n and n != qc and n not in restricted_responders:
                 responder = n
                 break
     if not qc:
