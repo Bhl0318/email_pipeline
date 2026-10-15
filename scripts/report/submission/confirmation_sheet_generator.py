@@ -456,17 +456,16 @@ class PatentApplicationFormGenerator:
                 data_rows6.append(['Application No/申请号:', parent.get('Application No', '') or ''])
                 data_rows6.append(['Filing Date/申请日:', parent.get('Filing Date', '') or ''])
 
-        # PCT：无任何 PCT 数据则整段不渲染
         PCT_applications = case_info.get('case_advance_info', {}) or {}
-        data_rows7 = []
-        if any((PCT_applications.get(k) or '').strip() for k in ('pct_app_no', 'pct_app_date', 'pct_pub_no', 'pct_pub_date')):
-            data_rows7 = [
-                ['PCT Application/PCT申请'],
-                ['Application No/申请号:', PCT_applications.get('pct_app_no', '') or ''],
-                ['Filing Date/申请日:', PCT_applications.get('pct_app_date', '') or ''],
-                ['Publication No/公开号:', PCT_applications.get('pct_pub_no', '') or ''],
-                ['Publication Date/公开日:', PCT_applications.get('pct_pub_date', '') or ''],
-            ]
+        pct_fields = (
+            ('pct_app_no', 'Application No/申请号:', 'pct.app_no'),
+            ('pct_app_date', 'Filing Date/申请日:', 'pct.filing_date'),
+            ('pct_pub_no', 'Publication No/公开号:', 'pct.pub_no'),
+            ('pct_pub_date', 'Publication Date/公开日:', 'pct.pub_date'),
+        )
+        pct_present = [(label, PCT_applications.get(field), key) for field, label, key in pct_fields
+                       if str(PCT_applications.get(field) or '').strip()]
+        data_rows7 = [['PCT Application/PCT申请']] + [[label, value] for label, value, _ in pct_present] if pct_present else []
 
         inventors = case_info.get('inventors', []) or []
         applicants_list = case_info.get("applicants", []) or []
@@ -631,7 +630,7 @@ class PatentApplicationFormGenerator:
                 for p in range(1, len(Parent_applications) + 1):
                     ks += [f"parent.{p}.app_no", f"parent.{p}.filing_date"]
             if data_rows7:                                                   # PCT
-                ks += [None, "pct.app_no", "pct.filing_date", "pct.pub_no", "pct.pub_date"]
+                ks += [None] + [key for _, _, key in pct_present]
             ks.append(None)                                                  # 发明人表头
             for gi, g in enumerate(_groups, 1):                             # 与 data_rows2 构建顺序一致
                 for idx, _inv in g["members"]:

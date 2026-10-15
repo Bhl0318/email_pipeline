@@ -139,17 +139,7 @@ app.mount("/output", StaticFiles(directory=str(_OUTPUT_DIR_FOR_MOUNT)), name="ou
 # US 递交预览/成品输出目录（挂载在 /output 下，PDF 可直接 URL 访问）
 SUBMISSION_OUTPUT_DIR = _OUTPUT_DIR_FOR_MOUNT / "submission"
 
-# 原始文档预览目录：审核服务（Windows）读 P:\confirmation-intake\<案号>\（P: 已映射到原始材料盘）。
-# 写死 P:\confirmation-intake\；挂载容错——非 Windows/盘未映射时跳过挂载、原始页暂不可用，服务不崩。
-SOURCE_DOC_DIR = Path("P:\\confirmation-intake")
-try:
-    SOURCE_DOC_DIR.mkdir(parents=True, exist_ok=True)
-except Exception as _e:  # noqa: BLE001
-    print(f"[source-docs] 目录不可用 {SOURCE_DOC_DIR}: {_e}", file=sys.stderr)
-if SOURCE_DOC_DIR.exists():
-    app.mount("/source-docs", StaticFiles(directory=str(SOURCE_DOC_DIR)), name="source-docs")
-else:
-    print(f"[source-docs] {SOURCE_DOC_DIR} 不存在，原始页预览暂不可用（挂载跳过）", file=sys.stderr)
+SOURCE_DOC_DIR = Path(os.environ.get("SUBMISSION_SOURCE_DOC_DIR") or "P:\\confirmation-intake")
 
 
 # ─── 健康检查 ────────────────────────────────────────────
@@ -1490,26 +1480,45 @@ def _source_doc_preview(case_volume: str, f: Path):
 _SOURCE_DOC_HIDDEN = {"body.txt", "email_meta.json", "extracted_fields.json", "result.json"}
 
 
+@app.get("/source-docs/{case_volume}/{name}")
+def serve_submission_source_doc(case_volume: str, name: str):
+    """请求时读取参考文件，不依赖服务启动时映射盘是否已连接。"""
+    if not re.fullmatch(r"[0-9A-Za-z-]+", case_volume) or not name or name != Path(name).name:
+        raise HTTPException(400, "非法参考文件路径")
+    path = SOURCE_DOC_DIR / case_volume / name
+    try:
+        if not path.is_file():
+            raise HTTPException(404, "参考文件不存在")
+    except OSError as exc:
+        raise HTTPException(503, f"参考文件目录不可访问：{exc}") from exc
+    return FileResponse(path)
+
+
 @app.get("/api/submission/tasks/{task_id}/source-docs")
 def get_submission_source_docs(task_id: str):
     """原始文档列表：系统最初提取数据写入 IPEasy 的源文件（NAS），供审核人对照核对著录项目。
-    测试期从 SOURCE_DOC_DIR/<case_volume>/ 读取；NAS 挂载后改环境变量 SOURCE_DOC_DIR 即可。
+    从 SOURCE_DOC_DIR/<case_volume>/ 读取；可用 SUBMISSION_SOURCE_DOC_DIR 指向 NAS UNC 路径。
     每个文件返回 url（原件下载）+ preview_url（可内联预览的 URL，Word 已转 PDF；不可预览为 null）。"""
     row = _load_submission_task(task_id)
     case_volume = (row.get("case_volume") or "").strip()
     docs = []
     if case_volume:
         case_dir = SOURCE_DOC_DIR / case_volume
-        if case_dir.is_dir():
-            for f in sorted(case_dir.iterdir()):
-                if f.is_file() and not f.name.startswith(".") and f.name.lower() not in _SOURCE_DOC_HIDDEN:
-                    preview_url, kind = _source_doc_preview(case_volume, f)
-                    docs.append({
-                        "filename": f.name,
-                        "url": f"/source-docs/{quote(case_volume)}/{quote(f.name)}",
-                        "preview_url": preview_url,
-                        "kind": kind,
-                    })
+        try:
+            if not SOURCE_DOC_DIR.is_dir():
+                raise HTTPException(503, f"参考文件目录不可访问：{SOURCE_DOC_DIR}")
+            if case_dir.is_dir():
+                for f in sorted(case_dir.iterdir()):
+                    if f.is_file() and not f.name.startswith(".") and f.name.lower() not in _SOURCE_DOC_HIDDEN:
+                        preview_url, kind = _source_doc_preview(case_volume, f)
+                        docs.append({
+                            "filename": f.name,
+                            "url": f"/source-docs/{quote(case_volume)}/{quote(f.name)}",
+                            "preview_url": preview_url,
+                            "kind": kind,
+                        })
+        except OSError as exc:
+            raise HTTPException(503, f"参考文件目录不可访问：{exc}") from exc
     return {"case_volume": case_volume, "docs": docs}
 
 
