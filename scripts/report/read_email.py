@@ -50,7 +50,7 @@ CHECKPOINT_PATH = os.path.join(SCRIPT_DIR, "checkpoint.json")
 # 汇报信侧：转达邮件的官文 PDF 临时保存到 _inbox，写库时再移到 output/{案号}/source/
 OUTPUT_DIR = os.path.normpath(os.path.join(SCRIPT_DIR, "..", "output"))
 OUTPUT_INBOX_DIR = os.path.join(OUTPUT_DIR, "_inbox")
-# 压缩包扩展名：20608 汇报信只需从原邮件补带压缩包文件
+# OA 汇报信除官文 PDF 外，也从原邮件补带压缩包文件
 _ARCHIVE_EXT = (".zip", ".rar", ".7z")
 
 # 汇报信模板层 (地区,通知类型)→(模板文件名,是否附PDF)：已挪进 oa_report_rules.json 的 `_templates` 段，
@@ -1089,7 +1089,7 @@ def read_and_classify(accounts=None, config_path=None):
 
 
 def dispatch_report(all_results, all_emails, dry_run=False):
-    """汇报信下游 sink：官文 PDF 入库 + 写 report_tasks + 发审核链接邮件。
+    """汇报信下游 sink：官文 PDF/压缩包入库 + 写 report_tasks + 发审核链接邮件。
     all_emails 用于重建 msgid → saved_pdfs 索引（跨账号，message_id 全局唯一）。
     注：email_pipeline 模式下本函数不再 move 邮件，归档统一交 archive_emails。
     dry_run=True 时：照常分类/打印，但不移 PDF、不写 report_tasks、不发邮件。"""
@@ -1245,10 +1245,9 @@ def dispatch_report(all_results, all_emails, dry_run=False):
                         except Exception as e:
                             print(f"  [移动官文 PDF 失败] {src}: {e}", file=sys.stderr)
 
-                # 20608(韶音)：OA 汇报信需带上原邮件的压缩包文件。
-                # PDF 已由上面的 _inbox 流程移入 source；这里从原邮件 raw_bytes 补出压缩包。
-                # 与 OA 立项侧 send_forward_oa 的 20608 处理保持一致(均只补带压缩包)。
-                if project and project[:5] == "20608":
+                # OA 汇报信：在已保存的 PDF 基础上，补带原邮件中的压缩包。
+                # PDF 已由上面的 _inbox 流程移入 source；压缩包从 raw_bytes 提取。
+                if project:
                     em = msgid_to_email.get(item_msgid)
                     raw = em.get("raw_bytes") if em else None
                     if raw:
@@ -1282,9 +1281,9 @@ def dispatch_report(all_results, all_emails, dry_run=False):
                                 added.append(fname)
                             if added:
                                 tag = "dry-run 将补带压缩包" if dry_run else "汇报信补带原邮件压缩包"
-                                print(f"  [20608] {tag}: {added}", file=sys.stderr)
+                                print(f"  [{project}] {tag}: {added}", file=sys.stderr)
                         except Exception as e:
-                            print(f"  [20608 附件补带失败] {item_msgid}: {e}", file=sys.stderr)
+                            print(f"  [OA汇报信附件补带失败] {item_msgid}: {e}", file=sys.stderr)
 
                 # US 官文 PDF 不走邮件附件：uspto.gov 通知邮件常不带 PDF，官文由 OA sink
                 # 经 USPTO API 下载（item['us_pdf_path']）。把它也并入审核任务附件。
@@ -1310,7 +1309,7 @@ def dispatch_report(all_results, all_emails, dry_run=False):
 
                 review_link = f"{REVIEW_BASE_URL}/review/{row_id}"
                 if dry_run:
-                    print(f"  [dry-run] 将写 report_tasks（template={template}, attach_pdf={attach_pdf}, 官文PDF×{len(source_attachments)}）", file=sys.stderr)
+                    print(f"  [dry-run] 将写 report_tasks（template={template}, attach_pdf={attach_pdf}, 附件×{len(source_attachments)}）", file=sys.stderr)
                     print(f"  [dry-run] 审核链接: {review_link}", file=sys.stderr)
                     all_review_links.append({
                         "link":       review_link,
@@ -1330,7 +1329,7 @@ def dispatch_report(all_results, all_emails, dry_run=False):
                         )
                         print(f"  → 审核链接: {review_link}", file=sys.stderr)
                         if source_attachments:
-                            print(f"    附 {len(source_attachments)} 个官文 PDF", file=sys.stderr)
+                            print(f"    附 {len(source_attachments)} 个官文附件", file=sys.stderr)
                         # 收集到通知邮件列表
                         all_review_links.append({
                             "link":       review_link,

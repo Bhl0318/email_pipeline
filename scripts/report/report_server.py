@@ -36,6 +36,7 @@ US 递交在线审核（/submission 路由组，表 submission_tasks）:
   POST /api/submission/filing/auto-transfer  cron：扫已回签且未转入的案件批量建 filing_preparation
 """
 import json
+import mimetypes
 import os
 import shutil
 import sys
@@ -49,6 +50,8 @@ from pathlib import Path
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.application import MIMEApplication
+from email.mime.base import MIMEBase
+from email import encoders
 from email.utils import getaddresses
 
 import requests
@@ -975,7 +978,7 @@ def _safe_filename(fields, template=None):
 
 def _build_mime(subject, html_body, pdf_bytes, pdf_filename, extra_attachments=None,
                 from_addr="", to_addrs=None, cc_addrs=None):
-    """构建 MIMEMultipart 邮件对象（HTML 正文 + 汇报信 PDF + 官文 PDF 附件）。
+    """构建 MIMEMultipart 邮件对象（HTML 正文 + 汇报信 PDF + 官文/上传附件）。
     返回 MIMEMultipart——SMTP 发送时直接 .as_string()，写 .eml 文件时 .as_bytes()。
     extra_attachments: 相对 OUTPUT_DIR 的路径列表，如 ['20651-0129CM00/source/通知书.pdf']"""
     msg = MIMEMultipart("mixed")
@@ -992,7 +995,7 @@ def _build_mime(subject, html_body, pdf_bytes, pdf_filename, extra_attachments=N
         part = MIMEApplication(pdf_bytes, _subtype="pdf")
         part.add_header("Content-Disposition", "attachment", filename=pdf_filename)
         msg.attach(part)
-    # 官文 PDF 附件
+    # 官文和手动上传的附件：按文件名设置 MIME 类型，压缩包不能标成 PDF。
     for rel in (extra_attachments or []):
         try:
             full = OUTPUT_DIR / rel
@@ -1000,11 +1003,15 @@ def _build_mime(subject, html_body, pdf_bytes, pdf_filename, extra_attachments=N
                 print(f"[eml] 官文附件不存在，跳过: {rel}", file=sys.stderr)
                 continue
             content = full.read_bytes()
-            part = MIMEApplication(content, _subtype="pdf")
+            mime_type = mimetypes.guess_type(full.name)[0] or "application/octet-stream"
+            maintype, subtype = mime_type.split("/", 1)
+            part = MIMEBase(maintype, subtype)
+            part.set_payload(content)
+            encoders.encode_base64(part)
             part.add_header("Content-Disposition", "attachment", filename=full.name)
             msg.attach(part)
         except Exception as e:
-            print(f"[eml] 附加官文 PDF 失败 {rel}: {e}", file=sys.stderr)
+            print(f"[eml] 附加附件失败 {rel}: {e}", file=sys.stderr)
     return msg
 
 
@@ -1145,7 +1152,7 @@ def preview_send(task_id: str, req: PreviewSendReq):
     base = _safe_filename(req.fields, template) or task_id
     subject = f"Privileged & Confidential-{base}"
 
-    # 官文 PDF 清单
+    # 官文附件清单（PDF、压缩包等）
     source_attachments = []
     if rows and rows[0].get("source_attachments"):
         try:
@@ -1209,14 +1216,14 @@ def confirm_task(task_id: str, req: ConfirmReq):
     case_dir = OUTPUT_DIR / re.sub(r'[\\/:*?"<>|\r\n]', "_", project).strip()
     out = {"task_id": task_id}
 
-    # 查官文 PDF 附件路径
+    # 查官文附件路径
     source_attachments = []
     if sa_rows and sa_rows[0].get("source_attachments"):
         try:
             source_attachments = json.loads(sa_rows[0]["source_attachments"])
         except Exception:
             pass
-    # 官文 PDF + 手动上传附件；按弹窗勾选过滤（未传=全带；只保留确有的，防越权附任意路径）
+    # 官文附件 + 手动上传附件；按弹窗勾选过滤（未传=全带；只保留已登记路径）
     manual_paths = [a["path"] for a in _report_manual_attachments(task_id)]
     all_atts = source_attachments + manual_paths
     if req.source_attachments is not None:
