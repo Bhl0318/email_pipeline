@@ -20,7 +20,11 @@ OCR_MAX_PAGES = 10   # 扫描件 OCR 页数上限（官文一般几页；防超�
 
 
 def _esc(s):
-    """HTML 转义（& 必须先转）。"""
+    """移除 XML 1.0 不允许的控制字符，再做 HTML 转义。"""
+    s = "".join(ch for ch in s if ch in "\t\n\r" or
+                0x20 <= ord(ch) <= 0xD7FF or
+                0xE000 <= ord(ch) <= 0xFFFD or
+                0x10000 <= ord(ch) <= 0x10FFFF)
     return (s.replace('&', '&amp;').replace('"', '&quot;')
              .replace("'", '&#x27;').replace('<', '&lt;').replace('>', '&gt;'))
 
