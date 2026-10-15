@@ -360,13 +360,19 @@ def _deepseek_report(basic, application_text, oa_text):
         + _blk("审查意见通知书（用于第四大类）", oa_text, 12000)
     )
     try:
-        client = OpenAI(api_key=_DEEPSEEK_API_KEY, base_url=_DEEPSEEK_BASE_URL)
+        client = OpenAI(api_key=_DEEPSEEK_API_KEY, base_url=_DEEPSEEK_BASE_URL,
+                        timeout=180.0, max_retries=0)
         resp = client.chat.completions.create(
             model=_DEEPSEEK_MODEL,
             max_tokens=3000,
             messages=[{"role": "user", "content": prompt}],
         )
-        return (resp.choices[0].message.content or "").strip()
+        if not resp.choices or not resp.choices[0].message:
+            raise ValueError("DeepSeek 返回 HTTP 200，但没有可用的报告内容")
+        content = (resp.choices[0].message.content or "").strip()
+        if not content:
+            raise ValueError("DeepSeek 返回 HTTP 200，但报告内容为空")
+        return content
     except Exception as e:
         print(f"[oa_report_ai] DeepSeek 生成失败: {e}", file=sys.stderr)
         return None
@@ -438,7 +444,9 @@ def build_case_report(item, oa_pdf_path=None, app_dir=None, with_personnel=True,
     oa_text = _pdf_text(oa_pdf_path)
     read_docs_md = _read_docs_md(files.get("spec"), oa_pdf_path)   # 顶部「读取的文档」节
 
+    print(f"[oa_report_ai] {project} 开始生成案件报告正文", file=sys.stderr)
     md = _deepseek_report(basic, application_text, oa_text)
+    print(f"[oa_report_ai] {project} 报告正文生成结束；开始查询人员档案", file=sys.stderr)
     workload_md = ""
     if md:
         # 拆出 DeepSeek 附带的「预估工作量」(标记后的内容)，放到第六节
@@ -459,6 +467,7 @@ def build_case_report(item, oa_pdf_path=None, app_dir=None, with_personnel=True,
             md = md.rstrip() + "\n\n" + build_personnel_md(project, execute=execute)
         except Exception as e:
             print(f"[oa_report_ai] 人员档案追加失败: {e}", file=sys.stderr)
+    print(f"[oa_report_ai] {project} 人员档案处理结束", file=sys.stderr)
 
     # 第六节：预估工作量（附加分配辅助信息，AI 依据报告内容判断）
     if workload_md:

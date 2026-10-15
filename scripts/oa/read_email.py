@@ -1586,22 +1586,29 @@ def dispatch_oa(all_results, all_emails=None, dry_run=False, test_project_prefix
             from oa_report_ai import build_case_report
             from oa_schemes import build_assignment_schemes, render_schemes_md
             from oa_assign_store import save_report
+            from time import monotonic
             _gen = 0
             for item in inserted_items:
                 oa_id = item.get("oa_id", "")
                 if not oa_id:
                     continue
+                _project = item.get("project", "")
+                _started = monotonic()
                 try:
+                    print(f"[分配报告] {_project} 开始生成案件报告", file=sys.stderr)
                     _md = build_case_report(item)
+                    print(f"[分配报告] {_project} 案件报告完成，耗时 {monotonic() - _started:.1f} 秒；开始生成分配方案", file=sys.stderr)
                     _sch = build_assignment_schemes(item.get("project", ""),
                                                     region=item.get("region", ""), report_md=_md)
+                    print(f"[分配报告] {_project} 分配方案完成，耗时 {monotonic() - _started:.1f} 秒；开始保存", file=sys.stderr)
                     _sec = render_schemes_md(_sch)
                     if _sec:
                         _md = _md.rstrip() + "\n\n" + _sec
                     save_report(oa_id, _md, _sch)
                     _gen += 1
+                    print(f"[分配报告] {_project} 保存完成，总耗时 {monotonic() - _started:.1f} 秒", file=sys.stderr)
                 except Exception as e:
-                    print(f"[分配报告] {item.get('project','')} 生成失败: {e}", file=sys.stderr)
+                    print(f"[分配报告] {_project} 生成失败（耗时 {monotonic() - _started:.1f} 秒）: {e}", file=sys.stderr)
             print(f"[分配报告] 立项即生成 {_gen} 件 → oa_assign_report", file=sys.stderr)
         except Exception as e:
             print(f"[分配报告] 模块不可用，跳过: {e}", file=sys.stderr)

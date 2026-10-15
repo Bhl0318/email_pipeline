@@ -76,10 +76,13 @@ def _deepseek(prompt):
     from openai import OpenAI
     from filter_oa_email import _DEEPSEEK_API_KEY, _DEEPSEEK_BASE_URL, _DEEPSEEK_MODEL
     try:
-        client = OpenAI(api_key=_DEEPSEEK_API_KEY, base_url=_DEEPSEEK_BASE_URL)
+        client = OpenAI(api_key=_DEEPSEEK_API_KEY, base_url=_DEEPSEEK_BASE_URL,
+                        timeout=180.0, max_retries=0)
         resp = client.chat.completions.create(
             model=_DEEPSEEK_MODEL, max_tokens=1400,
             messages=[{"role": "user", "content": prompt}])
+        if not resp.choices or not resp.choices[0].message:
+            raise ValueError("DeepSeek 返回 HTTP 200，但没有可用的分配方案")
         content = (resp.choices[0].message.content or "").strip()
         m = re.search(r"\[.*\]", content, re.DOTALL)
         if m:
@@ -196,6 +199,7 @@ def build_assignment_schemes(project, region="", report_md="", execute=None):
     candidates = [c for c in candidates if c.get("name") in _valid_users]
 
     if whitelist:
+        print(f"[oa_schemes] {project} 候选人和白名单已读取；开始生成方案", file=sys.stderr)
         raw = _deepseek_schemes_wl(candidates, whitelist, grade, report_md)
         # 合法名单 = 白名单 ∪ 连续性候选(本案/同族承办人)：后者是 projects 查出的真人，
         # 虽未必在白名单该格内，但连续性规则允许选，故不清空（只清真正编造的库外名）。
@@ -205,6 +209,7 @@ def build_assignment_schemes(project, region="", report_md="", execute=None):
         if not candidates:
             print(f"[oa_schemes] {project} 无白名单且无候选人，跳过", file=sys.stderr)
             return []
+        print(f"[oa_schemes] {project} 候选人已读取；开始生成方案", file=sys.stderr)
         raw = _deepseek_schemes(candidates)   # 兜底：候选池
         valid_names = {c["name"] for c in candidates}
         print(f"[oa_schemes] {project} 无白名单(档位={grade or '未知'})，退回候选池", file=sys.stderr)

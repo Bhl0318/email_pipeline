@@ -130,6 +130,7 @@ FORWARD_BODY_TEMPLATE = (
     "@OA 分析师值班人，请重启项目，生产管理安排人员处理。\n\n"
     "{unpublished_line}"
     "{prescreen_line}"
+    "{priority_exam_line}"
     "--\n"
     "发送人：系统\n"
 )
@@ -145,6 +146,8 @@ def build_forward_body(item):
                        else "该官文的答复期限待确认。")
     # 预审案件加注一行（第一/二次审查意见 + 邮件含预审案件时由分类器置 prescreen_note）
     prescreen_line = "注：该案件为预审案件\n\n" if item.get("prescreen_note") else ""
+    priority_exam_line = ("注：该案件为优先审查案件\n\n"
+                          if item.get("region") == "CN" and item.get("is_priority_exam") else "")
     # 未公开/受限申请：公开 API 403，官文未能自动下载/无附件 → 正文明确标注 + 明细，便于人工去 Patent Center 取
     if item.get("us_unpublished"):
         _app = item.get("application_no", "") or item.get("application", "") or ""
@@ -159,6 +162,7 @@ def build_forward_body(item):
         project=project, issue_date=issue_date, deadline=deadline,
         unpublished_line=unpublished_line,
         prescreen_line=prescreen_line,
+        priority_exam_line=priority_exam_line,
     )
 
 
