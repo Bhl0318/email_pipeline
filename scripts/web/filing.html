@@ -129,7 +129,7 @@
       <div id="dlBar" style="display:none;padding:6px 12px;background:#fef3c7;border-bottom:1px solid #fcd34d;font-size:12px;"></div>
       <div class="preview-body">
         <iframe id="previewFrame" style="display:none"></iframe>
-        <div class="preview-placeholder" id="previewPlaceholder">填好递交清单后点上方按钮生成预览<br>POA/Transmittal 内联显示；ADS 在线为数据核对版（本地），正式 XFA 版在确认发送时生成</div>
+        <div class="preview-placeholder" id="previewPlaceholder">填好递交清单后点上方按钮生成预览<br>POA/Transmittal 内联显示；ADS 使用本地 PDF.js 预览 XFA</div>
         <div id="emailPreview" style="display:none;position:absolute;inset:0;overflow:auto;padding:16px;background:#f1f5f9;"></div>
         <div class="preview-loading" id="previewLoading"><div class="spinner"></div><div id="previewLoadingText">生成中…</div></div>
       </div>
@@ -1030,23 +1030,32 @@ async function _syncPopWindows(){
       const files = j.files || [];
       const f = files[e.chipIdx] || files[0];
       if (f && f.pdf_url){
-        e.win.location.replace(f.pdf_url + (f.pdf_url.includes("?") ? "&" : "?") + "t=" + Date.now());
+        e.win.location.replace(e.target === "ads" ? pdfjsUrl(f.pdf_url) :
+          f.pdf_url + (f.pdf_url.includes("?") ? "&" : "?") + "t=" + Date.now());
       }
     } catch(_){ /* 该件同步失败忽略 */ }
   }
+}
+
+function pdfjsUrl(pdfUrl){
+  const file = new URL(pdfUrl.replace(/\\/g, "/"), location.origin);
+  file.searchParams.set("t", Date.now());
+  const viewer = new URL("/pdfjs/web/viewer.html", location.origin);
+  viewer.searchParams.set("file", file.pathname + file.search);
+  return viewer.href;
 }
 
 function _showDocPdf(target, pdfUrl){
   // 展示一份已存在的成品 PDF（与 preview() 生成后的展示一致；ADS 带 XFA 下载条）
   $("emailPreview").style.display = "none";
   $("previewPlaceholder").style.display = "none";
-  const fr = $("previewFrame"); fr.style.display = "block"; fr.src = pdfUrl;
+  const fr = $("previewFrame"); fr.style.display = "block"; fr.src = target === "ads" ? pdfjsUrl(pdfUrl) : pdfUrl;
   const bar = $("dlBar");
   if (target === "ads") {
     bar.style.display = "block";
-    bar.innerHTML = `当前为<b>数据核对版</b>（本地，仅核对字段）。需要 XFA：` +
+    bar.innerHTML = `当前由本地 PDF.js 预览 XFA。` +
       `<a href="#" onclick="adsXfa(false);return false;" style="color:#b45309;font-weight:600;">⬇ 下载 XFA 版</a>（Adobe 打开）` +
-      ` ｜ <a href="#" onclick="adsXfa(true);return false;" style="color:#b45309;">在线看 XFA 版</a>（本地 PDF.js）`;
+      ` ｜ <a href="#" onclick="adsXfa(true);return false;" style="color:#b45309;">按当前数据重生成</a>`;
   } else { bar.style.display = "none"; }
 }
 
@@ -1089,7 +1098,7 @@ async function preview(target){
   $("emailPreview").style.display = "none";
   // 高亮当前 tab + 显示 loading 遮罩
   document.querySelectorAll(".preview-head .tab").forEach(b => b.classList.toggle("active", b.dataset.target === target));
-  $("previewLoadingText").textContent = target === "ads" ? "生成中…（ADS 数据核对版）" : "生成中…";
+  $("previewLoadingText").textContent = target === "ads" ? "生成 ADS XFA 预览中…" : "生成中…";
   $("previewLoading").classList.add("show");
   try {
     const j = await api("POST", `${API}/${taskId}/preview`, { target, fields_json: fields, transmittal_options: opts });
@@ -1097,7 +1106,7 @@ async function preview(target){
     if (!files.length) { toast("未生成文件"); return; }
     docFileList = files;                       // POA 多申请人时多份
     renderDocChips(0);                         // >1 才显示切换 chips
-    _showDocPdf(target, files[0].pdf_url);     // 展示第一份（ADS 带 XFA 下载条，见 _showDocPdf）
+    _showDocPdf(target, files[0].pdf_url);
     if ((j.warnings||[]).length) toast(j.warnings[0]);
   } catch(e){ toast("预览失败: "+e.message); }
   finally { $("previewLoading").classList.remove("show"); }
@@ -1119,7 +1128,11 @@ async function previewSent(target){
       return;
     }
     ph.style.display = "none";
-    if (j.inline) {
+    if (target === "ads") {
+      fr.style.display = "block"; fr.src = pdfjsUrl(j.url); bar.style.display = "block";
+      bar.innerHTML = `已发版 <b>${esc(j.name)}</b>：` +
+        `<a href="${esc(j.url)}" target="_blank" style="color:#b45309;font-weight:600;">⬇ 打开/下载已发版</a>`;
+    } else if (j.inline) {
       fr.style.display = "block"; fr.src = j.url; bar.style.display = "none";
     } else {   // ADS 等 XFA 动态表单不内联，给下载
       fr.style.display = "none"; bar.style.display = "block";
@@ -1142,9 +1155,7 @@ async function adsXfa(online){
     if (online && j.online_pdf_url){
       $("emailPreview").style.display = "none";
       $("previewPlaceholder").style.display = "none";
-      const viewerUrl = new URL(j.online_pdf_url, location.origin);
-      viewerUrl.searchParams.set("file", viewerUrl.searchParams.get("file") + "?t=" + Date.now());
-      const fr = $("previewFrame"); fr.style.display = "block"; fr.src = viewerUrl.href;
+      const fr = $("previewFrame"); fr.style.display = "block"; fr.src = pdfjsUrl(j.download_url);
       if ((j.warnings||[]).length) toast(j.warnings[0], 5000);
     }
     if (!online && j.download_url) window.open(j.download_url, "_blank");

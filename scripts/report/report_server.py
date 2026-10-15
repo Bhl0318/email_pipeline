@@ -116,7 +116,7 @@ from submission.preview import docx_to_pdf, office_convert  # noqa: E402
 from submission.fields_mapping import fields_to_case_info, load_agent_info  # noqa: E402
 from submission.poa_generator import generate_poa, generate_poas  # noqa: E402
 from submission.transmittal_generator import generate_transmittal  # noqa: E402
-from submission.ads_generator import generate_ads, generate_ads_preview  # noqa: E402
+from submission.ads_generator import generate_ads  # noqa: E402
 from submission.agent_email import build_agent_email  # noqa: E402
 from submission import docusign_client as _docusign  # noqa: E402（仅 requests 依赖，安全 import）
 
@@ -2791,7 +2791,7 @@ class FilingPreviewReq(BaseModel):
 
 @app.post("/api/submission/filing/{task_id}/preview")
 def preview_filing_task(task_id: str, req: FilingPreviewReq):
-    """生成 POA / Transmittal / ADS 预览（PDF）。POA/Transmittal 可内联预览，ADS 仅下载。"""
+    """生成 POA / Transmittal / ADS 预览（PDF）；ADS 由前端交给本地 PDF.js 展示。"""
     row = _load_submission_task(task_id)
     fields = req.fields_json if req.fields_json is not None else (
         json.loads(row["fields_json"]) if row["fields_json"] else {})
@@ -2815,9 +2815,9 @@ def preview_filing_task(task_id: str, req: FilingPreviewReq):
             warnings.extend(d.get("warnings") or [])
             files = [{"name": d["file_name"], "pdf_url": _output_url(d["file_path"]), "type": d.get("type")}]
         elif req.target == "ads":
-            # 审阅阶段：本地"数据核对版"PDF（不上云、不产 XFA）；正式 XFA 在确认发送时生成
-            ads = generate_ads_preview(ci, preview_dir)
-            warnings.append("ADS 在线为数据核对版（本地生成，仅供核对字段）；正式 XFA 版在确认发送时生成")
+            if not (PDFJS_DIR / "web" / "viewer.html").is_file():
+                raise HTTPException(503, f"PDF.js 未部署：请将官方 dist 解压到 {PDFJS_DIR}，或配置 SUBMISSION_PDFJS_DIR")
+            ads = generate_ads(ci, preview_dir)
             files = [{"name": ads["file_name"], "pdf_url": _output_url(ads["file_path"]), "type": ads["type"]}]
         else:
             raise HTTPException(400, f"未知 target: {req.target}")
@@ -2865,11 +2865,15 @@ def filing_preview_existing(task_id: str, target: str = "poa"):
     _load_submission_task(task_id)
     preview_dir = SUBMISSION_OUTPUT_DIR / task_id / "preview"
     token = _FILING_TOKENS.get(target, target)
+    def matches_preview(path):
+        name = path.name.lower()
+        return (token.lower() in name and "-flat" not in name
+                and (target != "ads" or "ads数据核对" not in name))
     # 替换件优先（比生成版新才用；点过刷新预览→回落生成版）
     _gen_mtime = 0.0
     if preview_dir.is_dir():
         _ms = [p.stat().st_mtime for p in preview_dir.glob("*.pdf")
-               if token.lower() in p.name.lower() and "-flat" not in p.name.lower()]
+               if matches_preview(p)]
         _gen_mtime = max(_ms) if _ms else 0.0
     ov = _filing_override_pdf(task_id, target, _gen_mtime)
     if ov:
@@ -2877,8 +2881,7 @@ def filing_preview_existing(task_id: str, target: str = "poa"):
                 "files": [{"name": ov.stem, "pdf_url": _output_url(ov), "type": "pdf"}]}
     files = []
     if preview_dir.is_dir():
-        cand = [p for p in preview_dir.glob("*.pdf")
-                if token.lower() in p.name.lower() and "-flat" not in p.name.lower()]  # 排除在线扁平版
+        cand = [p for p in preview_dir.glob("*.pdf") if matches_preview(p)]
         # 按基名去重：去掉日期前缀(YYYY-MM-DD-)和 _free_output_path 在 Windows 占用时追加的 -时间戳 锁后缀，
         # 这样同一份 POA 的不同日期/重生成版本合并为一条；POA 多申请人时基名含申请人名 → 每人各留一份。
         best = {}
