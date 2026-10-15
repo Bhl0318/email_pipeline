@@ -98,6 +98,7 @@ def _template_text(name):
 
 
 WEB_DIR = ROOT / "web"
+PDFJS_DIR = Path(os.environ.get("SUBMISSION_PDFJS_DIR") or WEB_DIR / "pdfjs")
 PROTOTYPE_HTML = WEB_DIR / "prototype.html"
 TEMPLATES_PREVIEW_HTML = WEB_DIR / "templates_preview.html"
 EMAIL_CONFIG_PATH = SCRIPT_DIR / "email_config.json"
@@ -115,7 +116,7 @@ from submission.preview import docx_to_pdf, office_convert  # noqa: E402
 from submission.fields_mapping import fields_to_case_info, load_agent_info  # noqa: E402
 from submission.poa_generator import generate_poa, generate_poas  # noqa: E402
 from submission.transmittal_generator import generate_transmittal  # noqa: E402
-from submission.ads_generator import generate_ads, generate_ads_preview, generate_ads_flat  # noqa: E402
+from submission.ads_generator import generate_ads, generate_ads_preview  # noqa: E402
 from submission.agent_email import build_agent_email  # noqa: E402
 from submission import docusign_client as _docusign  # noqa: E402（仅 requests 依赖，安全 import）
 
@@ -125,6 +126,7 @@ FILING_HTML = WEB_DIR / "filing.html"
 
 app = FastAPI(title="汇报信审核服务", version="0.1")
 app.mount("/static", StaticFiles(directory=str(WEB_DIR)), name="static")
+app.mount("/pdfjs", StaticFiles(directory=str(PDFJS_DIR), check_dir=False), name="pdfjs")
 
 # OA 分配工具（第一阶段桩）：REST 接口并入本服务；页面 web/assign.html 走 /static，入口 /oa-assign
 from oa_assign import router as oa_assign_router  # noqa: E402
@@ -2902,7 +2904,7 @@ class FilingAdsXfaReq(BaseModel):
 @app.post("/api/submission/filing/{task_id}/ads-xfa")
 def filing_ads_xfa(task_id: str, online: int = 0, req: FilingAdsXfaReq = None):
     """按需生成 ADS XFA 版：默认本地 XFA 供下载（Adobe 打开，不上云）；
-    online=1 时额外走 pdfRest 扁平化，产出可在线看的真实排版 PDF。
+    online=1 时用同源 PDF.js 预览原始 XFA，不上传第三方。
     与预览一致，优先用页面当前编辑值 req.fields_json（未点保存也能带出签字/通信），缺省回退库中值。"""
     row = _load_submission_task(task_id)
     fields = (req.fields_json if (req and req.fields_json is not None)
@@ -2915,12 +2917,17 @@ def filing_ads_xfa(task_id: str, online: int = 0, req: FilingAdsXfaReq = None):
     out_dir = SUBMISSION_OUTPUT_DIR / task_id / "preview"
     out_dir.mkdir(parents=True, exist_ok=True)
     try:
-        if online:
-            ads = generate_ads_flat(ci, out_dir)
-            return {"download_url": _output_url(ads["xfa_file_path"]), "download_name": ads["xfa_file_name"],
-                    "online_pdf_url": _output_url(ads["file_path"]), "warnings": ads.get("warnings") or []}
+        if online and not (PDFJS_DIR / "web" / "viewer.html").is_file():
+            raise HTTPException(503, f"PDF.js 未部署：请将官方 dist 解压到 {PDFJS_DIR}，或配置 SUBMISSION_PDFJS_DIR")
         ads = generate_ads(ci, out_dir)
-        return {"download_url": _output_url(ads["file_path"]), "download_name": ads["file_name"]}
+        download_url = _output_url(ads["file_path"])
+        result = {"download_url": download_url, "download_name": ads["file_name"]}
+        if online:
+            viewer_file_url = download_url.replace("\\", "/")
+            result["online_pdf_url"] = f"/pdfjs/web/viewer.html?file={quote(viewer_file_url, safe='')}"
+        return result
+    except HTTPException:
+        raise
     except Exception as exc:
         raise HTTPException(500, f"ADS XFA 生成失败：{exc}")
 

@@ -1046,7 +1046,7 @@ function _showDocPdf(target, pdfUrl){
     bar.style.display = "block";
     bar.innerHTML = `当前为<b>数据核对版</b>（本地，仅核对字段）。需要 XFA：` +
       `<a href="#" onclick="adsXfa(false);return false;" style="color:#b45309;font-weight:600;">⬇ 下载 XFA 版</a>（Adobe 打开）` +
-      ` ｜ <a href="#" onclick="adsXfa(true);return false;" style="color:#b45309;">在线看真实排版</a>（上云扁平化）`;
+      ` ｜ <a href="#" onclick="adsXfa(true);return false;" style="color:#b45309;">在线看 XFA 版</a>（本地 PDF.js）`;
   } else { bar.style.display = "none"; }
 }
 
@@ -1087,7 +1087,7 @@ async function preview(target){
   if (data && data.status && data.status !== "pending") return previewSent(target);
   collectOpts();
   $("emailPreview").style.display = "none";
-  // 高亮当前 tab + 显示 loading 遮罩（ADS 走 pdfRest 扁平化，较慢，文案区分）
+  // 高亮当前 tab + 显示 loading 遮罩
   document.querySelectorAll(".preview-head .tab").forEach(b => b.classList.toggle("active", b.dataset.target === target));
   $("previewLoadingText").textContent = target === "ads" ? "生成中…（ADS 数据核对版）" : "生成中…";
   $("previewLoading").classList.add("show");
@@ -1130,11 +1130,11 @@ async function previewSent(target){
   finally { $("previewLoading").classList.remove("show"); }
 }
 
-// 按需看 ADS 的 XFA 版：online=false 本地生成下载(Adobe打开)；online=true 上云扁平化后在线看真实排版
+// 按需看 ADS 的 XFA 版：online=false 下载供 Adobe 打开；online=true 用本地 PDF.js 查看
 async function adsXfa(online){
   if (!taskId) return;
   collectOpts();                                   // 快照当前编辑（含查库带出的签字/通信），未保存也带出
-  $("previewLoadingText").textContent = online ? "生成真实排版中（上云，稍慢）…" : "生成 XFA 版中…";
+  $("previewLoadingText").textContent = online ? "生成 XFA 在线预览中…" : "生成 XFA 版中…";
   $("previewLoading").classList.add("show");
   try {
     const j = await api("POST", `${API}/${taskId}/ads-xfa${online ? "?online=1" : ""}`,
@@ -1142,10 +1142,12 @@ async function adsXfa(online){
     if (online && j.online_pdf_url){
       $("emailPreview").style.display = "none";
       $("previewPlaceholder").style.display = "none";
-      const fr = $("previewFrame"); fr.style.display = "block"; fr.src = j.online_pdf_url + "?t=" + Date.now();
+      const viewerUrl = new URL(j.online_pdf_url, location.origin);
+      viewerUrl.searchParams.set("file", viewerUrl.searchParams.get("file") + "?t=" + Date.now());
+      const fr = $("previewFrame"); fr.style.display = "block"; fr.src = viewerUrl.href;
       if ((j.warnings||[]).length) toast(j.warnings[0], 5000);
     }
-    if (j.download_url) window.open(j.download_url, "_blank");
+    if (!online && j.download_url) window.open(j.download_url, "_blank");
   } catch(e){ toast("失败: " + e.message); }
   finally { $("previewLoading").classList.remove("show"); }
 }
