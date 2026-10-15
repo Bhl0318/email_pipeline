@@ -197,28 +197,24 @@ def rebalance_address(addr1: str, addr2: str, width: int = ADDRESS_LINE1_MAX) ->
 
 
 def address_lines(addr1: str, addr2: str, width: int = ADDRESS_LINE1_MAX) -> list:
-    """按 width 把地址拆成多行列表：地址1 溢出挪到地址2，地址2 再溢出挪到地址3…
-
-    尊重已有 addr1/addr2 边界，只把超长行的尾段（按逗号）下移；无逗号不拆。
-    返回非空行列表（至少 1 行）。
-    """
-    a1, a2 = rebalance_address(addr1, addr2, width)
-    lines = [a1]
-    rest = a2
-    while rest and len(rest) > width:
-        parts = [p.strip() for p in re.split(r"[，,]", rest) if p.strip()]
-        if len(parts) <= 1:
-            break  # 无逗号可拆，整段留在当前行
-        cur = parts[0]
-        idx = 1
-        while idx < len(parts) and len(cur + ", " + parts[idx]) <= width:
-            cur += ", " + parts[idx]
-            idx += 1
-        lines.append(cur)
-        rest = ", ".join(parts[idx:])
-    if rest:
-        lines.append(rest)
-    return [ln for ln in lines if ln] or [""]
+    """按宽度排版 Assignment 地址：优先在靠近行尾的逗号处断开，否则在空格处断开。"""
+    lines = []
+    for address in (addr1, addr2):
+        rest = (address or "").strip()
+        while len(rest) > width:
+            breaks = [match.start() for match in re.finditer(r"\s+", rest) if match.start() <= width]
+            if not breaks:
+                break
+            cut = breaks[-1]
+            comma_breaks = [position for position in breaks
+                            if rest[:position].rstrip().endswith((",", "，"))]
+            if comma_breaks and cut - comma_breaks[-1] <= 8:
+                cut = comma_breaks[-1]
+            lines.append(rest[:cut].rstrip())
+            rest = rest[cut:].lstrip()
+        if rest:
+            lines.append(rest)
+    return lines or [""]
 
 
 def full_mailing_address_en(applicant: dict) -> str:
