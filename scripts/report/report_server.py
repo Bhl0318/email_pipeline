@@ -309,6 +309,10 @@ def get_task(task_id: str):
     # 注：fields_json 里值为 ""/None 的是占位，不应覆盖 enrich 查到的真实值
     effective_user = {k: v for k, v in user_fields.items() if v not in ("", None)}
     merged = {**p_defaults, **enriched, **effective_user}
+    if row.get("rule_domain") == "close":
+        # 结项汇报信的专利申请名称只以 IPEasy p_case_info.case_name 为准；
+        # 即使 fields_json 已有值，或 IPEasy 返回空值，也不沿用 TIP 的名称。
+        merged["申请名称"] = enriched.get("申请名称") or ""
 
     # 联系人：审核人没填过（仍是占位/空）时，默认填第一个接口人（姓名+邮箱）
     if interface_contacts:
