@@ -110,7 +110,12 @@ def fpo_reference_to_markdown(publication_number, timeout=420):
         verify=False,
         timeout=timeout,
     )
-    response.raise_for_status()
+    if not response.ok:
+        try:
+            detail = response.json().get("detail") or response.text[:300]
+        except (ValueError, AttributeError):
+            detail = response.text[:300]
+        raise RuntimeError(f"对比文件 OCR 服务 HTTP {response.status_code}: {str(detail)[:500]}")
     payload = response.json()
     if payload.get("publication_number") != publication_number:
         raise ValueError("OCR 服务返回的公开号与请求不符")
