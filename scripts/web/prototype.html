@@ -809,7 +809,9 @@
     });
     // 汇报信 PDF
     if (attachPdf) {
-      const issue = (currentFields['发文日期'] || '').replace(/\//g, '-');
+      // 与后端 _safe_filename 一致：汇报信 PDF 文件名使用发送日，结项任务没有发文日期。
+      const today = new Date();
+      const issue = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
       let ntype = currentFields['通知类型'] || '汇报信';
       if (!ntype.endsWith('转达')) ntype += '转达';
       const cref = currentFields['客户案号'] || '请提供';
