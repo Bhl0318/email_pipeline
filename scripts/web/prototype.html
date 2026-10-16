@@ -304,7 +304,7 @@
           </div>
           <div class="form-group">
             <label>签名品牌</label>
-            <select id="f-brand">
+            <select id="f-brand" onchange="updateBrand()">
               <option value="七星天">七星天</option>
               <option value="众慧">众慧</option>
             </select>
@@ -929,6 +929,14 @@
     renderAttachments();
   }
 
+  function updateBrand() {
+    currentFields['签名品牌'] = $('f-brand').value;
+    renderPreview();
+    if (currentPdfBlobUrl) { URL.revokeObjectURL(currentPdfBlobUrl); currentPdfBlobUrl = null; }
+    currentPdfBase64 = null;
+    renderAttachments();
+  }
+
   function collectFieldsFromForm() {
     for (const [field, inputId] of Object.entries(FIELD_TO_INPUT)) {
       if (field === '正文事项' && (!templateMd || !/\{\{\s*正文事项\s*\}\}/.test(templateMd))) continue;
@@ -946,6 +954,12 @@
     const options = key.split('/').map(x => x.trim());
     // {{选项一/选项二/选项三}} 可多选一；PCT/RO/132 表是官文编号字段。
     return options.length > 1 && options.every(Boolean) ? options : [];
+  }
+
+  function applyBrandIdsEmail(md) {
+    const email = currentFields['签名品牌'] === '众慧' ? 'IDS@zhycoip.com' : 'IDS@metis-ip.com';
+    // 仅处理模板正文里并列写出的两个 IDS 邮箱；单独出现的邮箱保持原样。
+    return md.replace(/IDS@metis-ip\.com\s*[/／]\s*IDS@zhycoip\.com|IDS@zhycoip\.com\s*[/／]\s*IDS@metis-ip\.com/gi, email);
   }
 
   // 已有字段沿用专用控件；模板新增字段按 {{字段}} 自动生成并读取 fields_json 默认值。
@@ -1051,7 +1065,7 @@
     }
 
     // 模板直接全文渲染（新模板无旧式 # / > 文档头）
-    let md = templateMd;
+    let md = applyBrandIdsEmail(templateMd);
 
     // 2) 替换 {{字段}} → 已填字段输出纯文本（不能包 <span>：否则 **{{字段}}** 里的 **
     //    紧贴 HTML 标签，触发 marked 的 flanking 规则、加粗失效、** 原样漏到正文）。
