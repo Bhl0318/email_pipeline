@@ -52,7 +52,7 @@ from email.mime.text import MIMEText
 from email.mime.application import MIMEApplication
 from email.mime.base import MIMEBase
 from email import encoders
-from email.utils import getaddresses
+from email.utils import getaddresses, formataddr
 
 import requests
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form
@@ -1091,8 +1091,31 @@ def _get_smtp_oauth2_token(account_cfg):
     return None
 
 
+def _normalize_mailboxes(values):
+    """把页面输入的「姓名 <邮箱>」规范为邮件头地址及纯邮箱信封地址。"""
+    headers, envelopes = [], []
+    for value in values or []:
+        raw = str(value or "").strip()
+        if not raw:
+            continue
+        parsed = getaddresses([raw])
+        if len(parsed) != 1:
+            raise ValueError(f"收件地址格式无效: {raw}")
+        name, addr = parsed[0]
+        addr = addr.strip()
+        if not _EMAIL_RE.fullmatch(addr):
+            raise ValueError(f"收件地址格式无效: {raw}")
+        headers.append(formataddr((name.strip(), addr)) if name.strip() else addr)
+        envelopes.append(addr)
+    return headers, envelopes
+
+
 def _send_smtp(msg, account_cfg, recipients, cc_addrs=None):
     """通过 SMTP 发送 MIMEMultipart 邮件。OAuth2 优先，失败降级密码。失败抛异常。"""
+    to_headers, to_envelopes = _normalize_mailboxes(recipients)
+    cc_headers, cc_envelopes = _normalize_mailboxes(cc_addrs)
+    if not to_envelopes:
+        raise ValueError("请填写有效收件人邮箱")
     smtp = smtplib.SMTP(account_cfg["smtp_host"], account_cfg["smtp_port"], timeout=30)
     try:
         smtp.ehlo()
@@ -1115,12 +1138,10 @@ def _send_smtp(msg, account_cfg, recipients, cc_addrs=None):
         if msg["To"]:   del msg["To"]
         if msg["Cc"]:   del msg["Cc"]
         msg["From"] = account_cfg["user"]
-        msg["To"] = ", ".join(recipients)            # 可含「姓名 <邮箱>」
-        if cc_addrs:
-            msg["Cc"] = ", ".join(cc_addrs)
-        # 信封收件人只要纯邮箱：从「姓名 <邮箱>」解析出地址
-        all_rcpts = [addr for _, addr in getaddresses(recipients + (cc_addrs or [])) if addr]
-        smtp.sendmail(account_cfg["user"], all_rcpts, msg.as_string())
+        msg["To"] = ", ".join(to_headers)
+        if cc_headers:
+            msg["Cc"] = ", ".join(cc_headers)
+        smtp.sendmail(account_cfg["user"], to_envelopes + cc_envelopes, msg.as_string())
     finally:
         try:
             smtp.quit()
@@ -1175,7 +1196,7 @@ def preview_send(task_id: str, req: PreviewSendReq):
     recipients, cc = [], []
     try:
         from enrich_report import query_case_recipients
-        _fmt = lambda c: (f'{c["name"]} <{c["email"]}>' if c.get("name") else c["email"])
+        _fmt = lambda c: (f'{c["name"].strip()} <{c["email"]}>' if (c.get("name") or "").strip() else c["email"])
         rc = query_case_recipients(project)   # {"to":[...], "cc":[...]}
         recipients = [_fmt(c) for c in rc.get("to", [])]
         cc = [_fmt(c) for c in rc.get("cc", [])]
