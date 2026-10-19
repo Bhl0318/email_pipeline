@@ -3,6 +3,7 @@
 
 用法：
     python scripts/oa/check_pdf_recognition.py /path/to/审查意见.pdf
+    python scripts/oa/check_pdf_recognition.py /path/to/审查意见.pdf --qwen-model qwen3-vl-plus
     python scripts/oa/check_pdf_recognition.py /path/to/审查意见.pdf --output-dir outputs/pdf_check
 
 默认运行文字层提取、Mistral OCR、qwen-vl-max，三者互不作为兜底。
@@ -11,6 +12,7 @@
 """
 import argparse
 import base64
+import os
 from pathlib import Path
 import sys
 from time import perf_counter
@@ -31,7 +33,7 @@ def extract_mistral(pdf_path):
     return pdf_to_markdown(str(pdf_path)) or ""
 
 
-def extract_qwen(pdf_path, max_pages):
+def extract_qwen(pdf_path, max_pages, model=None, base_url=None):
     """直接将 PDF 页面图片交给视觉模型，不先尝试 Mistral OCR。"""
     import fitz
     from openai import OpenAI
@@ -48,10 +50,10 @@ def extract_qwen(pdf_path, max_pages):
                             {"url": f"data:image/png;base64,{encoded}"}})
     if len(content) == 1:
         return ""
-    client = OpenAI(api_key=QWEN_API_KEY, base_url=QWEN_BASE_URL,
+    client = OpenAI(api_key=QWEN_API_KEY, base_url=base_url or QWEN_BASE_URL,
                     timeout=180.0, max_retries=0)
     response = client.chat.completions.create(
-        model=QWEN_VL_MODEL, max_tokens=4000,
+        model=model or QWEN_VL_MODEL, max_tokens=4000,
         messages=[{"role": "user", "content": content}])
     if not response.choices or not response.choices[0].message:
         return ""
@@ -72,6 +74,9 @@ def run_method(label, func, output_path=None):
 
     if error:
         print(f"识别失败：{error}")
+        if "model_not_found" in error or "Model not exist" in error:
+            print("模型不存在或当前账号/地域不可用。可用 --qwen-model 指定其他视觉模型，"
+                  "并确认 --qwen-base-url 与 API Key 属于同一地域。")
     elif result.strip():
         print(result)
         if output_path is not None:
@@ -88,6 +93,10 @@ def main(argv=None):
     parser.add_argument("pdf", type=Path, help="待识别的 PDF 文件")
     parser.add_argument("--text-pages", type=int, default=8, help="文字层提取页数，默认 8")
     parser.add_argument("--qwen-pages", type=int, default=6, help="qwen-vl-max 识别页数，默认 6")
+    parser.add_argument("--qwen-model", default=os.environ.get("QWEN_VL_MODEL", ""),
+                        help="视觉模型名；默认沿用正式 OA 流程的 qwen-vl-max")
+    parser.add_argument("--qwen-base-url", default=os.environ.get("QWEN_BASE_URL", ""),
+                        help="视觉模型接口地址；默认沿用正式 OA 流程的北京地址")
     parser.add_argument("--output-dir", type=Path, help="额外将三种识别全文分别保存到此目录")
     args = parser.parse_args(argv)
     if not args.pdf.is_file() or args.pdf.suffix.lower() != ".pdf":
@@ -99,10 +108,15 @@ def main(argv=None):
 
     pdf = args.pdf.resolve()
     print(f"文件：{pdf}", flush=True)
+    from parse_us_pdf import QWEN_BASE_URL, QWEN_VL_MODEL
+    qwen_model = args.qwen_model or QWEN_VL_MODEL
+    qwen_base_url = args.qwen_base_url or QWEN_BASE_URL
+    print(f"Qwen 模型：{qwen_model}；接口：{qwen_base_url}", flush=True)
     methods = (
         ("文字层（PyMuPDF / pypdf）", "text", lambda: extract_text_layer(pdf, args.text_pages)),
         ("Mistral OCR", "mistral", lambda: extract_mistral(pdf)),
-        ("qwen-vl-max 视觉识别", "qwen", lambda: extract_qwen(pdf, args.qwen_pages)),
+        (f"{qwen_model} 视觉识别", "qwen",
+         lambda: extract_qwen(pdf, args.qwen_pages, qwen_model, qwen_base_url)),
     )
     for label, filename, func in methods:
         output_path = args.output_dir / f"{pdf.stem}.{filename}.md" if args.output_dir else None
