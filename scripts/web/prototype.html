@@ -388,6 +388,18 @@
         </div>
       </div>
 
+      <!-- 结项汇报信固定字段 -->
+      <div class="form-section">
+        <h3><span class="icon icon-purple">&#128197;</span> 结项汇报信</h3>
+        <div class="form-row">
+          <div class="form-group">
+            <label>本申请递交日</label>
+            <input type="date" id="f-close-application-filing-date">
+            <div class="field-source"><span class="src-auto">&#9679;</span> TIP 结项日期 / 手填</div>
+          </div>
+        </div>
+      </div>
+
       <!-- US 专属字段 -->
       <div class="form-section">
         <h3><span class="icon icon-purple">&#127482;&#127480;</span> US 专属字段</h3>
@@ -677,6 +689,7 @@
     "延期后截止日期": "f-ext-deadline",
     // US 专属
     "递交日":     "f-submit-date",
+    "本申请递交日": "f-close-application-filing-date",
     "案号字段名": "f-ref-label",
     "延期描述":   "f-ext-desc",
     "IDS邮箱":    "f-ids-email",
@@ -703,7 +716,7 @@
     "指示日期":     "f-instruction-date",
     "生效国家列表": "f-validate-countries",
   };
-  const DATE_FIELDS = ["发文日期", "截止日期", "申请日", "指示期限",
+  const DATE_FIELDS = ["发文日期", "截止日期", "申请日", "本申请递交日", "指示期限",
     "延期后截止日期", "递交日", "收文日期", "答复通知日期", "书面答复截止日期",
     "缴费截止日期", "公告日期", "生效截止日期", "生效指示期限",
     "分案截止日期", "指示日期"];
