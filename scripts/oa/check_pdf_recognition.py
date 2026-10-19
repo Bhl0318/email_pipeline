@@ -6,8 +6,8 @@
     python scripts/oa/check_pdf_recognition.py /path/to/审查意见.pdf --qwen-model qwen3-vl-plus
     python scripts/oa/check_pdf_recognition.py /path/to/审查意见.pdf --output-dir outputs/pdf_check
 
-默认运行文字层提取、Mistral OCR、qwen-vl-max，三者互不作为兜底。
-文字层默认读前 8 页，qwen-vl-max 默认看前 6 页，Mistral OCR 处理整份 PDF；
+默认运行文字层提取、Mistral OCR、qwen3-vl-plus，三者互不作为兜底。
+文字层默认读前 8 页，qwen3-vl-plus 默认看前 6 页，Mistral OCR 处理整份 PDF；
 此页数与当前 OA 报告识别流程一致。需在已配置相应服务的环境运行远程方法。
 """
 import argparse
@@ -37,7 +37,7 @@ def extract_qwen(pdf_path, max_pages, model=None, base_url=None):
     """直接将 PDF 页面图片交给视觉模型，不先尝试 Mistral OCR。"""
     import fitz
     from openai import OpenAI
-    from parse_us_pdf import QWEN_API_KEY, QWEN_BASE_URL, QWEN_VL_MODEL
+    from parse_us_pdf import QWEN_API_KEY, QWEN_BASE_URL
 
     content = [{"type": "text", "text":
                 "这些是专利审查意见通知书/官方文件的扫描页。请逐字识别其中全部文字，"
@@ -53,7 +53,7 @@ def extract_qwen(pdf_path, max_pages, model=None, base_url=None):
     client = OpenAI(api_key=QWEN_API_KEY, base_url=base_url or QWEN_BASE_URL,
                     timeout=180.0, max_retries=0)
     response = client.chat.completions.create(
-        model=model or QWEN_VL_MODEL, max_tokens=4000,
+        model=model or "qwen3-vl-plus", max_tokens=4000,
         messages=[{"role": "user", "content": content}])
     if not response.choices or not response.choices[0].message:
         return ""
@@ -89,12 +89,12 @@ def run_method(label, func, output_path=None):
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description="比较 PDF 文字层、Mistral OCR、qwen-vl-max 的识别结果及耗时")
+    parser = argparse.ArgumentParser(description="比较 PDF 文字层、Mistral OCR、qwen3-vl-plus 的识别结果及耗时")
     parser.add_argument("pdf", type=Path, help="待识别的 PDF 文件")
     parser.add_argument("--text-pages", type=int, default=8, help="文字层提取页数，默认 8")
-    parser.add_argument("--qwen-pages", type=int, default=6, help="qwen-vl-max 识别页数，默认 6")
-    parser.add_argument("--qwen-model", default=os.environ.get("QWEN_VL_MODEL", ""),
-                        help="视觉模型名；默认沿用正式 OA 流程的 qwen-vl-max")
+    parser.add_argument("--qwen-pages", type=int, default=6, help="视觉模型识别页数，默认 6")
+    parser.add_argument("--qwen-model", default=os.environ.get("QWEN_VL_MODEL") or "qwen3-vl-plus",
+                        help="视觉模型名；默认 qwen3-vl-plus")
     parser.add_argument("--qwen-base-url", default=os.environ.get("QWEN_BASE_URL", ""),
                         help="视觉模型接口地址；默认沿用正式 OA 流程的北京地址")
     parser.add_argument("--output-dir", type=Path, help="额外将三种识别全文分别保存到此目录")
@@ -108,8 +108,8 @@ def main(argv=None):
 
     pdf = args.pdf.resolve()
     print(f"文件：{pdf}", flush=True)
-    from parse_us_pdf import QWEN_BASE_URL, QWEN_VL_MODEL
-    qwen_model = args.qwen_model or QWEN_VL_MODEL
+    from parse_us_pdf import QWEN_BASE_URL
+    qwen_model = args.qwen_model
     qwen_base_url = args.qwen_base_url or QWEN_BASE_URL
     print(f"Qwen 模型：{qwen_model}；接口：{qwen_base_url}", flush=True)
     methods = (
