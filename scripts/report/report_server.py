@@ -313,6 +313,21 @@ def get_task(task_id: str):
         # 结项汇报信的专利申请名称只以 IPEasy p_case_info.case_name 为准；
         # 即使 fields_json 已有值，或 IPEasy 返回空值，也不沿用 TIP 的名称。
         merged["申请名称"] = enriched.get("申请名称") or ""
+        # 本申请递交日优先使用 TIP 写入的 fields_json；旧任务缺失时从结项记录补齐。
+        filing_date = str(user_fields.get("本申请递交日") or "").strip()
+        if not filing_date and project:
+            try:
+                close_rows = execute_params(
+                    "SELECT clsdate FROM projects_close "
+                    "WHERE projnum = %s AND clsdate IS NOT NULL "
+                    "ORDER BY clsdate DESC LIMIT 1",
+                    (project,),
+                )
+                if close_rows and close_rows[0].get("clsdate"):
+                    filing_date = str(close_rows[0]["clsdate"])[:10]
+            except Exception as e:
+                print(f"[warn] task {task_id} 查询 projects_close.clsdate 失败: {e}", file=sys.stderr)
+        merged["本申请递交日"] = filing_date[:10]
 
     # 联系人：审核人没填过（仍是占位/空）时，默认填第一个接口人（姓名+邮箱）
     if interface_contacts:

@@ -977,6 +977,14 @@
     return md.replace(/IDS@metis-ip\.com\s*[/／]\s*IDS@zhycoip\.com|IDS@zhycoip\.com\s*[/／]\s*IDS@metis-ip\.com/gi, email);
   }
 
+  function effectiveTemplateMd() {
+    if (currentRuleDomain !== 'close') return templateMd;
+    // 旧结项模板将“本申请递交日”误写成 {{申请日}} 或 {{递交日期}}。
+    // 只改这一表格行，避免影响模板其他位置的日期。
+    return templateMd.replace(/(^\|\s*本申请递交日\s*[：:]?\s*\|\s*)\{\{\s*(?:申请日|递交日期)\s*\}\}/gm,
+      '$1{{本申请递交日}}');
+  }
+
   // 已有字段沿用专用控件；模板新增字段按 {{字段}} 自动生成并读取 fields_json 默认值。
   function renderDynamicFields() {
     const section = $('section-dynamic-fields');
@@ -984,7 +992,7 @@
     list.replaceChildren();
     if (!templateMd) { section.style.display = 'none'; return; }
 
-    const keys = [...new Set([...templateMd.matchAll(/\{\{\s*([^{}]+?)\s*\}\}/g)].map(m => m[1].trim()))];
+    const keys = [...new Set([...effectiveTemplateMd().matchAll(/\{\{\s*([^{}]+?)\s*\}\}/g)].map(m => m[1].trim()))];
     const extra = keys.filter(key => !(FIELD_TO_INPUT[key] && $(FIELD_TO_INPUT[key])));
     for (const key of extra) {
       const group = document.createElement('div');
@@ -1037,7 +1045,8 @@
     const used = new Set();
     const re = /\{\{\s*(.+?)\s*\}\}/g;
     let m;
-    while ((m = re.exec(templateMd)) !== null) used.add(m[1].trim());
+    const md = effectiveTemplateMd();
+    while ((m = re.exec(md)) !== null) used.add(m[1].trim());
 
     for (const [field, inputId] of Object.entries(FIELD_TO_INPUT)) {
       const el = $(inputId);
@@ -1080,7 +1089,7 @@
     }
 
     // 模板直接全文渲染（新模板无旧式 # / > 文档头）
-    let md = applyBrandIdsEmail(templateMd);
+    let md = applyBrandIdsEmail(effectiveTemplateMd());
 
     // 2) 替换 {{字段}} → 已填字段输出纯文本（不能包 <span>：否则 **{{字段}}** 里的 **
     //    紧贴 HTML 标签，触发 marked 的 flanking 规则、加粗失效、** 原样漏到正文）。
