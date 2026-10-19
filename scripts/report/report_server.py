@@ -319,7 +319,7 @@ def get_task(task_id: str):
             try:
                 close_rows = execute_params(
                     "SELECT clsdate FROM projects_close "
-                    "WHERE projnum = %s AND clsdate IS NOT NULL "
+                    "WHERE project = %s AND clsdate IS NOT NULL "
                     "ORDER BY clsdate DESC LIMIT 1",
                     (project,),
                 )
