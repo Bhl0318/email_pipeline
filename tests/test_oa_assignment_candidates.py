@@ -91,6 +91,35 @@ class CandidateRulesTest(unittest.TestCase):
         self.assertEqual(schemes[0]["responder"], "负责人")
         self.assertEqual(schemes[0]["qc"], "质检")
 
+    def test_historical_responder_outside_qc_tier_is_replaced(self):
+        candidates = [
+            {"name": "刘书华", "status": "在职", "sources": ["本案历史OA"]},
+            {"name": "黄丽洁", "status": "在职", "sources": ["本案历史OA"]},
+        ]
+        whitelist = [
+            {"name": "刘书华", "tier": "梯队2", "field": "通用", "tier_level": 2},
+            {"name": "卞棋", "tier": "QC", "field": "通用", "tier_level": 0},
+        ]
+
+        def execute(sql):
+            if "SELECT username_zn, cls" in sql:
+                return [{"username_zn": n, "cls": "", "user_type": ""}
+                        for n in ("刘书华", "黄丽洁", "卞棋")]
+            if "SELECT username_zn FROM users" in sql:
+                return [{"username_zn": n} for n in ("刘书华", "黄丽洁", "卞棋")]
+            raise AssertionError(sql)
+
+        with patch("oa_personnel.collect_candidates", return_value=candidates), \
+             patch("oa_whitelist_store.list_for", return_value=whitelist), \
+             patch("oa_schemes._deepseek_schemes_wl", return_value=[
+                 {"responder": "黄丽洁", "qc": "刘书华", "field": "通用",
+                  "note": "刘书华转任QC，保证连续性"}
+             ]):
+            schemes = build_assignment_schemes("20618-1568US00", region="US", execute=execute)
+        self.assertEqual(schemes[0]["responder"], "黄丽洁")
+        self.assertEqual(schemes[0]["qc"], "卞棋")
+        self.assertNotIn("刘书华转任QC", schemes[0]["note"])
+
     def test_attribute_query_failure_does_not_recommend_responder(self):
         candidates = [{"name": "可能受限", "status": "在职", "sources": ["本案历史OA"]}]
 
