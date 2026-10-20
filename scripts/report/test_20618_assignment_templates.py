@@ -1,10 +1,14 @@
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from docx import Document
 
-from submission.assignment_generator import _special_chain, generate_assignment, generate_assignments
+from submission.assignment_generator import (SPECIAL_ASSIGNMENT_TEMPLATES,
+                                             generate_assignment, generate_assignments)
+from submission.common import _assignee_from_applicant
+from submission.common import ASSIGNMENT_TEMPLATE
 
 
 def doc_text(path):
@@ -16,13 +20,13 @@ def doc_text(path):
 
 
 class SpecialAssignmentTemplateTests(unittest.TestCase):
-    def test_chain_ignores_this_app_when_prior_is_empty(self):
-        chain = _special_chain({"parent_applications": [{"Application No": "18/999,999",
-                                                          "Prior Application Number": ""}],
-                                "case_advance_info": {"pct_app_no": "PCT/CN2024/012345"},
-                                "filing_route": "Bypass Continuation in part of"})
-        self.assertNotIn("18/999,999", chain)
-        self.assertIn("a continuation-in-part of International Patent Application No. PCT/CN2024/012345", chain)
+    def test_special_templates_keep_general_signature_table_layout(self):
+        general = Document(ASSIGNMENT_TEMPLATE)
+        expected = [table._tbl.xml for table in general.tables]
+        for template in SPECIAL_ASSIGNMENT_TEMPLATES.values():
+            with self.subTest(template=template.name):
+                doc = Document(template)
+                self.assertEqual([table._tbl.xml for table in doc.tables], expected)
 
     def test_other_clients_still_use_general_template(self):
         fields = {
@@ -44,7 +48,9 @@ class SpecialAssignmentTemplateTests(unittest.TestCase):
             "application_type": "发明",
             "case_info": {"case_name_en": "A NEW MEDICAL DEVICE"},
             "applicants": [{"applicant_name_en": "NEW MEDICAL CORP.",
-                            "address1": "100 Main Street", "city_en": "Boston",
+                            "address1": "100 Main Street, Building 123, Industrial Development Zone",
+                            "address2": "45 Riverside Avenue, Suite 321", "city_en": "Boston",
+                            "province_city_en_us": "Massachusetts", "postcode": "02101",
                             "country_en_us": "US"}],
             "inventors": [{"last_name_en": name, "first_name_en": "Test",
                            "employer": "NEW MEDICAL CORP.",
@@ -58,19 +64,35 @@ class SpecialAssignmentTemplateTests(unittest.TestCase):
                              "company_city_en": "Boston",
                              "company_country_en": "US",
                              "assignee": "NEW MEDICAL CORP."}],
-            "parent_applications": [{"Prior Application Number": "18/123,456",
+            "parent_applications": [{"Application No": "18/123,456",
+                                     "Prior Application Number": "18/123,456",
                                      "Continuity Type": "Continuation of",
                                      "Filing Date": "2024-01-01"}],
             "case_advance_info": {"pct_app_no": "PCT/CN2023/987654",
                                   "pct_app_date": "2023-01-01"},
         }
         with tempfile.TemporaryDirectory() as folder:
-            files = generate_assignments(fields, folder)
+            with patch("submission.assignment_generator.Document", wraps=Document) as load_template:
+                files = generate_assignments(fields, folder)
+            self.assertEqual([Path(c.args[0]).name for c in load_template.call_args_list],
+                             ["Assignment-20618-inventors.docx", "Assignment-20618-company.docx"])
             self.assertEqual(len(files), 2)
             inventor_doc, inventor_text = doc_text(files[0]["file_path"])
             company_doc, company_text = doc_text(files[1]["file_path"])
-            self.assertEqual(len(inventor_doc.tables), 3)
+            self.assertEqual(len(inventor_doc.tables), 4)  # 优先权表 + 3 个通用模板签字表
             self.assertEqual(len(company_doc.tables), 4)
+            address_lines = _assignee_from_applicant(fields["applicants"][0])["address_lines"]
+            self.assertGreater(len(address_lines), 2)
+            for line in address_lines:
+                self.assertIn(line, inventor_text)
+            # 同一份数据走通用模板，生成后的地址续行和签字表也应逐项相同。
+            with patch("submission.assignment_generator.is_special_client", return_value=False):
+                generic_inventor = generate_assignment(
+                    fields, {"assignment_type": "个人转公司", "assignee": "NEW MEDICAL CORP."},
+                    Path(folder) / "generic")
+            generic_doc = Document(generic_inventor["file_path"])
+            self.assertEqual([t._tbl.xml for t in inventor_doc.tables],
+                             [t._tbl.xml for t in generic_doc.tables])
             for text in (inventor_text, company_text):
                 self.assertIn("20618-9999US00", text)
                 self.assertIn("A NEW MEDICAL DEVICE", text)
@@ -81,7 +103,6 @@ class SpecialAssignmentTemplateTests(unittest.TestCase):
                             "PCT/CN2016/085434", "No.2258 Chengbei"):
                     self.assertNotIn(old, text)
             self.assertIn("SMITH, Test", inventor_text)
-            self.assertIn("3 Test Street", inventor_text)
             self.assertIn("ALEX WU", company_text)
 
 
