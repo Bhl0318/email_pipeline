@@ -223,14 +223,19 @@ def address_lines(addr1: str, addr2: str, width: int = ADDRESS_LINE1_MAX) -> lis
 def full_mailing_address_en(applicant: dict) -> str:
     """完整英文通信地址：address1 + address2 + 城市 + 州省 + 邮编 + 国家 拼接。
 
-    与确认函 Mailing Address 的合并口径完全一致，保证 Assignment 与确认函显示同一地址。
+    与确认函 Mailing Address 一样，相邻同名字段只保留一次（如 Shanghai, Shanghai）。
     """
     parts = [
         applicant.get("address1", ""), applicant.get("address2", ""),
         applicant.get("city_en", ""), applicant.get("province_city_en_us", ""),
         applicant.get("postcode", ""), applicant.get("country_en_us", ""),
     ]
-    return ", ".join([str(p).strip() for p in parts if p and str(p).strip()])
+    out = []
+    for part in parts:
+        value = str(part or "").strip()
+        if value and (not out or out[-1].casefold() != value.casefold()):
+            out.append(value)
+    return ", ".join(out)
 
 
 def _assignee_from_applicant(applicant: dict) -> dict:

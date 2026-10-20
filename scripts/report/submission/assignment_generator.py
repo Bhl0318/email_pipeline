@@ -22,6 +22,7 @@ from docx.table import _Cell, _Row
 from .common import (
     ASSIGNMENT_TEMPLATE,
     blank_none,
+    clean_priority_no,
     company_addr_dict,
     _assignee_from_applicant,
     application_type_words,
@@ -304,6 +305,16 @@ def _fill_inventor_tables(doc, names, addr_lines, per_inventor_addresses=None,
 
 def _special_chain(fields):
     """用本案母案/PCT 数据描述在先申请；不沿用样例文件中写死的申请链。"""
+    def long_date(raw):
+        value = str(raw or "").strip()
+        for fmt in ("%Y-%m-%d", "%Y/%m/%d", "%Y.%m.%d"):
+            try:
+                parsed = datetime.strptime(value[:10], fmt)
+                return f"{parsed.strftime('%B')} {parsed.day}, {parsed.year}"
+            except ValueError:
+                continue
+        return value
+
     entries = []
     for parent in fields.get("parent_applications") or []:
         # Application No 是本段申请号，不能在 Prior 为空时冒充在先申请号。
@@ -325,7 +336,7 @@ def _special_chain(fields):
             relation = "related to"
         entry = f"{relation} U.S. Patent Application No. {no}"
         if date:
-            entry += f", filed on {date}"
+            entry += f", filed on {long_date(date)}"
         if patent:
             entry += f" (now Patent No. {patent})"
         entries.append(entry)
@@ -334,7 +345,7 @@ def _special_chain(fields):
     if pct_no:
         pct = f"International Patent Application No. {pct_no}"
         if advance.get("pct_app_date"):
-            pct += f", filed on {advance['pct_app_date']}"
+            pct += f", filed on {long_date(advance['pct_app_date'])}"
         route = (fields.get("filing_route") or "").lower()
         if "371" in route or "国家阶段" in route:
             pct_relation = "a 371 national-stage entry of"
@@ -343,9 +354,27 @@ def _special_chain(fields):
         else:
             pct_relation = "a continuation of"
         entries.append(f"{pct_relation} {pct}")
+    priorities = []
+    seen = set()
+    for priority in fields.get("priorities") or []:
+        number = clean_priority_no(priority.get("priority_no") or priority.get("priority_num") or "")
+        if not number or number.upper() == pct_no.upper() or number.upper() in seen:
+            continue
+        seen.add(number.upper())
+        country = (priority.get("priority_country_id") or "").strip().upper()
+        label = f"{country} " if country and not number.upper().startswith("PCT/") else ""
+        item = f"Patent Application No. {label}{number}"
+        if priority.get("priority_date"):
+            item += f", filed on {long_date(priority['priority_date'])}"
+        priorities.append(item)
     if not entries:
+        if priorities:
+            return "for which priority is claimed to " + " and ".join(priorities) + "; and"
         return "for which patent protection is sought; and"
-    return "for which is " + ", which is ".join(entries) + "; and"
+    chain = "for which is " + ", which is ".join(entries)
+    if priorities:
+        chain += ", and claims priority to " + " and ".join(priorities)
+    return chain + "; and"
 
 
 def _fill_special_address(table, first_key, second_key, lines):

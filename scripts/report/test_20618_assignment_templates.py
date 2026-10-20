@@ -7,8 +7,9 @@ from docx import Document
 from docx.oxml.ns import qn
 
 from submission.assignment_generator import (SPECIAL_ASSIGNMENT_TEMPLATES,
-                                             generate_assignment, generate_assignments)
-from submission.common import ASSIGNMENT_TEMPLATE
+                                             _special_chain, generate_assignment,
+                                             generate_assignments)
+from submission.common import ASSIGNMENT_TEMPLATE, full_mailing_address_en
 
 
 def doc_text(path):
@@ -20,6 +21,32 @@ def doc_text(path):
 
 
 class SpecialAssignmentTemplateTests(unittest.TestCase):
+    def test_municipality_is_not_repeated_in_mailing_address(self):
+        address = {"address1": "No. 1 Main Road", "city_en": "Shanghai",
+                   "province_city_en_us": "shanghai", "postcode": "200000",
+                   "country_en_us": "China"}
+        self.assertEqual(full_mailing_address_en(address),
+                         "No. 1 Main Road, Shanghai, 200000, China")
+        address["province_city_en_us"] = "Jiangsu"
+        self.assertIn("Shanghai, Jiangsu", full_mailing_address_en(address))
+
+    def test_priority_only_and_pct_not_duplicated(self):
+        chain = _special_chain({
+            "case_advance_info": {"pct_app_no": "PCT/CN2024/123456",
+                                  "pct_app_date": "2024-03-22"},
+            "priorities": [
+                {"priority_no": "PCT/CN2024/123456", "priority_country_id": "WO"},
+                {"priority_no": "CN 202410389713.5", "priority_country_id": "CN",
+                 "priority_date": "2024-04-02"},
+            ],
+        })
+        self.assertEqual(chain.count("PCT/CN2024/123456"), 1)
+        self.assertIn("Patent Application No. CN 202410389713.5, filed on April 2, 2024", chain)
+        priority_only = _special_chain({"priorities": [{"priority_no": "202511280001.X",
+                                                        "priority_country_id": "CN",
+                                                        "priority_date": "2025-11-28"}]})
+        self.assertIn("priority is claimed to Patent Application No. CN 202511280001.X", priority_only)
+
     def test_special_templates_keep_customer_wording_and_signature_layout(self):
         for template in SPECIAL_ASSIGNMENT_TEMPLATES.values():
             with self.subTest(template=template.name):
@@ -81,6 +108,8 @@ class SpecialAssignmentTemplateTests(unittest.TestCase):
                                      "Filing Date": "2024-01-01"}],
             "case_advance_info": {"pct_app_no": "PCT/CN2023/987654",
                                   "pct_app_date": "2023-01-01"},
+            "priorities": [{"priority_no": "CN 202511280001.X", "priority_country_id": "CN",
+                            "priority_date": "2025-11-28"}],
         }
         with tempfile.TemporaryDirectory() as folder:
             with patch("submission.assignment_generator.Document", wraps=Document) as load_template:
@@ -110,6 +139,10 @@ class SpecialAssignmentTemplateTests(unittest.TestCase):
                 self.assertIn("A NEW MEDICAL DEVICE", text)
                 self.assertIn("U.S. Patent Application No. 18/123,456", text)
                 self.assertIn("PCT/CN2023/987654", text)
+                self.assertIn("filed on January 1, 2024", text)
+                self.assertIn("filed on January 1, 2023", text)
+                self.assertIn("Patent Application No. CN 202511280001.X, filed on November 28, 2025", text)
+                self.assertNotIn("2025-11-28", text)
                 self.assertNotIn("{{", text)
                 for old in ("20618-0168US04", "SHANGHAI UNITED", "UNITED IMAGING",
                             "PCT/CN2016/085434", "No.2258 Chengbei"):
