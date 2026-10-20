@@ -21,6 +21,40 @@ def doc_text(path):
 
 
 class SpecialAssignmentTemplateTests(unittest.TestCase):
+    def test_confirmation_page_mother_case_numbers_enter_chain(self):
+        # 确认函页只提供 Application No / Filing Date，不提供 Prior 字段。
+        fields = {
+            "case_volume": "20618-9999US00",
+            "case_info": {"case_name_en": "A NEW DEVICE"},
+            "applicants": [{"applicant_name_en": "TEST CORP.", "address1": "1 Main Street"}],
+            "inventors": [{"last_name_en": "LI", "first_name_en": "Alice"}],
+            "filing_route": "Continuation in part of",
+            "parent_applications": [
+                {"Application No": "18/340,880", "Filing Date": "2023-06-25",
+                 "Prior Application Number": ""},
+                {"Application No": "17/452,087", "Filing Date": "2021-10-25",
+                 "Prior Application Number": "", "Patent Number": "11,686,867"},
+            ],
+        }
+        chain = _special_chain(fields)
+        self.assertIn("a continuation-in-part of U.S. application filed on June 25, 2023 "
+                      "(U.S. Application No. 18/340,880)", chain)
+        self.assertIn("U.S. Patent Application No. 17/452,087, filed on October 25, 2021 "
+                      "(now Patent No. 11,686,867)", chain)
+        with tempfile.TemporaryDirectory() as folder:
+            result = generate_assignment(fields, {"assignment_type": "个人转公司",
+                                                  "assignee": "TEST CORP."}, folder)
+            _, generated_text = doc_text(result["file_path"])
+            self.assertIn(chain, generated_text)
+
+    def test_new_chain_does_not_use_this_app_as_missing_prior(self):
+        chain = _special_chain({"parent_applications": [
+            {"Application No": "18/111,111", "Prior Application Number": "17/222,222"},
+            {"Application No": "18/333,333", "Prior Application Number": ""},
+        ]})
+        self.assertIn("17/222,222", chain)
+        self.assertNotIn("18/333,333", chain)
+
     def test_municipality_is_not_repeated_in_mailing_address(self):
         address = {"address1": "No. 1 Main Road", "city_en": "Shanghai",
                    "province_city_en_us": "shanghai", "postcode": "200000",
@@ -41,11 +75,50 @@ class SpecialAssignmentTemplateTests(unittest.TestCase):
             ],
         })
         self.assertEqual(chain.count("PCT/CN2024/123456"), 1)
-        self.assertIn("Patent Application No. CN 202410389713.5, filed on April 2, 2024", chain)
+        self.assertIn("Chinese Patent Application No. 202410389713.5 filed on April 2, 2024", chain)
         priority_only = _special_chain({"priorities": [{"priority_no": "202511280001.X",
                                                         "priority_country_id": "CN",
                                                         "priority_date": "2025-11-28"}]})
-        self.assertIn("priority is claimed to Patent Application No. CN 202511280001.X", priority_only)
+        self.assertIn("priority is claimed to Chinese Patent Application No. 202511280001.X", priority_only)
+
+    def test_us_pct_and_two_cn_priorities_use_customer_prose(self):
+        chain = _special_chain({
+            "filing_route": "Continuation in part of",
+            "parent_applications": [{"Prior Application Number": "18/049,277",
+                                     "Filing Date": "2022-10-24",
+                                     "Continuity Type": "Continuation in part of"}],
+            "case_advance_info": {"pct_app_no": "PCT/CN2021/089454",
+                                  "pct_app_date": "2021-04-23"},
+            "priorities": [
+                {"priority_no": "202010327417.4", "priority_country_id": "CN",
+                 "priority_date": "2020-04-23"},
+                {"priority_no": "202010374378.3", "priority_country_id": "CN",
+                 "priority_date": "2020-05-06"},
+            ],
+        })
+        self.assertEqual(chain,
+            "for which is a continuation-in-part of U.S. application filed on October 24, 2022 "
+            "(U.S. Application No. 18/049,277), which is a continuation of International Patent "
+            "Application No. PCT/CN2021/089454, filed on April 23, 2021; "
+            "which claims priority to Chinese Patent Application No. 202010327417.4 "
+            "filed on April 23, 2020, and claims priority to Chinese Patent Application No. "
+            "202010374378.3 filed on May 6, 2020; and")
+
+    def test_pct_only_routes_and_us_priority(self):
+        fields = {
+            "case_advance_info": {"pct_app_no": "PCT/CN2024/123456",
+                                  "pct_app_date": "2024-03-22"},
+            "priorities": [{"priority_no": "18/123,456", "priority_country_id": "US",
+                            "priority_date": "2023-03-22"}],
+        }
+        for route, relation in (("Bypass Continuation", "a continuation of"),
+                                ("371 National Stage", "a 371 national-stage entry of")):
+            with self.subTest(route=route):
+                fields["filing_route"] = route
+                chain = _special_chain(fields)
+                self.assertIn(f"for which is {relation} International Patent Application No. "
+                              "PCT/CN2024/123456", chain)
+                self.assertIn("U.S. Patent Application No. 18123456 filed on March 22, 2023", chain)
 
     def test_special_templates_keep_customer_wording_and_signature_layout(self):
         for template in SPECIAL_ASSIGNMENT_TEMPLATES.values():
@@ -137,11 +210,11 @@ class SpecialAssignmentTemplateTests(unittest.TestCase):
             for text in (inventor_text, company_text):
                 self.assertIn("20618-9999US00", text)
                 self.assertIn("A NEW MEDICAL DEVICE", text)
-                self.assertIn("U.S. Patent Application No. 18/123,456", text)
+                self.assertIn("U.S. Application No. 18/123,456", text)
                 self.assertIn("PCT/CN2023/987654", text)
                 self.assertIn("filed on January 1, 2024", text)
                 self.assertIn("filed on January 1, 2023", text)
-                self.assertIn("Patent Application No. CN 202511280001.X, filed on November 28, 2025", text)
+                self.assertIn("Chinese Patent Application No. 202511280001.X filed on November 28, 2025", text)
                 self.assertNotIn("2025-11-28", text)
                 self.assertNotIn("{{", text)
                 for old in ("20618-0168US04", "SHANGHAI UNITED", "UNITED IMAGING",

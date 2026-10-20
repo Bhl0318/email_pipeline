@@ -316,12 +316,22 @@ def _special_chain(fields):
         return value
 
     entries = []
-    for parent in fields.get("parent_applications") or []:
-        # Application No 是本段申请号，不能在 Prior 为空时冒充在先申请号。
+    parents = fields.get("parent_applications") or []
+    # 确认函旧数据仅有 Application No（该页标注为“母案申请号”）；递交页新链有 Prior。
+    # 只在整条链都没有 Prior 时回退，避免混合数据里把 This App 错当父案。
+    legacy_application_numbers = not any(
+        (p.get("Prior Application Number") or "").strip() for p in parents
+    )
+    for parent in parents:
         no = (parent.get("Prior Application Number") or "").strip()
+        if not no and legacy_application_numbers:
+            no = (parent.get("Application No") or parent.get("application_no") or "").strip()
         if not no:
             continue
-        kind = (parent.get("Continuity Type") or "continuation of").strip().lower()
+        kind = (parent.get("Continuity Type") or "").strip().lower()
+        if not kind:
+            route = (fields.get("filing_route") or "").strip().lower()
+            kind = route if any(word in route for word in ("continuation", "division", "371", "cip")) else "continuation of"
         date = (parent.get("Filing Date") or "").strip()
         patent = (parent.get("Patent Number") or "").strip()
         if "continuation in part" in kind or "continuation-in-part" in kind:
@@ -334,9 +344,12 @@ def _special_chain(fields):
             relation = "a continuation of"
         else:
             relation = "related to"
-        entry = f"{relation} U.S. Patent Application No. {no}"
-        if date:
-            entry += f", filed on {long_date(date)}"
+        if not entries and date:
+            entry = f"{relation} U.S. application filed on {long_date(date)} (U.S. Application No. {no})"
+        else:
+            entry = f"{relation} U.S. Patent Application No. {no}"
+            if date:
+                entry += f", filed on {long_date(date)}"
         if patent:
             entry += f" (now Patent No. {patent})"
         entries.append(entry)
@@ -349,7 +362,7 @@ def _special_chain(fields):
         route = (fields.get("filing_route") or "").lower()
         if "371" in route or "国家阶段" in route:
             pct_relation = "a 371 national-stage entry of"
-        elif "continuation in part" in route or "continuation-in-part" in route or "cip" in route:
+        elif not entries and ("continuation in part" in route or "continuation-in-part" in route or "cip" in route):
             pct_relation = "a continuation-in-part of"
         else:
             pct_relation = "a continuation of"
@@ -362,18 +375,23 @@ def _special_chain(fields):
             continue
         seen.add(number.upper())
         country = (priority.get("priority_country_id") or "").strip().upper()
-        label = f"{country} " if country and not number.upper().startswith("PCT/") else ""
-        item = f"Patent Application No. {label}{number}"
+        if number.upper().startswith("PCT/"):
+            label = "International Patent Application No."
+        else:
+            label = {"CN": "Chinese", "US": "U.S."}.get(country, country)
+            label = f"{label} Patent Application No." if label else "Patent Application No."
+        item = f"{label} {number}"
         if priority.get("priority_date"):
-            item += f", filed on {long_date(priority['priority_date'])}"
+            item += f" filed on {long_date(priority['priority_date'])}"
         priorities.append(item)
     if not entries:
         if priorities:
-            return "for which priority is claimed to " + " and ".join(priorities) + "; and"
+            return "for which priority is claimed to " + ", and to ".join(priorities) + "; and"
         return "for which patent protection is sought; and"
     chain = "for which is " + ", which is ".join(entries)
     if priorities:
-        chain += ", and claims priority to " + " and ".join(priorities)
+        chain += "; which claims priority to " + priorities[0]
+        chain += "".join(", and claims priority to " + item for item in priorities[1:])
     return chain + "; and"
 
 
