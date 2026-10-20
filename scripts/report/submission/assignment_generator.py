@@ -247,7 +247,8 @@ def _set_page_break_before_table(table):
         pPr.insert(0, OxmlElement('w:pageBreakBefore'))
 
 
-def _fill_inventor_tables(doc, names, addr_lines, per_inventor_addresses=None):
+def _fill_inventor_tables(doc, names, addr_lines, per_inventor_addresses=None,
+                          first_on_new_page=False):
     """个人转公司：按序把发明人填入签字表（含"发明人打印版名字"占位的表）。
 
     发明人数超过模板签字表数时，克隆最后一个签字表（连同其前的空行间隔）补足，
@@ -294,9 +295,9 @@ def _fill_inventor_tables(doc, names, addr_lines, per_inventor_addresses=None):
         if extra and addr2_row is not None:
             _clone_address_rows(table, addr2_row, extra)
         filled += 1
-    # 每个发明人签字表各占一页：给第 2 个起的已填签字表设 pageBreakBefore（分页显示）
+    # 用表格自身的分页属性控制，每张签字表只触发一次分页。
     used = list(inventor_tables)[:len(names)]
-    for _t in used[1:]:
+    for _t in (used if first_on_new_page else used[1:]):
         _set_page_break_before_table(_t)
     return filled, added
 
@@ -436,7 +437,8 @@ def _generate_special_assignment(fields, assignment, output_dir, seq, total, nam
             if fallback:
                 warnings.append(f"发明人 {name} 缺少独立住址，Assignment 暂用受让人地址，请核对")
             inventor_addresses.append(lines)
-        _fill_inventor_tables(doc, names, [], per_inventor_addresses=inventor_addresses)
+        _fill_inventor_tables(doc, names, [], per_inventor_addresses=inventor_addresses,
+                              first_on_new_page=True)
         for table in _inventor_signature_tables(doc):
             table._tbl.getparent().remove(table._tbl)
     for old, new in common.items():

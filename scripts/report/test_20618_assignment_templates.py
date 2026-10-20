@@ -4,6 +4,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from docx import Document
+from docx.oxml.ns import qn
 
 from submission.assignment_generator import (SPECIAL_ASSIGNMENT_TEMPLATES,
                                              generate_assignment, generate_assignments)
@@ -32,6 +33,9 @@ class SpecialAssignmentTemplateTests(unittest.TestCase):
         general = Document(ASSIGNMENT_TEMPLATE)
         self.assertEqual([t._tbl.xml for t in inventor.tables],
                          [t._tbl.xml for t in general.tables[1:3]])
+        self.assertFalse(any(br.get(qn("w:type")) == "page"
+                             for p in inventor.paragraphs
+                             for br in p._p.findall(".//" + qn("w:br"))))
 
     def test_other_clients_still_use_general_template(self):
         fields = {
@@ -88,6 +92,12 @@ class SpecialAssignmentTemplateTests(unittest.TestCase):
             company_doc, company_text = doc_text(files[1]["file_path"])
             self.assertEqual(len(inventor_doc.tables), 3)
             self.assertEqual(len(company_doc.tables), 4)
+            self.assertFalse(any(br.get(qn("w:type")) == "page"
+                                 for p in inventor_doc.paragraphs
+                                 for br in p._p.findall(".//" + qn("w:br"))))
+            for table in inventor_doc.tables:
+                first_p = table.rows[0].cells[0].paragraphs[0]
+                self.assertIsNotNone(first_p._p.find(".//" + qn("w:pageBreakBefore")))
             self.assertGreater(len(inventor_doc.tables[0].rows), 5)  # 长地址续行
             self.assertEqual(len(inventor_doc.tables[0].columns), 3)
             self.assertIn("1 Very Long Main Street", inventor_doc.tables[0].rows[3].cells[-1].text)
