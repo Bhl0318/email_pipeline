@@ -304,7 +304,7 @@ def _fill_inventor_tables(doc, names, addr_lines, per_inventor_addresses=None,
 
 
 def _special_chain(fields):
-    """用本案母案/PCT 数据描述在先申请；不沿用样例文件中写死的申请链。"""
+    """按 20618 的 US 母案、PCT 与优先权层级生成 Assignment 在先申请叙述。"""
     def long_date(raw):
         value = str(raw or "").strip()
         for fmt in ("%Y-%m-%d", "%Y/%m/%d", "%Y.%m.%d"):
@@ -316,6 +316,9 @@ def _special_chain(fields):
         return value
 
     entries = []
+    route = (fields.get("filing_route") or "").strip().lower()
+    route_is_cip = route == "cip" or any(term in route for term in ("continuation in part", "continuation-in-part", "bypass cip", "by pass cip"))
+    route_is_371 = "371" in route or "国家阶段" in route
     parents = fields.get("parent_applications") or []
     # 确认函旧数据仅有 Application No（该页标注为“母案申请号”）；递交页新链有 Prior。
     # 只在整条链都没有 Prior 时回退，避免混合数据里把 This App 错当父案。
@@ -330,20 +333,18 @@ def _special_chain(fields):
             continue
         kind = (parent.get("Continuity Type") or "").strip().lower()
         if not kind:
-            route = (fields.get("filing_route") or "").strip().lower()
-            kind = route if any(word in route for word in ("continuation", "division", "371", "cip")) else "continuation of"
+            kind = route if route_is_cip or "continuation" in route or "division" in route else "continuation of"
         date = (parent.get("Filing Date") or "").strip()
         patent = (parent.get("Patent Number") or "").strip()
-        if "continuation in part" in kind or "continuation-in-part" in kind:
+        if "continuation in part" in kind or "continuation-in-part" in kind or "cip" in kind:
             relation = "a continuation-in-part of"
         elif "division" in kind:
             relation = "a divisional of"
-        elif "371" in kind:
-            relation = "a 371 national-stage entry of"
         elif "continuation" in kind:
             relation = "a continuation of"
         else:
-            relation = "related to"
+            # 美国母案的关系只有续案/部分续案/分案；371 属于 PCT 国家阶段。
+            relation = "a continuation of"
         if not entries and date:
             entry = f"{relation} U.S. application filed on {long_date(date)} (U.S. Application No. {no})"
         else:
@@ -355,18 +356,28 @@ def _special_chain(fields):
         entries.append(entry)
     advance = fields.get("case_advance_info") or {}
     pct_no = (advance.get("pct_app_no") or "").strip()
+    has_us_parent = bool(entries)
     if pct_no:
-        pct = f"International Patent Application No. {pct_no}"
-        if advance.get("pct_app_date"):
-            pct += f", filed on {long_date(advance['pct_app_date'])}"
-        route = (fields.get("filing_route") or "").lower()
-        if "371" in route or "国家阶段" in route:
-            pct_relation = "a 371 national-stage entry of"
-        elif not entries and ("continuation in part" in route or "continuation-in-part" in route or "cip" in route):
-            pct_relation = "a continuation-in-part of"
+        pct_date = long_date(advance.get("pct_app_date"))
+        if entries:
+            pct_entry = f"a continuation of International Patent Application No. {pct_no}"
+            if pct_date:
+                pct_entry += f", filed on {pct_date}"
+        elif route_is_371:
+            pct_entry = f"a 371 national-stage entry of International Patent Application No. {pct_no}"
+            if pct_date:
+                pct_entry += f", filed on {pct_date}"
+        elif route_is_cip:
+            pct_entry = "a Continuation-in-part of International Application"
+            if pct_date:
+                pct_entry += f" filed on {pct_date}"
+            pct_entry += f" (International Application No. {pct_no})"
         else:
-            pct_relation = "a continuation of"
-        entries.append(f"{pct_relation} {pct}")
+            pct_entry = "a Continuation of International application"
+            if pct_date:
+                pct_entry += f" filed on {pct_date}"
+            pct_entry += f" (International Application No. {pct_no})"
+        entries.append(pct_entry)
     priorities = []
     seen = set()
     for priority in fields.get("priorities") or []:
@@ -386,12 +397,18 @@ def _special_chain(fields):
         priorities.append(item)
     if not entries:
         if priorities:
-            return "for which priority is claimed to " + ", and to ".join(priorities) + "; and"
+            return "claiming priority to " + ", and ".join(priorities) + "; and"
         return "for which patent protection is sought; and"
     chain = "for which is " + ", which is ".join(entries)
     if priorities:
-        chain += "; which claims priority to " + priorities[0]
-        chain += "".join(", and claims priority to " + item for item in priorities[1:])
+        if has_us_parent or route_is_371:
+            chain += "; which claims priority to " + priorities[0]
+            chain += "".join(", and claims priority to " + item for item in priorities[1:])
+        else:
+            # PCT-CON / PCT-CIP：前句以逗号接 claiming priority to。
+            chain += ", claiming priority to " + priorities[0]
+            for i, item in enumerate(priorities[1:], 1):
+                chain += (", and " if i == len(priorities) - 1 else ", ") + item
     return chain + "; and"
 
 

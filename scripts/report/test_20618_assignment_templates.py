@@ -79,7 +79,7 @@ class SpecialAssignmentTemplateTests(unittest.TestCase):
         priority_only = _special_chain({"priorities": [{"priority_no": "202511280001.X",
                                                         "priority_country_id": "CN",
                                                         "priority_date": "2025-11-28"}]})
-        self.assertIn("priority is claimed to Chinese Patent Application No. 202511280001.X", priority_only)
+        self.assertIn("claiming priority to Chinese Patent Application No. 202511280001.X", priority_only)
 
     def test_us_pct_and_two_cn_priorities_use_customer_prose(self):
         chain = _special_chain({
@@ -111,14 +111,55 @@ class SpecialAssignmentTemplateTests(unittest.TestCase):
             "priorities": [{"priority_no": "18/123,456", "priority_country_id": "US",
                             "priority_date": "2023-03-22"}],
         }
-        for route, relation in (("Bypass Continuation", "a continuation of"),
-                                ("371 National Stage", "a 371 national-stage entry of")):
+        for route, relation in (("Bypass Continuation", "a Continuation of International application"),
+                                ("371 National Stage", "a 371 national-stage entry of International Patent Application")):
             with self.subTest(route=route):
                 fields["filing_route"] = route
                 chain = _special_chain(fields)
-                self.assertIn(f"for which is {relation} International Patent Application No. "
-                              "PCT/CN2024/123456", chain)
+                self.assertIn(f"for which is {relation}", chain)
+                self.assertIn("PCT/CN2024/123456", chain)
                 self.assertIn("U.S. Patent Application No. 18123456 filed on March 22, 2023", chain)
+
+    def test_customer_five_filing_routes(self):
+        cn = lambda no, day: {"priority_no": no, "priority_country_id": "CN", "priority_date": day}
+        pct = {"pct_app_no": "PCT/CN2023/081289", "pct_app_date": "2023-03-14"}
+        priority = cn("202211097238.1", "2022-09-08")
+
+        con = _special_chain({"filing_route": "Bypass Continuation", "case_advance_info": pct,
+                              "priorities": [priority]})
+        self.assertEqual(con,
+            "for which is a Continuation of International application filed on March 14, 2023 "
+            "(International Application No. PCT/CN2023/081289), claiming priority to Chinese "
+            "Patent Application No. 202211097238.1 filed on September 8, 2022; and")
+        self.assertEqual(_special_chain({"filing_route": "Bypass Continuation", "case_advance_info": pct}),
+            "for which is a Continuation of International application filed on March 14, 2023 "
+            "(International Application No. PCT/CN2023/081289); and")
+
+        cip = _special_chain({"filing_route": "Bypass CIP", "case_advance_info": pct,
+                              "priorities": [cn("202311832487.5", "2023-12-27"),
+                                             cn("202210688095.5", "2022-06-17"),
+                                             cn("202210689642.1", "2022-06-17")]})
+        self.assertEqual(cip,
+            "for which is a Continuation-in-part of International Application filed on March 14, 2023 "
+            "(International Application No. PCT/CN2023/081289), claiming priority to Chinese "
+            "Patent Application No. 202311832487.5 filed on December 27, 2023, Chinese Patent "
+            "Application No. 202210688095.5 filed on June 17, 2022, and Chinese Patent "
+            "Application No. 202210689642.1 filed on June 17, 2022; and")
+
+        paris = _special_chain({"filing_route": "Paris", "priorities": [cn("202511106870.1", "2025-08-07")]})
+        self.assertEqual(paris, "claiming priority to Chinese Patent Application No. 202511106870.1 "
+                         "filed on August 7, 2025; and")
+
+        stage = _special_chain({"filing_route": "371", "case_advance_info": pct,
+                                "priorities": [priority, cn("202422933118.1", "2024-11-28")]})
+        self.assertEqual(stage,
+            "for which is a 371 national-stage entry of International Patent Application No. "
+            "PCT/CN2023/081289, filed on March 14, 2023; which claims priority to Chinese "
+            "Patent Application No. 202211097238.1 filed on September 8, 2022, and claims priority "
+            "to Chinese Patent Application No. 202422933118.1 filed on November 28, 2024; and")
+        self.assertEqual(_special_chain({"filing_route": "371", "case_advance_info": pct}),
+            "for which is a 371 national-stage entry of International Patent Application No. "
+            "PCT/CN2023/081289, filed on March 14, 2023; and")
 
     def test_special_templates_keep_customer_wording_and_signature_layout(self):
         for template in SPECIAL_ASSIGNMENT_TEMPLATES.values():
