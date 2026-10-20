@@ -7,6 +7,7 @@ from docx import Document
 
 from submission.assignment_generator import (SPECIAL_ASSIGNMENT_TEMPLATES,
                                              generate_assignment, generate_assignments)
+from submission.common import ASSIGNMENT_TEMPLATE
 
 
 def doc_text(path):
@@ -27,6 +28,10 @@ class SpecialAssignmentTemplateTests(unittest.TestCase):
         company = Document(SPECIAL_ASSIGNMENT_TEMPLATES["公司转公司"])
         self.assertEqual(company.tables[0].rows[0].cells[0].text, "Assignor")
         self.assertEqual(company.tables[0].rows[0].cells[-1].text, "{{ASSIGNOR}}")
+        inventor = Document(SPECIAL_ASSIGNMENT_TEMPLATES["个人转公司"])
+        general = Document(ASSIGNMENT_TEMPLATE)
+        self.assertEqual([t._tbl.xml for t in inventor.tables],
+                         [t._tbl.xml for t in general.tables[1:3]])
 
     def test_other_clients_still_use_general_template(self):
         fields = {
@@ -84,6 +89,9 @@ class SpecialAssignmentTemplateTests(unittest.TestCase):
             self.assertEqual(len(inventor_doc.tables), 3)
             self.assertEqual(len(company_doc.tables), 4)
             self.assertGreater(len(inventor_doc.tables[0].rows), 5)  # 长地址续行
+            self.assertEqual(len(inventor_doc.tables[0].columns), 3)
+            self.assertIn("1 Very Long Main Street", inventor_doc.tables[0].rows[3].cells[-1].text)
+            self.assertIn("2 Test Street", "\n".join(c.text for r in inventor_doc.tables[1].rows for c in r.cells))
             self.assertEqual(company_doc.tables[0].rows[0].cells[-1].text, "AMERICA HOLDINGS INC.")
             self.assertIn("for which is a continuation of", inventor_text)
             self.assertIn("for which is a continuation of", company_text)
@@ -98,6 +106,12 @@ class SpecialAssignmentTemplateTests(unittest.TestCase):
                     self.assertNotIn(old, text)
             self.assertIn("SMITH, Test", inventor_text)
             self.assertIn("ALEX WU", company_text)
+
+            single = generate_assignment(fields, {"assignment_type": "个人转公司",
+                                                  "assignor_inventors": ["SMITH, Test"],
+                                                  "assignee": "NEW MEDICAL CORP."}, Path(folder) / "single")
+            single_doc, _ = doc_text(single["file_path"])
+            self.assertEqual(len(single_doc.tables), 1)
 
 
 if __name__ == "__main__":

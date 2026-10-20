@@ -6,7 +6,7 @@
 - 按 assignments 数组逐份生成（一段转让一份文件，支持转让链多段）
 - 模板分区删除按页标记定位（个人转公司转让人页 / 公司转公司转让人页 / 公司转公司受让人页），
   不再用硬编码段落索引
-- 20618 客户按转让类型使用专用正文及签字表；Mailing Address 沿用通用模板的拆行规则
+- 20618 客户保留专用正文；个人转公司签字表采用通用版，公司转公司签字表保留专用版
 """
 import copy
 import re
@@ -247,7 +247,7 @@ def _set_page_break_before_table(table):
         pPr.insert(0, OxmlElement('w:pageBreakBefore'))
 
 
-def _fill_inventor_tables(doc, names, addr_lines):
+def _fill_inventor_tables(doc, names, addr_lines, per_inventor_addresses=None):
     """个人转公司：按序把发明人填入签字表（含"发明人打印版名字"占位的表）。
 
     发明人数超过模板签字表数时，克隆最后一个签字表（连同其前的空行间隔）补足，
@@ -255,10 +255,6 @@ def _fill_inventor_tables(doc, names, addr_lines):
     addr_lines 为地址多行列表：地址1/地址2 填前两行，超 2 行则克隆地址2行补足。
     返回 (填入发明人数, 克隆补足的签字表数)。
     """
-    line1 = addr_lines[0] if addr_lines else ""
-    line2 = addr_lines[1] if len(addr_lines) > 1 else ""
-    extra = addr_lines[2:] if len(addr_lines) > 2 else []
-
     inventor_tables = _inventor_signature_tables(doc)
     added = 0
     if inventor_tables and len(names) > len(inventor_tables):
@@ -277,7 +273,11 @@ def _fill_inventor_tables(doc, names, addr_lines):
         inventor_tables = _inventor_signature_tables(doc)  # 重新收集（含克隆）
 
     filled = 0
-    for name, table in zip(names, inventor_tables):
+    for index, (name, table) in enumerate(zip(names, inventor_tables)):
+        lines = per_inventor_addresses[index] if per_inventor_addresses is not None else addr_lines
+        line1 = lines[0] if lines else ""
+        line2 = lines[1] if len(lines) > 1 else ""
+        extra = lines[2:]
         addr2_row = None
         for row in table.rows:
             for cell in row.cells:
@@ -430,25 +430,15 @@ def _generate_special_assignment(fields, assignment, output_dir, seq, total, nam
         if not names:
             raise ValueError("20618 个人转公司 Assignment 缺少发明人")
         common["{{I_WE}}"] = "I" if len(names) == 1 else "WE"
-        tables = list(doc.tables)
-        while len(tables) < len(names):
-            tables[-1]._tbl.addnext(copy.deepcopy(tables[-1]._tbl))
-            tables = list(doc.tables)
-        for table in tables[len(names):]:
-            table._tbl.getparent().remove(table._tbl)
-        for idx, (table, name) in enumerate(zip(doc.tables, names)):
+        inventor_addresses = []
+        for name in names:
             lines, fallback = _special_inventor_address(fields, name, assignee)
             if fallback:
                 warnings.append(f"发明人 {name} 缺少独立住址，Assignment 暂用受让人地址，请核对")
-            for old, new in (("{{INVENTOR}}", name),):
-                for row in table.rows:
-                    for cell in row.cells:
-                        for paragraph in cell.paragraphs:
-                            _replace_in_paragraph(paragraph, old, new)
-            _fill_special_address(table, "{{INVENTOR_ADDRESS_1}}",
-                                  "{{INVENTOR_ADDRESS_2}}", lines)
-            if idx:
-                _set_page_break_before_table(table)
+            inventor_addresses.append(lines)
+        _fill_inventor_tables(doc, names, [], per_inventor_addresses=inventor_addresses)
+        for table in _inventor_signature_tables(doc):
+            table._tbl.getparent().remove(table._tbl)
     for old, new in common.items():
         _replace_everywhere(doc, old, new)
     remaining = "\n".join([p.text for p in doc.paragraphs] +
