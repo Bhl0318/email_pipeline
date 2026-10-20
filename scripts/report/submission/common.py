@@ -306,10 +306,11 @@ def _norm_company(s: str) -> str:
     return re.sub(r"[^0-9a-z]+", "", (s or "").lower())
 
 
-def resolve_assignee(fields: dict, name: str) -> dict:
+def resolve_assignee(fields: dict, name: str, *, prefer_employer_residence: bool = False) -> dict:
     """按受让人名字在 applicants 里匹配取地址（归一化：去空格/大小写/标点）。
 
-    匹配优先级：①applicants 里同名申请人取其地址；②转让链中间公司——applicants 里没有、
+    匹配优先级：①applicants 里同名申请人取其地址；个人转归属公司 Assignment 可指定
+    优先使用 employer_info 中独立编辑的 residence_en；②转让链中间公司——applicants 里没有、
     但有 公司转公司 段的 assigning_company == 该名字，则用该段 company_address 取地址
     （发明人先转给自己公司 B、B 再转申请人时，X→B 这份的受让人 B 地址来源）；
     ③都没有，名称仍用传入名（多公司各段名字保持各异）、地址回退首位申请人并标 matched=False。
@@ -322,6 +323,15 @@ def resolve_assignee(fields: dict, name: str) -> dict:
                 res = _assignee_from_applicant(a)
                 res["matched"] = True
                 return res
+        if prefer_employer_residence:
+            for employer, info in (fields.get("employer_info") or {}).items():
+                if key not in (_norm_company(employer), _norm_company((info or {}).get("applicant_name_en"))):
+                    continue
+                full = ((info or {}).get("residence_en") or "").strip()
+                if full:
+                    res = _assignee_from_company_address(name, full)
+                    res["matched"] = True
+                    return res
         # 转让链中间公司：地址在 公司转公司 段（结构化 company_* 或旧单串 company_address）
         for asg in fields.get("assignments") or []:
             if asg.get("assignment_type") != "公司转公司" or _norm_company(asg.get("assigning_company")) != key:
@@ -403,7 +413,7 @@ def effective_assignments(fields: dict):
             assignee = emp
             if _norm_company(emp) not in applicant_keys:
                 if _norm_company(emp) in bridge_keys:
-                    pass  # 转让链完整：X→B(本段) + B→申请人(公司转公司段)；B 地址由 resolve_assignee 从 company_address 取
+                    pass  # 转让链完整：X→B + B→申请人；X→B 优先用 B 的独立完整住址
                 else:
                     warnings.append(f"转让链断裂：发明人归属公司「{emp}」不在申请人中，且无「公司转公司」段将其转给申请人。"
                                     f"请补一段公司转公司（{emp}→申请人），或确认该发明人可直接转让给申请人。")

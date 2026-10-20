@@ -475,7 +475,8 @@ def _generate_special_assignment(fields, assignment, output_dir, seq, total, nam
     doc = Document(str(template))
     case_no = fields.get("case_volume") or ""
     title = ((fields.get("case_info") or {}).get("case_name_en") or "").upper()
-    assignee = resolve_assignee(fields, (assignment.get("assignee") or "").strip())
+    assignee = resolve_assignee(fields, (assignment.get("assignee") or "").strip(),
+                                prefer_employer_residence=kind == "个人转公司")
     warnings = []
     if assignment.get("assignee") and not assignee.get("matched"):
         warnings.append(f"受让人「{assignee['name']}」未匹配到申请人或转让链公司，地址使用首位申请人，请核对")
@@ -564,7 +565,8 @@ def generate_assignment(fields: dict, assignment: dict, output_dir, seq: int = 1
     title = ((fields.get("case_info") or {}).get("case_name_en") or "").upper()  # 申请名称全部大写
     # 受让人按本段 assignee 名字解析（匹配不到回退首位申请人并告警）
     seg_assignee_name = (assignment.get("assignee") or "").strip()
-    assignee = resolve_assignee(fields, seg_assignee_name)
+    assignee = resolve_assignee(fields, seg_assignee_name,
+                                prefer_employer_residence=assignment_type == "个人转公司")
     if seg_assignee_name and not assignee.get("matched"):
         warnings.append(f"受让人「{seg_assignee_name}」未匹配到申请人，已回退首位申请人「{assignee['name']}」")
     # 发明人按本段 assignor_inventors 子集（缺省时兜底全体，兼容存量数据）

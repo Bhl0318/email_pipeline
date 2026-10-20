@@ -21,6 +21,28 @@ def doc_text(path):
 
 
 class SpecialAssignmentTemplateTests(unittest.TestCase):
+    def test_inventor_to_nonapplicant_employer_uses_full_residence(self):
+        fields = {
+            "case_volume": "20618-0001US00", "application_type": "发明",
+            "case_info": {"case_name_en": "A MEDICAL DEVICE"},
+            "applicants": [{"applicant_name_en": "APPLICANT CO.", "address1": "Applicant Road"}],
+            "inventors": [{"last_name_en": "LI", "first_name_en": "Alice",
+                           "employer": "EMPLOYER CO., LTD."}],
+            "employer_info": {"EMPLOYER CO., LTD": {
+                "residence_en": "Full Employer Headquarters, No. 18 New Road, Shanghai, China"}},
+            "assignments": [{"assignment_type": "公司转公司",
+                             "assigning_company": "EMPLOYER CO., LTD.",
+                             "company_address1": "Old Structured Address",
+                             "assignee": "APPLICANT CO."}],
+        }
+        with tempfile.TemporaryDirectory() as folder:
+            result = generate_assignment(fields, {
+                "assignment_type": "个人转公司", "assignee": "EMPLOYER CO., LTD.",
+                "assignor_inventors": ["LI, Alice"]}, folder)
+            _, generated_text = doc_text(result["file_path"])
+            self.assertIn("Full Employer Headquarters", generated_text)
+            self.assertNotIn("Old Structured Address", generated_text)
+
     def test_narrow_signature_address_wraps_before_headquarters(self):
         fields = {
             "case_volume": "20618-9999US00", "application_type": "发明",
