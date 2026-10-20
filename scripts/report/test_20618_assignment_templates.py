@@ -7,8 +7,6 @@ from docx import Document
 
 from submission.assignment_generator import (SPECIAL_ASSIGNMENT_TEMPLATES,
                                              generate_assignment, generate_assignments)
-from submission.common import _assignee_from_applicant
-from submission.common import ASSIGNMENT_TEMPLATE
 
 
 def doc_text(path):
@@ -20,13 +18,15 @@ def doc_text(path):
 
 
 class SpecialAssignmentTemplateTests(unittest.TestCase):
-    def test_special_templates_keep_general_signature_table_layout(self):
-        general = Document(ASSIGNMENT_TEMPLATE)
-        expected = [table._tbl.xml for table in general.tables]
+    def test_special_templates_keep_customer_wording_and_signature_layout(self):
         for template in SPECIAL_ASSIGNMENT_TEMPLATES.values():
             with self.subTest(template=template.name):
                 doc = Document(template)
-                self.assertEqual([table._tbl.xml for table in doc.tables], expected)
+                self.assertIn("{{APPLICATION_CHAIN}}", "\n".join(p.text for p in doc.paragraphs))
+                self.assertNotIn("Application Number", "\n".join(c.text for t in doc.tables for r in t.rows for c in r.cells))
+        company = Document(SPECIAL_ASSIGNMENT_TEMPLATES["公司转公司"])
+        self.assertEqual(company.tables[0].rows[0].cells[0].text, "Assignor")
+        self.assertEqual(company.tables[0].rows[0].cells[-1].text, "{{ASSIGNOR}}")
 
     def test_other_clients_still_use_general_template(self):
         fields = {
@@ -54,10 +54,12 @@ class SpecialAssignmentTemplateTests(unittest.TestCase):
                             "country_en_us": "US"}],
             "inventors": [{"last_name_en": name, "first_name_en": "Test",
                            "employer": "NEW MEDICAL CORP.",
-                           "residence_en": f"{idx} Test Street, Boston, US"}
+                           "residence_en": ("1 Very Long Main Street, Building 123, Industrial Development Zone, "
+                                            "45 Riverside Avenue, Suite 321, Boston, Massachusetts 02101, US")
+                           if idx == 1 else f"{idx} Test Street, Boston, US"}
                           for idx, name in enumerate(("SMITH", "LEE", "KIM"), 1)],
             "assignments": [{"assignment_type": "公司转公司",
-                             "assigning_company": "NEW MEDICAL CORP.",
+                             "assigning_company": "AMERICA HOLDINGS INC.",
                              "company_representative": "ALEX WU",
                              "representative_title": "CEO",
                              "company_address1": "100 Main Street",
@@ -79,24 +81,16 @@ class SpecialAssignmentTemplateTests(unittest.TestCase):
             self.assertEqual(len(files), 2)
             inventor_doc, inventor_text = doc_text(files[0]["file_path"])
             company_doc, company_text = doc_text(files[1]["file_path"])
-            self.assertEqual(len(inventor_doc.tables), 4)  # 优先权表 + 3 个通用模板签字表
+            self.assertEqual(len(inventor_doc.tables), 3)
             self.assertEqual(len(company_doc.tables), 4)
-            address_lines = _assignee_from_applicant(fields["applicants"][0])["address_lines"]
-            self.assertGreater(len(address_lines), 2)
-            for line in address_lines:
-                self.assertIn(line, inventor_text)
-            # 同一份数据走通用模板，生成后的地址续行和签字表也应逐项相同。
-            with patch("submission.assignment_generator.is_special_client", return_value=False):
-                generic_inventor = generate_assignment(
-                    fields, {"assignment_type": "个人转公司", "assignee": "NEW MEDICAL CORP."},
-                    Path(folder) / "generic")
-            generic_doc = Document(generic_inventor["file_path"])
-            self.assertEqual([t._tbl.xml for t in inventor_doc.tables],
-                             [t._tbl.xml for t in generic_doc.tables])
+            self.assertGreater(len(inventor_doc.tables[0].rows), 5)  # 长地址续行
+            self.assertEqual(company_doc.tables[0].rows[0].cells[-1].text, "AMERICA HOLDINGS INC.")
+            self.assertIn("for which is a continuation of", inventor_text)
+            self.assertIn("for which is a continuation of", company_text)
             for text in (inventor_text, company_text):
                 self.assertIn("20618-9999US00", text)
                 self.assertIn("A NEW MEDICAL DEVICE", text)
-                self.assertIn("18/123,456", text)
+                self.assertIn("U.S. Patent Application No. 18/123,456", text)
                 self.assertIn("PCT/CN2023/987654", text)
                 self.assertNotIn("{{", text)
                 for old in ("20618-0168US04", "SHANGHAI UNITED", "UNITED IMAGING",

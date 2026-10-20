@@ -6,7 +6,7 @@
 - 按 assignments 数组逐份生成（一段转让一份文件，支持转让链多段）
 - 模板分区删除按页标记定位（个人转公司转让人页 / 公司转公司转让人页 / 公司转公司受让人页），
   不再用硬编码段落索引
-- 20618 客户按转让类型选择专用模板；签字区与 Mailing Address 沿用通用模板版式和填充规则
+- 20618 客户按转让类型使用专用正文及签字表；Mailing Address 沿用通用模板的拆行规则
 """
 import copy
 import re
@@ -27,6 +27,9 @@ from .common import (
     application_type_words,
     build_priority_rows,
     effective_assignments,
+    format_inventor_name,
+    full_mailing_address_en,
+    address_lines,
     get_assignee,
     inventor_names,
     is_special_client,
@@ -298,6 +301,170 @@ def _fill_inventor_tables(doc, names, addr_lines):
     return filled, added
 
 
+def _special_chain(fields):
+    """用本案母案/PCT 数据描述在先申请；不沿用样例文件中写死的申请链。"""
+    entries = []
+    for parent in fields.get("parent_applications") or []:
+        # Application No 是本段申请号，不能在 Prior 为空时冒充在先申请号。
+        no = (parent.get("Prior Application Number") or "").strip()
+        if not no:
+            continue
+        kind = (parent.get("Continuity Type") or "continuation of").strip().lower()
+        date = (parent.get("Filing Date") or "").strip()
+        patent = (parent.get("Patent Number") or "").strip()
+        if "continuation in part" in kind or "continuation-in-part" in kind:
+            relation = "a continuation-in-part of"
+        elif "division" in kind:
+            relation = "a divisional of"
+        elif "371" in kind:
+            relation = "a 371 national-stage entry of"
+        elif "continuation" in kind:
+            relation = "a continuation of"
+        else:
+            relation = "related to"
+        entry = f"{relation} U.S. Patent Application No. {no}"
+        if date:
+            entry += f", filed on {date}"
+        if patent:
+            entry += f" (now Patent No. {patent})"
+        entries.append(entry)
+    advance = fields.get("case_advance_info") or {}
+    pct_no = (advance.get("pct_app_no") or "").strip()
+    if pct_no:
+        pct = f"International Patent Application No. {pct_no}"
+        if advance.get("pct_app_date"):
+            pct += f", filed on {advance['pct_app_date']}"
+        route = (fields.get("filing_route") or "").lower()
+        if "371" in route or "国家阶段" in route:
+            pct_relation = "a 371 national-stage entry of"
+        elif "continuation in part" in route or "continuation-in-part" in route or "cip" in route:
+            pct_relation = "a continuation-in-part of"
+        else:
+            pct_relation = "a continuation of"
+        entries.append(f"{pct_relation} {pct}")
+    if not entries:
+        return "for which patent protection is sought; and"
+    return "for which is " + ", which is ".join(entries) + "; and"
+
+
+def _fill_special_address(table, first_key, second_key, lines):
+    """保留 20618 原签字表，仅按通用 Assignment 的地址行规则续行。"""
+    line1 = lines[0] if lines else ""
+    line2 = lines[1] if len(lines) > 1 else ""
+    second_row = None
+    for row in table.rows:
+        for cell in row.cells:
+            if first_key in cell.text:
+                cell.text = cell.text.replace(first_key, line1)
+            if second_key in cell.text:
+                cell.text = cell.text.replace(second_key, line2)
+                cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.BOTTOM
+                second_row = row
+    if second_row is not None and len(lines) > 2:
+        _clone_address_rows(table, second_row, lines[2:])
+
+
+def _special_inventor_address(fields, name, assignee):
+    """先取发明人独立住址，再取雇主住址；缺失时回退受让人地址并告警。"""
+    for inventor in fields.get("inventors") or []:
+        if re.sub(r"\W", "", format_inventor_name(inventor)).lower() != re.sub(r"\W", "", name).lower():
+            continue
+        residence = (inventor.get("residence_en") or "").strip()
+        if residence:
+            lines = address_lines(residence, "")
+            return lines, False
+        employer = (inventor.get("employer") or "").strip()
+        for key, info in (fields.get("employer_info") or {}).items():
+            if re.sub(r"\W", "", key).lower() == re.sub(r"\W", "", employer).lower():
+                residence = (info.get("residence_en") or "").strip()
+                if residence:
+                    lines = address_lines(residence, "")
+                    return lines, False
+        if (inventor.get("address1") or "").strip():
+            lines = address_lines(inventor.get("address1"), inventor.get("address2"))
+            return lines, False
+    return assignee["address_lines"], True
+
+
+def _generate_special_assignment(fields, assignment, output_dir, seq, total, name_tag):
+    """20618 专用模板：个人/公司转让分别填充，不复用样例案件的固定内容。"""
+    kind = assignment["assignment_type"]
+    template = SPECIAL_ASSIGNMENT_TEMPLATES[kind]
+    if not template.is_file():
+        raise FileNotFoundError(f"20618 Assignment 模板不存在：{template}")
+    doc = Document(str(template))
+    case_no = fields.get("case_volume") or ""
+    title = ((fields.get("case_info") or {}).get("case_name_en") or "").upper()
+    assignee = resolve_assignee(fields, (assignment.get("assignee") or "").strip())
+    warnings = []
+    if assignment.get("assignee") and not assignee.get("matched"):
+        warnings.append(f"受让人「{assignee['name']}」未匹配到申请人或转让链公司，地址使用首位申请人，请核对")
+    common = {
+        "{{CASE_NO}}": case_no, "{{TITLE}}": title,
+        "{{APPLICATION_CHAIN}}": _special_chain(fields),
+        "{{ASSIGNEE}}": assignee["name"],
+        "{{ASSIGNEE_ADDRESS}}": full_mailing_address_en(
+            next((a for a in fields.get("applicants") or []
+                  if (a.get("applicant_name_en") or "").strip().lower() == assignee["name"].lower()), {})
+        ) or ", ".join(assignee["address_lines"]),
+    }
+    if kind == "公司转公司":
+        assignor = _assignee_from_applicant(company_addr_dict(assignment))
+        assignor_name = (assignment.get("assigning_company") or "").strip()
+        common.update({
+            "{{ASSIGNOR}}": assignor_name,
+            "{{ASSIGNOR_ADDRESS}}": full_mailing_address_en(company_addr_dict(assignment)) or
+                ", ".join(assignor["address_lines"]),
+            "{{ASSIGNOR_REP}}": assignment.get("company_representative") or "",
+            "{{ASSIGNOR_TITLE}}": assignment.get("representative_title") or "",
+            "{{ASSIGNEE_REP}}": assignment.get("assignee_representative") or "",
+            "{{ASSIGNEE_TITLE}}": assignment.get("assignee_representative_title") or "",
+        })
+        _fill_special_address(doc.tables[0], "{{ASSIGNOR_ADDRESS_1}}",
+                              "{{ASSIGNOR_ADDRESS_2}}", assignor["address_lines"])
+        _fill_special_address(doc.tables[2], "{{ASSIGNEE_ADDRESS_1}}",
+                              "{{ASSIGNEE_ADDRESS_2}}", assignee["address_lines"])
+    else:
+        names = [str(n).strip() for n in assignment.get("assignor_inventors") or [] if str(n).strip()]
+        names = names or inventor_names(fields)
+        if not names:
+            raise ValueError("20618 个人转公司 Assignment 缺少发明人")
+        common["{{I_WE}}"] = "I" if len(names) == 1 else "WE"
+        tables = list(doc.tables)
+        while len(tables) < len(names):
+            tables[-1]._tbl.addnext(copy.deepcopy(tables[-1]._tbl))
+            tables = list(doc.tables)
+        for table in tables[len(names):]:
+            table._tbl.getparent().remove(table._tbl)
+        for idx, (table, name) in enumerate(zip(doc.tables, names)):
+            lines, fallback = _special_inventor_address(fields, name, assignee)
+            if fallback:
+                warnings.append(f"发明人 {name} 缺少独立住址，Assignment 暂用受让人地址，请核对")
+            for old, new in (("{{INVENTOR}}", name),):
+                for row in table.rows:
+                    for cell in row.cells:
+                        for paragraph in cell.paragraphs:
+                            _replace_in_paragraph(paragraph, old, new)
+            _fill_special_address(table, "{{INVENTOR_ADDRESS_1}}",
+                                  "{{INVENTOR_ADDRESS_2}}", lines)
+            if idx:
+                _set_page_break_before_table(table)
+    for old, new in common.items():
+        _replace_everywhere(doc, old, new)
+    remaining = "\n".join([p.text for p in doc.paragraphs] +
+                          [c.text for t in doc.tables for r in t.rows for c in r.cells] +
+                          [p.text for section in doc.sections for p in section.header.paragraphs])
+    if re.search(r"\{\{[^}]+\}\}", remaining):
+        raise ValueError("20618 Assignment 尚有未填模板字段")
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    file_name = (f"{datetime.now():%Y-%m-%d}-Assignment-{case_no}"
+                 + (f"-{seq}-{name_tag or kind}" if total > 1 else "") + ".docx")
+    file_path = output_dir / file_name
+    doc.save(str(file_path))
+    return {"file_path": str(file_path), "file_name": file_name, "warnings": warnings}
+
+
 # ─── 主入口 ──────────────────────────────────────────────
 
 def generate_assignment(fields: dict, assignment: dict, output_dir, seq: int = 1,
@@ -316,10 +483,10 @@ def generate_assignment(fields: dict, assignment: dict, output_dir, seq: int = 1
     assignment_type = assignment.get("assignment_type") or ""
     if assignment_type not in ("个人转公司", "公司转公司"):
         raise ValueError(f"assignment_type 非法：{assignment_type!r}")
-    special = is_special_client(fields.get("case_volume") or "")
-    template = SPECIAL_ASSIGNMENT_TEMPLATES[assignment_type] if special else ASSIGNMENT_TEMPLATE
-    if not template.exists():
-        raise RuntimeError(f"缺少模板 {template}")
+    if is_special_client(fields.get("case_volume") or ""):
+        return _generate_special_assignment(fields, assignment, output_dir, seq, total, name_tag)
+    if not ASSIGNMENT_TEMPLATE.exists():
+        raise RuntimeError(f"缺少模板 {ASSIGNMENT_TEMPLATE}")
 
     warnings = []
     case_volume = fields.get("case_volume") or ""
@@ -333,10 +500,11 @@ def generate_assignment(fields: dict, assignment: dict, output_dir, seq: int = 1
     seg_inventors = [str(n).strip() for n in (assignment.get("assignor_inventors") or []) if str(n).strip()]
     names = seg_inventors or inventor_names(fields)
     app_type_eng, confirm_type = application_type_words(fields.get("application_type") or "")
+    special = False
     today = datetime.now()
     today_dot = today.strftime("%Y.%m.%d")
 
-    doc = Document(str(template))
+    doc = Document(str(ASSIGNMENT_TEMPLATE))
 
     # 1. 页眉案号
     for section in doc.sections:
@@ -370,8 +538,6 @@ def generate_assignment(fields: dict, assignment: dict, output_dir, seq: int = 1
     _replace_everywhere(doc, "个人或公司", assignee["name"])
     _replace_everywhere(doc, "确认类型", confirm_type)
     _replace_everywhere(doc, "申请类型", app_type_eng)
-    if special:
-        _replace_everywhere(doc, "{{ASSIGNEE_ADDRESS}}", " ".join(assignee["address_lines"]))
 
     # 5. 优先权表（优先权 + PCT + 美国母案链）
     _fill_priority_table(doc, build_priority_rows(fields))
@@ -386,8 +552,6 @@ def generate_assignment(fields: dict, assignment: dict, output_dir, seq: int = 1
     else:
         # 公司地址：结构化 company_* 六字段拼全址拆 2 行（同申请人）；缺省回退旧单串
         company_addr = _assignee_from_applicant(company_addr_dict(assignment))
-        if special:
-            _replace_everywhere(doc, "{{ASSIGNOR_ADDRESS}}", " ".join(company_addr["address_lines"]))
         _replace_everywhere(doc, "转让公司名称", assignment.get("assigning_company") or "")
         _replace_everywhere(doc, "转让公司代表打印版名字", assignment.get("company_representative") or "")
         _replace_everywhere(doc, "转让公司代表职位", assignment.get("representative_title") or "")
@@ -411,11 +575,6 @@ def generate_assignment(fields: dict, assignment: dict, output_dir, seq: int = 1
     _remove_chinese_tables(doc)
     _remove_chinese_paragraphs(doc)
     _cleanup_blank_paragraphs(doc)
-    if special:
-        unresolved = "\n".join([p.text for p in doc.paragraphs] +
-                               [c.text for t in doc.tables for row in t.rows for c in row.cells])
-        if re.search(r"\{\{[^}]+\}\}", unresolved):
-            raise ValueError("20618 Assignment 模板仍有未填充字段")
 
     # 9. 保存
     output_dir = Path(output_dir)
