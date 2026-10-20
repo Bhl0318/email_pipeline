@@ -154,6 +154,11 @@ def _resolve_oa_action(region, ntype, project, item):
         rule = type_rules.get("其他")
     return rule
 
+
+def _resolve_oa_no_report_action(region, project):
+    """无汇报信模板或规则为 ignore 时，查地区下的 * 兜底转发规则。"""
+    return _load_oa_rules().get(region, {}).get("*", {}).get((project or "")[:5])
+
 # USPTO Document Type 代码 → 英文全名（用于汇报信"官文英文名称"字段）
 US_DOC_TYPE_FULLNAME = {
     "CTNF":         "Non-Final Office Action",
@@ -1105,6 +1110,25 @@ def dispatch_report(all_results, all_emails, dry_run=False):
     all_review_links = []  # 收集所有审核链接，最后统一发一封通知邮件
     report_actions = []    # 本次汇报信动作 [{message_id, project, action}]，供 main.py 汇总写邮件动作页
 
+    def forward_skipped(item, project, ntype, action):
+        fwd = action.get("forward") or {}
+        fwd_to = _resolve_forward_targets(fwd.get("to"), project)
+        fwd_cc = _resolve_forward_targets(fwd.get("cc"), project)
+        print(f"  [规则-skip] {project} {ntype} 不分配汇报信，转发 to={fwd_to} cc={fwd_cc}", file=sys.stderr)
+        if fwd_to:
+            report_actions.append({"message_id": item.get("message_id", ""),
+                                   "project": project, "action": "转发原始",
+                                   "reason": f"OA规则表skip不分配汇报信→转发原始官文({ntype})"})
+        if not dry_run and fwd_to and _fwd_pa_cfg:
+            em = msgid_to_email.get(item.get("message_id", ""))
+            _forward_official_email(
+                _fwd_pa_cfg,
+                em.get("raw_bytes") if em else None,
+                (em.get("subject") if em else "") or item.get("email_subject") or ntype,
+                fwd_to, fwd_cc)
+        elif not fwd_to:
+            print(f"  [转发跳过] {project} {ntype} 未解析到接口人/转发地址", file=sys.stderr)
+
     # 写入 TIP 系统（projects 表）
     if all_results:
         from db_query import execute as db_execute
@@ -1162,6 +1186,8 @@ def dispatch_report(all_results, all_emails, dry_run=False):
             preparer_override = None
             if tpl_info:
                 action = _resolve_oa_action(region, ntype, project, item)
+                if action and action.get("action") == "ignore":
+                    action = _resolve_oa_no_report_action(region, project) or action
                 if action is None:
                     # 不在 OA 规则表 → 回退旧逻辑：CN 5 开头跳过
                     if region == "CN" and project.startswith("5"):
@@ -1172,23 +1198,7 @@ def dispatch_report(all_results, all_emails, dry_run=False):
                     if act == "ignore":
                         tpl_info = None
                     elif act == "skip":
-                        fwd = action.get("forward") or {}
-                        fwd_to = _resolve_forward_targets(fwd.get("to"), project)
-                        fwd_cc = _resolve_forward_targets(fwd.get("cc"), project)
-                        print(f"  [规则-skip] {project} {ntype} 不分配汇报信，转发 to={fwd_to} cc={fwd_cc}", file=sys.stderr)
-                        if fwd_to:   # 解析到转发地址才算「转发原始」动作
-                            report_actions.append({"message_id": item.get("message_id", ""),
-                                                   "project": project, "action": "转发原始",
-                                                   "reason": f"OA规则表skip不分配汇报信→转发接口人({ntype})"})
-                        if not dry_run and fwd_to and _fwd_pa_cfg:
-                            em = msgid_to_email.get(item.get("message_id", ""))
-                            _forward_official_email(
-                                _fwd_pa_cfg,
-                                em.get("raw_bytes") if em else None,
-                                (em.get("subject") if em else "") or item.get("email_subject") or ntype,
-                                fwd_to, fwd_cc)
-                        elif not fwd_to:
-                            print(f"  [转发跳过] {project} {ntype} 未解析到接口人/转发地址", file=sys.stderr)
+                        forward_skipped(item, project, ntype, action)
                         tpl_info = None
                     elif act == "assign":
                         preparer_override = action.get("preparer")
@@ -1205,6 +1215,11 @@ def dispatch_report(all_results, all_emails, dry_run=False):
                                     em.get("raw_bytes") if em else None,
                                     (em.get("subject") if em else "") or item.get("email_subject") or ntype,
                                     af_to, af_cc)
+            else:
+                # 已识别官文但没有汇报信模板：仅命中 * 兜底规则的客户转发原邮件。
+                no_report_action = _resolve_oa_no_report_action(region, project)
+                if no_report_action and no_report_action.get("action") == "skip":
+                    forward_skipped(item, project, ntype, no_report_action)
             if tpl_info:
                 report_actions.append({"message_id": item.get("message_id", ""),
                                        "project": project, "action": "分配汇报信",

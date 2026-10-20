@@ -4,6 +4,7 @@
     "客户判定": "客户码=代理所案号前5位；'5开头'=首位为5；'其他'=未列出的客户码（兜底）",
     "审查意见次数": "CN 审查意见按系统抽出的 N 拆：@1=第一次(N=1)，@2+=第二次及以上(N>=2)  ← 待用户确认",
     "action": "assign=分配汇报信给 preparer；skip=不分配(记录 forward 去向)；ignore=邮件不用处理",
+    "无汇报信兜底": "地区下的 * 规则仅在已识别官文无模板或原规则为 ignore 时使用；明确的 assign/skip 规则优先",
     "also_forward": "assign 可选双动作：分配汇报信的同时，把原始官文再转发一份到 {to}+cc{cc}（如韶音20608发shokz+赵彤）",
     "邮箱图例": {
       "report@metis-ip.com": "report汇总邮箱",
@@ -53,6 +54,10 @@
     }
   },
   "CN": {
+    "*": {
+      "20618": {"action": "skip", "forward": {"to": ["report@metis-ip.com"], "cc": ["ui_pa@metis-ip.com"]}},
+      "20633": {"action": "skip", "forward": {"to": ["report@metis-ip.com"], "cc": ["patent8@metis-ip.com"]}}
+    },
     "补正通知书": {
       "20618": {
         "action": "skip",
@@ -520,6 +525,10 @@
     }
   },
   "US": {
+    "*": {
+      "20618": {"action": "skip", "forward": {"to": ["report@metis-ip.com"], "cc": ["ui_pa@metis-ip.com"]}},
+      "20633": {"action": "skip", "forward": {"to": ["report@metis-ip.com"], "cc": ["patent8@metis-ip.com"]}}
+    },
     "CTNF": {
       "20618": {
         "action": "skip",
@@ -841,6 +850,10 @@
     }
   },
   "EP": {
+    "*": {
+      "20618": {"action": "skip", "forward": {"to": ["report@metis-ip.com"], "cc": ["ui_pa@metis-ip.com"]}},
+      "20633": {"action": "skip", "forward": {"to": ["report@metis-ip.com"], "cc": ["patent8@metis-ip.com"]}}
+    },
     "Further search fee": {
       "20618": {
         "action": "skip",
