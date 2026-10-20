@@ -2,7 +2,7 @@
 """Declaration PDF 生成（消费 fields_json，移植自 old_submission/assignment/func_normal_form.py）。
 
 每位发明人一页，合并为一份多页 PDF；模板按特例客户清单选择：
-- 特例客户（20618 类）→ DECLARATION_en.pdf（英文版，含 PCT 勾选与申请号/日期栏）
+- 20618 客户 → 20618/Declaration-20618.pdf（由样例同版式空白英文表单制作）
 - 其余 → DECLARATION_encn.pdf（中英对照版，Text16-28 + Check Box17/18）
 """
 from datetime import datetime
@@ -11,7 +11,7 @@ from pathlib import Path
 import fitz  # PyMuPDF
 
 from .common import (
-    DECLARATION_EN_TEMPLATE,
+    DECLARATION_20618_TEMPLATE,
     DECLARATION_ENCN_TEMPLATE,
     inventor_names,
     is_special_client,
@@ -60,7 +60,7 @@ def _build_field_dict(special: bool, title: str, inventor: str,
             "Text1": "",
             **check_box,
         }
-        return DECLARATION_EN_TEMPLATE, fields
+        return DECLARATION_20618_TEMPLATE, fields
 
     check_box = (
         {"Check Box18": "Yes", "Text19": pct_app_no, "Text20": pct_app_date}
