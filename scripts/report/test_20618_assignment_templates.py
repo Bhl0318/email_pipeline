@@ -21,6 +21,36 @@ def doc_text(path):
 
 
 class SpecialAssignmentTemplateTests(unittest.TestCase):
+    def test_narrow_signature_address_wraps_before_headquarters(self):
+        fields = {
+            "case_volume": "20618-9999US00", "application_type": "发明",
+            "case_info": {"case_name_en": "A MEDICAL DEVICE"},
+            "applicants": [{"applicant_name_en": "WUHAN CO.",
+                            "address1": "Wuhan United Imaging Healthcare Headquarters",
+                            "address2": "No. 99 Gaokeyuan Road", "city_en": "Wuhan",
+                            "country_en_us": "China"}],
+            "inventors": [{"last_name_en": "LI", "first_name_en": "Alice",
+                           "residence_en": "Wuhan United Imaging Healthcare Headquarters, No. 99 Gaokeyuan Road"}],
+        }
+        with tempfile.TemporaryDirectory() as folder:
+            company = generate_assignment(fields, {
+                "assignment_type": "公司转公司", "assigning_company": "WUHAN HOLDINGS",
+                "company_address1": "Wuhan United Imaging Healthcare Headquarters",
+                "company_address2": "No. 99 Gaokeyuan Road",
+                "assignee": "WUHAN CO."}, folder)
+            doc = Document(company["file_path"])
+            for table in (doc.tables[0], doc.tables[2]):
+                first = table.rows[5].cells[-1].text
+                second = table.rows[6].cells[-1].text
+                self.assertEqual(first, "Wuhan United Imaging Healthcare")
+                self.assertTrue(second.startswith("Headquarters,"))
+                self.assertEqual(table.rows[4].cells[-1].text, "")
+            personal = generate_assignment(fields, {
+                "assignment_type": "个人转公司", "assignee": "WUHAN CO."}, folder)
+            table = Document(personal["file_path"]).tables[0]
+            self.assertEqual(table.rows[3].cells[-1].text, "Wuhan United Imaging Healthcare")
+            self.assertTrue(table.rows[4].cells[-1].text.startswith("Headquarters,"))
+
     def test_confirmation_page_mother_case_numbers_enter_chain(self):
         # 确认函页只提供 Application No / Filing Date，不提供 Prior 字段。
         fields = {

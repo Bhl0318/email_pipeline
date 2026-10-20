@@ -49,6 +49,7 @@ SPECIAL_ASSIGNMENT_TEMPLATES = {
     "个人转公司": SPECIAL_ASSIGNMENT_DIR / "Assignment-20618-inventors.docx",
     "公司转公司": SPECIAL_ASSIGNMENT_DIR / "Assignment-20618-company.docx",
 }
+SPECIAL_SIGNATURE_ADDRESS_WIDTH = 36  # 20618 签字表地址列较窄，避免单元格内部自动折行
 
 
 # ─── 文本替换与清理（行为对齐旧 generate_assign.py） ────────
@@ -189,6 +190,17 @@ def _remove_sections(doc, assignment_type, special_client):
         body.remove(el)
 
 
+def _keep_one_company_assignor_table(doc):
+    """通用模板含两张相同的公司 Assignor 签字表，仅保留第一张。"""
+    tables = [
+        table for table in doc.tables
+        if table.rows and table.rows[0].cells[0].text.strip() == "Assignor"
+        and "Seal or Signature:" in "".join(cell.text for row in table.rows for cell in row.cells)
+    ]
+    for table in tables[1:]:
+        table._element.getparent().remove(table._element)
+
+
 # ─── 分区填充 ────────────────────────────────────────────
 
 def _fill_priority_table(doc, rows):
@@ -288,9 +300,9 @@ def _fill_inventor_tables(doc, names, addr_lines, per_inventor_addresses=None,
                 elif "发明人签字日期" in cell.text:
                     cell.text = cell.text.replace("发明人签字日期", "")
                 elif "发明人地址1" in cell.text:
-                    cell.text = cell.text.replace("发明人地址1", line1)
+                    cell.text = cell.text.replace("发明人地址1", line1).strip()
                 elif "发明人地址2" in cell.text:
-                    cell.text = cell.text.replace("发明人地址2", line2)
+                    cell.text = cell.text.replace("发明人地址2", line2).strip()
                     cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.BOTTOM  # 与地址1一致贴底边
                     addr2_row = row
         if extra and addr2_row is not None:
@@ -413,7 +425,8 @@ def _special_chain(fields):
 
 
 def _fill_special_address(table, first_key, second_key, lines):
-    """保留 20618 原签字表，仅按通用 Assignment 的地址行规则续行。"""
+    """20618 窄地址列显式拆行，每行占一张表格行。"""
+    lines = address_lines(" ".join(lines), "", width=SPECIAL_SIGNATURE_ADDRESS_WIDTH)
     line1 = lines[0] if lines else ""
     line2 = lines[1] if len(lines) > 1 else ""
     second_row = None
@@ -436,19 +449,21 @@ def _special_inventor_address(fields, name, assignee):
             continue
         residence = (inventor.get("residence_en") or "").strip()
         if residence:
-            lines = address_lines(residence, "")
+            lines = address_lines(residence, "", width=SPECIAL_SIGNATURE_ADDRESS_WIDTH)
             return lines, False
         employer = (inventor.get("employer") or "").strip()
         for key, info in (fields.get("employer_info") or {}).items():
             if re.sub(r"\W", "", key).lower() == re.sub(r"\W", "", employer).lower():
                 residence = (info.get("residence_en") or "").strip()
                 if residence:
-                    lines = address_lines(residence, "")
+                    lines = address_lines(residence, "", width=SPECIAL_SIGNATURE_ADDRESS_WIDTH)
                     return lines, False
         if (inventor.get("address1") or "").strip():
-            lines = address_lines(inventor.get("address1"), inventor.get("address2"))
+            lines = address_lines(inventor.get("address1"), inventor.get("address2"),
+                                  width=SPECIAL_SIGNATURE_ADDRESS_WIDTH)
             return lines, False
-    return assignee["address_lines"], True
+    return address_lines(" ".join(assignee["address_lines"]), "",
+                         width=SPECIAL_SIGNATURE_ADDRESS_WIDTH), True
 
 
 def _generate_special_assignment(fields, assignment, output_dir, seq, total, name_tag):
@@ -558,7 +573,6 @@ def generate_assignment(fields: dict, assignment: dict, output_dir, seq: int = 1
     app_type_eng, confirm_type = application_type_words(fields.get("application_type") or "")
     special = False
     today = datetime.now()
-    today_dot = today.strftime("%Y.%m.%d")
 
     doc = Document(str(ASSIGNMENT_TEMPLATE))
 
@@ -613,7 +627,7 @@ def generate_assignment(fields: dict, assignment: dict, output_dir, seq: int = 1
         _replace_everywhere(doc, "转让公司代表职位", assignment.get("representative_title") or "")
         _replace_everywhere(doc, "转让公司地址1", company_addr["address1"])
         _replace_everywhere(doc, "转让公司地址2", company_addr["address2"])
-        _replace_everywhere(doc, "转让公司代表签字日期", today_dot)
+        _replace_everywhere(doc, "转让公司代表签字日期", "")
         if special:
             # 特例客户保留受让人签字页；代表姓名/职位留空待人工补签（不填占位符）
             _replace_everywhere(doc, "受让公司名称", assignee["name"])
@@ -621,10 +635,12 @@ def generate_assignment(fields: dict, assignment: dict, output_dir, seq: int = 1
             _replace_everywhere(doc, "受让公司代表职位", "")
             _replace_everywhere(doc, "受让公司地址1", assignee["address1"])
             _replace_everywhere(doc, "受让公司地址2", assignee["address2"])
-            _replace_everywhere(doc, "受让公司代表签字日期", today_dot)
+            _replace_everywhere(doc, "受让公司代表签字日期", "")
 
     # 7. 按页标记删除不适用的签字分区（段落+表格整段移除）
     _remove_sections(doc, assignment_type, special)
+    if assignment_type == "公司转公司":
+        _keep_one_company_assignor_table(doc)
 
     # 8. 收尾清理：高亮、残留中文表格/段落（未填充的占位表、页标记）、删表后的空白段/分页符
     _strip_all_highlights(doc)
