@@ -35,6 +35,9 @@ def build_email_modules(fields: dict, params: dict = None) -> list:
     """返回 [{id, title, html, checked, note}]；checked 为推导的默认勾选。
     （自定义正文内容由审核页在模块之间的"插入槽"提供，不在此生成。）"""
     params = params or {}
+    if str(fields.get("case_volume") or "").startswith("20618-"):
+        from .email_modules_20618 import build_20618_email_modules
+        return build_20618_email_modules(fields, params)
     case_volume = fields.get("case_volume") or "（案号）"
     filing_route = fields.get("filing_route") or "（落地方式）"
     ae_methods = (fields.get("ae_methods") or "").strip()
