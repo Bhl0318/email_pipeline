@@ -41,8 +41,8 @@ def query_customer_name(project):
         return ""
 
 
-def query_case_info(project):
-    """SQL Server IPEasy: case_volume = project → 申请号/申请名/申请日/客户案号"""
+def query_case_info(project, include_divisional_date=False):
+    """SQL Server IPEasy: case_volume = project → 案件信息及本申请递交日"""
     if not project:
         return {}
     cfg = _load_db_config().get("mssql_ipeasy", {})
@@ -56,20 +56,30 @@ def query_case_info(project):
             charset=cfg.get("charset", "utf8"),
         )
         cur = conn.cursor()  # 普通 cursor，按位置取值
-        cur.execute(
-            "SELECT case_volume_customer, app_no, case_name, app_date "
-            "FROM p_case_info WHERE case_volume = %s", (project,))
+        if include_divisional_date:
+            cur.execute(
+                "SELECT ci.case_volume_customer, ci.app_no, ci.case_name, "
+                "ci.app_date, ai.divisional_date "
+                "FROM p_case_info ci LEFT JOIN p_case_advance_info ai "
+                "ON ci.case_id = ai.case_id WHERE ci.case_volume = %s", (project,))
+        else:
+            cur.execute(
+                "SELECT case_volume_customer, app_no, case_name, app_date "
+                "FROM p_case_info WHERE case_volume = %s", (project,))
         row = cur.fetchone()
         cur.close()
         conn.close()
         if not row:
             return {}
-        return {
+        result = {
             "case_volume_customer": row[0],  # 委托方案号
             "app_no": row[1],                # 官方申请号（数字）= 申请号
             "case_name": row[2],
             "app_date": row[3],
         }
+        if include_divisional_date:
+            result["divisional_date"] = row[4]
+        return result
     except Exception as e:
         print(f"[enrich] 查 p_case_info 失败 {project}: {e}", file=sys.stderr)
         return {}
@@ -229,7 +239,7 @@ def _query_case_recipients_ipeasy(project):
         return []
 
 
-def enrich_cn_fields(project):
+def enrich_cn_fields(project, include_divisional_date=False):
     """返回要合并进 fields_json 的字段（查到才返回该键，覆盖"请提供"）"""
     out = {}
 
@@ -237,7 +247,7 @@ def enrich_cn_fields(project):
     if name:
         out["客户名称"] = name
 
-    info = query_case_info(project)
+    info = query_case_info(project, include_divisional_date=include_divisional_date)
     if info:
         if info.get("case_volume_customer"):
             out["客户案号"] = info["case_volume_customer"]
@@ -247,6 +257,8 @@ def enrich_cn_fields(project):
             out["申请名称"] = info["case_name"]
         if info.get("app_date"):
             out["申请日"] = str(info["app_date"])[:10]  # datetime → YYYY-MM-DD
+        if include_divisional_date and info.get("divisional_date"):
+            out["本申请递交日"] = str(info["divisional_date"])[:10]
 
     return out
 
