@@ -161,11 +161,14 @@ def update_checkpoint(account, folder, emails):
     # 按处理顺序保存 ID，清理时只删除最早记录的邮件。
     old_ids = existing.get("processed_ids", [])
     new_ids = []
+    new_subjects = {}
     latest_time = existing.get("last_time", "")
     for em in emails:
         msg_id = em.get("message_id", "")
         if msg_id:
             new_ids.append(msg_id)
+            if em.get("subject"):
+                new_subjects[msg_id] = em["subject"]
         em_date = em.get("date", "")
         if em_date > latest_time:
             latest_time = em_date
@@ -176,11 +179,15 @@ def update_checkpoint(account, folder, emails):
     all_ids.extend(dict.fromkeys(reversed(new_ids)))
     if len(all_ids) > 2000:
         all_ids = all_ids[1000:]
+    old_subjects = existing.get("processed_subjects") or {}
+    subjects = {msg_id: new_subjects.get(msg_id) or old_subjects.get(msg_id, "")
+                for msg_id in all_ids}
 
     cp[key] = {
         "last_time": latest_time,
         "updated_at": datetime.now().isoformat(),
         "processed_ids": all_ids,
+        "processed_subjects": subjects,
     }
     save_checkpoint(cp)
     print(f"断点已更新: {key} | 最新时间: {latest_time} | 已记录 {len(all_ids)} 条 ID", file=sys.stderr)
