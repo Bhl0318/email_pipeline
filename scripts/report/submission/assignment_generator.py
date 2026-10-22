@@ -442,6 +442,22 @@ def _fill_special_address(table, first_key, second_key, lines):
         _clone_address_rows(table, second_row, lines[2:])
 
 
+def _fill_special_title(doc, title):
+    """保留 20618 模板中标题占位 run 的加粗格式。"""
+    for paragraph in doc.paragraphs:
+        if "{{TITLE}}" not in paragraph.text:
+            continue
+        for run in paragraph.runs:
+            if "{{TITLE}}" in run.text:
+                run.text = run.text.replace("{{TITLE}}", title)
+                run.bold = True
+                break
+        else:
+            # 模板若将占位符拆成多个 run，仍须输出一个加粗的标题。
+            paragraph.text = ""
+            paragraph.add_run(title).bold = True
+
+
 def _special_inventor_address(fields, name, assignee):
     """先取发明人独立住址，再取雇主住址；缺失时回退受让人地址并告警。"""
     for inventor in fields.get("inventors") or []:
@@ -481,7 +497,7 @@ def _generate_special_assignment(fields, assignment, output_dir, seq, total, nam
     if assignment.get("assignee") and not assignee.get("matched"):
         warnings.append(f"受让人「{assignee['name']}」未匹配到申请人或转让链公司，地址使用首位申请人，请核对")
     common = {
-        "{{CASE_NO}}": case_no, "{{TITLE}}": title,
+        "{{CASE_NO}}": case_no,
         "{{APPLICATION_CHAIN}}": _special_chain(fields),
         "{{ASSIGNEE}}": assignee["name"],
         "{{ASSIGNEE_ADDRESS}}": full_mailing_address_en(
@@ -510,7 +526,7 @@ def _generate_special_assignment(fields, assignment, output_dir, seq, total, nam
         names = names or inventor_names(fields)
         if not names:
             raise ValueError("20618 个人转公司 Assignment 缺少发明人")
-        common["{{I_WE}}"] = "I" if len(names) == 1 else "WE"
+        common["{{I_WE}}"] = "I/WE"
         inventor_addresses = []
         for name in names:
             lines, fallback = _special_inventor_address(fields, name, assignee)
@@ -521,6 +537,9 @@ def _generate_special_assignment(fields, assignment, output_dir, seq, total, nam
                               first_on_new_page=True)
         for table in _inventor_signature_tables(doc):
             table._tbl.getparent().remove(table._tbl)
+    _fill_special_title(doc, title)
+    # 20618 专用表述：转让方/受让方公司均固定写作 a Chinese company。
+    _replace_everywhere(doc, ", whose address is", ", a Chinese company whose address is")
     for old, new in common.items():
         _replace_everywhere(doc, old, new)
     remaining = "\n".join([p.text for p in doc.paragraphs] +

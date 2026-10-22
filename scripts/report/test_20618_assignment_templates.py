@@ -40,6 +40,8 @@ class SpecialAssignmentTemplateTests(unittest.TestCase):
                 "assignment_type": "个人转公司", "assignee": "EMPLOYER CO., LTD.",
                 "assignor_inventors": ["LI, Alice"]}, folder)
             _, generated_text = doc_text(result["file_path"])
+            self.assertIn("WHEREAS I/WE, the below named inventor(s)", generated_text)
+            self.assertIn("EMPLOYER CO., LTD., a Chinese company whose address is", generated_text)
             self.assertIn("Full Employer Headquarters", generated_text)
             self.assertNotIn("Old Structured Address", generated_text)
 
@@ -285,6 +287,10 @@ class SpecialAssignmentTemplateTests(unittest.TestCase):
             self.assertEqual(len(files), 2)
             inventor_doc, inventor_text = doc_text(files[0]["file_path"])
             company_doc, company_text = doc_text(files[1]["file_path"])
+            for doc in (inventor_doc, company_doc):
+                title_paragraph = next(p for p in doc.paragraphs if p.text == "A NEW MEDICAL DEVICE")
+                self.assertTrue(any(run.bold and run.text == "A NEW MEDICAL DEVICE"
+                                    for run in title_paragraph.runs))
             self.assertEqual(len(inventor_doc.tables), 3)
             self.assertEqual(len(company_doc.tables), 4)
             self.assertFalse(any(br.get(qn("w:type")) == "page"
@@ -314,7 +320,10 @@ class SpecialAssignmentTemplateTests(unittest.TestCase):
                             "PCT/CN2016/085434", "No.2258 Chengbei"):
                     self.assertNotIn(old, text)
             self.assertIn("SMITH, Test", inventor_text)
+            self.assertIn("WHEREAS I/WE, the below named inventor(s)", inventor_text)
             self.assertIn("ALEX WU", company_text)
+            self.assertIn("WHEREAS, AMERICA HOLDINGS INC., a Chinese company whose address is", company_text)
+            self.assertIn("WHEREAS, NEW MEDICAL CORP., a Chinese company whose address is", company_text)
 
             single = generate_assignment(fields, {"assignment_type": "个人转公司",
                                                   "assignor_inventors": ["SMITH, Test"],
