@@ -311,7 +311,7 @@ def update_checkpoint(account, folder, emails):
     cp = load_checkpoint()
     key = f"{account}:{folder}"
     existing = cp.get(key, {})
-    # 保持处理顺序；set 会打乱顺序，截取末尾 2000 条时可能丢掉刚处理的 ID。
+    # 保持处理顺序；set 会打乱顺序，清理旧 ID 时可能丢掉刚处理的 ID。
     old_ids = existing.get("processed_ids", [])
     new_ids = []
     latest_time = existing.get("last_time", "")
@@ -323,12 +323,13 @@ def update_checkpoint(account, folder, emails):
         if em_date > latest_time:
             latest_time = em_date
 
-    # 邮件列表按新到旧排列；按处理时间将本轮 ID 放到末尾，再保留最近 2000 条。
+    # 邮件列表按新到旧排列；按处理时间将本轮 ID 放到末尾。
     # 即使历史断点的顺序已被旧版打乱，本轮处理的 ID 也不会被立即淘汰。
     refreshed = set(new_ids)
     all_ids = list(dict.fromkeys(msg_id for msg_id in old_ids if msg_id not in refreshed))
     all_ids.extend(dict.fromkeys(reversed(new_ids)))
-    all_ids = all_ids[-2000:]
+    if len(all_ids) > 2000:
+        all_ids = all_ids[1000:]
 
     cp[key] = {
         "last_time": latest_time,

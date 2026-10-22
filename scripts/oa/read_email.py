@@ -158,23 +158,24 @@ def update_checkpoint(account, folder, emails):
     cp = load_checkpoint()
     key = f"{account}:{folder}"
     existing = cp.get(key, {})
-    old_ids = set(existing.get("processed_ids", []))
-
-    # 收集新的 Message-ID
-    new_ids = set()
+    # 按处理顺序保存 ID，清理时只删除最早记录的邮件。
+    old_ids = existing.get("processed_ids", [])
+    new_ids = []
     latest_time = existing.get("last_time", "")
     for em in emails:
         msg_id = em.get("message_id", "")
         if msg_id:
-            new_ids.add(msg_id)
+            new_ids.append(msg_id)
         em_date = em.get("date", "")
         if em_date > latest_time:
             latest_time = em_date
 
-    # 合并 ID，只保留最近 30 天的（按数量限制，最多保留 2000 条）
-    all_ids = list(old_ids | new_ids)
+    # 邮件列表按新到旧排列；超过 2000 条时删除最早记录的 1000 条。
+    refreshed = set(new_ids)
+    all_ids = list(dict.fromkeys(msg_id for msg_id in old_ids if msg_id not in refreshed))
+    all_ids.extend(dict.fromkeys(reversed(new_ids)))
     if len(all_ids) > 2000:
-        all_ids = all_ids[-2000:]
+        all_ids = all_ids[1000:]
 
     cp[key] = {
         "last_time": latest_time,
