@@ -29,7 +29,8 @@ class Declaration20618Tests(unittest.TestCase):
             "case_advance_info": {"pct_app_no": "PCT/CN2024/123456",
                                   "pct_app_date": "2024-01-02"},
         }
-        for route, first, second in (("Paris", "On", ""),
+        for route, first, second in (("New", "On", ""),
+                                     ("Paris", "On", ""),
                                      ("Bypass Continuation", "", "On")):
             with self.subTest(route=route), tempfile.TemporaryDirectory() as folder:
                 fields["filing_route"] = route
@@ -52,6 +53,19 @@ class Declaration20618Tests(unittest.TestCase):
     def test_other_customers_keep_bilingual_template(self):
         template, _ = _build_field_dict(False, "TITLE", "LI, Alice", "", "")
         self.assertEqual(template, DECLARATION_ENCN_TEMPLATE)
+
+    def test_new_route_uses_attached_application_in_general_template(self):
+        fields = {
+            "case_volume": "20000-0001US00", "filing_route": "New",
+            "case_info": {"case_name_en": "A NEW DEVICE"},
+            "inventors": [{"last_name_en": "LI", "first_name_en": "Alice"}],
+        }
+        with tempfile.TemporaryDirectory() as folder:
+            result = generate_declarations(fields, folder)[0]
+            with fitz.open(result["file_path"]) as doc:
+                values = {w.field_name: (w.field_value or "").strip() for w in doc[0].widgets()}
+            self.assertEqual(values["Check Box17"], "Yes")
+            self.assertNotEqual(values.get("Check Box18"), "Yes")
 
 
 if __name__ == "__main__":

@@ -89,10 +89,10 @@ def generate_declarations(fields: dict, output_dir) -> list:
     pct_app_no = (advance.get("pct_app_no") or "").strip()
     pct_app_date = (advance.get("pct_app_date") or "").strip()
     # Declaration "This declaration is directed to:"：
-    #   落地方式为 Paris（巴黎公约）或 CIP（Continuation in part of）→ 勾第一项"随附的申请"；
+    #   落地方式为 New、Paris（巴黎公约）或 CIP（Continuation in part of）→ 勾第一项"随附的申请"；
     #   其余（371 / bypass / Continuation of / Division 等）→ 勾第二项，引用在先 PCT/美国申请号。
     _route = (fields.get("filing_route") or "").strip().lower()
-    force_attached = ("paris" in _route) or ("continuation in part" in _route) or ("cip" in _route)
+    force_attached = (_route == "new") or ("paris" in _route) or ("continuation in part" in _route) or ("cip" in _route)
     names = inventor_names(fields)
     if not names:
         raise ValueError("发明人列表为空，无法生成 Declaration")
