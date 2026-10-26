@@ -1145,7 +1145,8 @@ def dispatch_report(all_results, all_emails, dry_run=False):
         for item in all_results:
             project = item.get("project", "")
             project_name = item.get("project_name", "")
-            if not project or not project_name:
+            # R.70(2)/70a(2) 等非独立 EP 官文没有立项名称，但仍须按规则分配汇报信。
+            if not project or (not project_name and item.get("standalone_project") is not False):
                 continue
             # 检查是否已存在
             # check_sql = f"SELECT COUNT(*) as cnt FROM projects WHERE project='{project}' AND project_name='{project_name}'"
