@@ -490,11 +490,11 @@ class PatentApplicationFormGenerator:
         def _app_for_employer(key, emp):
             """employer 命中 employer_info（审核页手填）优先；否则命中申请人；再否则从 assignments
             公司转公司段取地址（结构化 company_* 优先，缺省回退单串 company_address）。"""
-            ei = _einfo_by_key.get(key)
+            ei = (case_info.get("employer_info") or {}).get(emp) or _einfo_by_key.get(key)
             if ei and any((ei.get(f) or "").strip() for f in
                           ("applicant_name_en", "applicant_name_cn", "address1", "city_en",
                            "country_en_us", "contact_address_cn")):
-                return ei
+                return {**(_app_by_name.get(key) or {}), **ei}
             app = _app_by_name.get(key)
             if app:
                 return app
@@ -570,7 +570,7 @@ class PatentApplicationFormGenerator:
             # 住址按该组 app（employer_info 手填 > 申请人 > 转让公司）的地址拼接
             res_en, res_cn = _residence(app)
             # employer_info 的【独立住址】覆盖：一次性拼接后独立、不跟 address 细节变（仅确认函用，ADS 仍用结构化）
-            _ei = _einfo_by_key.get(_norm(g["emp"])) or {}
+            _ei = (case_info.get("employer_info") or {}).get(g["emp"]) or _einfo_by_key.get(_norm(g["emp"])) or {}
             if (_ei.get("residence_en") or "").strip():
                 res_en = _ei["residence_en"].strip()
             if (_ei.get("residence_cn") or "").strip():

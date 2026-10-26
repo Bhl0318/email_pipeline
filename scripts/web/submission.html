@@ -755,15 +755,18 @@ function renderForm() {
   const _employerBlocks = [...new Set((fields.inventors||[]).map(i=>(i.employer||"").trim()).filter(Boolean))]
     .map(emp=>{ const d=_defEmpInfo(emp);
       fields.employer_info = fields.employer_info || {};
-      const cur = (fields.employer_info[emp] = fields.employer_info[emp] || {});
+      // 沿用已有的同名记录；只有完全没有匹配项时才创建，避免大小写不同的重复键。
+      const empKey = Object.hasOwn(fields.employer_info, emp) ? emp
+        : (Object.keys(fields.employer_info).find(k=>_empNorm(k)===_empNorm(emp)) || emp);
+      const cur = (fields.employer_info[empKey] = fields.employer_info[empKey] || {});
       // 住址一次性 materialize：空则按当前地址拼接写入，之后改地址细节不再变（Residence 独立）
       if (!(cur.residence_en||"").trim())
         cur.residence_en = _joinAddr([d.address1,d.address2,d.city_en,d.province_city_en_us,d.postcode,d.country_en_us]);
       if (!(cur.residence_cn||"").trim())
         cur.residence_cn = _joinAddr([d.contact_address_cn,d.city_cn,d.province_city_zh_cn,d.country_zh_cn]);
-      const defs = _EMP_FIELDS.map(([k,label,wide])=>({ path:["employer_info",emp,k], label, wide, deriveDefault:()=>(d[k]||"") }));
-      defs.push({ path:["employer_info",emp,"residence_en"], label:"住址（英文，独立，改地址不变）", wide:true });
-      defs.push({ path:["employer_info",emp,"residence_cn"], label:"住址（中文，独立，改地址不变）", wide:true });
+      const defs = _EMP_FIELDS.map(([k,label,wide])=>({ path:["employer_info",empKey,k], label, wide, deriveDefault:()=>(d[k]||"") }));
+      defs.push({ path:["employer_info",empKey,"residence_en"], label:"住址（英文，独立，改地址不变）", wide:true });
+      defs.push({ path:["employer_info",empKey,"residence_cn"], label:"住址（中文，独立，改地址不变）", wide:true });
       return { emp, defs }; });
 
   $("formSections").innerHTML = `

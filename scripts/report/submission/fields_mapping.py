@@ -121,10 +121,11 @@ def _inventor_applicant_addr(inv: dict, applicants: list, assignments: list, emp
     if not emp:
         return applicants[0] if applicants else {}
     _einfo = {_norm(k): v for k, v in (employer_info or {}).items() if isinstance(v, dict)}
-    ei = _einfo.get(emp)
+    ei = (employer_info or {}).get(inv.get("employer")) or _einfo.get(emp)
     if ei and any((ei.get(f) or "").strip() for f in
                   ("applicant_name_en", "address1", "city_en", "country_en_us", "contact_address_cn")):
-        return ei
+        applicant = next((a for a in applicants if _norm(a.get("applicant_name_en")) == emp), {})
+        return {**applicant, **ei}
     for a in applicants:
         if _norm(a.get("applicant_name_en")) == emp:
             return a

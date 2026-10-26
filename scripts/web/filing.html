@@ -302,6 +302,7 @@ async function openTask(id){
   try { data = await api("GET", `${API}/${id}`); }
   catch(e){ toast("加载失败: "+e.message); return; }
   fields = data.fields_json || {};
+  reconcileDuplicateEmployerAddresses();
   qaInitialFields = JSON.parse(JSON.stringify(fields)); qaOpenedAt = Date.now();   // QA 留痕：快照初始值+打开时刻
   opts = data.transmittal_options || {};
   initMail();
@@ -451,10 +452,12 @@ function invApplicantAddr(inv){
   if (!emp) return apps[0] || {};
   // employer_info（审核页手填，申请人同款结构）最优先
   const ei = fields.employer_info || {};
-  const eiKey = Object.keys(ei).find(k => norm(k) === emp);
+  // 与确认函页一致：先取发明人 employer 的原样键，再做不区分大小写匹配。
+  const eiKey = Object.hasOwn(ei, inv.employer) ? inv.employer
+    : Object.keys(ei).find(k => norm(k) === emp);
   if (eiKey){ const v = ei[eiKey] || {};
     if (["applicant_name_en","address1","city_en","country_en_us","contact_address_cn"].some(f => (v[f]||"").trim()))
-      return v; }
+      return {...(apps.find(a => norm(a.applicant_name_en) === emp) || {}), ...v}; }
   const hit = apps.find(a => norm(a.applicant_name_en) === emp);
   if (hit) return hit;
   const asg = (fields.assignments||[]).find(x => norm(x.assigning_company)===emp &&
@@ -473,6 +476,24 @@ function invApplicantAddr(inv){
     return {address1:(p[0]||"").trim(), address2:(p[1]||"").trim()};
   }
   return apps[0] || {};
+}
+// 旧数据可能有同一家公司的大小写重复键，且递交页曾把首条地址缓存进 filing_extra。
+// 仅当缓存值恰好等于另一条同名记录的默认地址时，改用 employer 原样键的地址；保留人工填写的其他值。
+function reconcileDuplicateEmployerAddresses(){
+  const ei = fields.employer_info || {};
+  const saved = (fields.filing_extra || {}).inventor_addresses || [];
+  (fields.inventors || []).forEach((inv, i) => {
+    const emp = (inv.employer || "").trim();
+    if (!emp || !Object.hasOwn(ei, emp) || !saved[i]) return;
+    const preferred = ei[emp] || {};
+    for (const [key, old] of Object.entries(ei)) {
+      if (key === emp || key.trim().toLowerCase() !== emp.toLowerCase()) continue;
+      for (const [mailKey, addrKey] of [["mail_address1", "address1"], ["mail_address2", "address2"]]) {
+        if (old && saved[i][mailKey] && saved[i][mailKey] === old[addrKey] && preferred[addrKey])
+          saved[i][mailKey] = preferred[addrKey];
+      }
+    }
+  });
 }
 // 发明人全名：姓, 名 中间名（对齐著录项"姓, 名"，中间名并入名后）；三者任一变化实时联动只读全名
 function invFullName(L, F, M){
@@ -1064,6 +1085,8 @@ async function autoPreviewDoc(target){
   curTarget = target;
   document.querySelectorAll(".preview-head .tab").forEach(b => b.classList.toggle("active", b.dataset.target === target));
   if (data && data.status && data.status !== "pending") return previewSent(target);
+  // ADS 地址可能刚从确认函同步或在本页修改；待审时始终按当前字段重生成。
+  if (target === "ads") return preview(target);
   try {
     const j = await api("GET", `${API}/${taskId}/preview-existing?target=${encodeURIComponent(target)}`);
     const files = j.files || [];

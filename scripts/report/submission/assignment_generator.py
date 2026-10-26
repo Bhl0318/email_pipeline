@@ -468,7 +468,9 @@ def _special_inventor_address(fields, name, assignee):
             lines = address_lines(residence, "", width=SPECIAL_SIGNATURE_ADDRESS_WIDTH)
             return lines, False
         employer = (inventor.get("employer") or "").strip()
-        for key, info in (fields.get("employer_info") or {}).items():
+        employer_info = fields.get("employer_info") or {}
+        employer_entries = sorted(employer_info.items(), key=lambda item: item[0] != employer)
+        for key, info in employer_entries:
             if re.sub(r"\W", "", key).lower() == re.sub(r"\W", "", employer).lower():
                 residence = (info.get("residence_en") or "").strip()
                 if residence:
