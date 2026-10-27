@@ -34,6 +34,7 @@ from .common import (
     get_assignee,
     inventor_names,
     is_special_client,
+    _norm_company,
     resolve_assignee,
     split_address,
 )
@@ -464,7 +465,10 @@ def _fill_special_title(doc, title):
 
 
 def _special_inventor_address(fields, name, assignee):
-    """先取发明人独立住址，再取雇主住址；缺失时回退受让人地址并告警。"""
+    """优先取发明人住址；归属公司是申请人时缺失则留空，其余回退雇主或受让人。"""
+    applicant_names = {_norm_company(a.get("applicant_name_en"))
+                       for a in fields.get("applicants") or []}
+    assignee_key = _norm_company(assignee["name"])
     for inventor in fields.get("inventors") or []:
         if re.sub(r"\W", "", format_inventor_name(inventor)).lower() != re.sub(r"\W", "", name).lower():
             continue
@@ -473,6 +477,13 @@ def _special_inventor_address(fields, name, assignee):
             lines = address_lines(residence, "", width=SPECIAL_SIGNATURE_ADDRESS_WIDTH)
             return lines, False
         employer = (inventor.get("employer") or "").strip()
+        employer_key = _norm_company(employer)
+        if employer_key and employer_key == assignee_key and employer_key in applicant_names:
+            addr1 = (inventor.get("address1") or "").strip()
+            addr2 = (inventor.get("address2") or "").strip()
+            if addr1 or addr2:
+                return address_lines(addr1, addr2, width=SPECIAL_SIGNATURE_ADDRESS_WIDTH), False
+            return [""], True
         employer_info = fields.get("employer_info") or {}
         employer_entries = sorted(employer_info.items(), key=lambda item: item[0] != employer)
         for key, info in employer_entries:
@@ -538,7 +549,9 @@ def _generate_special_assignment(fields, assignment, output_dir, seq, total, nam
         for name in names:
             lines, fallback = _special_inventor_address(fields, name, assignee)
             if fallback:
-                warnings.append(f"发明人 {name} 缺少独立住址，Assignment 暂用受让人地址，请核对")
+                warnings.append(f"发明人 {name} 缺少本人地址，Assignment 签字页地址留空，请核对"
+                                if not any(lines) else
+                                f"发明人 {name} 缺少独立住址，Assignment 暂用受让人地址，请核对")
             inventor_addresses.append(lines)
         _fill_inventor_tables(doc, names, [], per_inventor_addresses=inventor_addresses,
                               first_on_new_page=True)
@@ -642,7 +655,30 @@ def generate_assignment(fields: dict, assignment: dict, output_dir, seq: int = 1
 
     # 6. 签字分区填充
     if assignment_type == "个人转公司":
-        filled, added = _fill_inventor_tables(doc, names, assignee["address_lines"])
+        applicant_names = {_norm_company(a.get("applicant_name_en"))
+                           for a in fields.get("applicants") or []}
+        assignee_key = _norm_company(assignee["name"])
+        inventor_addresses = []
+        for name in names:
+            lines = assignee["address_lines"]
+            inventor = next((inv for inv in fields.get("inventors") or []
+                             if re.sub(r"\W", "", format_inventor_name(inv)).lower()
+                             == re.sub(r"\W", "", name).lower()), None)
+            employer_key = _norm_company((inventor or {}).get("employer"))
+            if employer_key and employer_key == assignee_key and employer_key in applicant_names:
+                residence = ((inventor or {}).get("residence_en") or "").strip()
+                addr1 = ((inventor or {}).get("address1") or "").strip()
+                addr2 = ((inventor or {}).get("address2") or "").strip()
+                if residence:
+                    lines = address_lines(residence, "")
+                elif addr1 or addr2:
+                    lines = address_lines(addr1, addr2)
+                else:
+                    lines = [""]
+                    warnings.append(f"发明人 {name} 缺少本人地址，Assignment 签字页地址留空，请核对")
+            inventor_addresses.append(lines)
+        filled, added = _fill_inventor_tables(
+            doc, names, [], per_inventor_addresses=inventor_addresses)
         if added:
             warnings.append(f"发明人 {len(names)} 名，签字表已自动扩容补足 {added} 个")
         if filled < len(names):
