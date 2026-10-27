@@ -1,0 +1,20 @@
+# 本地配置、密钥与运行时数据
+db_config.json
+scripts/*/checkpoint.json
+scripts/*/email_config.json
+scripts/*/*_config.local.json
+output/
+outputs/
+attachment/
+scripts/output/
+scripts/report/ads_test_out/
+scripts/oa/uspto/
+uspto_upload/
+
+# Python 与本地开发环境
+__pycache__/
+*.pyc
+.venv/
+venv/
+.idea/
+scripts/oa/test_*.py
