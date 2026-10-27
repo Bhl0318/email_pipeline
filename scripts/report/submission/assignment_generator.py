@@ -218,6 +218,11 @@ def _fill_priority_table(doc, rows):
             return
 
 
+def _mailing_address_line(value):
+    """签字页 Mailing Address 每行不保留行尾逗号；行内标点保持原样。"""
+    return (value or "").rstrip().rstrip(",，").rstrip()
+
+
 def _clone_address_rows(table, ref_row, extra_lines):
     """克隆地址行（连同底边线/格式）插在其后，逐行填入多出的地址行。"""
     prev_tr = ref_row._tr
@@ -228,7 +233,7 @@ def _clone_address_rows(table, ref_row, extra_lines):
         new_row = _Row(new_tr, table)
         # 地址在最后一格：替换文字（底边线在 tcPr，cell.text 不影响）
         addr_cell = new_row.cells[-1]
-        addr_cell.text = line
+        addr_cell.text = _mailing_address_line(line)
         # 文字落在底边线上（对齐地址1格的 vAlign=bottom，否则贴顶边）
         addr_cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.BOTTOM
 
@@ -289,8 +294,8 @@ def _fill_inventor_tables(doc, names, addr_lines, per_inventor_addresses=None,
     filled = 0
     for index, (name, table) in enumerate(zip(names, inventor_tables)):
         lines = per_inventor_addresses[index] if per_inventor_addresses is not None else addr_lines
-        line1 = lines[0] if lines else ""
-        line2 = lines[1] if len(lines) > 1 else ""
+        line1 = _mailing_address_line(lines[0]) if lines else ""
+        line2 = _mailing_address_line(lines[1]) if len(lines) > 1 else ""
         extra = lines[2:]
         addr2_row = None
         for row in table.rows:
@@ -427,8 +432,8 @@ def _special_chain(fields):
 def _fill_special_address(table, first_key, second_key, lines):
     """20618 窄地址列显式拆行，每行占一张表格行。"""
     lines = address_lines(" ".join(lines), "", width=SPECIAL_SIGNATURE_ADDRESS_WIDTH)
-    line1 = lines[0] if lines else ""
-    line2 = lines[1] if len(lines) > 1 else ""
+    line1 = _mailing_address_line(lines[0]) if lines else ""
+    line2 = _mailing_address_line(lines[1]) if len(lines) > 1 else ""
     second_row = None
     for row in table.rows:
         for cell in row.cells:
@@ -648,16 +653,16 @@ def generate_assignment(fields: dict, assignment: dict, output_dir, seq: int = 1
         _replace_everywhere(doc, "转让公司名称", assignment.get("assigning_company") or "")
         _replace_everywhere(doc, "转让公司代表打印版名字", assignment.get("company_representative") or "")
         _replace_everywhere(doc, "转让公司代表职位", assignment.get("representative_title") or "")
-        _replace_everywhere(doc, "转让公司地址1", company_addr["address1"])
-        _replace_everywhere(doc, "转让公司地址2", company_addr["address2"])
+        _replace_everywhere(doc, "转让公司地址1", _mailing_address_line(company_addr["address1"]))
+        _replace_everywhere(doc, "转让公司地址2", _mailing_address_line(company_addr["address2"]))
         _replace_everywhere(doc, "转让公司代表签字日期", "")
         if special:
             # 特例客户保留受让人签字页；代表姓名/职位留空待人工补签（不填占位符）
             _replace_everywhere(doc, "受让公司名称", assignee["name"])
             _replace_everywhere(doc, "受让公司代表打印版名字", "")
             _replace_everywhere(doc, "受让公司代表职位", "")
-            _replace_everywhere(doc, "受让公司地址1", assignee["address1"])
-            _replace_everywhere(doc, "受让公司地址2", assignee["address2"])
+            _replace_everywhere(doc, "受让公司地址1", _mailing_address_line(assignee["address1"]))
+            _replace_everywhere(doc, "受让公司地址2", _mailing_address_line(assignee["address2"]))
             _replace_everywhere(doc, "受让公司代表签字日期", "")
 
     # 7. 按页标记删除不适用的签字分区（段落+表格整段移除）

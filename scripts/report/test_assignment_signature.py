@@ -6,10 +6,29 @@ import unittest
 from docx import Document
 
 from submission.assignment_generator import generate_assignment
-from submission.common import resolve_assignee
+from submission.common import resolve_assignee, address_lines
 
 
 class GeneralAssignmentSignatureTests(unittest.TestCase):
+    def test_mailing_address_lines_have_no_trailing_commas(self):
+        residence = "No. 601 Huangpu Avenue West, Tianhe District, Guangzhou, Guangdong, China"
+        for case_no, width in (("99999-0003US00", 50), ("20618-0003US00", 36)):
+            with self.subTest(case_no=case_no), tempfile.TemporaryDirectory() as folder:
+                fields = {
+                    "case_volume": case_no, "application_type": "发明",
+                    "case_info": {"case_name_en": "TEST DEVICE"},
+                    "applicants": [{"applicant_name_en": "EMPLOYER CO.", "address1": residence}],
+                    "inventors": [{"last_name_en": "LI", "first_name_en": "Alice"}],
+                }
+                result = generate_assignment(fields, {"assignment_type": "个人转公司",
+                                                      "assignee": "EMPLOYER CO."}, folder)
+                doc = Document(result["file_path"])
+                cells = [cell.text.strip() for table in doc.tables for row in table.rows for cell in row.cells]
+                for line in address_lines(residence, "", width=width):
+                    self.assertIn(line.rstrip(","), cells)
+                    if line.endswith(","):
+                        self.assertNotIn(line, cells)
+
     def test_inventor_to_employer_uses_independent_full_address(self):
         fields = {
             "case_volume": "99999-0002US00", "application_type": "发明",
