@@ -1,8 +1,13 @@
 # 本地配置、密钥与运行时数据
 db_config.json
+scripts/email_config.json
 scripts/*/checkpoint.json
 scripts/*/email_config.json
 scripts/*/*_config.local.json
+scripts/report/submission/docusign_config.json
+scripts/report/submission/docusign_config.metis.json
+scripts/report/submission/docusign_config.golive-demo.json
+uspto_accounts.json
 output/
 outputs/
 attachment/
