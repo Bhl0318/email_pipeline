@@ -20,6 +20,7 @@ from docx.oxml.ns import qn
 from docx.table import _Cell, _Row
 
 from .common import (
+    ADDRESS_LINE1_MAX,
     ASSIGNMENT_TEMPLATE,
     blank_none,
     clean_priority_no,
@@ -464,37 +465,52 @@ def _fill_special_title(doc, title):
             paragraph.add_run(title).bold = True
 
 
+def _employer_address_lines(fields, employer, width=ADDRESS_LINE1_MAX, *, panel_only=False):
+    """Assignment 签字地址以确认函「发明人归属公司」的独立英文住址为准。"""
+    key = _norm_company(employer)
+    if not key:
+        return None
+    for name, info in (fields.get("employer_info") or {}).items():
+        if key not in (_norm_company(name), _norm_company((info or {}).get("applicant_name_en"))):
+            continue
+        full = ((info or {}).get("residence_en") or "").strip()
+        if not full:
+            full = full_mailing_address_en(info)
+        if full:
+            return address_lines(full, "", width=width)
+    if panel_only:
+        return None
+    # 存量数据尚无 employer_info 时，沿原路径由申请人或公司转公司段补地址。
+    for applicant in fields.get("applicants") or []:
+        if _norm_company(applicant.get("applicant_name_en")) == key:
+            full = full_mailing_address_en(applicant)
+            if full:
+                return address_lines(full, "", width=width)
+    for segment in fields.get("assignments") or []:
+        if (segment.get("assignment_type") or "") == "公司转公司" and _norm_company(segment.get("assigning_company")) == key:
+            full = full_mailing_address_en(company_addr_dict(segment))
+            if full:
+                return address_lines(full, "", width=width)
+    return None
+
+
 def _special_inventor_address(fields, name, assignee):
-    """优先取发明人住址；归属公司是申请人时缺失则留空，其余回退雇主或受让人。"""
-    applicant_names = {_norm_company(a.get("applicant_name_en"))
-                       for a in fields.get("applicants") or []}
-    assignee_key = _norm_company(assignee["name"])
+    """20618 优先取归属公司面板地址；旧案无面板时沿用发明人原始地址。"""
     for inventor in fields.get("inventors") or []:
         if re.sub(r"\W", "", format_inventor_name(inventor)).lower() != re.sub(r"\W", "", name).lower():
             continue
+        employer = inventor.get("employer")
+        lines = _employer_address_lines(fields, employer, SPECIAL_SIGNATURE_ADDRESS_WIDTH, panel_only=True)
+        if lines is not None:
+            return lines, False
         residence = (inventor.get("residence_en") or "").strip()
         if residence:
-            lines = address_lines(residence, "", width=SPECIAL_SIGNATURE_ADDRESS_WIDTH)
-            return lines, False
-        employer = (inventor.get("employer") or "").strip()
-        employer_key = _norm_company(employer)
-        if employer_key and employer_key == assignee_key and employer_key in applicant_names:
-            addr1 = (inventor.get("address1") or "").strip()
-            addr2 = (inventor.get("address2") or "").strip()
-            if addr1 or addr2:
-                return address_lines(addr1, addr2, width=SPECIAL_SIGNATURE_ADDRESS_WIDTH), False
-            return [""], True
-        employer_info = fields.get("employer_info") or {}
-        employer_entries = sorted(employer_info.items(), key=lambda item: item[0] != employer)
-        for key, info in employer_entries:
-            if re.sub(r"\W", "", key).lower() == re.sub(r"\W", "", employer).lower():
-                residence = (info.get("residence_en") or "").strip()
-                if residence:
-                    lines = address_lines(residence, "", width=SPECIAL_SIGNATURE_ADDRESS_WIDTH)
-                    return lines, False
+            return address_lines(residence, "", width=SPECIAL_SIGNATURE_ADDRESS_WIDTH), False
         if (inventor.get("address1") or "").strip():
-            lines = address_lines(inventor.get("address1"), inventor.get("address2"),
-                                  width=SPECIAL_SIGNATURE_ADDRESS_WIDTH)
+            return address_lines(inventor.get("address1"), inventor.get("address2"),
+                                 width=SPECIAL_SIGNATURE_ADDRESS_WIDTH), False
+        lines = _employer_address_lines(fields, employer, SPECIAL_SIGNATURE_ADDRESS_WIDTH)
+        if lines is not None:
             return lines, False
     return address_lines(" ".join(assignee["address_lines"]), "",
                          width=SPECIAL_SIGNATURE_ADDRESS_WIDTH), True
@@ -549,9 +565,7 @@ def _generate_special_assignment(fields, assignment, output_dir, seq, total, nam
         for name in names:
             lines, fallback = _special_inventor_address(fields, name, assignee)
             if fallback:
-                warnings.append(f"发明人 {name} 缺少本人地址，Assignment 签字页地址留空，请核对"
-                                if not any(lines) else
-                                f"发明人 {name} 缺少独立住址，Assignment 暂用受让人地址，请核对")
+                warnings.append(f"发明人 {name} 缺少归属公司地址，Assignment 暂用受让人地址，请核对")
             inventor_addresses.append(lines)
         _fill_inventor_tables(doc, names, [], per_inventor_addresses=inventor_addresses,
                               first_on_new_page=True)
@@ -655,27 +669,16 @@ def generate_assignment(fields: dict, assignment: dict, output_dir, seq: int = 1
 
     # 6. 签字分区填充
     if assignment_type == "个人转公司":
-        applicant_names = {_norm_company(a.get("applicant_name_en"))
-                           for a in fields.get("applicants") or []}
-        assignee_key = _norm_company(assignee["name"])
         inventor_addresses = []
         for name in names:
-            lines = assignee["address_lines"]
             inventor = next((inv for inv in fields.get("inventors") or []
                              if re.sub(r"\W", "", format_inventor_name(inv)).lower()
                              == re.sub(r"\W", "", name).lower()), None)
-            employer_key = _norm_company((inventor or {}).get("employer"))
-            if employer_key and employer_key == assignee_key and employer_key in applicant_names:
-                residence = ((inventor or {}).get("residence_en") or "").strip()
-                addr1 = ((inventor or {}).get("address1") or "").strip()
-                addr2 = ((inventor or {}).get("address2") or "").strip()
-                if residence:
-                    lines = address_lines(residence, "")
-                elif addr1 or addr2:
-                    lines = address_lines(addr1, addr2)
-                else:
-                    lines = [""]
-                    warnings.append(f"发明人 {name} 缺少本人地址，Assignment 签字页地址留空，请核对")
+            lines = _employer_address_lines(fields, (inventor or {}).get("employer"))
+            if lines is None:
+                lines = assignee["address_lines"]
+                if inventor and (inventor.get("employer") or "").strip():
+                    warnings.append(f"发明人 {name} 缺少归属公司地址，Assignment 暂用受让人地址，请核对")
             inventor_addresses.append(lines)
         filled, added = _fill_inventor_tables(
             doc, names, [], per_inventor_addresses=inventor_addresses)

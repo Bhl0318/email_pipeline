@@ -10,7 +10,7 @@ from submission.common import resolve_assignee, address_lines
 
 
 class GeneralAssignmentSignatureTests(unittest.TestCase):
-    def test_inventor_employed_by_applicant_uses_own_mailing_address(self):
+    def test_inventor_employed_by_applicant_uses_employer_panel_address(self):
         fields = {
             "case_volume": "99999-0004US00", "application_type": "发明",
             "case_info": {"case_name_en": "TEST DEVICE"},
@@ -23,22 +23,25 @@ class GeneralAssignmentSignatureTests(unittest.TestCase):
                  "employer": "APPLICANT CO., LTD.",
                  "address1": "Bob Home Road", "address2": "Nanjing, China"},
             ],
+            "employer_info": {"APPLICANT CO., LTD.": {
+                "residence_en": "Panel Office Road, Shanghai, China"}},
         }
         assignment = {"assignment_type": "个人转公司", "assignee": "APPLICANT CO., LTD.",
                       "assignor_inventors": ["LI, Alice", "WU, Bob"]}
         with tempfile.TemporaryDirectory() as folder:
             result = generate_assignment(fields, assignment, folder)
             doc = Document(result["file_path"])
-            for name, expected in (("LI, Alice", "Alice Residence"),
-                                   ("WU, Bob", "Bob Home Road")):
+            for name in ("LI, Alice", "WU, Bob"):
                 table = next(t for t in doc.tables
                              if any(name in cell.text for row in t.rows for cell in row.cells))
                 signature = " ".join(cell.text for row in table.rows for cell in row.cells)
-                self.assertIn(expected, signature)
+                self.assertIn("Panel Office Road", signature)
                 self.assertNotIn("Company Street", signature)
+                self.assertNotIn("Alice Residence", signature)
+                self.assertNotIn("Bob Home Road", signature)
             self.assertFalse(result["warnings"])
 
-    def test_non_applicant_employer_keeps_existing_assignee_address_rule(self):
+    def test_non_applicant_employer_uses_employer_panel_address(self):
         fields = {
             "case_volume": "99999-0005US00", "application_type": "发明",
             "case_info": {"case_name_en": "TEST DEVICE"},
@@ -48,6 +51,7 @@ class GeneralAssignmentSignatureTests(unittest.TestCase):
             "assignments": [{"assignment_type": "公司转公司",
                              "assigning_company": "EMPLOYER CO.",
                              "company_address1": "Employer Office"}],
+            "employer_info": {"EMPLOYER CO.": {"residence_en": "Panel Employer HQ"}},
         }
         with tempfile.TemporaryDirectory() as folder:
             result = generate_assignment(fields, {"assignment_type": "个人转公司",
@@ -56,10 +60,11 @@ class GeneralAssignmentSignatureTests(unittest.TestCase):
             doc = Document(result["file_path"])
             signature = " ".join(cell.text for table in doc.tables
                                  for row in table.rows for cell in row.cells)
-            self.assertIn("Employer Office", signature)
+            self.assertIn("Panel Employer HQ", signature)
+            self.assertNotIn("Employer Office", signature)
             self.assertNotIn("Alice Home", signature)
 
-    def test_applicant_employer_without_inventor_address_stays_blank(self):
+    def test_applicant_employer_address_does_not_need_inventor_address(self):
         for case_no in ("99999-0006US00", "20618-0006US00"):
             with self.subTest(case_no=case_no), tempfile.TemporaryDirectory() as folder:
                 fields = {
@@ -78,10 +83,10 @@ class GeneralAssignmentSignatureTests(unittest.TestCase):
                 signature = next(t for t in doc.tables
                                  if any("LI, Alice" in cell.text for row in t.rows for cell in row.cells))
                 text = " ".join(cell.text for row in signature.rows for cell in row.cells)
-                self.assertNotIn("Company Street", text)
-                self.assertTrue(any("地址留空" in w for w in result["warnings"]))
+                self.assertIn("Company Street", text)
+                self.assertFalse(result["warnings"])
 
-    def test_special_applicant_employer_uses_inventor_address_before_employer_info(self):
+    def test_special_applicant_employer_uses_employer_panel_before_inventor_address(self):
         fields = {
             "case_volume": "20618-0007US00", "application_type": "发明",
             "case_info": {"case_name_en": "TEST DEVICE"},
@@ -98,8 +103,8 @@ class GeneralAssignmentSignatureTests(unittest.TestCase):
             signature = next(t for t in doc.tables
                              if any("LI, Alice" in cell.text for row in t.rows for cell in row.cells))
             text = " ".join(cell.text for row in signature.rows for cell in row.cells)
-            self.assertIn("Alice Home Road", text)
-            self.assertNotIn("Company Street", text)
+            self.assertIn("Company Street", text)
+            self.assertNotIn("Alice Home Road", text)
 
     def test_mailing_address_lines_have_no_trailing_commas(self):
         residence = "No. 601 Huangpu Avenue West, Tianhe District, Guangzhou, Guangdong, China"
