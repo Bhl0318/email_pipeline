@@ -476,12 +476,13 @@ EP_TYPES = {
     "Summons to oral proceedings": ("Summons to attend oral proceedings pursuant to Rule 115(1)EPC（口头审理通知书）答复", True, True),
 }
 
-# EP 主题正则：【通信类型】... (EP号) ... Your Ref.: 案号; Our Ref: 代理号
-# 注：Your Ref 值与分号间可能有空格（"EP01 ;"）；Our Ref 可能位于主题结尾、后无分隔符。
+# EP 主题正则：【通信类型】... (EP号) ... Your Ref.: 编号; Our Ref: 编号
+# 两个 Ref 的案号位置可能互换，需分别校验；Our Ref 可能位于主题结尾。
 EP_SUBJECT_RE = re.compile(
     r'【(.+?)】.*?\((EP\d+\.\d)\).*?Your\s*Ref[.:_\s]+(\S+?)\s*[;,].*?Our\s*Ref[.:_\s]+(\S+?)\s*(?:[;,]|$)',
     re.IGNORECASE
 )
+EP_CASE_NUMBER_RE = re.compile(r"[0-9A-Z]{5}-[0-9A-Z]{8}", re.IGNORECASE)
 
 # EP 发文日期
 EP_ISSUE_DATE_RE = re.compile(r'(?:issued|on)\s+(\w+\s+\d{1,2},?\s*\d{4})', re.IGNORECASE)
@@ -522,7 +523,10 @@ def classify_ep(email_data):
     m = EP_SUBJECT_RE.search(subject)
     if m:
         result["ep_number"] = m.group(2)
-        result["project"] = m.group(3)
+        for reference in (m.group(3), m.group(4)):
+            if EP_CASE_NUMBER_RE.fullmatch(reference):
+                result["project"] = reference
+                break
         result["our_ref"] = m.group(4)
 
     # 是否分案
