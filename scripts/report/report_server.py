@@ -610,6 +610,7 @@ def delete_recipient(rid: int):
 # 页面 web/rules_admin.html 走 /static，入口 /rules-admin。表结构见 DS/汇报信流程/汇报信规则数据表设计.md。
 RULES_ADMIN_HTML = WEB_DIR / "rules_admin.html"
 _RULE_DOMAINS = {"oa": "OA官文规则", "close": "结项规则"}
+_RULE_VIEW_DOMAINS = {**_RULE_DOMAINS, "official": "其他官文规则"}
 _RULE_ACTIONS = {"assign", "skip", "ignore"}
 
 
@@ -639,18 +640,29 @@ def rules_admin_page():
 @app.get("/api/radmin/keys")
 def radmin_keys(domain: str = "", region: str = "", q: str = ""):
     """某规则域下的规则键清单（region+规则键，带模板名/attach）。用于左栏切换。"""
-    if domain not in _RULE_DOMAINS:
-        raise HTTPException(400, "domain 需为 oa/close")
+    if domain not in _RULE_VIEW_DOMAINS:
+        raise HTTPException(400, "domain 需为 oa/close/official")
     try:
-        rule_rows = execute_params(
-            "SELECT DISTINCT region, rule_key FROM report_rule WHERE rule_domain=%s AND status=1", (domain,)) or []
-        tpl_rows = execute_params(
-            "SELECT region, rule_key, template, attach_pdf FROM report_rule_template WHERE rule_domain=%s AND status=1",
-            (domain,)) or []
+        if domain == "official":
+            rule_rows = execute_params(
+                "SELECT DISTINCT region, rule_key FROM report_rule WHERE rule_domain=%s", (domain,)) or []
+            tpl_rows = execute_params(
+                "SELECT region, rule_key, template, attach_pdf, status FROM report_rule_template WHERE rule_domain=%s",
+                (domain,)) or []
+            map_rows = execute_params(
+                "SELECT region, rule_key, status FROM report_rule_map WHERE rule_domain=%s", (domain,)) or []
+        else:
+            rule_rows = execute_params(
+                "SELECT DISTINCT region, rule_key FROM report_rule WHERE rule_domain=%s AND status=1", (domain,)) or []
+            tpl_rows = execute_params(
+                "SELECT region, rule_key, template, attach_pdf FROM report_rule_template WHERE rule_domain=%s AND status=1",
+                (domain,)) or []
+            map_rows = []
     except Exception as e:
         raise HTTPException(500, f"查询失败: {e}")
     tpl = {(r["region"], r["rule_key"]): r for r in tpl_rows}
-    keys = {(r["region"], r["rule_key"]) for r in rule_rows} | set(tpl.keys())
+    mapping = {(r["region"], r["rule_key"]): r for r in map_rows}
+    keys = {(r["region"], r["rule_key"]) for r in rule_rows} | set(tpl.keys()) | set(mapping.keys())
     out = []
     for reg, rk in keys:
         if region and reg != region:
@@ -659,7 +671,8 @@ def radmin_keys(domain: str = "", region: str = "", q: str = ""):
             continue
         t = tpl.get((reg, rk), {})
         out.append({"region": reg, "rule_key": rk,
-                    "template": t.get("template", ""), "attach_pdf": int(t.get("attach_pdf", 0) or 0)})
+                    "template": t.get("template", ""), "attach_pdf": int(t.get("attach_pdf", 0) or 0),
+                    "status": int(mapping.get((reg, rk), {}).get("status", 1) or 0)})
     out.sort(key=lambda x: (x["region"], x["rule_key"]))
     return {"domain": domain, "keys": out}
 
@@ -667,25 +680,36 @@ def radmin_keys(domain: str = "", region: str = "", q: str = ""):
 @app.get("/api/radmin/detail")
 def radmin_detail(domain: str = "", region: str = "", rule_key: str = ""):
     """某 (域,region,规则键) 的完整维护数据：分派规则行 + 模板映射 + 模板正文 + (结项)组合映射。"""
-    if domain not in _RULE_DOMAINS:
-        raise HTTPException(400, "domain 需为 oa/close")
+    if domain not in _RULE_VIEW_DOMAINS:
+        raise HTTPException(400, "domain 需为 oa/close/official")
+    active = "" if domain == "official" else " AND status=1"
     try:
         rules = execute_params(
-            "SELECT id, rule_variant, customer_code, action, preparer, forward_to, forward_cc, seq, remark "
-            "FROM report_rule WHERE rule_domain=%s AND region=%s AND rule_key=%s AND status=1 "
-            "ORDER BY rule_variant, seq, id", (domain, region, rule_key)) or []
+            "SELECT id, rule_variant, customer_code, action, preparer, forward_to, forward_cc, "
+            "extra_json, seq, status, remark FROM report_rule "
+            "WHERE rule_domain=%s AND region=%s AND rule_key=%s" + active + " ORDER BY rule_variant, seq, id",
+            (domain, region, rule_key)) or []
         tpl = execute_params(
-            "SELECT template, attach_pdf FROM report_rule_template "
-            "WHERE rule_domain=%s AND region=%s AND rule_key=%s AND status=1 LIMIT 1",
+            "SELECT template, attach_pdf, status FROM report_rule_template "
+            "WHERE rule_domain=%s AND region=%s AND rule_key=%s" + active + " LIMIT 1",
             (domain, region, rule_key)) or []
         maps = execute_params(
-            "SELECT id, match_key FROM report_rule_map WHERE rule_domain=%s AND region=%s AND rule_key=%s AND status=1 "
-            "ORDER BY match_key", (domain, region, rule_key)) or []
+            "SELECT id, match_key, status, remark FROM report_rule_map "
+            "WHERE rule_domain=%s AND region=%s AND rule_key=%s" + active + " ORDER BY match_key",
+            (domain, region, rule_key)) or []
     except Exception as e:
         raise HTTPException(500, f"查询失败: {e}")
     for r in rules:
         r["forward_to"] = _jload(r.get("forward_to"))
         r["forward_cc"] = _jload(r.get("forward_cc"))
+        if domain == "official":
+            if isinstance(r.get("extra_json"), str):
+                try:
+                    r["extra_json"] = json.loads(r["extra_json"])
+                except (ValueError, TypeError):
+                    r["extra_json"] = {}
+        else:
+            r.pop("extra_json", None)
     tpl0 = tpl[0] if tpl else {"template": "", "attach_pdf": 0}
     content = ""
     tname = (tpl0.get("template") or "").strip()
@@ -697,6 +721,7 @@ def radmin_detail(domain: str = "", region: str = "", rule_key: str = ""):
             raise HTTPException(500, f"查模板正文失败: {e}")
     return {"domain": domain, "region": region, "rule_key": rule_key,
             "template": tname, "attach_pdf": int(tpl0.get("attach_pdf", 0) or 0),
+            "template_status": int(tpl0.get("status", 0) or 0),
             "content": content, "rules": rules, "maps": maps}
 
 
@@ -846,14 +871,32 @@ def radmin_map_save(m: RadminMap):
     if not m.region or not m.match_key.strip() or not m.rule_key.strip():
         raise HTTPException(400, "region/组合/规则键必填")
     now = _now_s()
+    match_key = m.match_key.strip()
+    rule_key = m.rule_key.strip()
     try:
         if m.id:
             execute_params("UPDATE report_rule_map SET match_key=%s, rule_key=%s, status=1, modifier='web', modification_time=%s WHERE id=%s",
-                           (m.match_key.strip(), m.rule_key.strip(), now, m.id))
+                           (match_key, rule_key, now, m.id))
         else:
-            execute_params("INSERT INTO report_rule_map (rule_domain, region, match_key, rule_key, status, create_by, create_time) "
-                           "VALUES (%s,%s,%s,%s,1,'web',%s)",
-                           (m.rule_domain, m.region, m.match_key.strip(), m.rule_key.strip(), now))
+            existing = execute_params(
+                "SELECT id, rule_key, status FROM report_rule_map "
+                "WHERE rule_domain=%s AND region=%s AND match_key=%s LIMIT 1",
+                (m.rule_domain, m.region, match_key)) or []
+            if existing:
+                old = existing[0]
+                if old["status"]:
+                    if old["rule_key"] != rule_key:
+                        raise HTTPException(409, f"组合「{match_key}」已关联规则「{old['rule_key']}」，请先删除原映射")
+                    return {"ok": True, "message": "组合映射已存在"}
+                execute_params(
+                    "UPDATE report_rule_map SET rule_key=%s, status=1, modifier='web', modification_time=%s WHERE id=%s",
+                    (rule_key, now, old["id"]))
+            else:
+                execute_params("INSERT INTO report_rule_map (rule_domain, region, match_key, rule_key, status, create_by, create_time) "
+                               "VALUES (%s,%s,%s,%s,1,'web',%s)",
+                               (m.rule_domain, m.region, match_key, rule_key, now))
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(500, f"保存失败（组合可能已存在）: {e}")
     return {"ok": True, "message": "组合映射已保存"}
