@@ -15,6 +15,7 @@ from pathlib import Path
 
 from docx import Document
 from docx.enum.table import WD_CELL_VERTICAL_ALIGNMENT
+from docx.shared import Pt
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.table import _Cell, _Row
@@ -455,23 +456,36 @@ def _special_chain(fields):
 
 
 def _fill_special_address(table, first_key, second_key, lines, width=SPECIAL_SIGNATURE_ADDRESS_WIDTH,
-                          prewrapped=False):
+                          prewrapped=False, compact=False):
     """签字表窄地址列显式拆行，每行占一张表格行，避免 Word 在单词间自行折行。"""
     if not prewrapped:
         lines = address_lines(" ".join(lines), "", width=width)
     line1 = _mailing_address_line(lines[0]) if lines else ""
     line2 = _mailing_address_line(lines[1]) if len(lines) > 1 else ""
     second_row = None
-    for row in table.rows:
+    first_row_index = None
+    for row_index, row in enumerate(table.rows):
         for cell in row.cells:
             if first_key in cell.text:
                 cell.text = cell.text.replace(first_key, line1)
+                first_row_index = row_index
             if second_key in cell.text:
                 cell.text = cell.text.replace(second_key, line2)
                 cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.BOTTOM
                 second_row = row
     if second_row is not None and len(lines) > 2:
         _clone_address_rows(table, second_row, lines[2:])
+    if compact and first_row_index is not None:
+        # 通用公司签字表的模板地址行有 6pt 段前间距；逐行克隆后会形成明显空隙。
+        # 地址区位于表尾，只收紧该区，保留其他签字行及 20618 专用模板的格式。
+        for row in table.rows[first_row_index:]:
+            row.height = None
+            address_cell = row.cells[-1]
+            address_cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.BOTTOM
+            for paragraph in address_cell.paragraphs:
+                paragraph.paragraph_format.space_before = Pt(0)
+                paragraph.paragraph_format.space_after = Pt(0)
+                paragraph.paragraph_format.line_spacing = 1
 
 
 def _fill_special_title(doc, title):
@@ -763,7 +777,8 @@ def generate_assignment(fields: dict, assignment: dict, output_dir, seq: int = 1
         for table in doc.tables:
             if any("转让公司地址1" in cell.text for row in table.rows for cell in row.cells):
                 _fill_special_address(table, "转让公司地址1", "转让公司地址2",
-                                      _general_signature_address_lines(company_address), prewrapped=True)
+                                      _general_signature_address_lines(company_address),
+                                      prewrapped=True, compact=True)
         _replace_everywhere(doc, "转让公司代表签字日期", "")
         if special:
             # 特例客户保留受让人签字页；代表姓名/职位留空待人工补签（不填占位符）

@@ -5,6 +5,7 @@ import unittest
 from pathlib import Path
 
 from docx import Document
+from docx.enum.table import WD_CELL_VERTICAL_ALIGNMENT
 
 from submission.assignment_generator import generate_assignment, generate_assignments
 from submission.common import resolve_assignee, address_lines
@@ -249,6 +250,14 @@ class GeneralAssignmentSignatureTests(unittest.TestCase):
             self.assertTrue(any("Majialong Comm." in line for line in lines))
             self.assertTrue(any("Shenzhen" in line for line in lines))
             self.assertTrue(all(not line.endswith(",") for line in lines))
+            for row in table.rows[5:]:
+                self.assertIsNone(row.height)
+                self.assertEqual(row.cells[-1].vertical_alignment,
+                                 WD_CELL_VERTICAL_ALIGNMENT.BOTTOM)
+                for paragraph in row.cells[-1].paragraphs:
+                    self.assertEqual(paragraph.paragraph_format.space_before.pt, 0)
+                    self.assertEqual(paragraph.paragraph_format.space_after.pt, 0)
+                    self.assertEqual(paragraph.paragraph_format.line_spacing, 1)
 
 
 if __name__ == "__main__":
