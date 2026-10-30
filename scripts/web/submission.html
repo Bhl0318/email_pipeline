@@ -728,22 +728,17 @@ function renderForm() {
   const _suppTitle = "确认函补充（发明地）";
 
   // 发明人归属公司（employer_info，申请人同款结构）：确认函分组住址 / ADS / filing通信地址 共用同一份
-  const _empNorm = s => (s||"").trim().toLowerCase();
+  const _empNorm = s => (s||"").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "");
   const _defEmpInfo = (emp) => {
     const hit = (fields.applicants||[]).find(a=>_empNorm(a.applicant_name_en)===_empNorm(emp));
     if (hit) return hit;
     const asg = (fields.assignments||[]).find(x=>_empNorm(x.assigning_company)===_empNorm(emp) &&
       ((x.company_address1||"").trim()||(x.company_address2||"").trim()||(x.company_address||"").trim()));
     if (asg) return { applicant_name_en:asg.assigning_company||emp, applicant_name_cn:"",
-      address1:asg.company_address1||"", address2:asg.company_address2||"", city_en:asg.company_city_en||"",
+      address1:asg.company_address1||asg.company_address||"", address2:asg.company_address2||"", city_en:asg.company_city_en||"",
       province_city_en_us:asg.company_province_en||"", postcode:asg.company_postcode||"", country_en_us:asg.company_country_en||"" };
-    // 匹配不到 → 名字用 employer 本身，地址回落申请人[0]（与后端确认函兜底一致）
-    const a0 = (fields.applicants||[])[0] || {};
-    return { applicant_name_en: emp, applicant_name_cn:"",
-      address1:a0.address1||"", address2:a0.address2||"", city_en:a0.city_en||"",
-      province_city_en_us:a0.province_city_en_us||"", postcode:a0.postcode||"", country_en_us:a0.country_en_us||"",
-      contact_address_cn:a0.contact_address_cn||"", city_cn:a0.city_cn||"",
-      province_city_zh_cn:a0.province_city_zh_cn||"", country_zh_cn:a0.country_zh_cn||"" };
+    // 非申请人、转让安排里也找不到地址：留空待核对，不能借用申请人地址冒充 X。
+    return { applicant_name_en: emp };
   };
   const _EMP_FIELDS = [["applicant_name_en","公司英文名",true],["applicant_name_cn","公司中文名",false],
     ["address1","地址1（英）",true],["address2","地址2（英）",false],["city_en","城市（英）",false],
@@ -759,6 +754,21 @@ function renderForm() {
       const empKey = Object.hasOwn(fields.employer_info, emp) ? emp
         : (Object.keys(fields.employer_info).find(k=>_empNorm(k)===_empNorm(emp)) || emp);
       const cur = (fields.employer_info[empKey] = fields.employer_info[empKey] || {});
+      // 旧版曾把首位申请人地址预填给未匹配的归属公司。仅当地址完全符合旧默认、
+      // 且没有任何独立于申请人的公司地址字段时清除，避免继续将 A 显示成 X。
+      const a0 = (fields.applicants||[])[0] || {};
+      const oldDefault = _joinAddr([a0.address1,a0.address2,a0.city_en,a0.province_city_en_us,a0.postcode,a0.country_en_us]);
+      const oldDefaultCn = _joinAddr([a0.contact_address_cn,a0.city_cn,a0.province_city_zh_cn,a0.country_zh_cn]);
+      const addrKeys = ["address1","address2","city_en","province_city_en_us","postcode","country_en_us",
+        "contact_address_cn","city_cn","province_city_zh_cn","country_zh_cn"];
+      const inherited = _empNorm(emp)!==_empNorm(a0.applicant_name_en) && oldDefault &&
+        (cur.residence_en||"").trim()===oldDefault &&
+        addrKeys.every(k=>!(cur[k]||"").trim() || (cur[k]||"").trim()===(a0[k]||"").trim());
+      if (inherited) {
+        delete cur.residence_en;
+        if ((cur.residence_cn||"").trim()===oldDefaultCn) delete cur.residence_cn;
+        for (const k of addrKeys) if ((cur[k]||"").trim()===(a0[k]||"").trim()) delete cur[k];
+      }
       // 住址一次性 materialize：空则按当前地址拼接写入，之后改地址细节不再变（Residence 独立）
       if (!(cur.residence_en||"").trim())
         cur.residence_en = _joinAddr([d.address1,d.address2,d.city_en,d.province_city_en_us,d.postcode,d.country_en_us]);
@@ -767,7 +777,7 @@ function renderForm() {
       const defs = _EMP_FIELDS.map(([k,label,wide])=>({ path:["employer_info",empKey,k], label, wide, deriveDefault:()=>(d[k]||"") }));
       defs.push({ path:["employer_info",empKey,"residence_en"], label:"住址（英文，独立，改地址不变）", wide:true });
       defs.push({ path:["employer_info",empKey,"residence_cn"], label:"住址（中文，独立，改地址不变）", wide:true });
-      return { emp, defs }; });
+      return { emp, defs, inherited }; });
 
   $("formSections").innerHTML = `
     ${ro ? `<div class="banner ok">该任务状态为 ${esc(task.status)}，仅可查看。${task.status === "done" ? ` <button class="reopen-btn" onclick="reopenTask()" style="margin-left:8px">退回重编</button>` : ""}</div>` : ""}
@@ -798,6 +808,7 @@ function renderForm() {
     ${_employerBlocks.length ? `<div class="section">${head("发明人归属公司（归属公司≠申请人时在此补公司名+地址；确认函分组住址 / ADS / 通信地址共用）")}<div class="section-body">
       ${_employerBlocks.map(b=>`<div style="border:1px solid #e2e8f0;border-radius:6px;padding:8px;margin-bottom:8px;">
         <div style="font-size:12px;font-weight:600;margin-bottom:6px;">归属公司：${esc(b.emp)}</div>
+        ${b.inherited ? '<div class="hint" style="color:#b45309;">旧版曾自动带入申请人地址，已清除；请核对并填写本公司的地址。</div>' : ''}
         <div class="grid">${b.defs.map(fieldInput).join("")}</div></div>`).join("")}
     </div></div>` : ""}
 

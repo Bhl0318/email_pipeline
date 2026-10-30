@@ -503,14 +503,7 @@ class PatentApplicationFormGenerator:
                     cd = company_addr_dict(a)
                     if any(cd.get(k) for k in ("address1", "city_en", "postcode", "country_en_us", "contact_address_en")):
                         return {**_EMPTY_APP, **cd}
-            # 都取不到 → 默认用申请人[0]的【地址/国别】(住址不空、与 ADS 一致)，但不带名字
-            # (labor 归属名仍回落到 employer 名 g["emp"]，不会被申请人名顶替)
-            if applicants_list:
-                _base = applicants_list[0]
-                return {**_EMPTY_APP, **{k: _base.get(k, "") for k in (
-                    "address1", "address2", "city_en", "city_cn",
-                    "province_city_en_us", "province_city_zh_cn", "postcode",
-                    "country_en_us", "country_zh_cn", "contact_address_cn", "contact_address_cn2")}}
+            # 非申请人归属公司没有地址时留空，不能把首位申请人的地址误写成该公司的地址。
             return _EMPTY_APP
 
         def _join_addr(parts):

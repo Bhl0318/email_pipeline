@@ -113,8 +113,9 @@ def _inventor_applicant_addr(inv: dict, applicants: list, assignments: list, emp
     """按发明人 employer 取对应申请人的地址（对齐确认函 confirmation_sheet_generator._app_for_employer）。
 
     employer 命中 employer_info（审核页手填，申请人同款结构）优先 → 该记录；
-    无 employer / 单申请人 → applicants[0]；命中申请人英文名 → 该申请人；
-    否则前雇主 → assignments.assigning_company 的公司地址（结构化 company_address1/2 优先）。
+    无 employer → applicants[0]；命中申请人英文名 → 该申请人；
+    否则前雇主 → assignments.assigning_company 的公司地址（结构化 company_address1/2 优先）；
+    均未命中时留空，不借用申请人地址。
     :return: 含 address1/address2/city_en/country_en_us/postcode/province_city_en_us 的申请人 dict（或子集）。
     """
     emp = _norm(inv.get("employer"))
@@ -149,7 +150,8 @@ def _inventor_applicant_addr(inv: dict, applicants: list, assignments: list, emp
             # ③ 实在都没有 → 才按首逗号兜底拆整串
             parts = [p.strip() for p in (asg.get("company_address") or "").strip().split(",", 1)]
             return {"address1": parts[0], "address2": parts[1] if len(parts) > 1 else ""}
-    return applicants[0] if applicants else {}
+    # employer 已填写但无法匹配归属公司地址时留空，避免将申请人地址误当成归属公司地址。
+    return {}
 
 
 def fields_to_case_info(fields: dict, agent_info: dict = None) -> dict:
