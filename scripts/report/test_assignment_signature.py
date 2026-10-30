@@ -153,7 +153,7 @@ class GeneralAssignmentSignatureTests(unittest.TestCase):
 
     def test_mailing_address_lines_have_no_trailing_commas(self):
         residence = "No. 601 Huangpu Avenue West, Tianhe District, Guangzhou, Guangdong, China"
-        for case_no, width in (("99999-0003US00", 50), ("20618-0003US00", 36)):
+        for case_no, width in (("99999-0003US00", 39), ("20618-0003US00", 36)):
             with self.subTest(case_no=case_no), tempfile.TemporaryDirectory() as folder:
                 fields = {
                     "case_volume": case_no, "application_type": "发明",
@@ -228,6 +228,27 @@ class GeneralAssignmentSignatureTests(unittest.TestCase):
             date_index = cells.index("Execution Date:")
             self.assertEqual(cells[date_index + 1], "")
             self.assertNotIn("转让公司代表签字日期", "".join(cells))
+
+    def test_company_assignor_long_address_uses_separate_rows(self):
+        address = ("Rm. 1101, Bldg. B, Lianhua Plaza, No. 3186 Nanshan Ave., "
+                   "Majialong Comm., Nantou Str., Nanshan Dist., Shenzhen, Guangdong 518000, China")
+        fields = {"case_volume": "99999-0011US00", "application_type": "发明",
+                  "case_info": {"case_name_en": "TEST DEVICE"},
+                  "applicants": [{"applicant_name_en": "APPLICANT A", "address1": "A Road"}],
+                  "inventors": [{"last_name_en": "LI", "first_name_en": "Alice"}]}
+        assignment = {"assignment_type": "公司转公司", "assigning_company": "COMPANY X",
+                      "company_address": address, "assignee": "APPLICANT A"}
+        with tempfile.TemporaryDirectory() as folder:
+            result = generate_assignment(fields, assignment, folder)
+            doc = Document(result["file_path"])
+            table = next(t for t in doc.tables if t.rows[0].cells[0].text.strip() == "Assignor")
+            lines = [row.cells[-1].text.strip() for row in table.rows[5:]]
+            self.assertGreater(len(lines), 2)
+            self.assertTrue(all(len(line) <= 39 for line in lines))
+            self.assertTrue(any("Nanshan Ave." in line for line in lines))
+            self.assertTrue(any("Majialong Comm." in line for line in lines))
+            self.assertTrue(any("Shenzhen" in line for line in lines))
+            self.assertTrue(all(not line.endswith(",") for line in lines))
 
 
 if __name__ == "__main__":

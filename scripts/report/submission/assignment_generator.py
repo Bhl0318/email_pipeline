@@ -20,7 +20,6 @@ from docx.oxml.ns import qn
 from docx.table import _Cell, _Row
 
 from .common import (
-    ADDRESS_LINE1_MAX,
     ASSIGNMENT_TEMPLATE,
     blank_none,
     clean_priority_no,
@@ -51,6 +50,7 @@ SPECIAL_ASSIGNMENT_TEMPLATES = {
     "个人转公司": SPECIAL_ASSIGNMENT_DIR / "Assignment-20618-inventors.docx",
     "公司转公司": SPECIAL_ASSIGNMENT_DIR / "Assignment-20618-company.docx",
 }
+GENERAL_SIGNATURE_ADDRESS_WIDTH = 39  # 通用个人/公司签字表的地址列同为 7.75 cm
 SPECIAL_SIGNATURE_ADDRESS_WIDTH = 36  # 20618 签字表地址列较窄，避免单元格内部自动折行
 
 
@@ -223,6 +223,29 @@ def _fill_priority_table(doc, rows):
 def _mailing_address_line(value):
     """签字页 Mailing Address 每行不保留行尾逗号；行内标点保持原样。"""
     return (value or "").rstrip().rstrip(",，").rstrip()
+
+
+def _general_signature_address_lines(full, width=GENERAL_SIGNATURE_ADDRESS_WIDTH):
+    """通用个人/公司签字表共用拆行：按列宽合并逗号片段，避免拆开街道名。"""
+    lines, current = [], ""
+    for part in (p.strip() for p in re.split(r"[,，]", full or "")):
+        if not part:
+            continue
+        joined = f"{current}, {part}" if current else part
+        if len(joined) <= width:
+            current = joined
+            continue
+        if current:
+            lines.append(current)
+        if len(part) > width:
+            chunks = address_lines(part, "", width=width)
+            lines.extend(chunks[:-1])
+            current = chunks[-1]
+        else:
+            current = part
+    if current:
+        lines.append(current)
+    return lines or [""]
 
 
 def _clone_address_rows(table, ref_row, extra_lines):
@@ -431,9 +454,11 @@ def _special_chain(fields):
     return chain + "; and"
 
 
-def _fill_special_address(table, first_key, second_key, lines):
-    """20618 窄地址列显式拆行，每行占一张表格行。"""
-    lines = address_lines(" ".join(lines), "", width=SPECIAL_SIGNATURE_ADDRESS_WIDTH)
+def _fill_special_address(table, first_key, second_key, lines, width=SPECIAL_SIGNATURE_ADDRESS_WIDTH,
+                          prewrapped=False):
+    """签字表窄地址列显式拆行，每行占一张表格行，避免 Word 在单词间自行折行。"""
+    if not prewrapped:
+        lines = address_lines(" ".join(lines), "", width=width)
     line1 = _mailing_address_line(lines[0]) if lines else ""
     line2 = _mailing_address_line(lines[1]) if len(lines) > 1 else ""
     second_row = None
@@ -465,7 +490,7 @@ def _fill_special_title(doc, title):
             paragraph.add_run(title).bold = True
 
 
-def _employer_address_lines(fields, employer, width=ADDRESS_LINE1_MAX, *, panel_only=False):
+def _employer_address_lines(fields, employer, width=GENERAL_SIGNATURE_ADDRESS_WIDTH, *, panel_only=False):
     """Assignment 签字地址以确认函「发明人归属公司」的独立英文住址为准。"""
     key = _norm_company(employer)
     if not key:
@@ -477,7 +502,8 @@ def _employer_address_lines(fields, employer, width=ADDRESS_LINE1_MAX, *, panel_
         if not full:
             full = full_mailing_address_en(info)
         if full:
-            return address_lines(full, "", width=width)
+            return (_general_signature_address_lines(full) if width == GENERAL_SIGNATURE_ADDRESS_WIDTH
+                    else address_lines(full, "", width=width))
     if panel_only:
         return None
     # 存量数据尚无 employer_info 时，沿原路径由申请人或公司转公司段补地址。
@@ -485,12 +511,14 @@ def _employer_address_lines(fields, employer, width=ADDRESS_LINE1_MAX, *, panel_
         if _norm_company(applicant.get("applicant_name_en")) == key:
             full = full_mailing_address_en(applicant)
             if full:
-                return address_lines(full, "", width=width)
+                return (_general_signature_address_lines(full) if width == GENERAL_SIGNATURE_ADDRESS_WIDTH
+                        else address_lines(full, "", width=width))
     for segment in fields.get("assignments") or []:
         if (segment.get("assignment_type") or "") == "公司转公司" and _norm_company(segment.get("assigning_company")) == key:
             full = full_mailing_address_en(company_addr_dict(segment))
             if full:
-                return address_lines(full, "", width=width)
+                return (_general_signature_address_lines(full) if width == GENERAL_SIGNATURE_ADDRESS_WIDTH
+                        else address_lines(full, "", width=width))
     return None
 
 
@@ -717,7 +745,7 @@ def generate_assignment(fields: dict, assignment: dict, output_dir, seq: int = 1
             if lines is None:
                 if inventor and (inventor.get("employer") or "").strip():
                     raise ValueError(f"发明人 {name} 缺少归属公司地址")
-                lines = assignee["address_lines"]
+                lines = _general_signature_address_lines(" ".join(assignee["address_lines"]))
             inventor_addresses.append(lines)
         filled, added = _fill_inventor_tables(
             doc, names, [], per_inventor_addresses=inventor_addresses)
@@ -726,13 +754,16 @@ def generate_assignment(fields: dict, assignment: dict, output_dir, seq: int = 1
         if filled < len(names):
             warnings.append(f"发明人 {len(names)} 名超出模板签字表容量且扩容失败，仅填入 {filled} 名")
     else:
-        # 公司地址：结构化 company_* 六字段拼全址拆 2 行（同申请人）；缺省回退旧单串
-        company_addr = _assignee_from_applicant(company_addr_dict(assignment))
+        # 公司地址：按签字表实际列宽拆成多行；超出模板两行时克隆地址行。
+        # 直接塞入两格会由 Word 在任意空格处自动折行，导致 Nanshan / Ave. 被拆开。
+        company_address = full_mailing_address_en(company_addr_dict(assignment))
         _replace_everywhere(doc, "转让公司名称", assignment.get("assigning_company") or "")
         _replace_everywhere(doc, "转让公司代表打印版名字", assignment.get("company_representative") or "")
         _replace_everywhere(doc, "转让公司代表职位", assignment.get("representative_title") or "")
-        _replace_everywhere(doc, "转让公司地址1", _mailing_address_line(company_addr["address1"]))
-        _replace_everywhere(doc, "转让公司地址2", _mailing_address_line(company_addr["address2"]))
+        for table in doc.tables:
+            if any("转让公司地址1" in cell.text for row in table.rows for cell in row.cells):
+                _fill_special_address(table, "转让公司地址1", "转让公司地址2",
+                                      _general_signature_address_lines(company_address), prewrapped=True)
         _replace_everywhere(doc, "转让公司代表签字日期", "")
         if special:
             # 特例客户保留受让人签字页；代表姓名/职位留空待人工补签（不填占位符）
