@@ -494,6 +494,42 @@ def _employer_address_lines(fields, employer, width=ADDRESS_LINE1_MAX, *, panel_
     return None
 
 
+def _validate_assignment_addresses(fields, assignment):
+    """生成前核对地址来源，避免把受让人/首位申请人的地址误写到转让方。"""
+    kind = assignment.get("assignment_type") or ""
+    assignee_name = (assignment.get("assignee") or "").strip()
+    if kind == "公司转公司":
+        company = (assignment.get("assigning_company") or "").strip()
+        if not ((assignment.get("company_address1") or "").strip()
+                or (assignment.get("company_address") or "").strip()):
+            raise ValueError(f"转让方公司「{company}」缺少英文地址；请填写公司转公司段的公司地址")
+    elif kind == "个人转公司":
+        names = [str(n).strip() for n in assignment.get("assignor_inventors") or [] if str(n).strip()]
+        names = names or inventor_names(fields)
+        for name in names:
+            inventor = next((inv for inv in fields.get("inventors") or []
+                             if re.sub(r"\W", "", format_inventor_name(inv)).lower()
+                             == re.sub(r"\W", "", name).lower()), None)
+            employer = ((inventor or {}).get("employer") or "").strip()
+            if employer and _employer_address_lines(fields, employer) is None:
+                raise ValueError(f"发明人 {name} 的归属公司「{employer}」缺少英文住址；"
+                                 "请填写确认函页的发明人归属公司住址")
+    if assignee_name:
+        assignee = resolve_assignee(
+            fields, assignee_name, prefer_employer_residence=kind == "个人转公司"
+        )
+        if not assignee.get("matched") or not any(line.strip() for line in assignee["address_lines"]):
+            raise ValueError(f"受让人「{assignee_name}」没有可匹配的地址；请核对申请人或转让链公司地址")
+
+
+def validate_assignment_addresses(fields):
+    """核对实际转让段的地址来源；返回待生成段，供预览与发送前预检。"""
+    assignments, warnings = effective_assignments(fields)
+    for item in assignments:
+        _validate_assignment_addresses(blank_none(fields or {}), blank_none(item or {}))
+    return assignments, warnings
+
+
 def _special_inventor_address(fields, name, assignee):
     """20618 优先取归属公司面板地址；旧案无面板时沿用发明人原始地址。"""
     for inventor in fields.get("inventors") or []:
@@ -503,15 +539,17 @@ def _special_inventor_address(fields, name, assignee):
         lines = _employer_address_lines(fields, employer, SPECIAL_SIGNATURE_ADDRESS_WIDTH, panel_only=True)
         if lines is not None:
             return lines, False
+        if (employer or "").strip():
+            lines = _employer_address_lines(fields, employer, SPECIAL_SIGNATURE_ADDRESS_WIDTH)
+            if lines is None:
+                raise ValueError(f"发明人 {name} 的归属公司「{employer}」缺少英文住址")
+            return lines, False
         residence = (inventor.get("residence_en") or "").strip()
         if residence:
             return address_lines(residence, "", width=SPECIAL_SIGNATURE_ADDRESS_WIDTH), False
         if (inventor.get("address1") or "").strip():
             return address_lines(inventor.get("address1"), inventor.get("address2"),
                                  width=SPECIAL_SIGNATURE_ADDRESS_WIDTH), False
-        lines = _employer_address_lines(fields, employer, SPECIAL_SIGNATURE_ADDRESS_WIDTH)
-        if lines is not None:
-            return lines, False
     return address_lines(" ".join(assignee["address_lines"]), "",
                          width=SPECIAL_SIGNATURE_ADDRESS_WIDTH), True
 
@@ -608,6 +646,7 @@ def generate_assignment(fields: dict, assignment: dict, output_dir, seq: int = 1
     assignment_type = assignment.get("assignment_type") or ""
     if assignment_type not in ("个人转公司", "公司转公司"):
         raise ValueError(f"assignment_type 非法：{assignment_type!r}")
+    _validate_assignment_addresses(fields, assignment)
     if is_special_client(fields.get("case_volume") or ""):
         return _generate_special_assignment(fields, assignment, output_dir, seq, total, name_tag)
     if not ASSIGNMENT_TEMPLATE.exists():
@@ -676,9 +715,9 @@ def generate_assignment(fields: dict, assignment: dict, output_dir, seq: int = 1
                              == re.sub(r"\W", "", name).lower()), None)
             lines = _employer_address_lines(fields, (inventor or {}).get("employer"))
             if lines is None:
-                lines = assignee["address_lines"]
                 if inventor and (inventor.get("employer") or "").strip():
-                    warnings.append(f"发明人 {name} 缺少归属公司地址，Assignment 暂用受让人地址，请核对")
+                    raise ValueError(f"发明人 {name} 缺少归属公司地址")
+                lines = assignee["address_lines"]
             inventor_addresses.append(lines)
         filled, added = _fill_inventor_tables(
             doc, names, [], per_inventor_addresses=inventor_addresses)
@@ -739,6 +778,9 @@ def generate_assignments(fields: dict, output_dir) -> list:
 
     生成前先清掉 output_dir 里旧的 Assignment 产物（docx/pdf），避免旧份（如曾按发明人
     拆成的多份）与新份混显。只清 Assignment，不碰同目录 POA/Transmittal/确认函/Declaration。"""
+    assignments, derive_warnings = validate_assignment_addresses(fields)
+    if not assignments:
+        raise ValueError("assignments 为空，无法生成 Assignment")
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     for _old in output_dir.glob("*Assignment*"):
@@ -746,9 +788,6 @@ def generate_assignments(fields: dict, output_dir) -> list:
             _old.unlink()
         except OSError:
             pass
-    assignments, derive_warnings = effective_assignments(fields)
-    if not assignments:
-        raise ValueError("assignments 为空，无法生成 Assignment")
     total = len(assignments)
     results = [
         generate_assignment(fields, item, output_dir, seq=i, total=total)

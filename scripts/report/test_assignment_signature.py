@@ -2,14 +2,59 @@
 
 import tempfile
 import unittest
+from pathlib import Path
 
 from docx import Document
 
-from submission.assignment_generator import generate_assignment
+from submission.assignment_generator import generate_assignment, generate_assignments
 from submission.common import resolve_assignee, address_lines
 
 
 class GeneralAssignmentSignatureTests(unittest.TestCase):
+    def test_missing_nonapplicant_employer_address_blocks_without_deleting_old_file(self):
+        fields = {
+            "case_volume": "99999-0008US00", "application_type": "发明",
+            "case_info": {"case_name_en": "TEST DEVICE"},
+            "applicants": [{"applicant_name_en": "APPLICANT A", "address1": "A Road"}],
+            "inventors": [{"last_name_en": "LI", "first_name_en": "Alice",
+                           "employer": "COMPANY X", "address1": "Old Inventor Address"}],
+            "employer_info": {"COMPANY X": {"applicant_name_en": "COMPANY X"}},
+            "assignments": [{"assignment_type": "公司转公司",
+                             "assigning_company": "COMPANY X", "company_address1": "X Road",
+                             "assignee": "APPLICANT A"}],
+        }
+        # 公司转公司段有地址时可作为 X 的来源；清空后不能借用 A 或发明人旧住址。
+        fields["assignments"][0]["company_address1"] = ""
+        with tempfile.TemporaryDirectory() as folder:
+            old = Path(folder) / "old-Assignment.docx"
+            old.write_bytes(b"old")
+            with self.assertRaisesRegex(ValueError, "COMPANY X.*缺少英文住址"):
+                generate_assignments(fields, folder)
+            self.assertEqual(old.read_bytes(), b"old")
+
+    def test_missing_company_assignor_address_blocks(self):
+        fields = {"case_volume": "99999-0009US00", "application_type": "发明",
+                  "case_info": {"case_name_en": "TEST DEVICE"},
+                  "applicants": [{"applicant_name_en": "APPLICANT A", "address1": "A Road"}],
+                  "inventors": [{"last_name_en": "LI", "first_name_en": "Alice"}]}
+        assignment = {"assignment_type": "公司转公司", "assigning_company": "COMPANY X",
+                      "assignee": "APPLICANT A"}
+        with tempfile.TemporaryDirectory() as folder:
+            with self.assertRaisesRegex(ValueError, "COMPANY X.*缺少英文地址"):
+                generate_assignment(fields, assignment, folder)
+
+    def test_unknown_assignee_does_not_inherit_first_applicant_address(self):
+        fields = {"case_volume": "99999-0010US00", "application_type": "发明",
+                  "case_info": {"case_name_en": "TEST DEVICE"},
+                  "applicants": [{"applicant_name_en": "APPLICANT A", "address1": "A Road"}],
+                  "inventors": [{"last_name_en": "LI", "first_name_en": "Alice",
+                                 "employer": "APPLICANT A"}]}
+        assignment = {"assignment_type": "个人转公司", "assignee": "COMPANY Y",
+                      "assignor_inventors": ["LI, Alice"]}
+        with tempfile.TemporaryDirectory() as folder:
+            with self.assertRaisesRegex(ValueError, "COMPANY Y.*没有可匹配的地址"):
+                generate_assignment(fields, assignment, folder)
+
     def test_inventor_employed_by_applicant_uses_employer_panel_address(self):
         fields = {
             "case_volume": "99999-0004US00", "application_type": "发明",

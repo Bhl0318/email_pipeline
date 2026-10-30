@@ -627,9 +627,19 @@ function missingFieldSet() {
 }
 
 function applicantNames() { return [...new Set((fields.applicants || []).map(a => (a.applicant_name_en || "").trim()).filter(Boolean))]; }
-// 申请人名改动后，原地刷新发明人「归属公司」datalist 的建议项（不动输入框已填的值，含非申请人公司名）
+function employerNorm(s) { return (s||"").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ""); }
+function employerNames() {
+  const names = new Map();
+  for (const name of [...applicantNames(), ...Object.keys(fields.employer_info||{}),
+                       ...(fields.inventors||[]).map(i=>i.employer||"")]) {
+    const value = (name||"").trim(), key = employerNorm(value);
+    if (key && !names.has(key)) names.set(key, value);
+  }
+  return [...names.values()];
+}
+// 归属公司名改动后，原地刷新发明人下拉建议项，保留当前已填写的值。
 function refreshEmployerSelects() {
-  const dlHtml = applicantNames().map(o => `<option value="${esc(o)}"></option>`).join("");
+  const dlHtml = employerNames().map(o => `<option value="${esc(o)}"></option>`).join("");
   document.querySelectorAll('#formSections input[data-path]').forEach(inp => {
     const p = JSON.parse(inp.getAttribute("data-path"));
     if (!(p[0] === "inventors" && p[2] === "employer")) return;
@@ -679,8 +689,8 @@ function arrayBlock(key, title, defs, extraHTML) {
         <button onclick="removeItem('${key}',${i})">删除</button></div>
       <div class="grid">${defs.map(([k, label, req, opt]) =>
         fieldInput({ path: [key, i, k], label, req,
-          datalist: opt === "applicantNames" ? applicantNames() : undefined,
-          hintText: opt === "applicantNames" ? "可从申请人里选，也可直接输入非申请人的公司名（发明人的雇主/前雇主）。地址来源：申请人→取其地址；非申请人→需在下方「转让安排」加一段“公司转公司”(转让方=该公司)并填公司地址" : undefined,
+          datalist: opt === "applicantNames" ? employerNames() : undefined,
+          hintText: opt === "applicantNames" ? "可从申请人或已添加的归属公司里选，也可直接输入公司名。非申请人归属公司如需转给申请人，请在「转让安排」增加公司转公司段。" : undefined,
         })).join("")}</div>
       ${extraHTML ? extraHTML(item, i) : ""}
     </div>`).join("");
@@ -728,7 +738,7 @@ function renderForm() {
   const _suppTitle = "确认函补充（发明地）";
 
   // 发明人归属公司（employer_info，申请人同款结构）：确认函分组住址 / ADS / filing通信地址 共用同一份
-  const _empNorm = s => (s||"").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "");
+  const _empNorm = employerNorm;
   const _defEmpInfo = (emp) => {
     const hit = (fields.applicants||[]).find(a=>_empNorm(a.applicant_name_en)===_empNorm(emp));
     if (hit) return hit;
@@ -747,7 +757,12 @@ function renderForm() {
     ["province_city_zh_cn","省（中）",false],["country_zh_cn","国别（中）",false]];
   const _joinAddr = (parts)=>{ const out=[]; for (let p of parts){ p=(p||"").trim();
     if (p && (!out.length || out[out.length-1].toLowerCase()!==p.toLowerCase())) out.push(p); } return out.join(", "); };
-  const _employerBlocks = [...new Set((fields.inventors||[]).map(i=>(i.employer||"").trim()).filter(Boolean))]
+  const _empNames = new Map();
+  for (const name of [...(fields.inventors||[]).map(i=>i.employer||""), ...Object.keys(fields.employer_info||{})]) {
+    const emp = (name||"").trim(), key = _empNorm(emp);
+    if (key && !_empNames.has(key)) _empNames.set(key, emp);
+  }
+  const _employerBlocks = [..._empNames.values()]
     .map(emp=>{ const d=_defEmpInfo(emp);
       fields.employer_info = fields.employer_info || {};
       // 沿用已有的同名记录；只有完全没有匹配项时才创建，避免大小写不同的重复键。
@@ -777,7 +792,7 @@ function renderForm() {
       const defs = _EMP_FIELDS.map(([k,label,wide])=>({ path:["employer_info",empKey,k], label, wide, deriveDefault:()=>(d[k]||"") }));
       defs.push({ path:["employer_info",empKey,"residence_en"], label:"住址（英文，独立，改地址不变）", wide:true });
       defs.push({ path:["employer_info",empKey,"residence_cn"], label:"住址（中文，独立，改地址不变）", wide:true });
-      return { emp, defs, inherited }; });
+      return { emp, empKey, defs, inherited }; });
 
   $("formSections").innerHTML = `
     ${ro ? `<div class="banner ok">该任务状态为 ${esc(task.status)}，仅可查看。${task.status === "done" ? ` <button class="reopen-btn" onclick="reopenTask()" style="margin-left:8px">退回重编</button>` : ""}</div>` : ""}
@@ -805,12 +820,16 @@ function renderForm() {
     <div class="section">${head("发明人", "inventors", "发明人")}<div class="section-body" id="sec-inventors">
       ${arrayBlock("inventors", "发明人", INVENTOR_FIELDS)}</div></div>
 
-    ${_employerBlocks.length ? `<div class="section">${head("发明人归属公司（归属公司≠申请人时在此补公司名+地址；确认函分组住址 / ADS / 通信地址共用）")}<div class="section-body">
+    <div class="section"><div class="section-head">发明人归属公司（按发明人归属分组填写公司名和住址）<span class="spacer"></span>
+      ${ro ? "" : '<button onclick="addEmployerCompany()">＋ 添加归属公司</button>'}</div><div class="section-body">
+      ${_employerBlocks.length ? "" : '<div class="hint">尚无归属公司；添加后可在发明人“归属公司”栏选择。</div>'}
       ${_employerBlocks.map(b=>`<div style="border:1px solid #e2e8f0;border-radius:6px;padding:8px;margin-bottom:8px;">
-        <div style="font-size:12px;font-weight:600;margin-bottom:6px;">归属公司：${esc(b.emp)}</div>
+        <div style="font-size:12px;font-weight:600;margin-bottom:6px;">归属公司：${esc(b.emp)}
+          ${(fields.inventors||[]).some(i=>_empNorm(i.employer)===_empNorm(b.emp)) ? "" : '<span class="hint">（尚未分配发明人）</span>'}
+          ${!ro && !(fields.inventors||[]).some(i=>_empNorm(i.employer)===_empNorm(b.emp)) ? `<button type="button" onclick='removeEmployerCompany(${esc(JSON.stringify(b.empKey))})'>删除</button>` : ""}</div>
         ${b.inherited ? '<div class="hint" style="color:#b45309;">旧版曾自动带入申请人地址，已清除；请核对并填写本公司的地址。</div>' : ''}
         <div class="grid">${b.defs.map(fieldInput).join("")}</div></div>`).join("")}
-    </div></div>` : ""}
+    </div></div>
 
     <div class="section">${head(_suppTitle)}<div class="section-body"><div class="grid">
       ${_suppFields.map(fieldInput).join("")}
@@ -848,6 +867,11 @@ function renderForm() {
     if (dp) {
       const p = JSON.parse(dp);
       if (p[0] === "applicants" && p[2] === "applicant_name_en") refreshEmployerSelects();
+      if (p[0] === "inventors" && p[2] === "employer") {
+        const top = pane.scrollTop;
+        renderForm();
+        pane.scrollTop = top;
+      }
     }
   };
   // 折叠：点 section 表头折叠/展开；点表头里的按钮/输入/链接不折叠（保留原有交互）
@@ -875,6 +899,26 @@ const EMPTY_ITEM = {
   parent_applications: () => Object.fromEntries(PARENT_FIELDS.map(([k]) => [k, ""])),
   assignments: () => ({ assignment_type: "", assigning_company: null, company_representative: null, representative_title: null, company_address: null }),
 };
+function addEmployerCompany() {
+  const name = (prompt("请输入归属公司英文名称（可与申请人相同）")||"").trim();
+  if (!name) return;
+  if (employerNames().some(n=>employerNorm(n)===employerNorm(name))) {
+    toast("该公司已存在，请在现有归属公司面板中填写地址");
+    return;
+  }
+  fields.employer_info = fields.employer_info || {};
+  fields.employer_info[name] = {applicant_name_en:name};
+  renderForm();
+  toast("已添加归属公司；请填写地址，并在对应发明人的“归属公司”栏选用");
+}
+function removeEmployerCompany(name) {
+  if ((fields.inventors||[]).some(i=>employerNorm(i.employer)===employerNorm(name))) {
+    toast("该公司已分配发明人，请先更改发明人的归属公司");
+    return;
+  }
+  delete (fields.employer_info||{})[name];
+  renderForm();
+}
 function addItem(key) { (fields[key] = fields[key] || []).push(EMPTY_ITEM[key]()); renderForm(); }
 function removeItem(key, i) { fields[key].splice(i, 1); renderForm(); }
 function moveItem(key, i, dir) { const a = fields[key]; const j = i + dir; [a[i], a[j]] = [a[j], a[i]]; renderForm(); }

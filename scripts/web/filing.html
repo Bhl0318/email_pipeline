@@ -475,7 +475,8 @@ function invApplicantAddr(inv){
     const p = (asg.company_address||"").trim().split(/,(.+)/);
     return {address1:(p[0]||"").trim(), address2:(p[1]||"").trim()};
   }
-  return apps[0] || {};
+  // 已填写 employer 却找不到对应公司时留空，与 ADS 生成器一致；不能借用首位申请人地址。
+  return {};
 }
 // 旧数据可能有同一家公司的大小写重复键，且递交页曾把首条地址缓存进 filing_extra。
 // 仅当缓存值恰好等于另一条同名记录的默认地址时，改用 employer 原样键的地址；保留人工填写的其他值。

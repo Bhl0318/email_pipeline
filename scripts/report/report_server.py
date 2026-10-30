@@ -109,7 +109,7 @@ from db_query import execute_params  # noqa: E402
 from submission.common import infer_subject_matter, normalize_parents, validate_for_confirm, parse_address_en, effective_assignments  # noqa: E402
 from submission.email_modules import build_email_modules  # noqa: E402
 from submission.confirmation_sheet import generate_confirmation_sheet, list_confirmation_rows  # noqa: E402
-from submission.assignment_generator import generate_assignments  # noqa: E402
+from submission.assignment_generator import generate_assignments, validate_assignment_addresses  # noqa: E402
 from submission.declaration_generator import generate_declarations  # noqa: E402
 from submission.preview import docx_to_pdf, office_convert  # noqa: E402
 # 环节4（递交文件）生成器 —— 与环节2 互不影响
@@ -1687,6 +1687,8 @@ def preview_submission_task(task_id: str, req: SubmissionPreviewReq):
             raise HTTPException(status_code=400, detail=f"未知 target: {req.target}")
     except HTTPException:
         raise
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=f"预览生成失败：{exc}")
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"预览生成失败：{exc}")
 
@@ -1912,6 +1914,10 @@ def preview_send_submission(task_id: str, req: SubmissionPreviewSendReq):
     problems = validate_for_confirm(fields)
     if problems:
         raise HTTPException(status_code=422, detail={"problems": problems})
+    try:
+        validate_assignment_addresses(fields)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail={"problems": [str(exc)]})
 
     # 2) 生成三件成品（每次重建 final/，保证与当前字段一致）
     final_dir = _submission_final_dir(task_id)

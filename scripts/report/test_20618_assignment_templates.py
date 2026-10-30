@@ -301,8 +301,9 @@ class SpecialAssignmentTemplateTests(unittest.TestCase):
                 self.assertIsNotNone(first_p._p.find(".//" + qn("w:pageBreakBefore")))
             self.assertGreater(len(inventor_doc.tables[0].rows), 5)  # 长地址续行
             self.assertEqual(len(inventor_doc.tables[0].columns), 3)
-            self.assertIn("1 Very Long Main Street", inventor_doc.tables[0].rows[3].cells[-1].text)
-            self.assertIn("2 Test Street", "\n".join(c.text for r in inventor_doc.tables[1].rows for c in r.cells))
+            # 归属公司已填写时，签字页取归属公司地址，不取发明人旧的个人住址。
+            self.assertIn("100 Main Street", inventor_doc.tables[0].rows[3].cells[-1].text)
+            self.assertNotIn("2 Test Street", "\n".join(c.text for r in inventor_doc.tables[1].rows for c in r.cells))
             self.assertEqual(company_doc.tables[0].rows[0].cells[-1].text, "AMERICA HOLDINGS INC.")
             self.assertIn("for which is a continuation of", inventor_text)
             self.assertIn("for which is a continuation of", company_text)
