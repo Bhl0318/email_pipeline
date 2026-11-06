@@ -75,5 +75,4 @@ app.filter_documents(bag, "CTNF", "2025-02-11")     # 挑匹配文档
 ## 来源与改动
 
 - 抽自：`oa/downloadByAPI.py`（USPTO）、`oa/download_patent_pdf.py`（FPO）。
-- OA 流程通过 `oa/downloadByAPI.py` 兼容入口使用本客户端；汇报信侧的 `report/us_deadline.py` 也直接使用本客户端。
-- USPTO API key 由参数 > 环境变量 `USPTO_API_KEY` > `scripts/email_config.json` 的 `uspto.api_key` 提供；不再在 OA 下载脚本中写死。
+- 改动：USPTO API key 由硬编码改为 参数 > 环境变量 `USPTO_API_KEY` > `email_config.json` 的 `uspto.api_key`；其余逻辑不变。
