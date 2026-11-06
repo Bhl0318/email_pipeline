@@ -17,6 +17,9 @@ import json
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 DOWNLOAD_DIR = os.path.join(SCRIPT_DIR, "../..", "attachment")
+_FOUNDATION_DIR = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "reusable", "foundation"))
+if _FOUNDATION_DIR not in sys.path:
+    sys.path.insert(0, _FOUNDATION_DIR)
 
 
 def get_us_deadline(application_no, document_code, oa_doc_date, project):
@@ -32,7 +35,7 @@ def get_us_deadline(application_no, document_code, oa_doc_date, project):
     Returns:
         dict: {"months": int, "deadline": str, "pdf_path": str} 或 None
     """
-    from downloadByAPI import USPTOApplication
+    from net_clients.uspto import USPTOApplication
     from parse_us_pdf import extract_us_deadline
 
     # oa_doc_date 格式统一为 YYYY-MM-DD
