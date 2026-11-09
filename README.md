@@ -30,18 +30,20 @@ scripts/
 ├── loader.py            # importlib 隔离加载 oa/ 与 report/（同名模块不串味）
 ├── pipeline_config.json # 账号列表 + sink 开关
 ├── email_config.json    # 共用邮箱凭据（gitignore，需本地放置）
-├── web/                 # 审核页前端（prototype.html / submission.html + js）
+├── web/                 # 汇报信与 OA 分配审核页前端
 ├── templates/           # 汇报信模板（md/ + docx/）
 ├── oa/                  # 复制自 OA立项/scripts/（在副本上拆了函数）
 └── report/              # 复制自 汇报信流程/scripts/（在副本上拆了函数）
-    ├── report_server.py     # ★FastAPI 审核服务（含 /submission 路由组）
-    ├── submission/          # US 递交文件生成（含 templates/ docx+pdf）
+    ├── report_server.py     # ★FastAPI 汇报信与 OA 分配审核服务
     └── email_config.json    # 审核服务独用凭据（gitignore，standalone 跑时放这）
 ```
 
 > **原则**：原始 `OA立项/`、`汇报信流程/` 是上游源，只在那里改，再手动同步下来。
 > email_pipeline 自带全部副本，是**唯一运行入口**——批处理（`main.py`）和审核服务
 > （`report/report_server.py`）都在这里跑。
+
+US 递交审核、文档生成及 USPTO 上传由独立的 `us_submission` 仓库和 8502 服务承接；
+本服务的 8501 端口用于汇报信与 OA 分配。
 
 ## 跑
 
@@ -55,7 +57,7 @@ cd scripts && python3 main.py
 
 ⚠️ `main.py` 会连真实邮箱 + 数据库 + 发邮件，属有副作用脚本，请在受控环境运行。
 
-### ② 审核服务（汇报信 + US 递交在线审核）
+### ② 审核服务（汇报信 + OA 分配）
 
 ```bash
 cp /path/to/email_config.json scripts/report/email_config.json   # standalone 独用
@@ -90,4 +92,4 @@ cd scripts/report && python3 report_server.py                    # 监听 :8501
 |------|--------|--------------|
 | `scripts/report/` | `汇报信流程/scripts/` | 4e08db6 时点 |
 | `scripts/oa/` | `OA立项/scripts/` | 214db50 时点 |
-| `scripts/report/report_server.py`+`submission/`、`scripts/web/`、`scripts/templates/` | `汇报信流程/`（同步审核服务全量依赖，email_pipeline 成唯一运行入口） | f5b3229 时点 |
+| `scripts/report/report_server.py`、`scripts/web/`、`scripts/templates/` | `汇报信流程/`（历史来源；US 递交现由独立仓库承接） | f5b3229 时点 |

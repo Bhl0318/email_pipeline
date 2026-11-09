@@ -9,7 +9,7 @@
 默认运行文字层提取、Mistral OCR、qwen3-vl-plus 和 pdfRest，四者互不作为兜底。
 文字层默认读前 8 页，qwen3-vl-plus 默认看前 6 页，其余处理整份 PDF；
 此页数与当前 OA 报告识别流程一致。需在已配置相应服务的环境运行远程方法。
-pdfRest 会把 PDF 上传到云端；可通过 PDFREST_API_KEY 覆盖项目已有密钥。
+pdfRest 会把 PDF 上传到云端；使用 PDFREST_API_KEY 环境变量配置密钥。
 """
 import argparse
 import base64
@@ -67,11 +67,6 @@ def extract_pdfrest(pdf_path, base_url="https://api.pdfrest.com", languages="chi
     import requests
 
     api_key = os.environ.get("PDFREST_API_KEY")
-    if not api_key:
-        report_dir = Path(__file__).resolve().parents[1] / "report"
-        sys.path.insert(0, str(report_dir))
-        from submission.common import PDFREST_API_KEY
-        api_key = PDFREST_API_KEY
     if not api_key:
         raise RuntimeError("未配置 PDFREST_API_KEY")
 
